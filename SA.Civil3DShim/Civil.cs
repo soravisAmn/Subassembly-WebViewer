@@ -7,25 +7,6 @@ namespace Autodesk.Civil
 {
     public enum CorridorMode { Layout = 0, Corridor = 1 }
 
-    public enum CorridorErrorLevel { Severe = 0, AsWarning = 1, Warning = 2 }
-
-    public enum CorridorError
-    {
-        Failure,
-        LogicalNameNotFound,
-        ParameterNotFound,
-        ValueTooSmall,
-        ValueTooLarge,
-        ValueShouldNotBeLessThanOrEqualToZero,
-        ValueShouldNotBeLessThanZero,
-        ValueShouldNotBeZero,
-        ValueShouldNotBeGreaterThanZero,
-        IntersectionNotFound,
-        NoSideslopeIntersectFound,
-        OutOfRange,
-        NotSupported
-    }
-
     public enum ParamLogicalNameType
     {
         Alignment = 1,

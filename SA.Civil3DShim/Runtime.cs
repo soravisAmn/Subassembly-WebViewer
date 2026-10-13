@@ -9,6 +9,53 @@ using SA.Shim;
 
 namespace Autodesk.Civil.Runtime
 {
+    // ตรงกับ Civil 3D API Reference: Autodesk.Civil.Runtime.CorridorErrorLevel / CorridorError (AeccDbMgd.dll)
+    public enum CorridorErrorLevel { None = 0, Informational = 1, AsWarning = 2, Severe = 3 }
+
+    public enum CorridorError
+    {
+        None = 0,
+        Success = -2147221504,
+        Failure = -2147221503,
+        CouldNotSolveInLayoutMode = -2147221502,
+        ParameterNotFound = -2147221501,
+        LogicalNameNotFound = -2147221500,
+        NoSideslopeIntersectFound = -2147221499,
+        NoSubgradeIntersectFound = -2147221498,
+        ScriptModuleNotFound = -2147221497,
+        ScriptMacroNotFound = -2147221496,
+        CorridorStateNotFound = -2147221495,
+        ScriptPossibleSyntaxError = -2147221494,
+        StopProcessingGroup = -2147221493,
+        StopProcessingAssembly = -2147221492,
+        StopProcessingRegion = -2147221491,
+        StopProcessingBaseline = -2147221490,
+        StopProcessingCorridor = -2147221489,
+        ElevationAtStationNotFound = -2147221488,
+        ScriptModulePathUpdated = -2147221487,
+        CorridorOutOfDate = -2147221486,
+        ValueShouldNotBeLessThanOrEqualToZero = -2147221485,
+        ValueShouldNotBeLessThanZero = -2147221484,
+        ValueShouldNotBeZero = -2147221483,
+        ValueInABadPosition = -2147221482,
+        ValueTooSmall = -2147221481,
+        ValueTooLarge = -2147221480,
+        NoLinkIntersectFound = -2147221479,
+        NoMarkedPointFound = -2147221478,
+        ValueShouldNotBeOdd = -2147221477,
+        InvalidArraySpecifiedForLinkDefinition = -2147221476,
+        InvalidArraySpecifiedForLinkDefinitionFormat = -2147221475,
+        InvalidArraySpecifiedForShapeDefinition = -2147221474,
+        InvalidArraySpecifiedForShapeDefinitionFormat = -2147221473,
+        InvalidCorridorStateObjectId = -2147221472,
+        InvalidSubassemblyCOMClassId = -2147221471,
+        StopProcessingConditional = -2147221469,
+        ReprocessSubassembly = -2147221468,
+        ReprocessAssembly = -2147221467,
+        ReprocessRegion = -2147221466,
+        ReprocessBaseline = -2147221465
+    }
+
     // ---------------- parameters ----------------
 
     public class Param<T>

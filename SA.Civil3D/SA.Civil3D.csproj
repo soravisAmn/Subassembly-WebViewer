@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Adapter สำหรับ Civil 3D 2027
+    Build: dotnet build SA.Civil3D -c Release
+    ผลลัพธ์: bin\Release\<tfm>\TrapezoidSA.dll + SA.Core.dll (ต้องวางคู่กันเสมอ)
+
+    ถ้า build ไม่ผ่านเพราะ TargetFramework หรือ reference:
+    ให้คัดลอกค่า TargetFramework / Reference จาก TrapezoidSA.csproj เดิมของคุณมาใส่แทน
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>TrapezoidSA</AssemblyName>
+    <RootNamespace>TestSubassembly</RootNamespace>
+    <PlatformTarget>x64</PlatformTarget>
+    <AcadDir>C:\Program Files\Autodesk\AutoCAD 2027</AcadDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SA.Core\SA.Core.csproj" />
+  </ItemGroup>
+
+  <!-- DLL ของ Civil 3D: Private=false = ไม่คัดลอกไปไว้ใน bin (Civil 3D โหลดของตัวเองอยู่แล้ว) -->
+  <ItemGroup>
+    <Reference Include="acdbmgd">
+      <HintPath>$(AcadDir)\acdbmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="accoremgd">
+      <HintPath>$(AcadDir)\accoremgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AecBaseMgd">
+      <HintPath>$(AcadDir)\ACA\AecBaseMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AeccDbMgd">
+      <HintPath>$(AcadDir)\C3D\AeccDbMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

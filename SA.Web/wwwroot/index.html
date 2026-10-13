@@ -1,0 +1,811 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subassembly Viewer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eceae4; --panel:#f7f6f2; --ink:#1d2025; --muted:#6b6f76; --line:#d6d3cb;
+  --paper:#fbfaf7; --grid:#e7e4dc; --grid2:#d9d5cb; --axis:#a8a395;
+  --accent:#1f5fbf; --accent-soft:#dbe6f7;
+  --ground:#7a5530; --ground-fill:rgba(122,85,48,.10);
+  --shape:rgba(31,95,191,.10);
+  --err:#b42318; --err-soft:#fde8e6; --warn:#a15c00; --warn-soft:#fdf0d9; --ok:#14845f;
+  --l1:#1f5fbf; --l2:#c46a12; --l3:#14845f; --l4:#6b3fb8; --l5:#b0306a; --l6:#0f7c8c; --l7:#7a6a00; --l8:#5c6068;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#16181b; --panel:#1d2024; --ink:#e7e5df; --muted:#9a9ea6; --line:#30343a;
+    --paper:#121417; --grid:#1e2125; --grid2:#2a2e33; --axis:#4a4f57;
+    --accent:#6ea4ff; --accent-soft:#1f2c42;
+    --ground:#c99a63; --ground-fill:rgba(201,154,99,.10);
+    --shape:rgba(110,164,255,.12);
+    --err:#ff8a80; --err-soft:#3a1d1b; --warn:#ffc266; --warn-soft:#352a14; --ok:#3fcf9a;
+    --l1:#6ea4ff; --l2:#f0a04b; --l3:#3fcf9a; --l4:#b08cff; --l5:#ff7eb6; --l6:#4fd2e0; --l7:#e2cf55; --l8:#9a9ea6;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 "IBM Plex Sans Thai",system-ui,sans-serif;display:grid;grid-template-columns:330px 1fr;grid-template-rows:auto 1fr;overflow:hidden}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+header{grid-column:1/3;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:15px;font-weight:600;margin:0 8px 0 0;white-space:nowrap}
+header select{width:auto;min-width:180px;max-width:320px}
+aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:4px 16px 24px}
+section{border-bottom:1px solid var(--line);padding:12px 0 8px}
+h2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;display:flex;justify-content:space-between;align-items:center}
+h2 button{text-transform:none;letter-spacing:0;font-weight:500;padding:1px 7px;font-size:11.5px}
+.row{display:grid;grid-template-columns:1fr 120px;align-items:center;gap:8px;margin-bottom:6px}
+.row label{font-size:13px;overflow:hidden;text-overflow:ellipsis}
+.row label small{display:block;color:var(--muted);font:11px "IBM Plex Mono",monospace}
+input[type=number],input[type=text],select{width:100%;font:13px "IBM Plex Mono",monospace;padding:4px 6px;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--ink)}
+input:focus,select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+input.changed{border-color:var(--accent);background:var(--accent-soft)}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
+button{font:500 12.5px "IBM Plex Sans Thai",sans-serif;padding:5px 10px;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.on,button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.check{display:flex;align-items:center;gap:6px;font-size:13px;margin:4px 0}
+.hint{font-size:12px;color:var(--muted);margin:4px 0 6px}
+.hint kbd{font:11px "IBM Plex Mono",monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;background:var(--paper)}
+.sel{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:6px;align-items:center;font-size:12px;margin-top:4px}
+.msgs div{font-size:12.5px;padding:5px 8px;border-radius:4px;margin-bottom:4px;overflow-wrap:anywhere}
+.msgs .e{background:var(--err-soft);color:var(--err)}
+.msgs .w{background:var(--warn-soft);color:var(--warn)}
+.log{font:12px "IBM Plex Mono",monospace;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:6px 8px;white-space:pre-wrap;max-height:220px;overflow:auto;margin:0}
+.empty{font-size:12px;color:var(--muted)}
+.tgt{font-size:12.5px;display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+.tgt b{font-weight:500}
+.tag{font-size:11px;padding:0 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tag.ok{color:var(--ok);border-color:var(--ok)}
+.tag.no{color:var(--warn);border-color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;color:var(--muted);font-weight:500;padding:3px 4px;border-bottom:1px solid var(--line)}
+td{padding:3px 4px;border-bottom:1px solid var(--grid2)}
+td.n{text-align:right;font-family:"IBM Plex Mono",monospace}
+tr.hl td{background:var(--accent-soft)}
+.sc-list div{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sc-list span{flex:1;font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-list span small{color:var(--muted);font-size:11px;margin-left:6px}
+.sc-list span:hover{color:var(--accent)}
+.sc-list button{padding:2px 7px}
+main{position:relative;overflow:hidden;background:var(--paper)}
+svg#view{width:100%;height:100%;display:block;touch-action:none;user-select:none}
+svg.stale .geo{opacity:.25}
+.topbar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:center;pointer-events:none}
+.topbar>*{pointer-events:auto}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;display:flex;gap:6px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.dot.off{background:var(--err)}
+.dot.busy{background:var(--warn)}
+.chip.flash{border-color:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
+.spacer{flex:1}
+.legend{position:absolute;right:10px;bottom:22px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;display:flex;gap:12px;flex-wrap:wrap;max-width:calc(100% - 20px)}
+.legend:empty{display:none}
+.legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);font:12px "IBM Plex Mono",monospace;padding:4px 7px;border-radius:4px;white-space:pre;display:none;z-index:5}
+.mode-banner{position:absolute;top:46px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:12.5px;padding:4px 12px;border-radius:999px;display:none}
+.problem{position:absolute;left:10px;right:10px;top:48px;max-height:60%;overflow:auto;background:var(--panel);border:1px solid var(--err);border-left-width:4px;border-radius:6px;padding:10px 14px;display:none;z-index:4}
+.problem.bottom{top:auto;bottom:64px;max-height:40%}
+.problem h3{margin:0 0 6px;font-size:14px;color:var(--err)}
+.problem .d{font:12.5px "IBM Plex Mono",monospace;padding:3px 0;border-bottom:1px solid var(--grid2);white-space:pre-wrap;overflow-wrap:anywhere}
+.problem .d b{color:var(--err);font-weight:500}
+.problem .d.wn b{color:var(--warn)}
+.problem .help{font-size:12.5px;color:var(--muted);margin-top:8px}
+.welcome{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:40px}
+.welcome div{max-width:480px}
+.welcome b{color:var(--ink)}
+/* svg */
+.g-minor{stroke:var(--grid);stroke-width:1}
+.g-major{stroke:var(--grid2);stroke-width:1}
+.g-axis{stroke:var(--axis);stroke-width:1.2}
+.g-lbl{fill:var(--muted);font:10.5px "IBM Plex Mono",monospace}
+.shape{fill:var(--shape);stroke:none;pointer-events:none}
+.gnd-fill{pointer-events:none}
+.link{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.pt{fill:var(--paper);stroke:var(--ink);stroke-width:1.4}
+.pt.hl{fill:var(--accent);stroke:var(--accent)}
+.pt-lbl{fill:var(--ink);font:11px "IBM Plex Mono",monospace;paint-order:stroke;stroke:var(--paper);stroke-width:3px}
+.gnd{fill:none;stroke:var(--ground);stroke-width:2}
+.gnd.off{stroke-dasharray:6 5;opacity:.6}
+.gnd.ext{stroke-dasharray:2 5;opacity:.7}
+.gnd-fill{fill:var(--ground-fill);stroke:none}
+.gnd-hit{fill:none;stroke:transparent;stroke-width:14;cursor:ns-resize}
+.add .gnd-hit{cursor:copy}
+.h{fill:var(--paper);stroke:var(--ground);stroke-width:2;cursor:grab}
+.h.sel{fill:var(--ground)}
+.origin{stroke:var(--accent);stroke-width:1.4}
+.origin-lbl{fill:var(--accent);font:10.5px "IBM Plex Mono",monospace}
+</style>
+</head>
+<body>
+<header>
+  <h1>Subassembly Viewer</h1>
+  <select id="file" title="ไฟล์ .cs ในโฟลเดอร์"></select>
+  <button id="b-open" title="เปิดไฟล์ .cs จากที่อื่น">Open .cs…</button>
+  <input id="f-open" type="file" accept=".cs" hidden>
+  <select id="cls" title="class ในไฟล์" hidden></select>
+  <span class="hint mono" id="folder" style="margin:0"></span>
+</header>
+
+<aside>
+  <section>
+    <h2>Parameters <button id="b-defaults" title="กลับไปใช้ค่า default จาก GetInputParameters">ค่า default</button></h2>
+    <div id="params"><div class="empty">เลือกไฟล์ .cs ก่อน</div></div>
+  </section>
+
+  <section>
+    <h2>Corridor</h2>
+    <div class="row"><label for="mode">Mode</label>
+      <select id="mode"><option value="corridor">Corridor</option><option value="layout">Layout</option></select></div>
+    <div class="row"><label for="oelev">Origin elevation<small>ระดับจริงของจุด origin</small></label><input id="oelev" type="number" step="0.5"></div>
+    <div id="targets"></div>
+    <label class="check"><input type="checkbox" id="surf-on"> กำหนด surface ของเว็บให้ Target Surface</label>
+  </section>
+
+  <section>
+    <h2>เส้น surface</h2>
+    <div class="btns">
+      <button id="b-add" title="A">+ Add point</button>
+      <button id="b-del" title="Delete">ลบจุด</button>
+      <button id="b-reset">รีเซ็ต</button>
+    </div>
+    <label class="check"><input type="checkbox" id="extend"> ต่อปลายเส้นออกไปแนวราบ (surface กว้างไม่จำกัด)</label>
+    <label class="check"><input type="checkbox" id="snap"> Snap 0.05 m</label>
+    <div class="hint">
+      ลากจุด = ขึ้น-ลง · <kbd>Shift</kbd>+ลาก = เลื่อนแนวราบด้วย<br>
+      ลากที่เส้น = เลื่อนทั้งเส้น · ดับเบิลคลิกเส้น = แทรกจุด · คลิกขวาที่จุด = ลบ
+    </div>
+    <div id="sel-box" class="sel" hidden>
+      <span>X</span><input id="sel-x" type="number" step="0.05">
+      <span>Y</span><input id="sel-y" type="number" step="0.05">
+    </div>
+  </section>
+
+  <section>
+    <h2>Messages · RecordError</h2>
+    <div id="issues" class="msgs"></div>
+  </section>
+
+  <section>
+    <h2>Log · Console.WriteLine</h2>
+    <pre id="log" class="log"></pre>
+  </section>
+
+  <section>
+    <h2>Points</h2>
+    <table><thead><tr><th>#</th><th>Codes</th><th style="text-align:right">Offset</th><th style="text-align:right">Elev</th></tr></thead>
+      <tbody id="pt-table"></tbody></table>
+  </section>
+
+  <section>
+    <h2>Scenarios</h2>
+    <div class="btns">
+      <button id="b-save">บันทึกกรณีนี้</button>
+      <button id="b-export">Export</button>
+      <button id="b-import">Import</button>
+      <input id="f-import" type="file" accept=".json" hidden>
+    </div>
+    <div id="sc-list" class="sc-list"></div>
+  </section>
+</aside>
+
+<main id="main">
+  <svg id="view"></svg>
+  <div class="topbar">
+    <div class="chip" id="srv"><span class="dot" id="srv-dot"></span><span id="srv-txt">กำลังเชื่อมต่อ…</span></div>
+    <div class="spacer"></div>
+    <label class="chip"><input type="checkbox" id="show-codes"> point codes</label>
+    <label class="chip">VE <select id="ve" style="width:auto;padding:1px 4px"><option>1</option><option>2</option><option>5</option></select></label>
+    <button class="chip" id="b-fit" title="F">Fit</button>
+  </div>
+  <div class="mode-banner" id="banner">โหมด Add point: คลิกบนเส้น surface เพื่อแทรกจุด · Esc เพื่อออก</div>
+  <div class="problem" id="problem"></div>
+  <div class="welcome" id="welcome"><div>
+    <p><b>ยังไม่มีไฟล์ .cs</b></p>
+    <p>วางไฟล์ .cs ของ subassembly ไว้ในโฟลเดอร์ <span class="mono" id="welcome-folder"></span> แล้วเลือกจากรายการด้านบน หรือกด <b>Open .cs…</b></p>
+  </div></div>
+  <div class="legend" id="legend"></div>
+  <div class="tip" id="tip"></div>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const svg = $("view"), main = $("main"), tip = $("tip");
+const NS = "http://www.w3.org/2000/svg";
+const DEFAULT_SURFACE = [{x:-12,y:-0.8},{x:0,y:-1.4},{x:12,y:-3.8}];
+const PALETTE = ["--l1","--l2","--l3","--l4","--l5","--l6","--l7","--l8"];
+const OPENED = "\u0001opened";   // ค่าใน dropdown สำหรับไฟล์ที่เปิดด้วยปุ่ม Open
+
+// ---------------- state ----------------
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+};
+const state = Object.assign({
+  file: null,                 // ชื่อไฟล์ในโฟลเดอร์
+  values: {},                 // values[fileKey][paramName]
+  classByFile: {},
+  surface: DEFAULT_SURFACE.map(p => ({...p})),
+  surfaceOn: true, layout: false, originElevation: 100, extendEnds: true,
+  view: { cx:1.5, cy:-1.8, scale:42, ve:1 },
+  showCodes: true, snap: false
+}, store.get("sav2.state", {}));
+const persist = () => store.set("sav2.state", state);
+
+let files = [], opened = null;   // opened = {name, text, handle, lastModified}
+let resp = null, result = null, stale = false;
+let addMode = false, selected = -1, hoverPt = -1, drag = null, lastSegDown = null;
+const codeColor = {};
+
+const fileKey = () => state.file === OPENED ? "opened:" + (opened ? opened.name : "") : state.file || "";
+const values = () => (state.values[fileKey()] ||= {});
+
+// ---------------- coordinates ----------------
+let W = 800, H = 600;
+const sx = x => W/2 + (x - state.view.cx) * state.view.scale;
+const sy = y => H/2 - (y - state.view.cy) * state.view.scale * state.view.ve;
+const wx = px => state.view.cx + (px - W/2) / state.view.scale;
+const wy = py => state.view.cy - (py - H/2) / (state.view.scale * state.view.ve);
+const f3 = v => (Math.abs(v) < 5e-4 ? 0 : v).toFixed(3);
+const snapV = v => state.snap ? Math.round(v / 0.05) * 0.05 : v;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function el(tag, attrs, parent){
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function colorFor(code){
+  if (!code) return css("--l8");
+  if (!(code in codeColor)) codeColor[code] = PALETTE[Object.keys(codeColor).length % (PALETTE.length - 1)];
+  return css(codeColor[code]);
+}
+const primaryCode = codes => codes.find(c => c !== "Datum") || codes[0] || "";
+
+// ---------------- rendering ----------------
+function niceStep(pxPerUnit){
+  for (const s of [0.05,0.1,0.2,0.5,1,2,5,10,20,50,100]) if (s * pxPerUnit >= 34) return s;
+  return 200;
+}
+
+function render(){
+  const r = main.getBoundingClientRect();
+  W = r.width; H = r.height;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = "";
+  svg.classList.toggle("add", addMode);
+  svg.classList.toggle("stale", stale);
+
+  const g = el("g", {}, svg);
+  const stepX = niceStep(state.view.scale), stepY = niceStep(state.view.scale * state.view.ve);
+  for (let x = Math.floor(wx(0) / stepX) * stepX; x <= wx(W); x += stepX){
+    const major = Math.abs(Math.round(x / stepX) % 5) === 0;
+    el("line", {x1:sx(x), x2:sx(x), y1:0, y2:H, class: Math.abs(x) < 1e-9 ? "g-axis" : major ? "g-major" : "g-minor"}, g);
+    if (major) el("text", {x:sx(x)+3, y:H-6, class:"g-lbl"}, g).textContent = +x.toFixed(2);
+  }
+  for (let y = Math.floor(wy(H) / stepY) * stepY; y <= wy(0); y += stepY){
+    const major = Math.abs(Math.round(y / stepY) % 5) === 0;
+    el("line", {x1:0, x2:W, y1:sy(y), y2:sy(y), class: Math.abs(y) < 1e-9 ? "g-axis" : major ? "g-major" : "g-minor"}, g);
+    if (major) el("text", {x:4, y:sy(y)-3, class:"g-lbl"}, g).textContent = +y.toFixed(2);
+  }
+
+  const fillLayer = el("g", {}, svg);   // พื้น surface อยู่ใต้ subassembly
+
+  // subassembly
+  if (result){
+    const geo = el("g", {class:"geo"}, svg);
+    const P = result.points;
+    for (const s of result.shapes){
+      if (s.polygon) el("polygon", {points: s.polygon.map(i => sx(P[i].x)+","+sy(P[i].y)).join(" "), class:"shape", "data-kind":"shape"}, geo);
+    }
+    result.links.forEach((l, i) => {
+      const d = l.pts.map((k, j) => (j ? "L" : "M") + sx(P[k].x) + " " + sy(P[k].y)).join(" ");
+      el("path", {d, class:"link", stroke: colorFor(primaryCode(l.codes)), "data-kind":"link", "data-i":i}, geo);
+    });
+    P.forEach((p, i) => {
+      el("circle", {cx:sx(p.x), cy:sy(p.y), r:4, class:"pt" + (i === hoverPt ? " hl" : ""), "data-kind":"pt", "data-i":i}, geo);
+      if (state.showCodes && p.codes.length)
+        el("text", {x:sx(p.x)+7, y:sy(p.y)-7, class:"pt-lbl"}, geo).textContent = p.codes.join(", ");
+    });
+  }
+
+  // surface
+  const pts = state.surface;
+  if (pts.length >= 2){
+    const d = pts.map((p,i) => (i ? "L" : "M") + sx(p.x) + " " + sy(p.y)).join(" ");
+    if (state.surfaceOn){
+      const a = pts[0], z = pts[pts.length-1];
+      const fd = state.extendEnds
+        ? `M0 ${sy(a.y)} L` + pts.map(p => sx(p.x) + " " + sy(p.y)).join(" L") + ` L${W} ${sy(z.y)} L${W} ${H} L0 ${H} Z`
+        : d + ` L${sx(z.x)} ${H} L${sx(a.x)} ${H} Z`;
+      el("path", {d: fd, class:"gnd-fill"}, fillLayer);
+    }
+    el("path", {d, class:"gnd" + (state.surfaceOn ? "" : " off")}, svg);
+    if (state.extendEnds){
+      const a = pts[0], z = pts[pts.length-1];
+      el("path", {d:`M0 ${sy(a.y)} L${sx(a.x)} ${sy(a.y)} M${sx(z.x)} ${sy(z.y)} L${W} ${sy(z.y)}`, class:"gnd ext"}, svg);
+    }
+    el("path", {d, class:"gnd-hit", "data-kind":"seg"}, svg);
+  }
+
+  el("line", {x1:sx(0)-9, x2:sx(0)+9, y1:sy(0), y2:sy(0), class:"origin"}, svg);
+  el("line", {x1:sx(0), x2:sx(0), y1:sy(0)-9, y2:sy(0)+9, class:"origin"}, svg);
+  el("text", {x:sx(0)-8, y:sy(0)+20, class:"origin-lbl", "text-anchor":"end"}, svg).textContent = "origin";
+
+  state.surface.forEach((p, i) => {
+    el("rect", {x:sx(p.x)-5, y:sy(p.y)-5, width:10, height:10, rx:2, class:"h" + (i === selected ? " sel" : ""), "data-kind":"h", "data-i":i}, svg);
+  });
+}
+
+function renderParams(){
+  const box = $("params");
+  const defs = result ? result.params : null;
+  if (!defs){
+    if (resp && !resp.ok) box.innerHTML = '<div class="empty">— คอมไพล์/โหลดไม่ผ่าน ดูรายละเอียดในกรอบแดง</div>';
+    return;
+  }
+  box.innerHTML = "";
+  if (!defs || !defs.length){ box.innerHTML = '<div class="empty">ไฟล์นี้ไม่มี input parameter</div>'; return; }
+  const v = values();
+  for (const d of defs){
+    const row = document.createElement("div"); row.className = "row";
+    const id = "prm-" + d.name;
+    const label = d.displayName && d.displayName !== d.name ? `${esc(d.displayName)}<small>${esc(d.name)} · ${d.kind}</small>` : `${esc(d.name)}<small>${d.kind}</small>`;
+    row.innerHTML = `<label for="${esc(id)}" title="${esc(d.description || "")}">${label}</label>`;
+    let input;
+    const cur = d.name in v ? v[d.name] : d.default;
+    if (d.kind === "long" && /^side$/i.test(d.name)){
+      input = document.createElement("select");
+      input.innerHTML = '<option value="0">0 · Right</option><option value="1">1 · Left</option>';
+      input.value = String(cur);
+      input.onchange = () => setParam(d, +input.value, input);
+    } else if (d.kind === "bool"){
+      input = document.createElement("input"); input.type = "checkbox"; input.checked = !!cur;
+      input.style.justifySelf = "start";
+      input.onchange = () => setParam(d, input.checked, input);
+    } else if (d.kind === "string"){
+      input = document.createElement("input"); input.type = "text"; input.value = cur ?? "";
+      input.oninput = () => setParam(d, input.value, input);
+    } else {
+      input = document.createElement("input"); input.type = "number";
+      input.step = d.kind === "long" ? "1" : "0.1"; input.value = cur;
+      input.oninput = () => { const n = parseFloat(input.value); if (!isNaN(n)) setParam(d, n, input); };
+    }
+    input.id = id;
+    if (d.name in v && v[d.name] !== d.default) input.classList.add("changed");
+    row.appendChild(input); box.appendChild(row);
+  }
+}
+function setParam(d, val, input){
+  values()[d.name] = val;
+  input.classList.toggle("changed", val !== d.default);
+  persist(); run();
+}
+
+function renderTargets(){
+  const box = $("targets"); box.innerHTML = "";
+  if (!result || !result.targets.length) return;
+  for (const t of result.targets){
+    const div = document.createElement("div"); div.className = "tgt";
+    const tag = !t.supported ? '<span class="tag no">ยังไม่รองรับ</span>'
+      : t.assigned ? '<span class="tag ok">กำหนดแล้ว</span>' : '<span class="tag">ไม่ได้กำหนด</span>';
+    div.innerHTML = `<span><b>${esc(t.displayName || t.name)}</b> <span class="mono" style="color:var(--muted);font-size:11px">${esc(t.type)}</span></span>${tag}`;
+    box.appendChild(div);
+  }
+}
+
+function renderPanels(){
+  const iss = $("issues"), tb = $("pt-table"), lg = $("legend"), log = $("log");
+  iss.innerHTML = ""; tb.innerHTML = ""; lg.innerHTML = "";
+  log.textContent = result && result.log.length ? result.log.join("\n") : "";
+  if (!log.textContent) log.innerHTML = '<span class="empty">ไม่มี output</span>';
+
+  const warns = resp && resp.ok ? (resp.warnings || []) : [];
+  if (!result){ iss.innerHTML = ""; return; }
+  if (!result.issues.length && !warns.length) iss.innerHTML = '<div class="empty">ไม่มี error / warning</div>';
+  for (const i of result.issues){
+    const d = document.createElement("div");
+    d.className = i.level === "Severe" ? "e" : "w";
+    d.textContent = `${i.level} · ${i.error} — ${i.message ?? ""}`;
+    iss.appendChild(d);
+  }
+  for (const w of warns){
+    const d = document.createElement("div"); d.className = "w";
+    d.textContent = `compiler ${w.id} (บรรทัด ${w.line}) — ${w.message}`;
+    iss.appendChild(d);
+  }
+
+  result.points.forEach((p, i) => {
+    const row = document.createElement("tr");
+    if (i === hoverPt) row.className = "hl";
+    row.innerHTML = `<td>${i}</td><td>${esc(p.codes.join(", ")) || "—"}</td><td class="n">${f3(p.x)}</td><td class="n">${f3(p.y)}</td>`;
+    row.onmouseenter = () => { hoverPt = i; render(); };
+    row.onmouseleave = () => { hoverPt = -1; render(); };
+    tb.appendChild(row);
+  });
+
+  const codes = new Set(); result.links.forEach(l => codes.add(primaryCode(l.codes)));
+  for (const c of codes){
+    const s = document.createElement("span");
+    s.innerHTML = `<i style="background:${colorFor(c)}"></i>${esc(c || "(no code)")}`;
+    lg.appendChild(s);
+  }
+  if (codes.size){
+    const g = document.createElement("span"); g.innerHTML = `<i style="background:${css("--ground")}"></i>Surface`; lg.appendChild(g);
+  }
+}
+
+function renderProblem(){
+  const box = $("problem");
+  let html = "";
+  if (resp && !resp.ok){
+    if (resp.stage === "compile"){
+      const errs = resp.diagnostics.filter(d => d.severity === "Error");
+      html = `<h3>คอมไพล์ ${esc(resp.file)} ไม่ผ่าน (${errs.length} error)</h3>`;
+      for (const d of resp.diagnostics)
+        html += `<div class="d${d.severity === "Error" ? "" : " wn"}"><b>${esc(resp.file)}(${d.line},${d.column}) ${d.id}</b>  ${esc(d.message)}</div>`;
+      if (resp.diagnostics.some(d => /CS0234|CS0246|CS0117|CS1061|CS0103|CS1501|CS7036/.test(d.id)))
+        html += `<div class="help">error ที่บอกว่า "does not contain a definition" / "could not be found" มักแปลว่าโค้ดเรียก Civil 3D API ที่ตัวจำลองยังไม่มี — เพิ่มได้ในโฟลเดอร์ SA.Civil3DShim (หรือส่งชื่อฟังก์ชันให้ Claude เพิ่มให้)</div>`;
+    } else {
+      html = `<h3>${esc(resp.message || "เกิดข้อผิดพลาด")}</h3>`;
+    }
+  } else if (result && result.exception){
+    const e = result.exception;
+    html = `<h3>${esc(e.type)} ระหว่าง ${esc(result.stage || "รัน")} (exception หลุดออกจากโค้ด)</h3><div class="d">${esc(e.message)}</div>` +
+           (e.stack ? `<div class="d" style="color:var(--muted)">${esc(e.stack)}</div>` : "");
+  }
+  box.innerHTML = html;
+  box.classList.toggle("bottom", !!(resp && resp.ok));
+  box.style.display = html ? "block" : "none";
+}
+
+function renderSelBox(){
+  const box = $("sel-box");
+  if (selected < 0 || !state.surface[selected]){ box.hidden = true; return; }
+  box.hidden = false;
+  if (document.activeElement !== $("sel-x")) $("sel-x").value = f3(state.surface[selected].x);
+  if (document.activeElement !== $("sel-y")) $("sel-y").value = f3(state.surface[selected].y);
+}
+
+function renderFileList(){
+  const sel = $("file"), cur = state.file;
+  sel.innerHTML = "";
+  if (!files.length && !opened) sel.innerHTML = '<option value="">(ไม่มีไฟล์ .cs ในโฟลเดอร์)</option>';
+  for (const f of files){
+    const o = document.createElement("option"); o.value = f.name; o.textContent = f.name; sel.appendChild(o);
+  }
+  if (opened){
+    const o = document.createElement("option"); o.value = OPENED;
+    o.textContent = "📂 " + opened.name + (opened.handle ? " (ติดตามการเซฟ)" : " (ไม่ติดตามการเซฟ)");
+    sel.appendChild(o);
+  }
+  sel.value = cur || "";
+  $("welcome").style.display = (!files.length && !opened) ? "flex" : "none";
+}
+
+function renderClasses(){
+  const sel = $("cls");
+  const list = resp && resp.ok ? resp.classes : [];
+  sel.hidden = list.length < 2;
+  sel.innerHTML = list.map(c => `<option>${esc(c)}</option>`).join("");
+  if (result) sel.value = result.className;
+}
+
+function syncInputs(){
+  $("mode").value = state.layout ? "layout" : "corridor";
+  $("oelev").value = state.originElevation;
+  $("surf-on").checked = state.surfaceOn;
+  $("show-codes").checked = state.showCodes;
+  $("snap").checked = state.snap;
+  $("extend").checked = state.extendEnds;
+  $("ve").value = state.view.ve;
+}
+
+// ---------------- server ----------------
+let inFlight = false, pending = false;
+function setStatus(kind, txt){
+  $("srv-dot").className = "dot" + (kind === "off" ? " off" : kind === "busy" ? " busy" : "");
+  $("srv-txt").textContent = txt;
+}
+
+function run(){
+  if (!state.file || (state.file === OPENED && !opened)) { resp = null; result = null; render(); renderPanels(); renderProblem(); return; }
+  if (inFlight){ pending = true; return; }
+  inFlight = true;
+  const body = {
+    className: state.classByFile[fileKey()] || null,
+    params: values(),
+    world: { surface: state.surface, surfaceAssigned: state.surfaceOn, layoutMode: state.layout, originElevation: state.originElevation, extendEnds: state.extendEnds }
+  };
+  if (state.file === OPENED){ body.source = opened.text; body.sourceName = opened.name; }
+  else body.file = state.file;
+  const t0 = performance.now();
+  fetch("/api/run", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) })
+    .then(r => r.json())
+    .then(r => {
+      resp = r;
+      if (r.ok){ result = r.result; stale = false; }
+      else stale = !!result;
+      const ms = performance.now() - t0;
+      setStatus(r.ok && !(result && result.exception) ? "ok" : "busy", r.ok ? `${r.file} · ${result.points.length} จุด · ${ms.toFixed(0)} ms` : `${r.file || ""} · ${r.stage === "compile" ? "คอมไพล์ไม่ผ่าน" : "ผิดพลาด"}`);
+      render(); renderPanels(); renderParams(); renderTargets(); renderClasses(); renderProblem();
+    })
+    .catch(() => setStatus("off", "server ไม่ตอบ — หน้าต่าง run-viewer ยังเปิดอยู่ไหม?"))
+    .finally(() => { inFlight = false; if (pending){ pending = false; run(); } });
+}
+function changed(){ persist(); render(); renderSelBox(); run(); }
+
+// ติดตามไฟล์: โฟลเดอร์ (ผ่าน server) และไฟล์ที่เปิดด้วยปุ่ม Open (ผ่าน file handle)
+let lastSig = null, lastMtime = {};
+function poll(){
+  fetch("/api/files").then(r => r.json()).then(info => {
+    $("folder").textContent = info.folder;
+    $("welcome-folder").textContent = info.folder;
+    const sig = info.files.map(f => f.name).join("|");
+    const prevMtime = lastMtime[state.file];
+    files = info.files;
+    lastMtime = Object.fromEntries(files.map(f => [f.name, f.mtime]));
+    if (sig !== lastSig){
+      lastSig = sig;
+      if (!state.file || (state.file !== OPENED && !lastMtime[state.file])) {
+        state.file = files.length ? files[0].name : (opened ? OPENED : null);
+        persist(); run();
+      }
+      renderFileList();
+    }
+    if (state.file && state.file !== OPENED && prevMtime && prevMtime !== lastMtime[state.file]) flashReload();
+    if (!resp && state.file) run();
+  }).catch(() => setStatus("off", "server ไม่ตอบ — หน้าต่าง run-viewer ยังเปิดอยู่ไหม?"));
+
+  if (opened && opened.handle){
+    opened.handle.getFile().then(f => {
+      if (f.lastModified !== opened.lastModified){
+        opened.lastModified = f.lastModified;
+        return f.text().then(t => { opened.text = t; if (state.file === OPENED) flashReload(); });
+      }
+    }).catch(() => {});
+  }
+}
+function flashReload(){
+  run();
+  const c = $("srv"); c.classList.add("flash"); setTimeout(() => c.classList.remove("flash"), 1200);
+}
+
+// ---------------- open file ----------------
+$("b-open").onclick = async () => {
+  if (window.showOpenFilePicker){
+    try{
+      const [handle] = await window.showOpenFilePicker({ types:[{ description:"C# source", accept:{ "text/plain":[".cs"] } }] });
+      const f = await handle.getFile();
+      opened = { name: f.name, text: await f.text(), handle, lastModified: f.lastModified };
+      selectFile(OPENED);
+    }catch(e){ /* ยกเลิก */ }
+  } else $("f-open").click();
+};
+$("f-open").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  opened = { name: f.name, text: await f.text(), handle: null, lastModified: f.lastModified };
+  e.target.value = "";
+  selectFile(OPENED);
+};
+function selectFile(name){
+  state.file = name; resp = null; result = null; stale = false; selected = -1;
+  persist(); renderFileList(); render(); renderPanels(); renderProblem();
+  $("params").innerHTML = '<div class="empty">กำลังคอมไพล์…</div>';
+  setStatus("busy", "กำลังคอมไพล์…");
+  run();
+}
+$("file").onchange = () => selectFile($("file").value);
+$("cls").onchange = () => { state.classByFile[fileKey()] = $("cls").value; persist(); run(); };
+
+// ---------------- interaction ----------------
+function evtPos(e){ const r = svg.getBoundingClientRect(); return { px: e.clientX - r.left, py: e.clientY - r.top }; }
+
+function insertOnSurface(px){
+  const x = wx(px), s = state.surface;
+  for (let i = 0; i < s.length - 1; i++){
+    if (x > s[i].x && x < s[i+1].x){
+      const t = (x - s[i].x) / (s[i+1].x - s[i].x);
+      s.splice(i + 1, 0, { x: snapV(x), y: s[i].y + t * (s[i+1].y - s[i].y) });
+      selected = i + 1;
+      changed();
+      return;
+    }
+  }
+}
+function deletePoint(i){
+  if (i < 0 || state.surface.length <= 2) return;
+  state.surface.splice(i, 1);
+  selected = -1;
+  changed();
+}
+function setAddMode(on){
+  addMode = on;
+  $("b-add").classList.toggle("on", on);
+  $("banner").style.display = on ? "block" : "none";
+  render();
+}
+
+svg.addEventListener("pointerdown", e => {
+  const t = e.target, kind = t.dataset.kind, { px, py } = evtPos(e);
+  if (e.button === 2) return;
+  if (kind === "h"){
+    selected = +t.dataset.i;
+    drag = { type:"pt", i: selected };
+    renderSelBox();
+  } else if (kind === "seg" && e.button === 0){
+    const now = performance.now(), dbl = lastSegDown && now - lastSegDown.t < 350 && Math.hypot(px - lastSegDown.px, py - lastSegDown.py) < 6;
+    lastSegDown = { t: now, px, py };
+    if (addMode || dbl){ lastSegDown = null; insertOnSurface(px); return; }
+    drag = { type:"all", py, ys: state.surface.map(p => p.y) };
+  } else {
+    drag = { type:"pan", px, py, cx: state.view.cx, cy: state.view.cy };
+  }
+  svg.setPointerCapture(e.pointerId); e.preventDefault();
+});
+
+svg.addEventListener("pointermove", e => {
+  const { px, py } = evtPos(e);
+  if (!drag){ hoverTip(e, px, py); return; }
+  if (drag.type === "pan"){
+    tip.style.display = "none";
+    state.view.cx = drag.cx - (px - drag.px) / state.view.scale;
+    state.view.cy = drag.cy + (py - drag.py) / (state.view.scale * state.view.ve);
+    render();
+  } else if (drag.type === "pt"){
+    const s = state.surface, p = s[drag.i];
+    p.y = snapV(wy(py));
+    if (e.shiftKey){
+      const lo = drag.i > 0 ? s[drag.i-1].x + 0.01 : -Infinity;
+      const hi = drag.i < s.length - 1 ? s[drag.i+1].x - 0.01 : Infinity;
+      p.x = Math.min(hi, Math.max(lo, snapV(wx(px))));
+    }
+    showTip(px, py, `X ${f3(p.x)}\nY ${f3(p.y)}`);
+    changed();
+  } else if (drag.type === "all"){
+    const dy = snapV(wy(py) - wy(drag.py));
+    state.surface.forEach((p, i) => p.y = drag.ys[i] + dy);
+    showTip(px, py, `เลื่อน surface ${dy >= 0 ? "+" : ""}${f3(dy)} m`);
+    changed();
+  }
+});
+const endDrag = () => { if (drag){ drag = null; tip.style.display = "none"; persist(); } };
+svg.addEventListener("pointerup", endDrag);
+svg.addEventListener("pointercancel", endDrag);
+svg.addEventListener("contextmenu", e => {
+  e.preventDefault();
+  if (e.target.dataset.kind === "h") deletePoint(+e.target.dataset.i);
+});
+svg.addEventListener("wheel", e => {
+  e.preventDefault();
+  const { px, py } = evtPos(e);
+  const bx = wx(px), by = wy(py);
+  state.view.scale = Math.min(800, Math.max(4, state.view.scale * Math.exp(-e.deltaY * 0.0015)));
+  state.view.cx = bx - (px - W/2) / state.view.scale;
+  state.view.cy = by + (py - H/2) / (state.view.scale * state.view.ve);
+  render(); persist();
+}, { passive:false });
+
+function showTip(px, py, text){
+  tip.textContent = text; tip.style.display = "block";
+  tip.style.left = (px + 14) + "px"; tip.style.top = (py + 14) + "px";
+}
+function hoverTip(e, px, py){
+  const k = e.target.dataset.kind, i = +e.target.dataset.i;
+  if (k === "pt" && result){
+    const p = result.points[i];
+    showTip(px, py, `#${i} ${p.codes.join(", ") || "(no code)"}\nOffset ${f3(p.x)}\nElev   ${f3(p.y)}\n(จริง ${f3(p.y + state.originElevation)})`);
+  } else if (k === "link" && result){
+    const l = result.links[i];
+    showTip(px, py, `link #${i}: ${l.pts.join("→")}\n${l.codes.join(", ") || "(no code)"}`);
+  } else if (k === "h"){
+    const p = state.surface[i];
+    showTip(px, py, `surface #${i}\nX ${f3(p.x)}\nY ${f3(p.y)}`);
+  } else tip.style.display = "none";
+}
+
+function fit(){
+  const xs = [], ys = [];
+  if (result) result.points.forEach(p => { xs.push(p.x); ys.push(p.y); });
+  state.surface.forEach(p => { xs.push(p.x); ys.push(p.y); });
+  if (!xs.length) return;
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  state.view.scale = Math.max(4, Math.min((W - 120) / Math.max(maxX - minX, 1), (H - 160) / (Math.max(maxY - minY, 1) * state.view.ve)));
+  state.view.cx = (minX + maxX) / 2;
+  state.view.cy = (minY + maxY) / 2;
+  render(); persist();
+}
+
+// ---------------- panel inputs ----------------
+$("mode").onchange = () => { state.layout = $("mode").value === "layout"; changed(); };
+$("oelev").addEventListener("input", () => { const v = parseFloat($("oelev").value); if (!isNaN(v)){ state.originElevation = v; changed(); } });
+$("surf-on").onchange = () => { state.surfaceOn = $("surf-on").checked; changed(); };
+$("show-codes").onchange = () => { state.showCodes = $("show-codes").checked; persist(); render(); };
+$("snap").onchange = () => { state.snap = $("snap").checked; persist(); };
+$("extend").onchange = () => { state.extendEnds = $("extend").checked; changed(); };
+$("ve").onchange = () => { state.view.ve = +$("ve").value; persist(); render(); };
+$("b-fit").onclick = fit;
+$("b-add").onclick = () => setAddMode(!addMode);
+$("b-del").onclick = () => deletePoint(selected);
+$("b-reset").onclick = () => { state.surface = DEFAULT_SURFACE.map(p => ({...p})); selected = -1; changed(); };
+$("b-defaults").onclick = () => { state.values[fileKey()] = {}; persist(); run(); };
+$("sel-x").addEventListener("change", () => {
+  const s = state.surface, i = selected, v = parseFloat($("sel-x").value);
+  if (isNaN(v) || i < 0) return;
+  const lo = i > 0 ? s[i-1].x + 0.01 : -Infinity, hi = i < s.length - 1 ? s[i+1].x - 0.01 : Infinity;
+  s[i].x = Math.min(hi, Math.max(lo, v)); changed();
+});
+$("sel-y").addEventListener("input", () => {
+  const v = parseFloat($("sel-y").value);
+  if (!isNaN(v) && selected >= 0){ state.surface[selected].y = v; changed(); }
+});
+document.addEventListener("keydown", e => {
+  if (["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName)) return;
+  if (e.key === "Escape") setAddMode(false);
+  else if (e.key === "a" || e.key === "A") setAddMode(!addMode);
+  else if (e.key === "f" || e.key === "F") fit();
+  else if (e.key === "Delete" || e.key === "Backspace") deletePoint(selected);
+});
+
+// ---------------- scenarios ----------------
+let scenarios = store.get("sav2.scenarios", []);
+function snapshot(name){
+  return { name, file: state.file === OPENED ? (opened ? opened.name : "") : state.file,
+           values: {...values()}, surface: state.surface.map(p => ({...p})),
+           surfaceOn: state.surfaceOn, layout: state.layout, originElevation: state.originElevation };
+}
+function loadScenario(s){
+  state.surface = s.surface.map(p => ({...p}));
+  state.surfaceOn = s.surfaceOn; state.layout = s.layout; state.originElevation = s.originElevation;
+  if (s.file && files.some(f => f.name === s.file)) state.file = s.file;
+  values(); state.values[fileKey()] = {...s.values};
+  selected = -1; syncInputs(); renderFileList(); changed();
+}
+function renderScenarios(){
+  const box = $("sc-list"); box.innerHTML = "";
+  if (!scenarios.length){ box.innerHTML = '<div class="empty">ยังไม่มีกรณีที่บันทึกไว้</div>'; return; }
+  scenarios.forEach((s, i) => {
+    const row = document.createElement("div");
+    const name = document.createElement("span");
+    name.innerHTML = `${esc(s.name)}<small>${esc(s.file || "")}</small>`; name.title = "โหลดกรณีนี้";
+    name.onclick = () => loadScenario(s);
+    const del = document.createElement("button"); del.textContent = "×"; del.title = "ลบ";
+    del.onclick = () => { scenarios.splice(i, 1); store.set("sav2.scenarios", scenarios); renderScenarios(); };
+    row.append(name, del); box.appendChild(row);
+  });
+}
+$("b-save").onclick = () => {
+  const name = prompt("ตั้งชื่อกรณีนี้", "กรณี " + (scenarios.length + 1));
+  if (!name) return;
+  scenarios.push(snapshot(name)); store.set("sav2.scenarios", scenarios); renderScenarios();
+};
+$("b-export").onclick = () => {
+  const blob = new Blob([JSON.stringify(scenarios, null, 2)], { type:"application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "scenarios.json"; a.click();
+  URL.revokeObjectURL(a.href);
+};
+$("b-import").onclick = () => $("f-import").click();
+$("f-import").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => {
+    try{ const arr = JSON.parse(t); if (Array.isArray(arr)){ scenarios = scenarios.concat(arr); store.set("sav2.scenarios", scenarios); renderScenarios(); } }
+    catch{ alert("ไฟล์ไม่ใช่ JSON ของ scenarios"); }
+  });
+  e.target.value = "";
+};
+
+// ---------------- start ----------------
+if (state.file === OPENED) state.file = null;   // ไฟล์ที่เปิดเองไม่ถูกจำข้ามการรีเฟรช
+syncInputs(); renderScenarios(); renderPanels();
+new ResizeObserver(() => render()).observe(main);
+render(); poll(); setInterval(poll, 1000);
+</script>
+</body>
+</html>

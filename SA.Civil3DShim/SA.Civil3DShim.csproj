@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    ตัวจำลอง Civil 3D API (เฉพาะส่วนที่ subassembly ใช้)
+    ชื่อ namespace / class / method ตรงกับของจริง เพื่อให้ไฟล์ .cs ของ subassembly คอมไพล์ได้โดยไม่ต้องแก้
+    ถ้าไฟล์ .cs เรียก API ที่ยังไม่มีในนี้ เว็บจะขึ้น compile error -> เพิ่มเข้าไปในไฟล์ของโปรเจกต์นี้
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>SA.Shim</RootNamespace>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SA.Civil3DShim\SA.Civil3DShim.csproj" />
+  </ItemGroup>
+
+  <!-- Roslyn: ใช้คอมไพล์ไฟล์ .cs ของ subassembly ตอนรัน (ดาวน์โหลดจาก NuGet อัตโนมัติตอน build ครั้งแรก) -->
+  <ItemGroup Condition="'$(LocalRoslynDir)' == ''">
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(LocalRoslynDir)' != ''">
+    <Reference Include="Microsoft.CodeAnalysis">
+      <HintPath>$(LocalRoslynDir)/Microsoft.CodeAnalysis.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.CSharp">
+      <HintPath>$(LocalRoslynDir)/Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- net8.0: Civil 3D 2025 ขึ้นไป (รวม 2027) โหลด DLL นี้ได้ และเว็บก็ใช้ได้ -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>SA.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

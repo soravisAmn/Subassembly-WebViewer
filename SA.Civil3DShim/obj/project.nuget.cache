@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "4aL33AlLN48=",
+  "dgSpecHash": "dkxY9zmZBic=",
   "success": true,
-  "projectFilePath": "D:\\test_cad\\webapp_show_SA\\SA.Civil3DShim\\SA.Civil3DShim.csproj",
+  "projectFilePath": "D:\\test_cad\\Subassembly-WebViewer\\SA.Civil3DShim\\SA.Civil3DShim.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\USER\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.31\\microsoft.netcore.app.ref.8.0.31.nupkg.sha512",
     "C:\\Users\\USER\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.31\\microsoft.windowsdesktop.app.ref.8.0.31.nupkg.sha512",

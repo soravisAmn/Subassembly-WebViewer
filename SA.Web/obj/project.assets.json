@@ -1012,11 +1012,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\test_cad\\webapp_show_SA\\SA.Web\\SA.Web.csproj",
+      "projectUniqueName": "D:\\test_cad\\Subassembly-WebViewer\\SA.Web\\SA.Web.csproj",
       "projectName": "SA.Web",
-      "projectPath": "D:\\test_cad\\webapp_show_SA\\SA.Web\\SA.Web.csproj",
+      "projectPath": "D:\\test_cad\\Subassembly-WebViewer\\SA.Web\\SA.Web.csproj",
       "packagesPath": "C:\\Users\\USER\\.nuget\\packages\\",
-      "outputPath": "D:\\test_cad\\webapp_show_SA\\SA.Web\\obj\\",
+      "outputPath": "D:\\test_cad\\Subassembly-WebViewer\\SA.Web\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\USER\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -1032,8 +1032,8 @@
           "framework": "net8.0",
           "targetAlias": "net8.0",
           "projectReferences": {
-            "D:\\test_cad\\webapp_show_SA\\SA.Civil3DShim\\SA.Civil3DShim.csproj": {
-              "projectPath": "D:\\test_cad\\webapp_show_SA\\SA.Civil3DShim\\SA.Civil3DShim.csproj"
+            "D:\\test_cad\\Subassembly-WebViewer\\SA.Civil3DShim\\SA.Civil3DShim.csproj": {
+              "projectPath": "D:\\test_cad\\Subassembly-WebViewer\\SA.Civil3DShim\\SA.Civil3DShim.csproj"
             }
           }
         }

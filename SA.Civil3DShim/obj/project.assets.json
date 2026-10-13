@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\test_cad\\webapp_show_SA\\SA.Civil3DShim\\SA.Civil3DShim.csproj",
+      "projectUniqueName": "D:\\test_cad\\Subassembly-WebViewer\\SA.Civil3DShim\\SA.Civil3DShim.csproj",
       "projectName": "SA.Civil3DShim",
-      "projectPath": "D:\\test_cad\\webapp_show_SA\\SA.Civil3DShim\\SA.Civil3DShim.csproj",
+      "projectPath": "D:\\test_cad\\Subassembly-WebViewer\\SA.Civil3DShim\\SA.Civil3DShim.csproj",
       "packagesPath": "C:\\Users\\USER\\.nuget\\packages\\",
-      "outputPath": "D:\\test_cad\\webapp_show_SA\\SA.Civil3DShim\\obj\\",
+      "outputPath": "D:\\test_cad\\Subassembly-WebViewer\\SA.Civil3DShim\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\USER\\AppData\\Roaming\\NuGet\\NuGet.Config"

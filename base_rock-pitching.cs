@@ -11,7 +11,7 @@
 //        P1 (origin)     TopWidth       P2
 //         o============================o              <- Top
 //        /                              \
-//       /                                \   Depth (>= 2 m)
+//       /  SideSlope 1:1.5 (V:H)         \   Depth (>= 2 m)
 //      o=============o~~~~~~~~~~~~~~~~~~~~o P3         <- ระดับฐาน
 //     P4              \__ surface __       \
 //                                   \___    \
@@ -23,6 +23,9 @@
 //     ช่วงที่ surface ต่ำกว่าฐาน -> ขอบล่างวิ่งตามผิว surface
 //   - ถ้า P3 / P4 ลอยอยู่เหนือ surface จะต่อเส้นด้านข้างลงไปด้วย slope เดิมจนชน surface (E3 / E4)
 //   - Layout mode หรือไม่ได้กำหนด surface -> วาดคางหมูปกติ
+//
+// ความกว้างฐานคำนวณจาก slope ด้านข้าง: SideSlope = ระยะราบต่อ 1 หน่วยดิ่ง (1:1.5 -> 1.5)
+//   ระยะยื่นของฐานแต่ละข้าง = Depth x SideSlope
 
 using System;
 using System.Collections.Generic;
@@ -40,7 +43,7 @@ namespace TestSubassembly
         // ชื่อ parameter
         private const string SideParam = "Side";
         private const string TopWidthParam = "TopWidth";
-        private const string BottomWidthParam = "BottomWidth";
+        private const string SideSlopeParam = "SideSlope";
         private const string DepthParam = "Depth";
         private const string SurfaceTarget = "TargetSurface";
 
@@ -51,7 +54,7 @@ namespace TestSubassembly
         // ค่า default
         private const int SideDefault = Right;
         private const double TopWidthDefault = 4.0;
-        private const double BottomWidthDefault = 6.0;
+        private const double SideSlopeDefault = 1.5; // 1:1.5 (ดิ่ง:ราบ)
         private const double DepthDefault = 2.0;
 
         // ความสูงขั้นต่ำ (เมตร)
@@ -104,7 +107,7 @@ namespace TestSubassembly
 
                 corridorState.ParamsLong.Add(SideParam, SideDefault);
                 corridorState.ParamsDouble.Add(TopWidthParam, TopWidthDefault);
-                corridorState.ParamsDouble.Add(BottomWidthParam, BottomWidthDefault);
+                corridorState.ParamsDouble.Add(SideSlopeParam, SideSlopeDefault);
                 corridorState.ParamsDouble.Add(DepthParam, DepthDefault);
             }
             catch (Exception e)
@@ -142,7 +145,7 @@ namespace TestSubassembly
             // อ่านค่า parameter
             int side = (int)GetLong(paramsLong, SideParam, SideDefault);
             double topWidth = GetDouble(paramsDouble, TopWidthParam, TopWidthDefault);
-            double bottomWidth = GetDouble(paramsDouble, BottomWidthParam, BottomWidthDefault);
+            double sideSlope = GetDouble(paramsDouble, SideSlopeParam, SideSlopeDefault);
             double depth = GetDouble(paramsDouble, DepthParam, DepthDefault);
 
             // ตรวจค่าที่ผู้ใช้ใส่
@@ -151,10 +154,10 @@ namespace TestSubassembly
                 RecordError(corridorState, CorridorError.ValueShouldNotBeLessThanOrEqualToZero, TopWidthParam);
                 topWidth = TopWidthDefault;
             }
-            if (bottomWidth <= 0)
+            if (sideSlope <= 0)
             {
-                RecordError(corridorState, CorridorError.ValueShouldNotBeLessThanOrEqualToZero, BottomWidthParam);
-                bottomWidth = BottomWidthDefault;
+                RecordError(corridorState, CorridorError.ValueShouldNotBeLessThanOrEqualToZero, SideSlopeParam);
+                sideSlope = SideSlopeDefault;
             }
             if (depth < MinDepth)
             {
@@ -166,8 +169,8 @@ namespace TestSubassembly
             // กลับด้านเมื่อวางฝั่งซ้าย
             double flip = side == Left ? -1.0 : 1.0;
 
-            // ระยะยื่นของฐานแต่ละข้าง (บวก = ฐานกว้างกว่าด้านบน)
-            double halfDiff = (bottomWidth - topWidth) / 2.0;
+            // ระยะยื่นของฐานแต่ละข้าง ตาม slope ด้านข้าง (ฐานกว้างกว่าด้านบนเสมอ)
+            double halfDiff = depth * sideSlope;
             double baseY = -depth;
 
             var p1 = new Vertex(0.0, 0.0, "TrapTopInside", "Top");
@@ -195,7 +198,7 @@ namespace TestSubassembly
                     try
                     {
                         var ground = new GroundSampler(corridorState, surfaceId, flip);
-                        lowerChain = BuildLowerChain(ground, p3, p4, halfDiff, depth, baseY);
+                        lowerChain = BuildLowerChain(ground, p3, p4, sideSlope, baseY);
                     }
                     catch (Exception e)
                     {
@@ -222,22 +225,21 @@ namespace TestSubassembly
         // คำนวณเส้นขอบจาก P3 ถึง P4 ตาม surface
 
         private static List<Vertex> BuildLowerChain(GroundSampler ground, Vertex p3, Vertex p4,
-                                                    double halfDiff, double depth, double baseY)
+                                                    double sideSlope, double baseY)
         {
             // slope ของด้านข้าง (ลงต่อ 1 หน่วยแนวราบ) ใช้ค่าเดิมตอนต่อลงไปชน surface
-            double run = Math.Max(Math.Abs(halfDiff), 1e-4);
-            double sideSlope = -depth / run;
+            double grade = -1.0 / sideSlope;
 
-            // ทิศที่ด้านข้างวิ่งออกไป (ในแกน U): ด้านนอกไป +U ด้านในไป -U เมื่อฐานกว้างกว่าด้านบน
-            double outsideDir = halfDiff >= 0 ? 1.0 : -1.0;
-            double insideDir = -outsideDir;
+            // ทิศที่ด้านข้างวิ่งออกไป (ในแกน U): ด้านนอกไป +U ด้านในไป -U
+            const double outsideDir = 1.0;
+            const double insideDir = -1.0;
 
             // ปลายด้านนอก (R) และด้านใน (L) ของขอบล่าง
             bool extendOutside = ground.ElevationAt(p3.U) < baseY - Tolerance;
             bool extendInside = ground.ElevationAt(p4.U) < baseY - Tolerance;
 
-            Vertex r = extendOutside ? ground.IntersectFrom(p3, outsideDir, sideSlope, "TrapToeOutside") : p3;
-            Vertex l = extendInside ? ground.IntersectFrom(p4, insideDir, sideSlope, "TrapToeInside") : p4;
+            Vertex r = extendOutside ? ground.IntersectFrom(p3, outsideDir, grade, "TrapToeOutside") : p3;
+            Vertex l = extendInside ? ground.IntersectFrom(p4, insideDir, grade, "TrapToeInside") : p4;
 
             if (l.U >= r.U - Tolerance)
                 throw new InvalidOperationException("ด้านข้างที่ต่อลงไปตัดกันก่อนถึง surface");

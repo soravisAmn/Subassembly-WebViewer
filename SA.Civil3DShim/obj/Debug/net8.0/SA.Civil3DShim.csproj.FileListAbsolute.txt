@@ -21,3 +21,15 @@ D:\test_cad\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\SA.Civil3DShim
 D:\test_cad\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\refint\SA.Civil3DShim.dll
 D:\test_cad\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\SA.Civil3DShim.pdb
 D:\test_cad\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\ref\SA.Civil3DShim.dll
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\bin\Debug\net8.0\SA.Civil3DShim.deps.json
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\bin\Debug\net8.0\SA.Civil3DShim.dll
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\bin\Debug\net8.0\SA.Civil3DShim.pdb
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\SA.Civil3DShim.GeneratedMSBuildEditorConfig.editorconfig
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\SA.Civil3DShim.AssemblyInfoInputs.cache
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\SA.Civil3DShim.AssemblyInfo.cs
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\SA.Civil3DShim.csproj.CoreCompileInputs.cache
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\SA.Civil3DShim.sourcelink.json
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\SA.Civil3DShim.dll
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\refint\SA.Civil3DShim.dll
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\SA.Civil3DShim.pdb
+D:\Yo\Subassembly-WebViewer\SA.Civil3DShim\obj\Debug\net8.0\ref\SA.Civil3DShim.dll

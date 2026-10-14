@@ -31,7 +31,7 @@
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--ink);font:14px/1.45 "IBM Plex Sans Thai",system-ui,sans-serif;display:grid;grid-template-columns:330px 1fr;grid-template-rows:auto 1fr;overflow:hidden}
 .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
-header{grid-column:1/3;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
 header h1{font-size:15px;font-weight:600;margin:0 8px 0 0;white-space:nowrap}
 header select{width:auto;min-width:180px;max-width:320px}
 aside{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:4px 16px 24px}
@@ -119,13 +119,34 @@ svg.stale .geo{opacity:.25}
 .h.sel{fill:var(--ground)}
 .origin{stroke:var(--accent);stroke-width:1.4}
 .origin-lbl{fill:var(--accent);font:10.5px "IBM Plex Mono",monospace}
+/* แถบแก้โค้ด */
+body.editing{grid-template-columns:330px minmax(280px,var(--edw,44vw)) 1fr}
+#ed{display:none;position:relative;flex-direction:column;min-width:0;min-height:0;background:var(--panel);border-right:1px solid var(--line)}
+body.editing #ed{display:flex}
+.ed-bar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);min-height:40px}
+.ed-bar .name{font:500 12.5px "IBM Plex Mono",monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ed-bar .chip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ed-bar button{padding:3px 9px}
+.dot.idle{background:var(--muted)}
+.ed-conflict{display:none;padding:8px 10px;background:var(--warn-soft);color:var(--warn);font-size:12.5px;border-bottom:1px solid var(--line)}
+.ed-conflict.on{display:block}
+.ed-conflict .btns{margin:6px 0 0}
+#ed-host{flex:1;min-height:0;position:relative;background:var(--paper)}
+#ed-host textarea{position:absolute;inset:0;width:100%;height:100%;border:0;resize:none;padding:8px 10px;font:13px/1.5 "IBM Plex Mono",monospace;background:var(--paper);color:var(--ink);outline:none;tab-size:4;white-space:pre;overflow:auto}
+.ed-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:24px;font-size:13px;background:var(--paper);z-index:2}
+.ed-empty[hidden]{display:none}
+#ed-resize{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:6}
+.problem .d[data-line]{cursor:pointer}
+.problem .d[data-line]:hover{background:var(--accent-soft)}
 </style>
 </head>
 <body>
 <header>
   <h1>Subassembly Viewer</h1>
   <select id="file" title="ไฟล์ .cs ในโฟลเดอร์"></select>
+  <button id="b-new" title="สร้างไฟล์ .cs ใหม่ในโฟลเดอร์จาก template">+ ไฟล์ใหม่</button>
   <button id="b-open" title="เปิดไฟล์ .cs จากที่อื่น">Open .cs…</button>
+  <button id="b-edit" title="แสดง/ซ่อนแถบแก้โค้ด (Ctrl+E)">✎ แก้โค้ด</button>
   <input id="f-open" type="file" accept=".cs" hidden>
   <select id="cls" title="class ในไฟล์" hidden></select>
   <span class="hint mono" id="folder" style="margin:0"></span>
@@ -193,6 +214,26 @@ svg.stale .geo{opacity:.25}
   </section>
 </aside>
 
+<div id="ed">
+  <div class="ed-bar">
+    <span class="name" id="ed-name">—</span>
+    <span class="chip" id="ed-state" title=""><span class="dot idle" id="ed-dot"></span><span id="ed-txt">—</span></span>
+    <span class="spacer"></span>
+    <button id="ed-save" title="บันทึกตอนนี้ (Ctrl+S) — ปกติบันทึกเองหลังหยุดพิมพ์ 1 วินาที">บันทึก</button>
+    <button id="ed-dl" title="ดาวน์โหลดโค้ดในแถบนี้เป็นไฟล์ .cs">ดาวน์โหลด</button>
+    <button id="ed-close" title="ซ่อนแถบโค้ด (Ctrl+E)">×</button>
+  </div>
+  <div class="ed-conflict" id="ed-conflict">
+    <div id="ed-conflict-msg"></div>
+    <div class="btns">
+      <button id="ed-keep" class="primary">เก็บฉบับในเว็บ (เขียนทับไฟล์)</button>
+      <button id="ed-take">ใช้ฉบับในไฟล์</button>
+    </div>
+  </div>
+  <div id="ed-host"><div class="ed-empty" id="ed-empty">เลือกไฟล์ .cs จากรายการด้านบน หรือกด <b>&nbsp;+ ไฟล์ใหม่&nbsp;</b></div></div>
+  <div id="ed-resize" title="ลากเพื่อปรับความกว้าง"></div>
+</div>
+
 <main id="main">
   <svg id="view"></svg>
   <div class="topbar">
@@ -207,6 +248,7 @@ svg.stale .geo{opacity:.25}
   <div class="welcome" id="welcome"><div>
     <p><b>ยังไม่มีไฟล์ .cs</b></p>
     <p>วางไฟล์ .cs ของ subassembly ไว้ในโฟลเดอร์ <span class="mono" id="welcome-folder"></span> แล้วเลือกจากรายการด้านบน หรือกด <b>Open .cs…</b></p>
+    <p>หรือกด <b>+ ไฟล์ใหม่</b> เพื่อเริ่มเขียน subassembly จาก template ในเว็บนี้เลย</p>
   </div></div>
   <div class="legend" id="legend"></div>
   <div class="tip" id="tip"></div>
@@ -450,7 +492,7 @@ function renderProblem(){
       const errs = resp.diagnostics.filter(d => d.severity === "Error");
       html = `<h3>คอมไพล์ ${esc(resp.file)} ไม่ผ่าน (${errs.length} error)</h3>`;
       for (const d of resp.diagnostics)
-        html += `<div class="d${d.severity === "Error" ? "" : " wn"}"><b>${esc(resp.file)}(${d.line},${d.column}) ${d.id}</b>  ${esc(d.message)}</div>`;
+        html += `<div class="d${d.severity === "Error" ? "" : " wn"}" data-line="${d.line}" data-col="${d.column}"><b>${esc(resp.file)}(${d.line},${d.column}) ${d.id}</b>  ${esc(d.message)}</div>`;
       if (resp.diagnostics.some(d => /CS0234|CS0246|CS0117|CS1061|CS0103|CS1501|CS7036/.test(d.id)))
         html += `<div class="help">error ที่บอกว่า "does not contain a definition" / "could not be found" มักแปลว่าโค้ดเรียก Civil 3D API ที่ตัวจำลองยังไม่มี — เพิ่มได้ในโฟลเดอร์ SA.Civil3DShim (หรือส่งชื่อฟังก์ชันให้ Claude เพิ่มให้)</div>`;
     } else {
@@ -458,11 +500,17 @@ function renderProblem(){
     }
   } else if (result && result.exception){
     const e = result.exception;
-    html = `<h3>${esc(e.type)} ระหว่าง ${esc(result.stage || "รัน")} (exception หลุดออกจากโค้ด)</h3><div class="d">${esc(e.message)}</div>` +
-           (e.stack ? `<div class="d" style="color:var(--muted)">${esc(e.stack)}</div>` : "");
+    const title = e.type === "Timeout" || e.type === "StackOverflow" ? `${esc(e.type)} — เว็บหยุดการรันให้แล้ว`
+                : `${esc(e.type)} ระหว่าง ${esc(result.stage || "รัน")} (exception หลุดออกจากโค้ด)`;
+    html = `<h3>${title}</h3><div class="d">${esc(e.message)}</div>`;
+    for (const s of (e.stack || "").split("\n").filter(Boolean)){
+      const m = /:line (\d+)/.exec(s);
+      html += `<div class="d" style="color:var(--muted)"${m ? ` data-line="${m[1]}"` : ""}>${esc(s)}</div>`;
+    }
   }
+  if (html && editorActive() && /data-line/.test(html)) html += `<div class="help">คลิกบรรทัดที่มีเลขบรรทัดเพื่อไปที่โค้ดตรงนั้น</div>`;
   box.innerHTML = html;
-  box.classList.toggle("bottom", !!(resp && resp.ok));
+  box.classList.toggle("bottom", !!(resp && resp.ok) || editorActive());
   box.style.display = html ? "block" : "none";
 }
 
@@ -524,7 +572,8 @@ function run(){
     params: values(),
     world: { surface: state.surface, surfaceAssigned: state.surfaceOn, layoutMode: state.layout, originElevation: state.originElevation, extendEnds: state.extendEnds }
   };
-  if (state.file === OPENED){ body.source = opened.text; body.sourceName = opened.name; }
+  if (editorActive()){ body.source = E.get(); body.sourceName = ed.name; }   // โค้ดในแถบแก้ (รวมส่วนที่ยังไม่บันทึก)
+  else if (state.file === OPENED){ body.source = opened.text; body.sourceName = opened.name; }
   else body.file = state.file;
   const t0 = performance.now();
   fetch("/api/run", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) })
@@ -535,7 +584,7 @@ function run(){
       else stale = !!result;
       const ms = performance.now() - t0;
       setStatus(r.ok && !(result && result.exception) ? "ok" : "busy", r.ok ? `${r.file} · ${result.points.length} จุด · ${ms.toFixed(0)} ms` : `${r.file || ""} · ${r.stage === "compile" ? "คอมไพล์ไม่ผ่าน" : "ผิดพลาด"}`);
-      render(); renderPanels(); renderParams(); renderTargets(); renderClasses(); renderProblem();
+      render(); renderPanels(); renderParams(); renderTargets(); renderClasses(); renderProblem(); applyMarkers();
     })
     .catch(() => setStatus("off", "server ไม่ตอบ — หน้าต่าง run-viewer ยังเปิดอยู่ไหม?"))
     .finally(() => { inFlight = false; if (pending){ pending = false; run(); } });
@@ -545,7 +594,7 @@ function changed(){ persist(); render(); renderSelBox(); run(); }
 // ติดตามไฟล์: โฟลเดอร์ (ผ่าน server) และไฟล์ที่เปิดด้วยปุ่ม Open (ผ่าน file handle)
 let lastSig = null, lastMtime = {};
 function poll(){
-  fetch("/api/files").then(r => r.json()).then(info => {
+  return fetch("/api/files").then(r => r.json()).then(info => {
     $("folder").textContent = info.folder;
     $("welcome-folder").textContent = info.folder;
     const sig = info.files.map(f => f.name).join("|");
@@ -557,14 +606,17 @@ function poll(){
       if (!state.file || (state.file !== OPENED && !lastMtime[state.file])) {
         state.file = files.length ? files[0].name : (opened ? OPENED : null);
         persist(); run();
+        if (ed.open) loadDoc();
       }
       renderFileList();
     }
-    if (state.file && state.file !== OPENED && prevMtime && prevMtime !== lastMtime[state.file]) flashReload();
+    // ไฟล์ที่เปิดอยู่ในแถบแก้: checkExternal จัดการเอง (โหลดฉบับใหม่ หรือแจ้งว่าชนกัน)
+    if (editorActive()) checkExternal();
+    else if (state.file && state.file !== OPENED && prevMtime && prevMtime !== lastMtime[state.file]) flashReload();
     if (!resp && state.file) run();
   }).catch(() => setStatus("off", "server ไม่ตอบ — หน้าต่าง run-viewer ยังเปิดอยู่ไหม?"));
 
-  if (opened && opened.handle){
+  if (opened && opened.handle && !(editorActive() && state.file === OPENED)){
     opened.handle.getFile().then(f => {
       if (f.lastModified !== opened.lastModified){
         opened.lastModified = f.lastModified;
@@ -601,6 +653,7 @@ function selectFile(name){
   $("params").innerHTML = '<div class="empty">กำลังคอมไพล์…</div>';
   setStatus("busy", "กำลังคอมไพล์…");
   run();
+  if (ed.open) loadDoc();
 }
 $("file").onchange = () => selectFile($("file").value);
 $("cls").onchange = () => { state.classByFile[fileKey()] = $("cls").value; persist(); run(); };
@@ -747,7 +800,10 @@ $("sel-y").addEventListener("input", () => {
   if (!isNaN(v) && selected >= 0){ state.surface[selected].y = v; changed(); }
 });
 document.addEventListener("keydown", e => {
-  if (["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName)) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && !e.shiftKey && !e.altKey && (e.key === "e" || e.key === "E")){ e.preventDefault(); toggleEditor(); return; }
+  if (mod && !e.shiftKey && !e.altKey && (e.key === "s" || e.key === "S")){ e.preventDefault(); if (ed.open) saveNow(); return; }
+  if (["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName) || e.target.closest("#ed")) return;
   if (e.key === "Escape") setAddMode(false);
   else if (e.key === "a" || e.key === "A") setAddMode(!addMode);
   else if (e.key === "f" || e.key === "F") fit();
@@ -767,6 +823,7 @@ function loadScenario(s){
   if (s.file && files.some(f => f.name === s.file)) state.file = s.file;
   values(); state.values[fileKey()] = {...s.values};
   selected = -1; syncInputs(); renderFileList(); changed();
+  if (ed.open) loadDoc();
 }
 function renderScenarios(){
   const box = $("sc-list"); box.innerHTML = "";
@@ -801,11 +858,369 @@ $("f-import").onchange = e => {
   e.target.value = "";
 };
 
+// ---------------- แถบแก้โค้ด ----------------
+// พิมพ์แล้วรูปวาดใหม่เองหลังหยุดพิมพ์ RUN_DELAY และบันทึกลงไฟล์เองหลัง SAVE_DELAY
+//   folder : ไฟล์ในโฟลเดอร์ของ viewer -> บันทึกผ่าน /api/save
+//   handle : ไฟล์ที่เปิดด้วยปุ่ม Open ใน Chrome/Edge -> เขียนกลับผ่านสิทธิ์ของเบราว์เซอร์
+//   memory : ไฟล์ที่เปิดด้วยปุ่ม Open ในเบราว์เซอร์อื่น -> แก้ได้ในเว็บ แต่ต้องกดดาวน์โหลดเอง
+// ถ้าไฟล์ถูกแก้จากโปรแกรมอื่น: ในเว็บไม่มีอะไรค้างบันทึก -> โหลดฉบับใหม่ให้เอง
+//                             ในเว็บมีส่วนที่ยังไม่บันทึก -> หยุดบันทึกอัตโนมัติแล้วให้เลือกว่าจะเก็บฉบับไหน
+const MONACO_BASE = "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min";
+const RUN_DELAY = 400, SAVE_DELAY = 900;
+const ed = {
+  open: false, key: null, name: null, kind: null, ready: false, loading: false,
+  savedText: "", base: null,          // เนื้อหา/เวลาแก้ไขของไฟล์บนดิสก์ล่าสุดที่รู้
+  dirty: false, saving: false, again: false, checking: false,
+  conflict: null, error: null, hooked: false
+};
+let E = null, edLoading = null, saveT = 0, runT = 0, suppress = false;
+
+function editorActive(){ return ed.open && !!E && ed.ready && !ed.loading && ed.key === fileKey(); }
+
+function loadEditor(){
+  if (edLoading) return edLoading;
+  edLoading = new Promise(resolve => {
+    let done = false;
+    const finish = make => { if (!done){ done = true; resolve(make()); } };
+    const fallback = () => finish(plainEditor);
+    const timer = setTimeout(fallback, 15000);
+    const s = document.createElement("script");
+    s.src = MONACO_BASE + "/vs/loader.js";
+    s.onerror = () => { clearTimeout(timer); fallback(); };
+    s.onload = () => {
+      const worker = `self.MonacoEnvironment={baseUrl:"${MONACO_BASE}/"};importScripts("${MONACO_BASE}/vs/base/worker/workerMain.js");`;
+      window.MonacoEnvironment = { getWorkerUrl: () => URL.createObjectURL(new Blob([worker], { type: "text/javascript" })) };
+      window.require.config({ paths: { vs: MONACO_BASE + "/vs" } });
+      window.require(["vs/editor/editor.main"],
+        monaco => { clearTimeout(timer); finish(() => monacoEditor(monaco)); },
+        () => { clearTimeout(timer); fallback(); });
+    };
+    document.head.appendChild(s);
+  });
+  return edLoading;
+}
+
+function monacoEditor(monaco){
+  const dark = matchMedia("(prefers-color-scheme: dark)");
+  const model = monaco.editor.createModel("", "csharp");
+  const editor = monaco.editor.create($("ed-host"), {
+    model, automaticLayout: true, theme: dark.matches ? "vs-dark" : "vs",
+    fontFamily: '"IBM Plex Mono", ui-monospace, monospace', fontSize: 13,
+    minimap: { enabled: false }, scrollBeyondLastLine: false, tabSize: 4, insertSpaces: true,
+    fixedOverflowWidgets: true, renderWhitespace: "selection"
+  });
+  dark.addEventListener("change", e => monaco.editor.setTheme(e.matches ? "vs-dark" : "vs"));
+  const sev = { Error: monaco.MarkerSeverity.Error, Warning: monaco.MarkerSeverity.Warning };
+  const eolOf = t => t.includes("\r\n") ? monaco.editor.EndOfLineSequence.CRLF : monaco.editor.EndOfLineSequence.LF;
+  return {
+    get: () => model.getValue(),
+    set(text, keepUndo){
+      if (keepUndo){
+        // แยกเป็น undo ก้อนของตัวเอง: Ctrl+Z ครั้งเดียวกลับไปฉบับก่อนโหลด
+        model.pushStackElement();
+        model.pushEditOperations([], [{ range: model.getFullModelRange(), text }], () => null);
+        model.pushStackElement();
+      }
+      else model.setValue(text);
+      model.pushEOL(eolOf(text));     // คง CRLF/LF เดิมของไฟล์
+    },
+    onChange(cb){ model.onDidChangeContent(cb); },
+    markers(list){
+      const n = model.getLineCount();
+      monaco.editor.setModelMarkers(model, "sa", list.map(m => {
+        const line = Math.min(Math.max(m.line, 1), n);
+        const endLine = Math.min(Math.max(m.endLine || line, line), n);
+        let col = m.col || 1, endCol = m.endCol || 0;
+        if (!m.col){ col = model.getLineFirstNonWhitespaceColumn(line) || 1; endCol = model.getLineMaxColumn(line); }
+        if (endLine === line && endCol <= col) endCol = col + 1;
+        return { startLineNumber: line, startColumn: col, endLineNumber: endLine, endColumn: endCol, message: m.message, severity: sev[m.severity] || sev.Error };
+      }));
+    },
+    goto(line, col){ editor.revealLineInCenter(line); editor.setPosition({ lineNumber: line, column: col || 1 }); editor.focus(); },
+    focus(){ editor.focus(); }
+  };
+}
+
+// ตัวแก้สำรองเมื่อโหลด Monaco ไม่ได้ (เช่น ไม่มีอินเทอร์เน็ต)
+function plainEditor(){
+  const ta = document.createElement("textarea");
+  ta.spellcheck = false;
+  $("ed-host").appendChild(ta);
+  ta.addEventListener("keydown", e => {
+    if (e.key === "Tab"){ e.preventDefault(); ta.setRangeText("    ", ta.selectionStart, ta.selectionEnd, "end"); ta.dispatchEvent(new Event("input")); }
+  });
+  let eol = "\n";
+  return {
+    plain: true,
+    get: () => eol === "\n" ? ta.value : ta.value.replace(/\n/g, eol),
+    set(text){ eol = text.includes("\r\n") ? "\r\n" : "\n"; ta.value = text.replace(/\r\n/g, "\n"); },
+    onChange(cb){ ta.addEventListener("input", cb); },
+    markers(){},
+    goto(line){
+      const lines = ta.value.split("\n");
+      let p = 0;
+      for (let i = 0; i < line - 1 && i < lines.length; i++) p += lines[i].length + 1;
+      ta.focus(); ta.setSelectionRange(p, p);
+      ta.scrollTop = Math.max(0, line - 6) * (ta.scrollHeight / Math.max(lines.length, 1));
+    },
+    focus(){ ta.focus(); }
+  };
+}
+
+function setText(text, keepUndo){ suppress = true; try{ E.set(text, keepUndo); } finally { suppress = false; } }
+
+async function openEditor(){
+  // ไฟล์จากปุ่ม Open: ขอสิทธิ์เขียนตอนที่ผู้ใช้เพิ่งคลิก (เบราว์เซอร์ยอมถามเฉพาะจังหวะนี้)
+  if (state.file === OPENED && opened && opened.handle) await askWrite(opened.handle);
+  ed.open = true; state.editorOpen = true; persist();
+  document.body.classList.add("editing"); $("b-edit").classList.add("on");
+  renderEditorBar();
+  E = await loadEditor();
+  if (!ed.hooked){ ed.hooked = true; E.onChange(onEdit); }
+  if (!ed.open) return;
+  ed.key = null;                     // บังคับโหลดเนื้อหาไฟล์ล่าสุด
+  await loadDoc();
+  if (ed.ready) E.focus();
+}
+
+function closeEditor(){
+  flushSave();
+  ed.open = false; state.editorOpen = false; persist();
+  document.body.classList.remove("editing"); $("b-edit").classList.remove("on");
+  renderProblem(); run();            // กลับไปแสดงจากไฟล์บนดิสก์
+}
+function toggleEditor(){ ed.open ? closeEditor() : openEditor(); }
+
+async function loadDoc(){
+  if (!ed.open || !E) return;
+  const key = fileKey();
+  if (ed.key === key && (ed.ready || ed.loading)) return;
+  flushSave();
+  Object.assign(ed, { key, name: null, kind: null, ready: false, loading: true, dirty: false, conflict: null, error: null, again: false });
+  clearTimeout(saveT);
+  E.markers([]);
+  renderEditorBar();
+
+  if (!state.file || (state.file === OPENED && !opened)){
+    ed.loading = false; $("ed-empty").hidden = false; renderEditorBar(); return;
+  }
+  if (state.file === OPENED){
+    ed.kind = opened.handle ? "handle" : "memory"; ed.name = opened.name;
+    setText(opened.text); ed.savedText = opened.text; ed.base = opened.lastModified;
+  } else {
+    const r = await fetch("/api/source?file=" + encodeURIComponent(state.file)).then(r => r.json()).catch(() => null);
+    if (ed.key !== key) return;      // ผู้ใช้เปลี่ยนไฟล์ระหว่างรอ
+    if (!r || !r.ok){ ed.loading = false; ed.error = r ? r.message : "server ไม่ตอบ"; renderEditorBar(); return; }
+    ed.kind = "folder"; ed.name = r.file;
+    setText(r.source); ed.savedText = r.source; ed.base = r.mtime;
+  }
+  ed.loading = false; ed.ready = true;
+  $("ed-empty").hidden = true;
+  renderEditorBar(); renderProblem(); run();
+}
+
+function onEdit(){
+  if (suppress || !ed.ready) return;
+  const text = E.get();
+  ed.dirty = text !== ed.savedText;
+  ed.error = null;
+  if (state.file === OPENED && opened && ed.key === fileKey()) opened.text = text;
+  renderEditorBar();
+  clearTimeout(runT); runT = setTimeout(run, RUN_DELAY);
+  if (ed.kind === "folder" || ed.kind === "handle"){ clearTimeout(saveT); saveT = setTimeout(save, SAVE_DELAY); }
+}
+
+async function askWrite(handle){
+  try{
+    if (await handle.queryPermission({ mode: "readwrite" }) === "granted") return true;
+    return await handle.requestPermission({ mode: "readwrite" }) === "granted";
+  }catch{ return false; }
+}
+
+async function save(force){
+  clearTimeout(saveT);
+  if (!ed.ready || !(ed.kind === "folder" || ed.kind === "handle")) return;
+  if (!force && (!ed.dirty || ed.conflict)) return;
+  if (ed.saving){ ed.again = true; return; }
+  const key = ed.key, name = ed.name, text = E.get();
+  ed.saving = true; ed.error = null; renderEditorBar();
+  try{
+    if (ed.kind === "folder"){
+      const r = await fetch("/api/save", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: name, source: text, baseMtime: ed.base, force: !!force }) }).then(r => r.json());
+      if (ed.key !== key) return;
+      if (r.ok){ ed.savedText = text; ed.base = r.mtime; lastMtime[name] = r.mtime; ed.conflict = null; }
+      else if (r.conflict) ed.conflict = { source: r.source, mtime: r.mtime };
+      else ed.error = r.message || "บันทึกไม่ได้";
+    } else {
+      const h = opened.handle;
+      const disk = await h.getFile();
+      if (!force && disk.lastModified !== ed.base){
+        const t = await disk.text();
+        if (t !== ed.savedText && t !== text){ ed.conflict = { source: t, mtime: disk.lastModified }; return; }
+      }
+      if (!await askWrite(h)) throw new Error("เบราว์เซอร์ไม่ได้ให้สิทธิ์เขียนไฟล์นี้ (กดบันทึกอีกครั้งเพื่อขอสิทธิ์ หรือใช้ดาวน์โหลด)");
+      const w = await h.createWritable();
+      await w.write(text); await w.close();
+      const f = await h.getFile();
+      if (ed.key !== key) return;
+      ed.savedText = text; ed.base = f.lastModified; ed.conflict = null;
+      opened.text = text; opened.lastModified = f.lastModified;
+    }
+  }catch(e){
+    if (ed.key === key) ed.error = (e && e.message) || "บันทึกไม่ได้";
+  }finally{
+    ed.saving = false;
+    if (ed.key === key){
+      ed.dirty = E.get() !== ed.savedText;
+      renderEditorBar();
+      if (ed.again || (ed.dirty && !ed.conflict && !ed.error)){ ed.again = false; saveT = setTimeout(save, 300); }
+    }
+  }
+}
+function saveNow(){
+  if (ed.kind === "memory") return download();
+  ed.error = null;
+  save();
+}
+function flushSave(){ if (ed.ready && ed.dirty && !ed.conflict) save(); }
+
+// ไฟล์ถูกแก้จากโปรแกรมอื่นหรือไม่ (เรียกจาก poll ทุก 1 วินาที)
+async function checkExternal(){
+  if (!editorActive() || ed.saving || ed.checking || ed.conflict) return;
+  const key = ed.key;
+  ed.checking = true;
+  try{
+    let disk = null;
+    if (ed.kind === "folder"){
+      const f = files.find(f => f.name === ed.name);
+      if (!f || f.mtime === ed.base) return;
+      const r = await fetch("/api/source?file=" + encodeURIComponent(ed.name)).then(r => r.json()).catch(() => null);
+      if (r && r.ok) disk = { text: r.source, mtime: r.mtime };
+    } else if (ed.kind === "handle"){
+      const f = await opened.handle.getFile();
+      if (f.lastModified === ed.base) return;
+      disk = { text: await f.text(), mtime: f.lastModified };
+    } else return;
+    if (!disk || ed.key !== key || ed.saving) return;
+
+    const cur = E.get();
+    if (disk.text === ed.savedText || disk.text === cur){
+      // ไม่ได้เปลี่ยนเนื้อหาจริง (เช่น เป็นผลของการบันทึกของเว็บเอง)
+      ed.base = disk.mtime;
+      if (disk.text === cur){ ed.savedText = cur; ed.dirty = false; }
+    } else if (!ed.dirty){
+      setText(disk.text, true);
+      ed.savedText = disk.text; ed.base = disk.mtime;
+      if (state.file === OPENED) { opened.text = disk.text; opened.lastModified = disk.mtime; }
+      flashReload();
+    } else {
+      ed.conflict = { source: disk.text, mtime: disk.mtime };
+      clearTimeout(saveT);
+    }
+    renderEditorBar();
+  } finally { ed.checking = false; }
+}
+
+function renderEditorBar(){
+  $("ed-name").textContent = ed.name || (ed.loading ? "…" : "—");
+  let dot = "", txt = "บันทึกแล้ว", tip = "";
+  if (!ed.ready && !ed.loading && !ed.error){ dot = "idle"; txt = "ยังไม่ได้เลือกไฟล์"; }
+  else if (ed.loading){ dot = "busy"; txt = "กำลังโหลด…"; }
+  else if (ed.conflict){ dot = "off"; txt = "ไฟล์ถูกแก้จากโปรแกรมอื่น"; }
+  else if (ed.error){ dot = "off"; txt = ed.ready ? "บันทึกไม่ได้" : "เปิดไฟล์ไม่ได้"; tip = ed.error; }
+  else if (ed.kind === "memory"){ dot = ed.dirty ? "busy" : "idle"; txt = ed.dirty ? "แก้ในเว็บ ยังไม่ได้ลงไฟล์ (กดดาวน์โหลด)" : "เบราว์เซอร์นี้บันทึกลงไฟล์เองไม่ได้"; }
+  else if (ed.saving){ dot = "busy"; txt = "กำลังบันทึก…"; }
+  else if (ed.dirty){ dot = "busy"; txt = "ยังไม่บันทึก"; }
+  if (E && E.plain) tip = (tip ? tip + "\n" : "") + "โหลดตัวแก้โค้ด Monaco ไม่ได้ (ไม่มีอินเทอร์เน็ต?) ใช้ช่องข้อความธรรมดาแทน";
+  $("ed-dot").className = "dot " + dot;
+  $("ed-txt").textContent = txt + (E && E.plain ? " · โหมดข้อความธรรมดา" : "");
+  $("ed-state").title = tip || txt;
+  $("ed-save").disabled = !ed.ready;
+  $("ed-dl").disabled = !ed.ready;
+
+  const c = $("ed-conflict");
+  c.classList.toggle("on", !!ed.conflict);
+  if (ed.conflict)
+    $("ed-conflict-msg").innerHTML = `<b>${esc(ed.name)}</b> ถูกแก้จากโปรแกรมอื่นขณะที่ในเว็บมีส่วนที่ยังไม่บันทึก — หยุดบันทึกอัตโนมัติไว้ก่อน เลือกว่าจะเก็บฉบับไหน`;
+}
+
+function applyMarkers(){
+  if (!E || !ed.ready) return;
+  if (!editorActive() || !resp || resp.file !== ed.name){ E.markers([]); return; }
+  const list = [];
+  for (const d of (resp.ok ? resp.warnings : resp.diagnostics) || [])
+    list.push({ line: d.line, col: d.column, endLine: d.endLine, endCol: d.endColumn, message: `${d.id}: ${d.message}`, severity: d.severity });
+  if (resp.ok && result && result.exception){
+    const m = /:line (\d+)/.exec(result.exception.stack || "");
+    if (m) list.push({ line: +m[1], message: `${result.exception.type}: ${result.exception.message}`, severity: "Error" });
+  }
+  E.markers(list);
+}
+
+function download(){
+  if (!E || !ed.ready) return;
+  const blob = new Blob([E.get()], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = ed.name || "subassembly.cs"; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+$("b-edit").onclick = toggleEditor;
+$("ed-close").onclick = closeEditor;
+$("ed-save").onclick = saveNow;
+$("ed-dl").onclick = download;
+$("ed-keep").onclick = () => { ed.conflict = null; save(true); };
+$("ed-take").onclick = () => {
+  const c = ed.conflict; if (!c) return;
+  setText(c.source, true);
+  Object.assign(ed, { savedText: c.source, base: c.mtime, conflict: null, dirty: false, error: null });
+  if (state.file === OPENED){ opened.text = c.source; opened.lastModified = c.mtime; }
+  renderEditorBar(); run(); E.focus();     // Ctrl+Z ย้อนกลับไปฉบับในเว็บได้
+};
+$("ed-keep").addEventListener("click", () => E && E.focus());
+$("problem").addEventListener("click", e => {
+  const d = e.target.closest("[data-line]");
+  if (d && editorActive()) E.goto(+d.dataset.line, +(d.dataset.col || 1));
+});
+
+$("b-new").onclick = async () => {
+  const name = prompt("ชื่อไฟล์ .cs ใหม่ (สร้างในโฟลเดอร์ของ viewer)", "new-subassembly");
+  if (!name) return;
+  const r = await fetch("/api/new", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) })
+    .then(r => r.json()).catch(() => ({ ok: false, message: "server ไม่ตอบ — หน้าต่าง run-viewer ยังเปิดอยู่ไหม?" }));
+  if (!r.ok){ alert(r.message); return; }
+  await poll();
+  selectFile(r.file);
+  if (!ed.open) openEditor();
+};
+
+// ปรับความกว้างแถบโค้ด
+$("ed-resize").addEventListener("pointerdown", e => {
+  const x0 = e.clientX, w0 = $("ed").getBoundingClientRect().width;
+  const move = ev => {
+    state.edWidth = Math.round(Math.max(280, Math.min(innerWidth - 330 - 240, w0 + ev.clientX - x0)));
+    document.body.style.setProperty("--edw", state.edWidth + "px");
+  };
+  const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); persist(); };
+  addEventListener("pointermove", move); addEventListener("pointerup", up);
+  e.preventDefault();
+});
+
+// ปิดหน้าเว็บระหว่างที่ยังไม่บันทึก: ไฟล์ในโฟลเดอร์ส่งบันทึกครั้งสุดท้าย, แบบอื่นให้เบราว์เซอร์ถามก่อน
+addEventListener("beforeunload", e => {
+  if (!ed.open || !ed.ready || !ed.dirty || ed.conflict) return;
+  if (ed.kind === "folder")
+    navigator.sendBeacon("/api/save", new Blob([JSON.stringify({ file: ed.name, source: E.get(), baseMtime: ed.base })], { type: "application/json" }));
+  else { e.preventDefault(); e.returnValue = ""; }
+});
+
 // ---------------- start ----------------
 if (state.file === OPENED) state.file = null;   // ไฟล์ที่เปิดเองไม่ถูกจำข้ามการรีเฟรช
-syncInputs(); renderScenarios(); renderPanels();
+if (state.edWidth) document.body.style.setProperty("--edw", state.edWidth + "px");
+syncInputs(); renderScenarios(); renderPanels(); renderEditorBar();
 new ResizeObserver(() => render()).observe(main);
 render(); poll(); setInterval(poll, 1000);
+if (state.editorOpen) openEditor();
 </script>
 </body>
 </html>

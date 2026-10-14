@@ -10,6 +10,8 @@
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <RootNamespace>SA.Shim</RootNamespace>
+    <!-- RunGuard อ่านตำแหน่ง stack เพื่อหยุด recursion ไม่จบก่อนเว็บล่ม -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
 </Project>

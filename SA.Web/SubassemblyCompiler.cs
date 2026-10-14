@@ -11,7 +11,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Text;
 
-public record CompileDiagnostic(string Severity, string Id, int Line, int Column, string Message);
+public record CompileDiagnostic(string Severity, string Id, int Line, int Column, string Message, int EndLine = 0, int EndColumn = 0);
 
 public class CompiledSubassembly
 {
@@ -57,7 +57,10 @@ public class SubassemblyCompiler
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var parseOptions = new CSharpParseOptions(LanguageVersion.Latest, preprocessorSymbols: new[] { "DEBUG", "TRACE", "SA_VIEWER" });
         var text = SourceText.From(source, Encoding.UTF8);
-        var tree = CSharpSyntaxTree.ParseText(text, parseOptions, path: fileName);
+        var parsed = CSharpSyntaxTree.ParseText(text, parseOptions, path: fileName);
+        // แทรกจุดตรวจเวลา/ความลึก stack (ดู RunGuardRewriter) — ไฟล์จริงไม่ถูกแก้
+        var guarded = RunGuardRewriter.Apply(parsed, text, parseOptions);
+        var tree = guarded.Tree;
 
         var compilation = CSharpCompilation.Create(
             "SA_" + Path.GetFileNameWithoutExtension(fileName) + "_" + hash[..8],
@@ -70,7 +73,7 @@ public class SubassemblyCompiler
         using var pe = new MemoryStream();
         using var pdb = new MemoryStream();
         EmitResult emit = compilation.Emit(pe, pdb,
-            embeddedTexts: new[] { EmbeddedText.FromSource(fileName, text) },
+            embeddedTexts: new[] { EmbeddedText.FromSource(fileName, tree.GetText()) },
             options: new EmitOptions(debugInformationFormat: DebugInformationFormat.PortablePdb));
 
         var diags = emit.Diagnostics
@@ -78,9 +81,9 @@ public class SubassemblyCompiler
             .Where(d => d.Severity == DiagnosticSeverity.Error || d.Id != "CS1591")
             .Select(d =>
             {
-                var span = d.Location.GetLineSpan();
-                return new CompileDiagnostic(d.Severity.ToString(), d.Id,
-                    span.StartLinePosition.Line + 1, span.StartLinePosition.Character + 1, d.GetMessage());
+                var (line, col) = guarded.MapToOriginal(d.Location);
+                var (endLine, endCol) = guarded.MapToOriginal(Location.Create(d.Location.SourceTree ?? tree, new TextSpan(d.Location.SourceSpan.End, 0)));
+                return new CompileDiagnostic(d.Severity.ToString(), d.Id, line, col, d.GetMessage(), endLine, endCol);
             })
             .OrderBy(d => d.Severity == "Error" ? 0 : 1).ThenBy(d => d.Line)
             .ToList();

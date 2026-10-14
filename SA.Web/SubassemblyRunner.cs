@@ -57,7 +57,10 @@ public class RunOutput
 public class SubassemblyRunner
 {
     private readonly object _gate = new();
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    // RunGuard หยุดโค้ดที่ใช้เวลาเกิน GuardLimit (เช็คที่ต้น loop/method ที่แทรกไว้ตอนคอมไพล์)
+    // Timeout เป็นด่านสุดท้ายสำหรับโค้ดที่ค้างในจุดที่ไม่มีจุดตรวจ เช่น Thread.Sleep
+    private static readonly TimeSpan GuardLimit = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(6);
 
     public RunOutput Run(Type type, Dictionary<string, JsonElement>? values, WorldInput w)
     {
@@ -82,40 +85,65 @@ public class SubassemblyRunner
 
             Console.SetOut(log);
             Trace.Listeners.Add(listener);
+            string? guardTripped = null, guardStack = null;
             try
             {
                 var task = Task.Run(() =>
                 {
                     SimHost.Current = cs;
-                    object inst = Activator.CreateInstance(type)!;
+                    RunGuard.Begin(GuardLimit);
+                    try
+                    {
+                        object inst = Activator.CreateInstance(type)!;
 
-                    output.Stage = "GetLogicalNames";
-                    Call(inst, "GetLogicalNames");
-                    int targetCount = cs.ParamsLong.Count;
+                        output.Stage = "GetLogicalNames";
+                        Call(inst, "GetLogicalNames");
+                        int targetCount = cs.ParamsLong.Count;
 
-                    output.Stage = "GetInputParameters";
-                    Call(inst, "GetInputParameters");
-                    output.Stage = "GetOutputParameters";
-                    Call(inst, "GetOutputParameters");
+                        output.Stage = "GetInputParameters";
+                        Call(inst, "GetInputParameters");
+                        output.Stage = "GetOutputParameters";
+                        Call(inst, "GetOutputParameters");
 
-                    CollectDefs(cs, targetCount, output);
-                    ApplyValues(cs, targetCount, values);
-                    AssignTargets(cs, targetCount, world, output);
+                        CollectDefs(cs, targetCount, output);
+                        ApplyValues(cs, targetCount, values);
+                        AssignTargets(cs, targetCount, world, output);
 
-                    output.Stage = "Draw";
-                    Call(inst, "Draw");
-                    output.Stage = null;
+                        output.Stage = "Draw";
+                        Call(inst, "Draw");
+                        output.Stage = null;
+                    }
+                    finally
+                    {
+                        guardTripped = RunGuard.Tripped;
+                        guardStack = RunGuard.TrippedStack;
+                        RunGuard.End();
+                    }
                 });
 
                 if (!task.Wait(Timeout))
                 {
-                    output.Exception = new { type = "Timeout", message = $"โค้ดทำงานเกิน {Timeout.TotalSeconds:0} วินาทีในขั้น {output.Stage} (วนลูปไม่จบ?) — ถ้าเว็บช้าลงให้ปิดแล้วเปิดใหม่", stack = "" };
+                    output.Exception = new { type = "Timeout", message = $"โค้ดทำงานเกิน {Timeout.TotalSeconds:0} วินาทีในขั้น {output.Stage} และหยุดเองไม่ได้ (ค้างในจุดที่ไม่มี loop เช่น Thread.Sleep?) — ถ้าเว็บช้าลงให้ปิดหน้าต่าง run-viewer แล้วเปิดใหม่", stack = "" };
+                }
+                else if (guardTripped == "timeout")
+                {
+                    // โค้ดอาจ catch exception ไว้เอง (เช่น catch (Exception) ใน Draw) จึงรายงานจาก flag แทน
+                    output.Exception = new { type = "Timeout", message = $"โค้ดทำงานเกิน {GuardLimit.TotalSeconds:0} วินาทีในขั้น {output.Stage ?? "Draw"} — น่าจะมี loop ที่ไม่จบ เว็บหยุดการรันให้แล้ว", stack = UserStack(guardStack) };
+                }
+                else if (guardTripped == "stack")
+                {
+                    output.Exception = new { type = "StackOverflow", message = $"เรียกฟังก์ชันซ้อนกันลึกเกินไปในขั้น {output.Stage ?? "Draw"} (recursion ไม่จบ?) เว็บหยุดให้ก่อน stack ล้น", stack = UserStack(guardStack) };
                 }
             }
             catch (AggregateException ae)
             {
                 var e = ae.InnerException is TargetInvocationException tie && tie.InnerException != null ? tie.InnerException : ae.InnerException ?? ae;
-                output.Exception = new { type = e.GetType().Name, message = e.Message, stack = UserStack(e) };
+                if (e is ViewerTimeoutException)
+                    output.Exception = new { type = "Timeout", message = e.Message + $" (ขั้น {output.Stage})", stack = UserStack(guardStack ?? e.StackTrace) };
+                else if (e is InsufficientExecutionStackException)
+                    output.Exception = new { type = "StackOverflow", message = $"เรียกฟังก์ชันซ้อนกันลึกเกินไปในขั้น {output.Stage} (recursion ไม่จบ?) เว็บหยุดให้ก่อน stack ล้น", stack = UserStack(guardStack ?? e.StackTrace) };
+                else
+                    output.Exception = new { type = e.GetType().Name, message = e.Message, stack = UserStack(e) };
             }
             finally
             {
@@ -243,11 +271,16 @@ public class SubassemblyRunner
     }
 
     // เก็บเฉพาะบรรทัด stack trace ที่อยู่ในไฟล์ของผู้ใช้ (ตัดส่วนของเว็บ/ตัวจำลองออก)
-    private static string UserStack(Exception e)
+    private static string UserStack(Exception e) => UserStack(e.StackTrace);
+
+    private static string UserStack(string? stackTrace)
     {
-        var lines = (e.StackTrace ?? "").Split('\n').Select(l => l.Trim())
-            .Where(l => l.Length > 0 && !l.StartsWith("---") && !l.Contains("InvokeStub_") && !l.Contains("SubassemblyRunner") && !l.StartsWith("at System."))
+        var lines = (stackTrace ?? "").Split('\n').Select(l => l.Trim())
+            .Where(l => l.Length > 0 && !l.StartsWith("---") && !l.Contains("InvokeStub_") && !l.Contains("SubassemblyRunner") && !l.Contains("SA.Shim.RunGuard") && !l.StartsWith("at System."))
             .ToList();
+        const int max = 12;   // recursion ลึกจะได้ stack หลายพันบรรทัด ตัดให้อ่านได้
+        if (lines.Count > max)
+            return string.Join("\n", lines.Take(max)) + $"\n… (อีก {lines.Count - max} บรรทัด)";
         return string.Join("\n", lines);
     }
 }

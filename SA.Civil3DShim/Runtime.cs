@@ -287,13 +287,14 @@ namespace Autodesk.Civil.Runtime
 
     public class CorridorState
     {
-        public CorridorState(SimWorld world)
+        // originOffset / originElevation = ตำแหน่งจริงของ origin ของ subassembly ตัวนี้
+        public CorridorState(SimWorld world, double originOffset, double originElevation)
         {
             World = world;
             Mode = world.LayoutMode ? CorridorMode.Layout : CorridorMode.Corridor;
             CurrentStation = world.Station;
-            CurrentOffset = world.OriginOffset;
-            CurrentElevation = world.OriginElevation;
+            CurrentOffset = originOffset;
+            CurrentElevation = originElevation;
         }
 
         public SimWorld World { get; }
@@ -323,6 +324,14 @@ namespace Autodesk.Civil.Runtime
         public ObjectId CurrentBaselineId { get; set; } = SimWorld.AlignmentId;
         public ObjectId CurrentProfileId { get; set; } = SimWorld.ProfileId;
         public bool CurrentAlignmentIsOffsetAlignment { get; set; }
+
+        // ตาม API Reference:
+        //   CurrentAssemblyOffset/Elevation    = ตำแหน่ง assembly เทียบ baseline alignment / profile
+        //   CurrentSubassemblyOffset/Elevation = ตำแหน่งจุดเกาะของ subassembly เทียบ origin ของ assembly
+        public double CurrentAssemblyOffset { get; set; }
+        public double CurrentAssemblyElevation { get; set; }
+        public double CurrentSubassemblyOffset { get; set; }
+        public double CurrentSubassemblyElevation { get; set; }
         public bool CurrentAssemblyOffsetIsFixed { get; set; }
         public double CurrentAssemblyFixedOffset { get; set; }
         public double CurrentAssemblyFixedElevation { get; set; }

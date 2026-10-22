@@ -3,7 +3,8 @@
 //
 // ระบบพิกัดจำลอง:
 //   alignment เป็นเส้นตรงวิ่งตามแกน +Y  ->  X (โลก) = offset, Y (โลก) = station
-//   surface ในเว็บกำหนดเป็น (offset, elevation) เทียบกับ origin ของ subassembly
+//   surface เก็บเป็นค่าจริง (offset จาก alignment, elevation จริง)
+//   origin ของแต่ละ subassembly อยู่ใน CorridorState (CurrentOffset / CurrentElevation)
 
 using System;
 using System.Collections.Generic;
@@ -14,7 +15,7 @@ namespace SA.Shim
 {
     public class SimWorld
     {
-        // จุด surface เทียบกับ origin (X = offset, Y = elevation) เรียงตาม X
+        // จุด surface ค่าจริง (X = offset จาก alignment, Y = elevation จริง)
         public List<(double X, double Y)> Surface { get; set; } = new List<(double X, double Y)>();
 
         // ต่อปลายเส้น surface ออกไปแนวราบไม่จำกัด (จำลอง surface ที่กว้างกว่าที่วาด)
@@ -27,8 +28,6 @@ namespace SA.Shim
         public bool LayoutMode { get; set; }
 
         public double Station { get; set; } = 0.0;
-        public double OriginOffset { get; set; } = 0.0;
-        public double OriginElevation { get; set; } = 100.0;
 
         public static readonly ObjectId SurfaceId = new ObjectId(1, "EG (web surface)");
         public static readonly ObjectId AlignmentId = new ObjectId(2, "Alignment (straight, +Y)");
@@ -38,8 +37,7 @@ namespace SA.Shim
 
         internal List<(double O, double E)> SurfaceAbs()
         {
-            return Surface.Select(p => (O: OriginOffset + p.X, E: OriginElevation + p.Y))
-                          .OrderBy(p => p.O).ToList();
+            return Surface.Select(p => (O: p.X, E: p.Y)).OrderBy(p => p.O).ToList();
         }
 
         internal double ElevationAtOffset(double absOffset)
@@ -49,7 +47,7 @@ namespace SA.Shim
                 absOffset = Math.Max(s[0].O, Math.Min(s[s.Count - 1].O, absOffset));
             if (s.Count < 2 || absOffset < s[0].O - 1e-9 || absOffset > s[s.Count - 1].O + 1e-9)
                 throw new Autodesk.Civil.PointNotOnEntityException(
-                    $"offset {absOffset - OriginOffset:0.###} (เทียบ origin) อยู่นอกขอบเขตของ surface");
+                    $"offset {absOffset:0.###} อยู่นอกขอบเขตของ surface");
             for (int i = 0; i < s.Count - 1; i++)
             {
                 if (absOffset <= s[i + 1].O + 1e-9)

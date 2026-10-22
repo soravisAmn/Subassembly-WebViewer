@@ -21,6 +21,9 @@ public class WorldInput
 
 public record SurfacePt(double X, double Y);
 
+// จุดผลลัพธ์: X/Y เทียบ origin ของ subassembly (AssemblyService แปลงเป็นพิกัดบนจอให้)
+public record OutPt(double X, double Y, string[] Codes);
+
 public class ParamDef
 {
     public required string Name { get; init; }
@@ -44,7 +47,7 @@ public class RunOutput
     public string ClassName { get; set; } = "";
     public List<ParamDef> Params { get; } = new();
     public List<TargetDef> Targets { get; } = new();
-    public List<object> Points { get; } = new();
+    public List<OutPt> Points { get; set; } = new();
     public List<object> Links { get; } = new();
     public List<object> Shapes { get; } = new();
     public List<SimIssue> Issues { get; set; } = new();
@@ -62,20 +65,34 @@ public class SubassemblyRunner
     private static readonly TimeSpan GuardLimit = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(6);
 
+    // โหมดไฟล์เดียว: origin อยู่ที่ offset 0, ระดับ OriginElevation; surface กำหนดเทียบ origin
     public RunOutput Run(Type type, Dictionary<string, JsonElement>? values, WorldInput w)
+    {
+        var world = new SimWorld
+        {
+            Surface = (w.Surface ?? new()).Select(p => (p.X, w.OriginElevation + p.Y)).OrderBy(p => p.Item1).ToList(),
+            SurfaceAssigned = w.SurfaceAssigned,
+            ExtendEnds = w.ExtendEnds,
+            LayoutMode = w.LayoutMode,
+            Station = w.Station
+        };
+        return Run(type, values, world, 0.0, w.OriginElevation, w.OriginElevation);
+    }
+
+    // originOffset / originElevation = ตำแหน่งจริงของจุดเกาะ (origin) ของ subassembly ตัวนี้
+    // baselineElevation = ระดับจริงของแกน assembly (alignment อยู่ที่ offset 0)
+    public RunOutput Run(Type type, Dictionary<string, JsonElement>? values, SimWorld world,
+                         double originOffset, double originElevation, double baselineElevation)
     {
         lock (_gate)
         {
-            var world = new SimWorld
+            var cs = new CorridorState(world, originOffset, originElevation)
             {
-                Surface = (w.Surface ?? new()).Select(p => (p.X, p.Y)).OrderBy(p => p.X).ToList(),
-                SurfaceAssigned = w.SurfaceAssigned,
-                ExtendEnds = w.ExtendEnds,
-                LayoutMode = w.LayoutMode,
-                OriginElevation = w.OriginElevation,
-                Station = w.Station
+                CurrentAssemblyOffset = 0.0,
+                CurrentAssemblyElevation = 0.0,
+                CurrentSubassemblyOffset = originOffset,
+                CurrentSubassemblyElevation = originElevation - baselineElevation
             };
-            var cs = new CorridorState(world);
             var output = new RunOutput { ClassName = type.FullName ?? type.Name };
 
             var log = new StringWriter();
@@ -243,7 +260,7 @@ public class SubassemblyRunner
     private static void CollectGeometry(CorridorState cs, RunOutput o)
     {
         foreach (var p in cs.Points)
-            o.Points.Add(new { x = p.Offset, y = p.Elevation, codes = p.Codes.ToArray() });
+            o.Points.Add(new OutPt(p.Offset, p.Elevation, p.Codes.ToArray()));
         foreach (var l in cs.Links)
             o.Links.Add(new { pts = l.Points.Select(p => p.Index).ToArray(), codes = l.Codes.ToArray() });
         foreach (var s in cs.Shapes)

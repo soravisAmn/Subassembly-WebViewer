@@ -21,15 +21,17 @@ builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
     o.SerializerOptions.NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals;
 });
+var folder = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath,
+    builder.Configuration["SubassemblyFolder"] ?? ".."));
+
 builder.Services.AddSingleton<SubassemblyCompiler>();
 builder.Services.AddSingleton<SubassemblyRunner>();
+builder.Services.AddSingleton(sp => new AssemblyService(
+    sp.GetRequiredService<SubassemblyCompiler>(), sp.GetRequiredService<SubassemblyRunner>(), folder));
 
 var app = builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();
-
-var folder = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath,
-    app.Configuration["SubassemblyFolder"] ?? ".."));
 var startedAt = DateTime.Now;
 
 app.Logger.LogInformation("Subassembly folder: {Folder}", folder);
@@ -40,17 +42,45 @@ app.MapGet("/api/info", () => new
     folder
 });
 
-// รายการไฟล์ .cs ในโฟลเดอร์ (ไม่รวมโฟลเดอร์ย่อย) พร้อมเวลาแก้ไขล่าสุด
+// รายการไฟล์ .cs และไฟล์ .assembly.json ในโฟลเดอร์ (ไม่รวมโฟลเดอร์ย่อย) พร้อมเวลาแก้ไขล่าสุด
 app.MapGet("/api/files", () =>
 {
-    var files = Directory.Exists(folder)
-        ? Directory.GetFiles(folder, "*.cs", SearchOption.TopDirectoryOnly)
+    List<object> List(string pattern) => Directory.Exists(folder)
+        ? Directory.GetFiles(folder, pattern, SearchOption.TopDirectoryOnly)
             .Select(f => new FileInfo(f))
             .OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
             .Select(f => new { name = f.Name, mtime = Mtime(f.FullName), size = f.Length })
             .ToList<object>()
         : new List<object>();
-    return new { folder, files };
+    return new { folder, files = List("*.cs"), assemblies = List("*.assembly.json") };
+});
+
+// ---------------- assembly: ประกอบหลาย subassembly ----------------
+
+app.MapPost("/api/assembly", (AssemblyReq req, AssemblyService svc) => new { items = svc.Run(req) });
+
+// เปิด / บันทึกไฟล์ .assembly.json ในโฟลเดอร์
+app.MapGet("/api/assembly-file", (string name) =>
+{
+    var file = FileUtil.AssemblyFileName(name);
+    var path = file == null ? null : Path.Combine(folder, file);
+    if (path == null || !File.Exists(path)) return Results.NotFound(new { message = $"ไม่พบไฟล์ {name}" });
+    return Results.Text(ReadShared(path), "application/json");
+});
+
+app.MapPost("/api/assembly-file", (AssemblySaveRequest req) =>
+{
+    var file = FileUtil.AssemblyFileName(req.Name);
+    if (file == null) return Results.BadRequest(new { message = "ชื่อไฟล์ไม่ถูกต้อง" });
+    try
+    {
+        WriteText(Path.Combine(folder, file), JsonSerializer.Serialize(req.Content, new JsonSerializerOptions { WriteIndented = true }));
+        return Results.Ok(new { name = file });
+    }
+    catch (Exception e)
+    {
+        return Results.BadRequest(new { message = $"บันทึก {file} ไม่ได้: {e.Message}" });
+    }
 });
 
 app.MapPost("/api/run", (RunRequest req, SubassemblyCompiler compiler, SubassemblyRunner runner) =>
@@ -211,6 +241,7 @@ static string ReadShared(string path)
 
 record SaveRequest(string? File, string? Source, string? BaseMtime, bool Force);
 record NewRequest(string? Name);
+record AssemblySaveRequest(string? Name, JsonElement Content);
 
 record RunRequest(string? File, string? Source, string? SourceName, string? ClassName,
                   Dictionary<string, JsonElement>? Params, WorldInput? World);

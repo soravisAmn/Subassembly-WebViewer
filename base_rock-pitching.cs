@@ -53,7 +53,7 @@ namespace TestSubassembly
 
         // ค่า default
         private const int SideDefault = Right;
-        private const double TopWidthDefault = 4.0;
+        private const double TopWidthDefault = 2.0;
         private const double SideSlopeDefault = 1.5; // 1:1.5 (ดิ่ง:ราบ)
         private const double DepthDefault = 2.0;
 

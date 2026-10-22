@@ -15,6 +15,7 @@
   --shape:rgba(31,95,191,.10);
   --err:#b42318; --err-soft:#fde8e6; --warn:#a15c00; --warn-soft:#fdf0d9; --ok:#14845f;
   --l1:#1f5fbf; --l2:#c46a12; --l3:#14845f; --l4:#6b3fb8; --l5:#b0306a; --l6:#0f7c8c; --l7:#7a6a00; --l8:#5c6068;
+  --base:#b0306a;
 }
 @media (prefers-color-scheme:dark){
   :root{
@@ -25,6 +26,7 @@
     --shape:rgba(110,164,255,.12);
     --err:#ff8a80; --err-soft:#3a1d1b; --warn:#ffc266; --warn-soft:#352a14; --ok:#3fcf9a;
     --l1:#6ea4ff; --l2:#f0a04b; --l3:#3fcf9a; --l4:#b08cff; --l5:#ff7eb6; --l6:#4fd2e0; --l7:#e2cf55; --l8:#9a9ea6;
+    --base:#ff7eb6;
   }
 }
 *{box-sizing:border-box}
@@ -137,6 +139,52 @@ body.editing #ed{display:flex}
 .ed-empty[hidden]{display:none}
 #ed-resize{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:6}
 .problem .d[data-line]{cursor:pointer}
+/* assembly */
+body:not(.asm) .asm-only{display:none !important}
+body.asm .single-only{display:none !important}
+.hgroup{display:inline-flex;align-items:center;gap:6px}
+.seg{display:inline-flex}
+.seg button{border-radius:0}
+.seg button:first-child{border-radius:4px 0 0 4px}
+.seg button:last-child{border-radius:0 4px 4px 0;margin-left:-1px}
+header .sep{width:1px;height:22px;background:var(--line);margin:0 2px}
+h2 .sub{text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;text-align:left;margin-left:6px}
+.tree{margin:0 -6px}
+.node{display:flex;align-items:flex-start;gap:6px;padding:5px 6px;border-radius:5px;cursor:pointer;border:1px solid transparent}
+.node:hover{background:var(--paper)}
+.node.sel{background:var(--accent-soft);border-color:var(--accent)}
+.node .ic{flex:none;width:14px;text-align:center;font-size:12px;line-height:20px;color:var(--muted)}
+.node .ic.base{color:var(--base)}
+.node .body{flex:1;min-width:0}
+.node .name{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node .name small{font-weight:400;color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:11px}
+.node .att{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node .att.lost,.node .att.free{color:var(--warn)}
+.node .acts{flex:none;display:flex;gap:3px;opacity:0;transition:opacity .1s}
+.node:hover .acts,.node.sel .acts{opacity:1}
+.node .acts button{padding:0 6px;font-size:12px;line-height:20px}
+.sdot{flex:none;width:8px;height:8px;border-radius:50%;margin-top:7px;background:var(--ok)}
+.sdot.w{background:var(--warn)}
+.sdot.e{background:var(--err)}
+.sdot.n{background:var(--line)}
+.group{font-size:11px;color:var(--muted);margin:8px 6px 2px;text-transform:uppercase;letter-spacing:.06em}
+.item.dim{opacity:.45}
+.item.drag{opacity:.85}
+.shape.item-hit{pointer-events:auto;cursor:move}
+.link-hit{fill:none;stroke:transparent;stroke-width:10;cursor:move}
+.item .pt{cursor:move}
+.pt-lbl{pointer-events:none}
+.org{fill:var(--paper);stroke:var(--accent);stroke-width:1.6;cursor:move}
+.org.free{stroke:var(--warn);stroke-dasharray:3 2}
+.org.lost{stroke:var(--warn);fill:var(--warn-soft)}
+.bl-line{stroke:var(--base);stroke-width:1;stroke-dasharray:8 4 2 4;opacity:.7;pointer-events:none}
+.bl{fill:var(--paper);stroke:var(--base);stroke-width:2;cursor:move}
+.bl-lbl{fill:var(--base);font:11px "IBM Plex Mono",monospace;pointer-events:none;paint-order:stroke;stroke:var(--paper);stroke-width:3px}
+.snap{fill:none;stroke:var(--accent);stroke-width:1.2;opacity:.55;pointer-events:none}
+.snap.hot{stroke-width:2.5;opacity:1}
+.snap-lbl{fill:var(--accent);font:11px "IBM Plex Mono",monospace;pointer-events:none;paint-order:stroke;stroke:var(--paper);stroke-width:3px}
+#asm-welcome{pointer-events:none}
+#asm-welcome div{background:color-mix(in srgb,var(--paper) 85%,transparent);padding:12px 16px;border-radius:8px}
 .problem .d[data-line]:hover{background:var(--accent-soft)}
 </style>
 </head>
@@ -149,12 +197,30 @@ body.editing #ed{display:flex}
   <button id="b-edit" title="แสดง/ซ่อนแถบแก้โค้ด (Ctrl+E)">✎ แก้โค้ด</button>
   <input id="f-open" type="file" accept=".cs" hidden>
   <select id="cls" title="class ในไฟล์" hidden></select>
+  <span class="sep"></span>
+  <span class="seg"><button id="m-single" title="ดูไฟล์ .cs ทีละไฟล์">ไฟล์เดียว</button><button id="m-asm" title="ประกอบหลาย subassembly เป็น assembly">Assembly</button></span>
+  <span class="hgroup asm-only">
+    <button id="b-asm-add" class="primary" title="เพิ่มไฟล์ที่เลือกอยู่ลงใน assembly (จะลอยอยู่ ลากไปเกาะแกนหรือจุดเอง)">+ เพิ่มลง assembly</button>
+    <select id="asm-file" title="ไฟล์ .assembly.json ในโฟลเดอร์" style="min-width:150px"></select>
+    <button id="b-asm-save" title="บันทึกลงไฟล์ .assembly.json ในโฟลเดอร์">บันทึก</button>
+    <button id="b-asm-saveas">บันทึกเป็น…</button>
+    <button id="b-asm-new">ใหม่</button>
+  </span>
   <span class="hint mono" id="folder" style="margin:0"></span>
 </header>
 
 <aside>
+  <section class="asm-only">
+    <h2>Assembly</h2>
+    <div id="tree" class="tree"></div>
+    <div class="hint">
+      ลาก subassembly (จับที่ตัวมันหรือจุด ◇ origin) ไปปล่อยใกล้ <b style="color:var(--base)">แกน</b> หรือจุดของตัวอื่นเพื่อเกาะ ·
+      ลากออกห่างเพื่อปลด · ลากแกน ⊞ ไปวางตรงไหนก็ได้ · เลือกตัวไหน แถบโค้ดจะเปิดไฟล์ของตัวนั้น
+    </div>
+  </section>
+
   <section>
-    <h2>Parameters <button id="b-defaults" title="กลับไปใช้ค่า default จาก GetInputParameters">ค่า default</button></h2>
+    <h2>Parameters <span class="sub asm-only" id="sel-name"></span> <button id="b-defaults" title="กลับไปใช้ค่า default จาก GetInputParameters">ค่า default</button></h2>
     <div id="params"><div class="empty">เลือกไฟล์ .cs ก่อน</div></div>
   </section>
 
@@ -162,7 +228,8 @@ body.editing #ed{display:flex}
     <h2>Corridor</h2>
     <div class="row"><label for="mode">Mode</label>
       <select id="mode"><option value="corridor">Corridor</option><option value="layout">Layout</option></select></div>
-    <div class="row"><label for="oelev">Origin elevation<small>ระดับจริงของจุด origin</small></label><input id="oelev" type="number" step="0.5"></div>
+    <div class="row single-only"><label for="oelev">Origin elevation<small>ระดับจริงของจุด origin</small></label><input id="oelev" type="number" step="0.5"></div>
+    <div class="row asm-only"><label for="bl-elev">ระดับแกน assembly<small>ระดับจริง (profile)</small></label><input id="bl-elev" type="number" step="0.5"></div>
     <div id="targets"></div>
     <label class="check"><input type="checkbox" id="surf-on"> กำหนด surface ของเว็บให้ Target Surface</label>
   </section>
@@ -245,7 +312,11 @@ body.editing #ed{display:flex}
   </div>
   <div class="mode-banner" id="banner">โหมด Add point: คลิกบนเส้น surface เพื่อแทรกจุด · Esc เพื่อออก</div>
   <div class="problem" id="problem"></div>
-  <div class="welcome" id="welcome"><div>
+  <div class="welcome asm-only" id="asm-welcome"><div>
+    <p><b>Assembly ยังว่าง</b></p>
+    <p>เลือกไฟล์ .cs ด้านบนแล้วกด <b>+ เพิ่มลง assembly</b> จากนั้นลาก subassembly ไปปล่อยที่แกน assembly (⊞ เส้นประสีชมพู)</p>
+  </div></div>
+  <div class="welcome single-only" id="welcome"><div>
     <p><b>ยังไม่มีไฟล์ .cs</b></p>
     <p>วางไฟล์ .cs ของ subassembly ไว้ในโฟลเดอร์ <span class="mono" id="welcome-folder"></span> แล้วเลือกจากรายการด้านบน หรือกด <b>Open .cs…</b></p>
     <p>หรือกด <b>+ ไฟล์ใหม่</b> เพื่อเริ่มเขียน subassembly จาก template ในเว็บนี้เลย</p>
@@ -275,7 +346,9 @@ const state = Object.assign({
   surface: DEFAULT_SURFACE.map(p => ({...p})),
   surfaceOn: true, layout: false, originElevation: 100, extendEnds: true,
   view: { cx:1.5, cy:-1.8, scale:42, ve:1 },
-  showCodes: true, snap: false
+  showCodes: true, snap: false,
+  asmOn: false,
+  asm: { baseline: { x:0, y:0 }, items: [], selectedId: null, name: null }
 }, store.get("sav2.state", {}));
 const persist = () => store.set("sav2.state", state);
 
@@ -285,7 +358,9 @@ let addMode = false, selected = -1, hoverPt = -1, drag = null, lastSegDown = nul
 const codeColor = {};
 
 const fileKey = () => state.file === OPENED ? "opened:" + (opened ? opened.name : "") : state.file || "";
-const values = () => (state.values[fileKey()] ||= {});
+const values = () => state.asmOn
+  ? (selItem() ? (selItem().params ||= {}) : {})      // assembly: parameter ของตัวที่เลือก
+  : (state.values[fileKey()] ||= {});
 
 // ---------------- coordinates ----------------
 let W = 800, H = 600;
@@ -318,6 +393,7 @@ function niceStep(pxPerUnit){
 }
 
 function render(){
+  if (state.asmOn) return renderAsm();
   const r = main.getBoundingClientRect();
   W = r.width; H = r.height;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
@@ -564,6 +640,7 @@ function setStatus(kind, txt){
 }
 
 function run(){
+  if (state.asmOn) return runAsm();
   if (!state.file || (state.file === OPENED && !opened)) { resp = null; result = null; render(); renderPanels(); renderProblem(); return; }
   if (inFlight){ pending = true; return; }
   inFlight = true;
@@ -599,6 +676,8 @@ function poll(){
     $("welcome-folder").textContent = info.folder;
     const sig = info.files.map(f => f.name).join("|");
     const prevMtime = lastMtime[state.file];
+    const prevAll = lastMtime;
+    assemblies = info.assemblies || []; renderAsmFileList();
     files = info.files;
     lastMtime = Object.fromEntries(files.map(f => [f.name, f.mtime]));
     if (sig !== lastSig){
@@ -610,10 +689,13 @@ function poll(){
       }
       renderFileList();
     }
+    // assembly: ไฟล์ของตัวไหนถูกแก้จากโปรแกรมอื่น -> คำนวณใหม่
+    if (state.asmOn && A().items.some(it => it.file && prevAll[it.file] && prevAll[it.file] !== lastMtime[it.file]
+                                         && !(editorActive() && ed.name === it.file))) flashReload();
     // ไฟล์ที่เปิดอยู่ในแถบแก้: checkExternal จัดการเอง (โหลดฉบับใหม่ หรือแจ้งว่าชนกัน)
     if (editorActive()) checkExternal();
     else if (state.file && state.file !== OPENED && prevMtime && prevMtime !== lastMtime[state.file]) flashReload();
-    if (!resp && state.file) run();
+    if (state.asmOn ? !Object.keys(asmRes).length && A().items.length : (!resp && state.file)) run();
   }).catch(() => setStatus("off", "server ไม่ตอบ — หน้าต่าง run-viewer ยังเปิดอยู่ไหม?"));
 
   if (opened && opened.handle && !(editorActive() && state.file === OPENED)){
@@ -648,6 +730,12 @@ $("f-open").onchange = async e => {
   selectFile(OPENED);
 };
 function selectFile(name){
+  if (state.asmOn){
+    // assembly: dropdown เลือกไฟล์ที่จะเพิ่ม / เปิดในแถบโค้ด ไม่เปลี่ยนรูปที่วาดอยู่
+    state.file = name; persist(); renderFileList();
+    if (ed.open) loadDoc();
+    return;
+  }
   state.file = name; resp = null; result = null; stale = false; selected = -1;
   persist(); renderFileList(); render(); renderPanels(); renderProblem();
   $("params").innerHTML = '<div class="empty">กำลังคอมไพล์…</div>';
@@ -656,7 +744,11 @@ function selectFile(name){
   if (ed.open) loadDoc();
 }
 $("file").onchange = () => selectFile($("file").value);
-$("cls").onchange = () => { state.classByFile[fileKey()] = $("cls").value; persist(); run(); };
+$("cls").onchange = () => {
+  if (state.asmOn){ const it = selItem(); if (it) it.className = $("cls").value; }
+  else state.classByFile[fileKey()] = $("cls").value;
+  persist(); run();
+};
 
 // ---------------- interaction ----------------
 function evtPos(e){ const r = svg.getBoundingClientRect(); return { px: e.clientX - r.left, py: e.clientY - r.top }; }
@@ -689,6 +781,7 @@ function setAddMode(on){
 svg.addEventListener("pointerdown", e => {
   const t = e.target, kind = t.dataset.kind, { px, py } = evtPos(e);
   if (e.button === 2) return;
+  if (state.asmOn && e.button === 0 && asmPointerDown(e, kind, px, py)){ svg.setPointerCapture(e.pointerId); e.preventDefault(); return; }
   if (kind === "h"){
     selected = +t.dataset.i;
     drag = { type:"pt", i: selected };
@@ -727,9 +820,11 @@ svg.addEventListener("pointermove", e => {
     state.surface.forEach((p, i) => p.y = drag.ys[i] + dy);
     showTip(px, py, `เลื่อน surface ${dy >= 0 ? "+" : ""}${f3(dy)} m`);
     changed();
+  } else if (drag.type === "baseline" || drag.type === "item"){
+    asmPointerMove(e, px, py);
   }
 });
-const endDrag = () => { if (drag){ drag = null; tip.style.display = "none"; persist(); } };
+const endDrag = () => { if (drag){ if (!asmEndDrag()) drag = null; tip.style.display = "none"; persist(); } };
 svg.addEventListener("pointerup", endDrag);
 svg.addEventListener("pointercancel", endDrag);
 svg.addEventListener("contextmenu", e => {
@@ -751,6 +846,7 @@ function showTip(px, py, text){
   tip.style.left = (px + 14) + "px"; tip.style.top = (py + 14) + "px";
 }
 function hoverTip(e, px, py){
+  if (state.asmOn) return asmHoverTip(e, px, py);
   const k = e.target.dataset.kind, i = +e.target.dataset.i;
   if (k === "pt" && result){
     const p = result.points[i];
@@ -765,6 +861,7 @@ function hoverTip(e, px, py){
 }
 
 function fit(){
+  if (state.asmOn) return asmFit();
   const xs = [], ys = [];
   if (result) result.points.forEach(p => { xs.push(p.x); ys.push(p.y); });
   state.surface.forEach(p => { xs.push(p.x); ys.push(p.y); });
@@ -788,7 +885,11 @@ $("b-fit").onclick = fit;
 $("b-add").onclick = () => setAddMode(!addMode);
 $("b-del").onclick = () => deletePoint(selected);
 $("b-reset").onclick = () => { state.surface = DEFAULT_SURFACE.map(p => ({...p})); selected = -1; changed(); };
-$("b-defaults").onclick = () => { state.values[fileKey()] = {}; persist(); run(); };
+$("b-defaults").onclick = () => {
+  if (state.asmOn){ const it = selItem(); if (it) it.params = {}; }
+  else state.values[fileKey()] = {};
+  persist(); run();
+};
 $("sel-x").addEventListener("change", () => {
   const s = state.surface, i = selected, v = parseFloat($("sel-x").value);
   if (isNaN(v) || i < 0) return;
@@ -813,11 +914,17 @@ document.addEventListener("keydown", e => {
 // ---------------- scenarios ----------------
 let scenarios = store.get("sav2.scenarios", []);
 function snapshot(name){
+  if (state.asmOn){
+    const c = asmContent(); c.items.forEach((x, i) => { if (!x.file) x.source = A().items[i].source; });
+    return { name, asm: c, file: A().items.length + " subassembly" };
+  }
   return { name, file: state.file === OPENED ? (opened ? opened.name : "") : state.file,
            values: {...values()}, surface: state.surface.map(p => ({...p})),
            surfaceOn: state.surfaceOn, layout: state.layout, originElevation: state.originElevation };
 }
 function loadScenario(s){
+  if (s.asm){ if (!state.asmOn) setAsmMode(true); return loadAsmContent(JSON.parse(JSON.stringify(s.asm)), A().name); }
+  if (state.asmOn) setAsmMode(false);
   state.surface = s.surface.map(p => ({...p}));
   state.surfaceOn = s.surfaceOn; state.layout = s.layout; state.originElevation = s.originElevation;
   if (s.file && files.some(f => f.name === s.file)) state.file = s.file;
@@ -857,6 +964,505 @@ $("f-import").onchange = e => {
   });
   e.target.value = "";
 };
+
+// ---------------- assembly: ประกอบ subassembly หลายไฟล์ ----------------
+// พิกัดบนจอใช้ชุดเดียวกับโหมดไฟล์เดียว: Y = 0 คือระดับจริง originElevation
+// แกน assembly วางได้อิสระที่ A().baseline; subassembly แต่ละตัวเกาะที่แกน / จุดของตัวอื่น (ด้วย point code) / หรือลอยอยู่
+const SNAP_PX = 14;
+const A = () => state.asm;
+let asmRes = {};               // id -> ผลจาก /api/assembly
+let assemblies = [];           // ไฟล์ .assembly.json ในโฟลเดอร์
+
+const selItem = () => state.asmOn ? (A().items.find(i => i.id === A().selectedId) || null) : null;
+const itemLabel = it => it ? (it.file || it.sourceName || "?") : "";
+const newId = () => "s" + Math.random().toString(36).slice(2, 8);
+const offOf = x => x - A().baseline.x;
+const elevOf = y => state.originElevation + y;
+
+function setAsmMode(on){
+  flushSave();
+  state.asmOn = on;
+  document.body.classList.toggle("asm", on);
+  $("m-single").classList.toggle("on", !on);
+  $("m-asm").classList.toggle("on", on);
+  resp = null; result = null; stale = false; asmRes = {}; selected = -1; hoverPt = -1;
+  if (on){ const it = selItem(); if (it && it.file){ state.file = it.file; renderFileList(); } }
+  persist(); syncInputs();
+  $("params").innerHTML = '<div class="empty">กำลังคำนวณ…</div>';
+  render(); renderPanels(); renderProblem(); renderTree();
+  if (ed.open) loadDoc();
+  run();
+}
+
+// ลูกหลานของ item (ใช้กันเกาะวน และสำหรับ mirror)
+function descendants(id){
+  const out = new Set(), stack = [id];
+  while (stack.length){
+    const cur = stack.pop();
+    for (const it of A().items) if (it.attach.type === "point" && it.attach.parent === cur && !out.has(it.id)){ out.add(it.id); stack.push(it.id); }
+  }
+  return out;
+}
+function itemStatus(id){
+  const r = asmRes[id];
+  if (!r) return "n";
+  if (!r.ok || (r.result && r.result.exception)) return "e";
+  if (r.attachState === "lost" || r.attachState === "free" || (r.result && r.result.issues.some(i => i.level !== "Informational"))) return "w";
+  return "ok";
+}
+function sideOf(it){
+  const r = asmRes[it.id];
+  const def = r && r.result ? r.result.params.find(p => /^side$/i.test(p.name) && p.kind === "long") : null;
+  if (!def) return null;
+  const v = def.name in (it.params || {}) ? it.params[def.name] : def.default;
+  return +v === 1 ? 1 : 0;
+}
+
+// ---- วาด ----
+function renderAsm(){
+  const r = main.getBoundingClientRect();
+  W = r.width; H = r.height;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = "";
+  svg.classList.toggle("add", addMode);
+  svg.classList.remove("stale");
+
+  // grid: แนวราบวัดจากแกน assembly, แนวดิ่งเป็นระดับจริง
+  const g = el("g", {}, svg);
+  const bx = A().baseline.x, by = A().baseline.y;
+  const stepX = niceStep(state.view.scale), stepY = niceStep(state.view.scale * state.view.ve);
+  for (let k = Math.floor((wx(0) - bx) / stepX); bx + k * stepX <= wx(W); k++){
+    const x = bx + k * stepX, major = Math.abs(k % 5) === 0;
+    el("line", {x1:sx(x), x2:sx(x), y1:0, y2:H, class: major ? "g-major" : "g-minor"}, g);
+    if (major) el("text", {x:sx(x)+3, y:H-6, class:"g-lbl"}, g).textContent = +(k * stepX).toFixed(2);
+  }
+  for (let k = Math.floor(elevOf(wy(H)) / stepY); k * stepY - state.originElevation <= wy(0); k++){
+    const y = k * stepY - state.originElevation, major = Math.abs(k % 5) === 0;
+    el("line", {x1:0, x2:W, y1:sy(y), y2:sy(y), class: major ? "g-major" : "g-minor"}, g);
+    if (major) el("text", {x:4, y:sy(y)-3, class:"g-lbl"}, g).textContent = +(k * stepY).toFixed(2);
+  }
+
+  const pts = state.surface;
+  if (pts.length >= 2 && state.surfaceOn){
+    const a = pts[0], z = pts[pts.length-1];
+    const fd = state.extendEnds
+      ? `M0 ${sy(a.y)} L` + pts.map(p => sx(p.x) + " " + sy(p.y)).join(" L") + ` L${W} ${sy(z.y)} L${W} ${H} L0 ${H} Z`
+      : "M" + pts.map(p => sx(p.x) + " " + sy(p.y)).join(" L") + ` L${sx(z.x)} ${H} L${sx(a.x)} ${H} Z`;
+    el("path", {d: fd, class:"gnd-fill"}, svg);
+  }
+  el("line", {x1:sx(bx), x2:sx(bx), y1:0, y2:H, class:"bl-line"}, svg);
+
+  const dragId = drag && drag.type === "item" ? drag.id : null;
+  for (const it of A().items){
+    const rr = asmRes[it.id];
+    if (!rr || !rr.result) continue;
+    const res = rr.result, P = res.points;
+    const isSel = it.id === A().selectedId;
+    const grp = el("g", {class:"item" + (A().selectedId && !isSel && dragId !== it.id ? " dim" : "") + (dragId === it.id ? " drag" : "")}, svg);
+    for (const s of res.shapes)
+      if (s.polygon) el("polygon", {points: s.polygon.map(i => sx(P[i].x)+","+sy(P[i].y)).join(" "), class:"shape item-hit", "data-kind":"item", "data-id":it.id}, grp);
+    res.links.forEach((l, i) => {
+      const d = l.pts.map((k, j) => (j ? "L" : "M") + sx(P[k].x) + " " + sy(P[k].y)).join(" ");
+      el("path", {d, class:"link", stroke: colorFor(primaryCode(l.codes))}, grp);
+      el("path", {d, class:"link-hit", "data-kind":"link", "data-id":it.id, "data-i":i}, grp);
+    });
+    P.forEach((p, i) => {
+      el("circle", {cx:sx(p.x), cy:sy(p.y), r:3.6, class:"pt" + (isSel && i === hoverPt ? " hl" : ""), "data-kind":"pt", "data-id":it.id, "data-i":i}, grp);
+      if (state.showCodes && isSel && p.codes.length)
+        el("text", {x:sx(p.x)+7, y:sy(p.y)-7, class:"pt-lbl"}, grp).textContent = p.codes.join(", ");
+    });
+  }
+
+  if (pts.length >= 2){
+    const d = pts.map((p,i) => (i ? "L" : "M") + sx(p.x) + " " + sy(p.y)).join(" ");
+    el("path", {d, class:"gnd" + (state.surfaceOn ? "" : " off"), style:"pointer-events:none"}, svg);
+    if (state.extendEnds){
+      const a = pts[0], z = pts[pts.length-1];
+      el("path", {d:`M0 ${sy(a.y)} L${sx(a.x)} ${sy(a.y)} M${sx(z.x)} ${sy(z.y)} L${W} ${sy(z.y)}`, class:"gnd ext", style:"pointer-events:none"}, svg);
+    }
+    el("path", {d, class:"gnd-hit", "data-kind":"seg"}, svg);
+  }
+
+  // origin ◇ ของแต่ละตัว
+  for (const it of A().items){
+    const rr = asmRes[it.id];
+    const dragging = dragId === it.id;
+    const ox = dragging ? drag.ox : (rr ? rr.originX : it.attach.x);
+    const oy = dragging ? drag.oy : (rr ? rr.originY : it.attach.y);
+    const st = dragging ? drag.attach.type : (rr ? rr.attachState : it.attach.type);
+    const s = it.id === A().selectedId ? 7 : 5.5;
+    el("path", {d:`M${sx(ox)} ${sy(oy)-s} L${sx(ox)+s} ${sy(oy)} L${sx(ox)} ${sy(oy)+s} L${sx(ox)-s} ${sy(oy)} Z`,
+      class:"org" + (st === "free" ? " free" : st === "lost" ? " lost" : ""), "data-kind":"item", "data-id":it.id}, svg);
+  }
+
+  if (drag && drag.type === "item" && drag.moved){
+    for (const c of drag.cands){
+      const hot = drag.hot === c;
+      el("circle", {cx:sx(c.x), cy:sy(c.y), r: hot ? 10 : 6, class:"snap" + (hot ? " hot" : "")}, svg);
+      if (hot) el("text", {x:sx(c.x)+12, y:sy(c.y)+16, class:"snap-lbl"}, svg).textContent = c.label;
+    }
+  }
+
+  el("rect", {x:sx(bx)-7, y:sy(by)-7, width:14, height:14, rx:3, class:"bl", "data-kind":"baseline"}, svg);
+  el("text", {x:sx(bx)+10, y:sy(by)-10, class:"bl-lbl"}, svg).textContent = `แกน assembly · ${f3(elevOf(by))}`;
+
+  state.surface.forEach((p, i) => {
+    el("rect", {x:sx(p.x)-5, y:sy(p.y)-5, width:10, height:10, rx:2, class:"h" + (i === selected ? " sel" : ""), "data-kind":"h", "data-i":i}, svg);
+  });
+
+  $("asm-welcome").style.display = A().items.length ? "none" : "flex";
+}
+
+function renderTree(){
+  const box = $("tree"); if (!box) return;
+  box.innerHTML = "";
+  if (!state.asmOn) return;
+  const items = A().items, known = new Set(items.map(i => i.id));
+  const kids = id => items.filter(it => it.attach.type === "point" && it.attach.parent === id);
+
+  const base = document.createElement("div");
+  base.className = "node" + (A().selectedId ? "" : " sel");
+  base.innerHTML = `<span class="ic base">⊞</span><div class="body"><div class="name">แกน assembly</div>
+    <div class="att mono">ระดับ ${f3(elevOf(A().baseline.y))}</div></div>`;
+  base.onclick = () => selectItem(null);
+  box.appendChild(base);
+
+  const drawn = new Set();
+  const addNode = (it, depth) => {
+    if (drawn.has(it.id)) return;
+    drawn.add(it.id);
+    const rr = asmRes[it.id], st = itemStatus(it.id), a = it.attach;
+    const div = document.createElement("div");
+    div.className = "node" + (it.id === A().selectedId ? " sel" : "");
+    div.style.paddingLeft = (6 + depth * 16) + "px";
+    let att = "", attCls = "";
+    if (rr && rr.attachState === "lost"){ att = "⚠ " + (rr.attachNote || "หาจุดเกาะไม่เจอ"); attCls = "lost"; }
+    else if (a.type === "baseline") att = "เกาะแกน assembly";
+    else if (a.type === "point"){
+      const p = items.find(x => x.id === a.parent);
+      att = `เกาะ ${esc(a.code ? a.code : "จุด #" + a.index + " (ไม่มี code)")} ของ ${esc(itemLabel(p))}`;
+    } else { att = "ยังไม่ได้เกาะ — ลากไปที่แกนหรือจุด"; attCls = "free"; }
+    const side = sideOf(it);
+    div.innerHTML = `<span class="sdot ${st === "ok" ? "" : st}"></span>
+      <div class="body"><div class="name">${esc(itemLabel(it))} <small>${side !== null ? (side ? "Left" : "Right") : ""}</small></div>
+      <div class="att ${attCls}">${att}</div></div>
+      <div class="acts"><button data-act="mirror" title="Mirror: สำเนาฝั่งตรงข้าม (สลับ Side) พร้อมตัวที่เกาะอยู่">⇋</button><button data-act="del" title="เอาออกจาก assembly (ไฟล์ไม่ถูกลบ)">×</button></div>`;
+    div.onclick = e => {
+      const act = e.target.dataset && e.target.dataset.act;
+      if (act === "mirror") return mirrorItem(it.id);
+      if (act === "del") return removeItem(it.id);
+      selectItem(it.id);
+    };
+    box.appendChild(div);
+    for (const k of kids(it.id)) addNode(k, depth + 1);
+  };
+  for (const it of items.filter(i => i.attach.type === "baseline")) addNode(it, 1);
+  const rest = items.filter(i => !drawn.has(i.id));
+  if (rest.length){
+    const g = document.createElement("div"); g.className = "group"; g.textContent = "ยังไม่ได้เกาะแกน"; box.appendChild(g);
+    for (const it of rest.filter(i => i.attach.type !== "point" || !known.has(i.attach.parent))) addNode(it, 0);
+    for (const it of rest) addNode(it, 0);    // กันตกหล่น (เช่น เกาะวน)
+  }
+  if (!items.length){
+    const e = document.createElement("div"); e.className = "empty"; e.style.margin = "6px";
+    e.textContent = "ยังไม่มี subassembly — เลือกไฟล์ด้านบนแล้วกด + เพิ่มลง assembly"; box.appendChild(e);
+  }
+  $("sel-name").textContent = selItem() ? itemLabel(selItem()) : "";
+  $("bl-elev").value = f3(elevOf(A().baseline.y));
+}
+
+// แปลงผลของตัวที่เลือกเป็น resp/result แบบโหมดไฟล์เดียว เพื่อใช้แผงด้านข้าง / กรอบแดง / เส้นหยักในแถบโค้ดชุดเดิม
+// จุดในแผง Points แสดงเทียบ origin ของตัวที่เลือก (ค่าเดียวกับที่โค้ดส่งให้ Points.Add)
+function mapSelected(){
+  const r = A().selectedId ? asmRes[A().selectedId] : null;
+  if (!r){ resp = null; result = null; }
+  else {
+    resp = { ok: r.ok, file: r.file, stage: r.stage, message: r.message, diagnostics: r.diagnostics || [],
+             classes: r.classes || [], warnings: r.ok ? (r.diagnostics || []) : [] };
+    result = r.result ? { ...r.result, points: r.result.points.map(p => ({ x: p.x - r.originX, y: p.y - r.originY, codes: p.codes })) } : null;
+  }
+}
+function renderAsmPanels(){
+  mapSelected();
+  renderAsm(); renderTree(); renderPanels(); renderParams(); renderTargets(); renderClasses(); renderProblem(); applyMarkers();
+  const it = selItem();
+  if (!it) $("params").innerHTML = '<div class="empty">เลือก subassembly ใน Assembly ก่อน</div>';
+  else if (!asmRes[it.id]) $("params").innerHTML = '<div class="empty">กำลังคอมไพล์…</div>';
+  const r = it ? asmRes[it.id] : null;
+  if (r && r.attachState === "lost"){
+    const d = document.createElement("div"); d.className = "w"; d.textContent = "จุดเกาะ · " + r.attachNote;
+    $("issues").prepend(d);
+  }
+  if (!it) $("issues").innerHTML = '<div class="empty">เลือก subassembly เพื่อดูข้อความ</div>';
+}
+
+function selectItem(id){
+  A().selectedId = id; hoverPt = -1;
+  const it = selItem();
+  if (it && it.file && it.file !== state.file){
+    state.file = it.file; renderFileList();
+    if (ed.open) loadDoc();
+  }
+  persist(); renderAsmPanels();
+}
+
+// ---- ส่งไป server ----
+function asmBody(){
+  return {
+    baseline: A().baseline, datum: state.originElevation,
+    surface: state.surface, surfaceAssigned: state.surfaceOn, extendEnds: state.extendEnds, layoutMode: state.layout,
+    items: A().items.map(it => {
+      const attach = drag && drag.type === "item" && drag.id === it.id ? drag.attach : it.attach;
+      const o = { id: it.id, className: it.className || null, params: it.params || {}, attach };
+      const name = it.file || it.sourceName;
+      // โค้ดในแถบแก้ (รวมส่วนที่ยังไม่บันทึก) ใช้กับทุกตัวที่มาจากไฟล์เดียวกัน
+      if (editorActive() && ed.name === name && (it.file ? ed.kind === "folder" : ed.kind !== "folder")){ o.source = E.get(); o.sourceName = name; }
+      else if (it.file) o.file = it.file;
+      else { o.source = opened && opened.name === it.sourceName ? opened.text : it.source; o.sourceName = it.sourceName; }
+      return o;
+    })
+  };
+}
+
+function runAsm(){
+  if (inFlight){ pending = true; return; }
+  inFlight = true;
+  const t0 = performance.now();
+  fetch("/api/assembly", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(asmBody()) })
+    .then(r => r.json())
+    .then(r => {
+      asmRes = {};
+      for (const x of r.items) asmRes[x.id] = x;
+      // จำตำแหน่งจุดเกาะล่าสุด (ใช้เป็นตำแหน่งสำรองเมื่อหาจุดเกาะไม่เจอ)
+      for (const it of A().items){
+        const x = asmRes[it.id];
+        if (x && x.attachState !== "lost" && !(drag && drag.id === it.id)){ it.attach.x = x.originX; it.attach.y = x.originY; }
+      }
+      const bad = A().items.filter(it => itemStatus(it.id) === "e").length;
+      setStatus(bad ? "busy" : "ok", `assembly · ${A().items.length} subassembly${bad ? ` · ${bad} มีปัญหา` : ""} · ${(performance.now() - t0).toFixed(0)} ms`);
+      if (!drag) persist();
+      renderAsmPanels();
+    })
+    .catch(() => setStatus("off", "server ไม่ตอบ — หน้าต่าง run-viewer ยังเปิดอยู่ไหม?"))
+    .finally(() => { inFlight = false; if (pending){ pending = false; run(); } });
+}
+
+// ---- แก้ assembly ----
+function addItem(){
+  if (!state.file) return;
+  const props = state.file === OPENED
+    ? { sourceName: opened.name, source: opened.text }
+    : { file: state.file };
+  const n = A().items.length;
+  // ตัวใหม่ลอยอยู่เหนือแกน ให้ผู้ใช้ลากไปเกาะเอง
+  const it = Object.assign({ id: newId(), className: null, params: {},
+    attach: { type:"free", x: A().baseline.x + 2 + (n % 4) * 1.5, y: A().baseline.y + 2.5 } }, props);
+  A().items.push(it);
+  A().selectedId = it.id;
+  persist(); renderAsmPanels(); run();
+}
+
+function removeItem(id){
+  const items = A().items;
+  // ตัวที่เกาะอยู่กับตัวนี้: ปลดให้ลอยอยู่ที่ตำแหน่งเดิม
+  for (const k of items) if (k.attach.type === "point" && k.attach.parent === id){
+    const r = asmRes[k.id];
+    k.attach = { type:"free", x: r ? r.originX : k.attach.x, y: r ? r.originY : k.attach.y };
+  }
+  A().items = items.filter(i => i.id !== id);
+  if (A().selectedId === id) A().selectedId = null;
+  persist(); renderAsmPanels(); run();
+}
+
+// Mirror: สำเนาตัวที่เลือกพร้อมตัวที่เกาะอยู่ทั้งหมด สลับ Side และเกาะที่เดียวกัน (ตัวที่ลอยอยู่สะท้อนข้ามแกน)
+function mirrorItem(id){
+  const ids = [id, ...descendants(id)], map = {};
+  ids.forEach(x => map[x] = newId());
+  const clones = ids.map(x => {
+    const src = A().items.find(i => i.id === x);
+    const c = JSON.parse(JSON.stringify(src));
+    c.id = map[x];
+    const r = asmRes[x];
+    const def = r && r.result ? r.result.params.find(p => /^side$/i.test(p.name) && p.kind === "long") : null;
+    if (def) c.params[def.name] = sideOf(src) === 1 ? 0 : 1;
+    if (x !== id) c.attach.parent = map[c.attach.parent];
+    else if (c.attach.type === "free") c.attach.x = 2 * A().baseline.x - c.attach.x;
+    return c;
+  });
+  A().items.push(...clones);
+  A().selectedId = map[id];
+  persist(); renderAsmPanels(); run();
+}
+
+// จุดที่ตัวที่ลากเกาะได้: แกน + ทุกจุดของตัวอื่น (ยกเว้นตัวเองและตัวที่เกาะอยู่กับตัวเอง)
+function snapCandidates(id){
+  const banned = descendants(id); banned.add(id);
+  const c = [{ x: A().baseline.x, y: A().baseline.y, attach:{ type:"baseline" }, label:"แกน assembly" }];
+  for (const it of A().items){
+    if (banned.has(it.id)) continue;
+    const r = asmRes[it.id];
+    if (!r || !r.result) continue;
+    r.result.points.forEach((p, i) => {
+      const code = p.codes[0] || null;
+      c.push({ x:p.x, y:p.y, attach:{ type:"point", parent: it.id, code, index: i },
+               label: (code || `จุด #${i} (ไม่มี code)`) + " · " + itemLabel(it) });
+    });
+  }
+  return c;
+}
+
+// ---- เมาส์ ----
+function asmPointerDown(e, kind, px, py){
+  const t = e.target;
+  if (kind === "baseline"){
+    drag = { type:"baseline", px, py, x0: A().baseline.x, y0: A().baseline.y };
+    return true;
+  }
+  if (kind === "item" || kind === "link" || kind === "pt"){
+    const id = t.dataset.id, it = A().items.find(i => i.id === id);
+    if (!it) return false;
+    if (A().selectedId !== id) selectItem(id);
+    const r = asmRes[id];
+    const ox = r ? r.originX : it.attach.x, oy = r ? r.originY : it.attach.y;
+    drag = { type:"item", id, px, py, ox, oy, ox0: ox, oy0: oy, moved:false, attach: it.attach, cands: snapCandidates(id), hot:null };
+    return true;
+  }
+  return false;
+}
+
+function asmPointerMove(e, px, py){
+  if (drag.type === "baseline"){
+    A().baseline.x = snapV(drag.x0 + (px - drag.px) / state.view.scale);
+    A().baseline.y = snapV(drag.y0 - (py - drag.py) / (state.view.scale * state.view.ve));
+    showTip(px, py, `แกน assembly\nระดับ ${f3(elevOf(A().baseline.y))}`);
+    $("bl-elev").value = f3(elevOf(A().baseline.y));
+    changed();
+    return;
+  }
+  if (!drag.moved && Math.hypot(px - drag.px, py - drag.py) < 4) return;
+  drag.moved = true;
+  let ox = drag.ox0 + (px - drag.px) / state.view.scale;
+  let oy = drag.oy0 - (py - drag.py) / (state.view.scale * state.view.ve);
+  let best = null, bestD = SNAP_PX;
+  for (const c of drag.cands){
+    const d = Math.hypot(sx(c.x) - sx(ox), sy(c.y) - sy(oy));
+    if (d < bestD){ best = c; bestD = d; }
+  }
+  drag.hot = best;
+  if (best){ ox = best.x; oy = best.y; drag.attach = { ...best.attach, x: ox, y: oy }; }
+  else { ox = snapV(ox); oy = snapV(oy); drag.attach = { type:"free", x: ox, y: oy }; }
+  drag.ox = ox; drag.oy = oy;
+  showBanner(best ? "ปล่อยเพื่อเกาะที่ " + best.label : "ปล่อยตรงนี้ = ยังไม่เกาะ (ลอยอยู่)");
+  tip.style.display = "none";
+  renderAsm(); run();
+}
+
+function asmEndDrag(){
+  if (drag.type === "item" && drag.moved){
+    const it = A().items.find(i => i.id === drag.id);
+    if (it) it.attach = drag.attach;
+    showBanner("");
+    drag = null;
+    persist(); run();
+    return true;
+  }
+  return false;
+}
+
+function showBanner(t){
+  const b = $("banner");
+  if (t){ b.textContent = t; b.style.display = "block"; }
+  else { b.textContent = "โหมด Add point: คลิกบนเส้น surface เพื่อแทรกจุด · Esc เพื่อออก"; b.style.display = addMode ? "block" : "none"; }
+}
+
+function asmHoverTip(e, px, py){
+  const k = e.target.dataset.kind, i = +e.target.dataset.i, id = e.target.dataset.id;
+  const r = id ? asmRes[id] : null, it = id ? A().items.find(x => x.id === id) : null;
+  if (k === "pt" && r && r.result){
+    const p = r.result.points[i];
+    showTip(px, py, `${itemLabel(it)} #${i} ${p.codes.join(", ") || "(no code)"}\nOffset ${f3(offOf(p.x))}  (จากแกน)\nElev   ${f3(elevOf(p.y))}`);
+  } else if (k === "link" && r && r.result){
+    const l = r.result.links[i];
+    showTip(px, py, `${itemLabel(it)} link #${i}: ${l.pts.join("→")}\n${l.codes.join(", ") || "(no code)"}`);
+  } else if (k === "h"){
+    const p = state.surface[i];
+    showTip(px, py, `surface #${i}\nOffset ${f3(offOf(p.x))}  (จากแกน)\nElev   ${f3(elevOf(p.y))}`);
+  } else if (k === "baseline"){
+    showTip(px, py, `แกน assembly (ลากเพื่อย้าย)\nระดับ ${f3(elevOf(A().baseline.y))}`);
+  } else if (k === "item" && it){
+    showTip(px, py, `${itemLabel(it)}\nลากไปปล่อยที่แกน/จุดเพื่อเกาะ`);
+  } else tip.style.display = "none";
+}
+
+function asmFit(){
+  const xs = [A().baseline.x], ys = [A().baseline.y];
+  for (const id in asmRes){ const x = asmRes[id].result; if (x) x.points.forEach(p => { xs.push(p.x); ys.push(p.y); }); }
+  state.surface.forEach(p => { xs.push(p.x); ys.push(p.y); });
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  state.view.scale = Math.max(4, Math.min((W - 120) / Math.max(maxX - minX, 1), (H - 160) / (Math.max(maxY - minY, 1) * state.view.ve)));
+  state.view.cx = (minX + maxX) / 2;
+  state.view.cy = (minY + maxY) / 2;
+  render(); persist();
+}
+
+// ---- ไฟล์ .assembly.json ----
+function asmContent(){
+  return {
+    version: 1,
+    baseline: A().baseline, originElevation: state.originElevation,
+    surface: state.surface, surfaceOn: state.surfaceOn, layout: state.layout, extendEnds: state.extendEnds,
+    items: A().items.map(it => ({ id: it.id, file: it.file, sourceName: it.sourceName, source: it.file ? undefined : it.source,
+                                  className: it.className, params: it.params, attach: it.attach }))
+  };
+}
+function loadAsmContent(c, name){
+  A().baseline = c.baseline || { x:0, y:0 };
+  if (c.originElevation != null) state.originElevation = c.originElevation;
+  if (c.surface) state.surface = c.surface;
+  if (c.surfaceOn != null) state.surfaceOn = c.surfaceOn;
+  if (c.layout != null) state.layout = !!c.layout;
+  if (c.extendEnds != null) state.extendEnds = c.extendEnds;
+  A().items = (c.items || []).map(it => ({ params:{}, ...it }));
+  A().selectedId = null; A().name = name;
+  asmRes = {}; selected = -1;
+  syncInputs(); renderAsmFileList(); persist(); renderAsmPanels(); run();
+  setTimeout(asmFit, 400);
+}
+function renderAsmFileList(){
+  const sel = $("asm-file");
+  sel.innerHTML = `<option value="">${A().name ? "—" : "(ยังไม่ได้บันทึก)"}</option>` + assemblies.map(a => `<option>${esc(a.name)}</option>`).join("");
+  sel.value = A().name && assemblies.some(a => a.name === A().name) ? A().name : "";
+}
+async function saveAsm(name){
+  const r = await fetch("/api/assembly-file", { method:"POST", headers:{ "Content-Type":"application/json" },
+                         body: JSON.stringify({ name, content: asmContent() }) }).catch(() => null);
+  const j = r ? await r.json().catch(() => ({})) : { message: "server ไม่ตอบ" };
+  if (!r || !r.ok){ alert(j.message || "บันทึกไม่สำเร็จ"); return; }
+  A().name = j.name; persist(); await poll();
+  setStatus("ok", "บันทึก " + j.name + " แล้ว");
+}
+$("m-single").onclick = () => state.asmOn && setAsmMode(false);
+$("m-asm").onclick = () => !state.asmOn && setAsmMode(true);
+$("b-asm-add").onclick = addItem;
+$("b-asm-save").onclick = () => A().name ? saveAsm(A().name) : $("b-asm-saveas").onclick();
+$("b-asm-saveas").onclick = () => {
+  const n = prompt("ชื่อไฟล์ assembly (บันทึกเป็น ชื่อ.assembly.json ในโฟลเดอร์)", (A().name || "assembly").replace(/\.assembly\.json$/i, ""));
+  if (n) saveAsm(n);
+};
+$("b-asm-new").onclick = () => {
+  if (A().items.length && !confirm("เริ่ม assembly ใหม่? (ส่วนที่ยังไม่ได้บันทึกจะหายไป)")) return;
+  loadAsmContent({ baseline: A().baseline }, null);
+};
+$("asm-file").onchange = async () => {
+  const n = $("asm-file").value; if (!n) return;
+  const r = await fetch("/api/assembly-file?name=" + encodeURIComponent(n)).catch(() => null);
+  if (!r || !r.ok){ alert("เปิดไฟล์ไม่สำเร็จ"); return; }
+  loadAsmContent(await r.json(), n);
+};
+$("bl-elev").addEventListener("change", () => {
+  const v = parseFloat($("bl-elev").value);
+  if (!isNaN(v)){ state.originElevation = v - A().baseline.y; changed(); renderTree(); }
+});
 
 // ---------------- แถบแก้โค้ด ----------------
 // พิมพ์แล้วรูปวาดใหม่เองหลังหยุดพิมพ์ RUN_DELAY และบันทึกลงไฟล์เองหลัง SAVE_DELAY
@@ -1218,6 +1824,9 @@ addEventListener("beforeunload", e => {
 if (state.file === OPENED) state.file = null;   // ไฟล์ที่เปิดเองไม่ถูกจำข้ามการรีเฟรช
 if (state.edWidth) document.body.style.setProperty("--edw", state.edWidth + "px");
 syncInputs(); renderScenarios(); renderPanels(); renderEditorBar();
+document.body.classList.toggle("asm", !!state.asmOn);
+$("m-single").classList.toggle("on", !state.asmOn); $("m-asm").classList.toggle("on", !!state.asmOn);
+if (state.asmOn) renderTree();
 new ResizeObserver(() => render()).observe(main);
 render(); poll(); setInterval(poll, 1000);
 if (state.editorOpen) openEditor();

@@ -2,6 +2,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SA.Core\SA.Core.csproj" />
+    <!-- ตัวสร้างโค้ด / คอมไพเลอร์ / ตัวรันของเว็บ (DrawingTests.cs) -->
+    <ProjectReference Include="..\SA.Web\SA.Web.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -12,6 +12,7 @@
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SA.Drawing;
 
 [assembly: System.Reflection.Metadata.MetadataUpdateHandler(typeof(HotReloadTracker))]
 
@@ -31,7 +32,8 @@ builder.Services.AddSingleton(sp => new AssemblyService(
 
 var app = builder.Build();
 app.UseDefaultFiles();
-app.UseStaticFiles();
+// หน้าเว็บแยกเป็นหลายไฟล์ (css/, js/) -> ให้เบราว์เซอร์ถามทุกครั้งว่าไฟล์เปลี่ยนไหม กันได้ js เก่าปนกับ html ใหม่
+app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = c => c.Context.Response.Headers.CacheControl = "no-cache" });
 var startedAt = DateTime.Now;
 
 app.Logger.LogInformation("Subassembly folder: {Folder}", folder);
@@ -186,6 +188,100 @@ app.MapPost("/api/new", (NewRequest req) =>
     }
 });
 
+// ---------------- ส่วนที่วาดในเว็บ (DrawingSpec) -> โค้ด C# ----------------
+// ดูโค้ดที่สร้าง (แถบโค้ด read-only): ไม่มีไฟล์ = ทั้งไฟล์ใหม่; มีไฟล์ที่มีช่วง SA-DRAWING = ไฟล์เดิมที่แทนช่วงนั้นแล้ว
+app.MapPost("/api/drawing/code", (DrawingReq req) =>
+{
+    try
+    {
+        var spec = DrawingSpec.Parse(req.Spec);
+        var raw = req.Spec.GetRawText();
+        var path = string.IsNullOrEmpty(req.File) ? null : FolderFile(folder, req.File);
+        if (path != null && File.Exists(path))
+        {
+            var src = ReadShared(path);
+            var block = CodeGenerator.FindBlock(src);
+            if (block == null) return Results.Ok(new { ok = false, message = $"{Path.GetFileName(path)} ยังไม่มีช่วง SA-DRAWING (ไฟล์ที่เขียนเอง — Milestone 4)" });
+            return Results.Ok(new { ok = true, source = CodeGenerator.ReplaceBlock(src, block, CodeGenerator.GenerateBlock(spec, raw, block.Indent)) });
+        }
+        var name = req.FileName ?? spec.ClassName + ".cs";
+        return Results.Ok(new { ok = true, source = CodeGenerator.GenerateFile(spec, raw, Path.GetFileName(name)) });
+    }
+    catch (Exception e) when (e is FormatException or JsonException)
+    {
+        return Results.Ok(new { ok = false, message = "สร้างโค้ดไม่ได้: " + e.Message });
+    }
+});
+
+// อ่านส่วนที่วาดกลับจากไฟล์ (sa-spec) ตอน import / เปิด project
+app.MapGet("/api/drawing/spec", (string file) =>
+{
+    var path = FolderFile(folder, file);
+    if (path == null || !File.Exists(path)) return Results.Ok(new { ok = false, message = $"ไม่พบไฟล์ {file}" });
+    var block = CodeGenerator.FindBlock(ReadShared(path));
+    if (block?.SpecJson == null) return Results.Ok(new { ok = true, spec = (JsonElement?)null, edited = false });
+    try
+    {
+        using var doc = JsonDocument.Parse(block.SpecJson);
+        return Results.Ok(new { ok = true, spec = (JsonElement?)doc.RootElement.Clone(), edited = !CodeGenerator.BlockMatchesSpec(block) });
+    }
+    catch (JsonException e)
+    {
+        return Results.Ok(new { ok = false, message = $"อ่าน sa-spec ใน {file} ไม่ได้: {e.Message}" });
+    }
+});
+
+// Save .cs: ไฟล์ยังไม่มี = สร้างทั้งไฟล์; มีช่วง SA-DRAWING = แทนที่เฉพาะช่วงนั้น (ส่วนอื่นไม่เปลี่ยนแม้แต่ไบต์เดียว)
+//   ชื่อซ้ำกับไฟล์ที่ไม่มีช่วงนี้ -> ถาม (overwrite) · ช่วงในไฟล์ถูกแก้ด้วยมือ -> ถาม (force)
+app.MapPost("/api/drawing/save", (DrawingReq req) =>
+{
+    var path = FolderFile(folder, req.File);
+    if (path == null) return Results.Ok(new { ok = false, message = $"ตั้งชื่อไฟล์แบบนี้ไม่ได้: {req.File}" });
+    var name = Path.GetFileName(path);
+    try
+    {
+        var spec = DrawingSpec.Parse(req.Spec);
+        var raw = req.Spec.GetRawText();
+        string text;
+        bool created = false;
+        if (!File.Exists(path))
+        {
+            text = CodeGenerator.GenerateFile(spec, raw, name);
+            created = true;
+        }
+        else
+        {
+            var src = ReadShared(path);
+            var block = CodeGenerator.FindBlock(src);
+            if (block == null)
+            {
+                if (!req.Overwrite)
+                    return Results.Ok(new { ok = false, exists = true, message = $"มีไฟล์ชื่อ {name} อยู่แล้ว และไม่ใช่ไฟล์ที่สร้างจากเว็บ" });
+                text = CodeGenerator.GenerateFile(spec, raw, name);
+            }
+            else
+            {
+                if (!req.Force && !CodeGenerator.BlockMatchesSpec(block))
+                    return Results.Ok(new { ok = false, edited = true, message = $"ช่วง SA-DRAWING ใน {name} ถูกแก้ด้วยมือ (ไม่ตรงกับ sa-spec)" });
+                var miss = CodeGenerator.MissingCalls(src, spec);
+                if (miss.Count > 0)
+                    return Results.Ok(new { ok = false, message = $"{name} ไม่มีบรรทัด {string.Join(", ", miss)} ที่เรียกส่วนที่วาด — การแทรกบรรทัดให้เองมาใน Milestone 4" });
+                text = CodeGenerator.ReplaceBlock(src, block, CodeGenerator.GenerateBlock(spec, raw, block.Indent));
+            }
+        }
+        WriteText(path, text);
+        return Results.Ok(new { ok = true, file = name, created, mtime = Mtime(path) });
+    }
+    catch (Exception e) when (e is FormatException or JsonException)
+    {
+        return Results.Ok(new { ok = false, message = "สร้างโค้ดไม่ได้: " + e.Message });
+    }
+    catch (IOException e)
+    {
+        return Results.Ok(new { ok = false, message = $"บันทึก {name} ไม่ได้: {e.Message}" });
+    }
+});
+
 app.Run();
 
 // ชื่อไฟล์ .cs ที่อยู่ชั้นบนสุดของโฟลเดอร์เท่านั้น (กันชื่อที่พาออกนอกโฟลเดอร์ เช่น ..\x.cs)
@@ -242,6 +338,7 @@ static string ReadShared(string path)
 record SaveRequest(string? File, string? Source, string? BaseMtime, bool Force);
 record NewRequest(string? Name);
 record AssemblySaveRequest(string? Name, JsonElement Content);
+record DrawingReq(JsonElement Spec, string? File, string? FileName, bool Overwrite, bool Force);
 
 record RunRequest(string? File, string? Source, string? SourceName, string? ClassName,
                   Dictionary<string, JsonElement>? Params, WorldInput? World);

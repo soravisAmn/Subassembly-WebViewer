@@ -1,0 +1,182 @@
+[
+  {
+    "name": "สันเขื่อน + ลาดชนดินราบ (Right)",
+    "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }],
+    "spec": {
+      "className": "CrestRight", "namespace": "TestSubassembly",
+      "params": [
+        { "name": "Side", "kind": "long", "default": 0 },
+        { "name": "Width", "kind": "double", "default": 3, "displayName": "ความกว้างสัน", "min": 0.5 },
+        { "name": "SideSlope", "kind": "double", "default": 2 }
+      ],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": ["Crown"], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["EdgeTop"], "def": { "type": "delta", "from": "P1", "dx": "Width", "dy": "0" } },
+        { "id": "P3", "codes": [], "def": { "type": "slopeLength", "from": "P2", "slope": "-1/SideSlope", "length": "sqrt(5)", "dir": 1, "measure": "along" } },
+        { "id": "P4", "codes": ["Daylight"], "def": { "type": "slopeToSurface", "from": "P3", "slope": "-1/SideSlope", "dir": 1, "target": "TargetSurface", "maxDistance": "50", "layoutLength": "3" } },
+        { "id": "P5", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "0", "dy": "-3" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Top", "Datum"] },
+        { "id": "L2", "points": ["P2", "P3"], "codes": ["Side"] },
+        { "id": "L3", "points": ["P3", "P4"], "codes": ["Daylight"] },
+        { "id": "L4", "points": ["P4", "P5"], "codes": ["Datum"] },
+        { "id": "L5", "points": ["P5", "P1"], "codes": [] }
+      ],
+      "shapes": [{ "id": "S1", "links": ["L1", "L2", "L3", "L4", "L5"], "codes": ["Fill"] }],
+      "side": { "param": "Side", "mirror": true }
+    }
+  },
+  {
+    "name": "สันเขื่อนเดียวกัน Side = Left",
+    "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }],
+    "values": { "Side": 1, "Width": 4 },
+    "copySpecFrom": 0
+  },
+  {
+    "name": "ผิวดินหักหลายช่วง: ลาดตัดขึ้นชนดิน + วิ่งตามผิวดิน + บนผิวดิน",
+    "surface": [{ "x": -10, "y": 2 }, { "x": 1, "y": 1.5 }, { "x": 4, "y": 3 }, { "x": 7, "y": 2.2 }, { "x": 15, "y": 4 }],
+    "spec": {
+      "className": "CutSlope",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }, { "name": "CutSlope", "kind": "double", "default": 1.5 }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface" }],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["CutDaylight"], "def": { "type": "slopeToSurface", "from": "P1", "slope": "1/CutSlope", "dir": 1, "target": "TargetSurface", "maxDistance": "50", "layoutLength": "3" } },
+        { "id": "P3", "codes": ["Toe"], "def": { "type": "onSurface", "from": "P2", "dx": "9", "target": "TargetSurface" } },
+        { "id": "P4", "codes": [], "def": { "type": "onSurface", "dx": "-6", "target": "TargetSurface" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Cut"] },
+        { "id": "L2", "type": "followSurface", "from": "P2", "to": "P3", "target": "TargetSurface", "codes": ["Ground"] },
+        { "id": "L3", "type": "followSurface", "from": "P1", "to": "P4", "target": "TargetSurface", "codes": [] }
+      ],
+      "shapes": [],
+      "side": { "param": "Side", "mirror": true }
+    }
+  },
+  {
+    "name": "ผิวดินหักหลายช่วง Side = Left (ผิวดินไม่สมมาตร)",
+    "surface": [{ "x": -10, "y": 2 }, { "x": -4, "y": 1.2 }, { "x": 1, "y": 1.5 }, { "x": 4, "y": 3 }, { "x": 15, "y": 4 }],
+    "values": { "Side": 1 },
+    "copySpecFrom": 2
+  },
+  {
+    "name": "Layout mode: ไม่มีดิน ใช้ความยาวคงที่ / เส้นตรง",
+    "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }],
+    "layout": true,
+    "copySpecFrom": 2
+  },
+  {
+    "name": "Corridor แต่ไม่ได้กำหนด Target Surface",
+    "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }],
+    "surfaceAssigned": false,
+    "copySpecFrom": 0
+  },
+  {
+    "name": "ลาดไม่ชนดินภายใน maxDistance -> หยุดที่ maxDistance",
+    "surface": [{ "x": -30, "y": -20 }, { "x": 30, "y": -20 }],
+    "spec": {
+      "className": "NoHit",
+      "params": [{ "name": "MaxD", "kind": "double", "default": 8 }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface" }],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": [], "def": { "type": "slopeToSurface", "from": "P1", "slope": "-0.25", "dir": -1, "target": "TargetSurface", "maxDistance": "MaxD", "layoutLength": "3" } }
+      ],
+      "links": [{ "id": "L1", "points": ["P1", "P2"], "codes": [] }],
+      "shapes": [],
+      "side": null
+    }
+  },
+  {
+    "name": "between / intersect / measure dx-dy / ฟังก์ชันในนิพจน์",
+    "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }],
+    "values": { "H": 2.5 },
+    "spec": {
+      "className": "Funcs",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }, { "name": "H", "kind": "double", "default": 2 }, { "name": "Ang", "kind": "double", "default": 30 }],
+      "targets": [],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "max(H, 1) * 2 - -1", "dy": "-(H - 0.5) / 2" } },
+        { "id": "P3", "codes": [], "def": { "type": "slopeLength", "from": "P1", "slope": "-tan(Ang)", "length": "H", "dir": 1, "measure": "dx" } },
+        { "id": "P4", "codes": [], "def": { "type": "slopeLength", "from": "P2", "slope": "-1/2", "length": "pow(H, 2) / 4", "dir": -1, "measure": "dy" } },
+        { "id": "P5", "codes": ["Mid"], "def": { "type": "between", "a": "P1", "b": "P2", "t": "0.5" } },
+        { "id": "P6", "codes": ["X"], "def": { "type": "intersect", "a1": "P1", "a2": "P3", "b1": "P2", "b2": "P4" } },
+        { "id": "P7", "codes": [], "def": { "type": "delta", "from": "P6", "dx": "atan(1) / 45 + abs(-0.5) + min(3, 2, H)", "dy": "cos(60) - sin(30)" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["A"] },
+        { "id": "L2", "points": ["P3", "P6"], "codes": ["B"] },
+        { "id": "L3", "points": ["P6", "P7"], "codes": [] }
+      ],
+      "shapes": [],
+      "side": { "param": "Side", "mirror": true }
+    }
+  },
+  {
+    "name": "ฟังก์ชันในนิพจน์ Side = Left",
+    "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }],
+    "values": { "Side": 1, "Ang": 40 },
+    "copySpecFrom": 7
+  },
+  {
+    "name": "ขอบเขต parameter (ต่ำกว่า min / สูงกว่า max) + long",
+    "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }],
+    "values": { "Width": 0.1, "Steps": 9 },
+    "spec": {
+      "className": "Bounds",
+      "params": [{ "name": "Width", "kind": "double", "default": 3, "min": 0.5, "max": 10 }, { "name": "Steps", "kind": "long", "default": 2, "min": 1, "max": 4 }],
+      "targets": [],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "Width * Steps", "dy": "Steps / 8" } }
+      ],
+      "links": [{ "id": "L1", "points": ["P1", "P2"], "codes": [] }],
+      "shapes": [],
+      "side": null
+    }
+  },
+  {
+    "name": "อ้างจุดที่ไม่มี / อ้างกันเป็นวง / หารด้วยศูนย์ -> ข้ามเหมือนกัน",
+    "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }],
+    "spec": {
+      "className": "Broken",
+      "params": [{ "name": "Z", "kind": "double", "default": 0 }],
+      "targets": [],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": [], "def": { "type": "delta", "from": "P9", "dx": "1", "dy": "0" } },
+        { "id": "P3", "codes": [], "def": { "type": "delta", "from": "P4", "dx": "1", "dy": "0" } },
+        { "id": "P4", "codes": [], "def": { "type": "delta", "from": "P3", "dx": "1", "dy": "0" } },
+        { "id": "P5", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "1 / Z", "dy": "0" } },
+        { "id": "P6", "codes": ["Ok"], "def": { "type": "delta", "from": "P1", "dx": "2", "dy": "1" } },
+        { "id": "P7", "codes": [], "def": { "type": "intersect", "a1": "P1", "a2": "P6", "b1": "P1", "b2": "P6" } }
+      ],
+      "links": [{ "id": "L1", "points": ["P1", "P6"], "codes": [] }, { "id": "L2", "points": ["P2", "P6"], "codes": [] }],
+      "shapes": [{ "id": "S1", "links": ["L1", "L2"], "codes": [] }],
+      "side": null
+    }
+  },
+  {
+    "name": "surface มีขอบเขต (ไม่ต่อปลาย): จุดบนดินนอกขอบเขต / ลาดไม่ชน",
+    "surface": [{ "x": -5, "y": -1 }, { "x": 5, "y": -2 }],
+    "extendEnds": false,
+    "spec": {
+      "className": "Bounded",
+      "params": [],
+      "targets": [{ "name": "TargetSurface", "type": "Surface" }],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": [], "def": { "type": "onSurface", "dx": "3", "target": "TargetSurface" } },
+        { "id": "P3", "codes": [], "def": { "type": "onSurface", "dx": "8", "target": "TargetSurface" } },
+        { "id": "P4", "codes": [], "def": { "type": "slopeToSurface", "from": "P1", "slope": "0.1", "dir": 1, "target": "TargetSurface", "maxDistance": "20", "layoutLength": "3" } }
+      ],
+      "links": [{ "id": "L1", "type": "followSurface", "from": "P2", "to": "P1", "target": "TargetSurface", "codes": [] }],
+      "shapes": [],
+      "side": null
+    }
+  }
+]

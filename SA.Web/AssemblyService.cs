@@ -10,6 +10,7 @@
 // รันตัวแม่ก่อนตัวลูกเสมอ แล้วแปลงจุดผลลัพธ์ (เทียบ origin) เป็นพิกัดบนจอ
 
 using System.Text.Json;
+using SA.Drawing;
 using SA.Shim;
 
 public class AttachReq
@@ -31,6 +32,9 @@ public class ItemReq
     public string? ClassName { get; set; }
     public Dictionary<string, JsonElement>? Params { get; set; }
     public AttachReq Attach { get; set; } = new();
+    // ส่วนที่วาดในเว็บ (DrawingSpec): ไม่มีไฟล์ = สร้างทั้งไฟล์จาก spec; มีไฟล์ที่มีช่วง SA-DRAWING = แทนที่ช่วงนั้นก่อนรัน
+    public JsonElement? Spec { get; set; }
+    public string? FileName { get; set; }
 }
 
 public class AssemblyReq
@@ -61,6 +65,7 @@ public class ItemResult
     public string AttachState { get; set; } = "free";  // baseline | point | free | lost
     public string? AttachNote { get; set; }
     public RunOutput? Result { get; set; }
+    public bool Generated { get; set; }                // รันโค้ดที่สร้างจาก spec (รูปที่เว็บแสดงมาจาก JS ส่วนผลนี้ใช้ตรวจ)
 }
 
 public class AssemblyService
@@ -165,7 +170,25 @@ public class AssemblyService
     private void RunItem(ItemReq item, ItemResult res, SimWorld world, double bx, double datum, double baselineElev)
     {
         string source, name;
-        if (!string.IsNullOrEmpty(item.Source))
+        DrawingSpec? spec = null;
+        try
+        {
+            if (item.Spec is { ValueKind: JsonValueKind.Object } sp) spec = DrawingSpec.Parse(sp);
+        }
+        catch (Exception e)
+        {
+            res.Stage = "generate"; res.Message = "อ่านส่วนที่วาดไม่ได้: " + e.Message; return;
+        }
+
+        if (spec != null && string.IsNullOrEmpty(item.Source) && string.IsNullOrEmpty(item.File))
+        {
+            // ADD ในเว็บ ยังไม่มีไฟล์: สร้างทั้งไฟล์ในหน่วยความจำ
+            name = Path.GetFileName(item.FileName ?? spec.ClassName + ".cs");
+            try { source = CodeGenerator.GenerateFile(spec, item.Spec!.Value.GetRawText(), name); }
+            catch (FormatException e) { res.Stage = "generate"; res.File = name; res.Message = "สร้างโค้ดไม่ได้: " + e.Message; return; }
+            res.Generated = true;
+        }
+        else if (!string.IsNullOrEmpty(item.Source))
         {
             source = item.Source;
             name = Path.GetFileName(item.SourceName ?? "opened.cs");
@@ -187,6 +210,14 @@ public class AssemblyService
             res.Stage = "file"; res.Message = "ยังไม่ได้เลือกไฟล์ .cs"; return;
         }
         res.File = name;
+
+        // ไฟล์ที่มีช่วง SA-DRAWING: ใช้ส่วนที่วาดล่าสุดในเว็บแทนช่วงเดิม (ยังไม่เขียนลงไฟล์จนกว่าจะกด Save)
+        if (spec != null && !res.Generated && CodeGenerator.FindBlock(source) is { } block)
+        {
+            try { source = CodeGenerator.ReplaceBlock(source, block, CodeGenerator.GenerateBlock(spec, item.Spec!.Value.GetRawText(), block.Indent)); }
+            catch (FormatException e) { res.Stage = "generate"; res.Message = "สร้างโค้ดไม่ได้: " + e.Message; return; }
+            res.Generated = true;
+        }
 
         var compiled = _compiler.Compile(source, name);
         res.CompileMs = compiled.CompileMs;

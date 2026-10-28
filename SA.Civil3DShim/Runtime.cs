@@ -203,6 +203,7 @@ namespace Autodesk.Civil.Runtime
             var p = new Point(_items.Count, offset, elevation);
             p.Codes.Add(code);
             _items.Add(p);
+            CallSites.Record(p);
             return p;
         }
 
@@ -223,6 +224,7 @@ namespace Autodesk.Civil.Runtime
             var l = new Link(_items.Count, points.ToArray());
             l.Codes.Add(code);
             _items.Add(l);
+            CallSites.Record(l);
             return l;
         }
 
@@ -243,6 +245,7 @@ namespace Autodesk.Civil.Runtime
             var s = new Shape(_items.Count, links.ToArray());
             s.Codes.Add(code);
             _items.Add(s);
+            CallSites.Record(s);
             return s;
         }
 

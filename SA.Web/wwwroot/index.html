@@ -141,11 +141,11 @@
 <footer id="bar">
   <span class="xy mono" id="bar-xy" title="offset จากแกน assembly / ระดับจริง ที่ตำแหน่งเมาส์">—</span>
   <button class="tg" data-tg="grid" title="แสดงเส้น grid">Grid</button>
-  <button class="tg" data-tg="snap" title="ปัดค่าเป็นทุก 0.05 m ตอนลาก (surface / แกน / subassembly ที่ลอยอยู่)">Snap</button>
-  <button class="tg" data-tg="ortho" title="ล็อกแนวราบ/ดิ่งตอนวาด (F8) — ใช้ตอนวาดใน Milestone 2">Ortho (F8)</button>
+  <button class="tg" data-tg="snap" id="b-gsnap">Grid snap</button>
+  <button class="tg" data-tg="ortho" title="ล็อกแนวราบ/ดิ่งตอนวาดจุดอิสระ (F8)">Ortho (F8)</button>
   <span class="slopes" id="slopes" title="slope สำเร็จรูป: คลิก = ล็อกมุมตอนวาด · ดับเบิลคลิก = แก้ค่า"></span>
   <span class="vsep"></span>
-  <span class="lbl">OSNAP:</span>
+  <button class="tg" data-tg="osOn" title="Object snap เปิด/ปิดทั้งหมด (F3) — ปิด = ไม่จับจุดเลย ไม่ว่าปุ่มชนิดด้านขวาจะเปิดอยู่หรือไม่">OSNAP (F3)</button>
   <button class="tg os" data-os="end">Endpoint</button>
   <button class="tg os" data-os="mid">Midpoint</button>
   <button class="tg os" data-os="int">Intersection</button>
@@ -168,10 +168,16 @@
 <script src="js/core.js"></script>
 <script src="js/expr.js"></script>
 <script src="js/spec.js"></script>
+<script src="js/snap.js"></script>
+<script src="js/select.js"></script>
+<script src="js/ops.js"></script>
 <script src="js/workspace.js"></script>
 <script src="js/draw.js"></script>
+<script src="js/history.js"></script>
+<script src="js/cmd.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/editor.js"></script>
+<script src="js/codelink.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -6,9 +6,9 @@
 //   ล็อก slope = slopeLength · อื่นๆ = delta (dx, dy) จากจุดก่อนหน้า
 "use strict";
 
-const draw = { tool: null, chain: [], cand: null, mouse: null, typing: false };
+// list = snap ทั้งหมดที่ตำแหน่งเมาส์ · cyc / lastCyc = ตัวที่ Tab วนไว้ · lastPx/lastPy = เมาส์ล่าสุดบนจอ (ไว้คำนวณใหม่เมื่อกดปุ่ม)
+const draw = { tool: null, chain: [], cand: null, mouse: null, typing: false, list: [], cyc: null, lastCyc: null, lastPx: null, lastPy: null };
 let drawRes = {};                  // item id -> ผล Spec.evaluate (เทียบ origin) จาก render ล่าสุด
-const undoStack = [], redoStack = [];
 const TOOL_NAMES = { point: "Point", link: "Link", shape: "Shape", daylight: "ลาดจนชนดิน", follow: "วิ่งตามผิวดิน" };
 const OSNAP_LABEL = { end: "Endpoint", mid: "Midpoint", int: "Intersection", surf: "Surface", perp: "Perpendicular", near: "Nearest", ray: "ลาดชนดิน" };
 
@@ -79,40 +79,41 @@ const drawingDirty = it => !!it.spec && it.savedSpec !== JSON.stringify(it.spec)
 // Save (.cs) ได้ไหม: ยังไม่มีไฟล์ / ไฟล์ที่มีช่วง SA-DRAWING แล้ว (ไฟล์เขียนเองที่ยังไม่มีช่วงนี้ = Milestone 4)
 const canSaveDrawing = it => !!it && !!it.spec && (!hasCode(it) || (!!it.file && (it.generatedFile || (asmRes[it.id] && asmRes[it.id].generated))));
 
-// ---------------- แก้ spec (มี Undo) ----------------
-function specEdit(fn, it){
+// ---------------- แก้ spec (Undo ดู history.js) ----------------
+// label = ชื่อการกระทำที่แถบบอกแสดงตอน Undo
+function specEdit(fn, it, label){
   it = it || editItem();
   if (!it || !it.spec) return;
-  undoStack.push({ id: it.id, json: JSON.stringify(it.spec) });
-  if (undoStack.length > 200) undoStack.shift();
-  redoStack.length = 0;
+  History.act(label || "แก้ส่วนที่วาด");
   const r = fn(it.spec);
   persist(); renderAll();
   return r;
 }
-function undoRedo(redo){
-  const from = redo ? redoStack : undoStack, to = redo ? undoStack : redoStack;
-  const s = from.pop(); if (!s) return;
-  const it = itemById(s.id); if (!it) return;
-  to.push({ id: s.id, json: JSON.stringify(it.spec) });
-  it.spec = JSON.parse(s.json);
-  const sel = state.sel;
-  if (/^d(pt|link|shape)$/.test(sel.type) && !specObj(it, sel)) state.sel = { type:"item", item: it.id };
-  persist(); renderAll();
-  showBanner((redo ? "Redo" : "Undo") + " แล้ว"); setTimeout(() => showBanner(drawBanner()), 900);
-}
 const specObj = (it, s) => !it.spec ? null : s.type === "dpt" ? Spec.byId(it.spec.points, s.id) : s.type === "dlink" ? Spec.byId(it.spec.links, s.id) : Spec.byId(it.spec.shapes, s.id);
+const DRAWN_KIND = { dpt: "point", dlink: "link", dshape: "shape" };
 function deleteDrawn(it, kind, id){
-  const gone = Spec.cascadePreview(it.spec, kind, id);
-  if (gone.length > 1 && !confirm(`ลบ ${id} จะลบ ${gone.filter(g => g !== id).join(", ")} ที่พึ่ง ${id} ไปด้วย ตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
-  specEdit(s => Spec.removeCascade(s, kind, id), it);
+  deleteDrawnSet(it, [{ type: { point: "dpt", link: "dlink", shape: "dshape" }[kind], item: it.id, id }]);
+}
+// ลบ point / link / shape ที่วาด (หลายชิ้นพร้อมกัน) — สิ่งที่พึ่งของที่ลบจะหายไปด้วย: บอกก่อนแล้วให้ยืนยัน
+function deleteDrawnSet(it, list){
+  const objs = list.filter(o => o.item === it.id && DRAWN_KIND[o.type] && specObj(it, o));
+  if (!objs.length) return;
+  const picked = new Set(objs.map(o => o.id)), trial = JSON.parse(JSON.stringify(it.spec)), gone = new Set();
+  for (const o of objs) for (const g of Spec.removeCascade(trial, DRAWN_KIND[o.type], o.id)) gone.add(g);
+  const extra = [...gone].filter(g => !picked.has(g));
+  const what = objs.length === 1 ? objs[0].id : `${objs.length} objects ที่เลือก`;
+  const list_ = extra.length > 15 ? extra.slice(0, 15).join(", ") + ` … และอีก ${extra.length - 15} ชิ้น` : extra.join(", ");
+  if (extra.length && !confirm(`ลบ ${what} จะลบ ${list_} ที่พึ่งอยู่ไปด้วย (รวม ${extra.length} ชิ้น) ตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
+  const n = picked.size + extra.length;
+  specEdit(s => { for (const o of objs) Spec.removeCascade(s, DRAWN_KIND[o.type], o.id); }, it, n === 1 ? `ลบ ${objs[0].id}` : `ลบ ${n} objects`);
   setSel({ type:"item", item: it.id });
 }
 
 // ---------------- เครื่องมือ ----------------
 function setTool(t){
   if (t && !state.editing) return;
-  draw.tool = t; draw.chain = []; draw.cand = null; closeTyping(); tip.style.display = "none";
+  if (t && cmd.name) endCmd();
+  draw.tool = t; draw.chain = []; draw.cand = null; draw.list = []; draw.lastCyc = null; closeTyping(); tip.style.display = "none";
   for (const b of document.querySelectorAll("#drawer [data-tool]")) b.classList.toggle("on", b.dataset.tool === t);
   showBanner(drawBanner());
   render();
@@ -144,82 +145,90 @@ function renderDrawer(){
 // พิกัดทั้งหมดในส่วนนี้เป็นค่าเทียบ origin ของตัวที่แก้ (ค่าจริงบนจอ = origin + ค่า)
 const slopeLock = () => state.bar.slope >= 0 ? state.bar.slopes[state.bar.slope] : null;
 const slopeMag = txt => { const m = /^1:(.+)$/.exec(txt); return m ? "1/" + m[1] : txt; };
-function pxDist(o, a, b){ return Math.hypot(sx(o.x + a.x) - sx(o.x + b.x), sy(o.y + a.y) - sy(o.y + b.y)); }
 
 function prevPoint(){
   const it = editItem(), r = drawRes[it.id];
   let id = draw.chain[draw.chain.length - 1];
-  if (!id && draw.tool === "point" && state.sel.type === "dpt" && state.sel.item === it.id) id = state.sel.id;
+  // Point: อ้างจากจุดที่เลือก (เลือกหลายชิ้น = จุดที่เลือกล่าสุด)
+  const picked = draw.tool === "point" ? selList().filter(s => s.type === "dpt" && s.item === it.id) : [];
+  if (!id && picked.length) id = picked[picked.length - 1].id;
   const p = id && r && r.pts[id];
   return p && !p.err ? { id, x: p.x, y: p.y } : null;
 }
 
 // ผู้สมัคร snap ที่ตำแหน่งเมาส์ m -> { x, y, kind, label, make() -> id ของจุด }
+// รายการทั้งหมดเก็บใน draw.list (Tab วนเลือก) · ตัวที่ใช้ = draw.list[draw.cyc.i] · ไม่มี snap = จุดอิสระ
+// ทุกเครื่องมือใช้ปุ่ม OSNAP ชุดเดียวกัน (ปิด Endpoint แล้วคลิกบนจุดเดิม = ได้จุดใหม่ แบบ AutoCAD)
 function snapAt(m){
-  const it = editItem(), r = drawRes[it.id], o = { x: r.ox, y: r.oy }, spec = it.spec, os = state.bar.osnap;
-  const A = prevPoint(), F = r.flip, R = 12;
-  const cands = [];
-  // จุดลาดชนดินจับได้ไกลกว่า (ผู้ใช้เล็งตามแนวลาด ไม่ได้เล็งจุดเป๊ะ)
-  const add = (kind, x, y, label, make) => { const d = pxDist(o, { x, y }, m); if (d <= (kind === "ray" ? 2.5 * R : R)) cands.push({ kind, x, y, label, make, d }); };
-  const ctxS = specCtx(it, o).surface, ground = ctxS && !state.layout ? Spec.makeGround(ctxS, state.extendEnds) : null;
-  if (draw.tool === "daylight" && A) return daylightCand(m, A, F, ground);
-  const onlyEnds = draw.tool === "shape" || draw.tool === "follow" || draw.tool === "daylight";
-  const straight = spec.links.filter(l => l.type !== "followSurface" && r.links[l.id] && !r.links[l.id].err);
+  const it = editItem(), r = drawRes[it.id], A = prevPoint();
+  draw.list = []; draw.cyc = null;
+  if (draw.tool === "daylight" && A) return daylightCand(m, A, r.flip, editGround(it));
+  return pickSnap(editSnapList(m, A, true), () => freePoint(m, A, r.flip));
+}
+// ตัวที่ใช้จากรายการ (Tab วนไว้ตัวไหน) ไม่มี = fallback()
+function pickSnap(list, fallback){
+  draw.list = list;
+  draw.cyc = Snap.keep(list, draw.lastCyc);
+  draw.lastCyc = draw.cyc;
+  return list.length ? list[draw.cyc.i] : fallback();
+}
+function editGround(it){
+  const r = drawRes[it.id], s = specCtx(it, { x: r.ox, y: r.oy }).surface;
+  return s && !state.layout ? Spec.makeGround(s, state.extendEnds) : null;
+}
+// snap ทั้งหมดของตัวที่แก้ที่เมาส์ m (เทียบ origin) — A = จุดก่อนหน้า (Perpendicular) · withRay = ลาดชนดินเมื่อล็อก slope
+// ใช้ทั้งตอนวาดและตอนเลือกจุดฐาน / ปลายทางของ Move / Copy / Paste (cmd.js)
+function editSnapList(m, A, withRay){
+  const it = editItem(), r = drawRes[it.id], spec = it.spec, os = state.bar.osnap, F = r.flip, ground = editGround(it);
 
-  if (os.end || onlyEnds){
-    for (const p of spec.points){ const q = r.pts[p.id]; if (q && !q.err) add("end", q.x, q.y, p.id + (p.codes.length ? " " + p.codes.join(",") : ""), () => p.id); }
-    if (!onlyEnds){
-      const rr = asmRes[it.id];
-      if (rr && rr.result) rr.result.points.forEach((p, i) => {
-        const x = p.x - rr.originX, y = p.y - rr.originY, code = p.codes[0];
-        add("end", x, y, code ? `${code} (โค้ดเดิม)` : `#${i} โค้ดเดิม (ไม่มี code)`, () => {
-          if (code){ const ex = spec.points.find(q => q.def.type === "external" && q.def.code === code); return ex ? ex.id : Spec.addPoint(spec, { type:"external", code }); }
-          return Spec.addPoint(spec, { type:"delta", dx: Expr.num(x * F), dy: Expr.num(y) });
-        });
-      });
-      add("end", 0, 0, "origin", () => { const ex = spec.points.find(q => q.def.type === "origin"); return ex ? ex.id : Spec.addPoint(spec, { type:"origin" }); });
-    }
+  // จุดที่จับได้: จุดที่วาด ก่อนจุดของโค้ดเดิม (ซ้อนกัน = ใช้จุดที่วาด) และ origin
+  const points = [];
+  for (const p of spec.points){ const q = r.pts[p.id]; if (q && !q.err) points.push({ x: q.x, y: q.y, label: p.id + (p.codes.length ? " " + p.codes.join(",") : ""), make: () => p.id }); }
+  const rr = asmRes[it.id];
+  if (rr && rr.result) rr.result.points.forEach((p, i) => {
+    const x = p.x - rr.originX, y = p.y - rr.originY, code = p.codes[0];
+    points.push({ x, y, label: code ? `${code} (โค้ดเดิม)` : `#${i} โค้ดเดิม (ไม่มี code)`, make: () => {
+      if (code){ const ex = spec.points.find(q => q.def.type === "external" && q.def.code === code); return ex ? ex.id : Spec.addPoint(spec, { type:"external", code }); }
+      return Spec.addPoint(spec, { type:"delta", dx: Expr.num(x * F), dy: Expr.num(y) });
+    } });
+  });
+  points.push({ x: 0, y: 0, label: "origin", make: () => { const ex = spec.points.find(q => q.def.type === "origin"); return ex ? ex.id : Spec.addPoint(spec, { type:"origin" }); } });
+  const segs = spec.links.filter(l => l.type !== "followSurface" && r.links[l.id] && !r.links[l.id].err)
+    .map(l => ({ id: l.id, a: r.pts[l.points[0]], b: r.pts[l.points[1]], ends: l.points }));
+  // ล็อก slope แล้วลากไปทางผิวดิน = จุดที่ลาดชนดิน (daylight)
+  let ray = null;
+  if (withRay && ground && A && slopeLock()){ const c = daylightCand(m, A, F, ground); if (c.kind === "ray") ray = c; }
+
+  const list = Snap.collect({ mouse: m, scale: { x: state.view.scale, y: state.view.scale * state.view.ve }, R: OSNAP_PX,
+    os: { ...os, on: state.bar.osOn }, points, segs, from: A, ground, ray });
+  for (const c of list) c.make = snapMake(c, spec, A, F);
+  return list;
+}
+const OSNAP_PX = 12;
+// ชนิด snap -> ความหมายของจุดใน spec
+function snapMake(c, spec, A, F){
+  const [a, b] = c.seg ? c.seg.ends : [];
+  switch (c.kind){
+    case "end": return c.point.make;
+    case "ray": return c.make;
+    case "int": { const [a1, a2] = c.segs[0].ends, [b1, b2] = c.segs[1].ends; return () => Spec.addPoint(spec, { type:"intersect", a1, a2, b1, b2 }); }
+    case "mid": return () => Spec.addPoint(spec, { type:"between", a, b, t:"0.5" });
+    case "perp": case "near": return () => Spec.addPoint(spec, { type:"between", a, b, t: Expr.num(c.t) });
+    case "surf": return () => Spec.addPoint(spec, { type:"onSurface", ...(A ? { from: A.id } : {}), dx: Expr.num((c.x - (A ? A.x : 0)) * F), target: "TargetSurface" });
   }
-  if (!onlyEnds){
-    if (os.int) for (let i = 0; i < straight.length; i++) for (let j = i + 1; j < straight.length; j++){
-      const [a1, a2] = straight[i].points, [b1, b2] = straight[j].points;
-      if (new Set([a1, a2, b1, b2]).size < 4) continue;          // ต่อกันที่ปลาย = endpoint อยู่แล้ว
-      const P1 = r.pts[a1], P2 = r.pts[a2], Q1 = r.pts[b1], Q2 = r.pts[b2];
-      const x = Spec.lineX(P1, P2, Q1, Q2);
-      if (!x) continue;
-      const on = (a, b) => Spec.projectSeg(a, b, x).t > -1e-6 && Spec.projectSeg(a, b, x).t < 1 + 1e-6 && Math.hypot(Spec.projectSeg(a, b, x).x - x.x, Spec.projectSeg(a, b, x).y - x.y) < 1e-6;
-      if (on(P1, P2) && on(Q1, Q2)) add("int", x.x, x.y, `จุดตัด ${straight[i].id} × ${straight[j].id}`, () => Spec.addPoint(spec, { type:"intersect", a1, a2, b1, b2 }));
-    }
-    if (os.mid) for (const l of straight){
-      const [a, b] = l.points, P1 = r.pts[a], P2 = r.pts[b];
-      add("mid", (P1.x + P2.x) / 2, (P1.y + P2.y) / 2, `กึ่งกลาง ${l.id}`, () => Spec.addPoint(spec, { type:"between", a, b, t:"0.5" }));
-    }
-    if (os.surf && ground && A && slopeLock()){
-      // ล็อก slope แล้วลากไปทางผิวดิน = จุดที่ลาดชนดิน (daylight)
-      const c = daylightCand(m, A, F, ground);
-      if (c.kind === "ray") add("ray", c.x, c.y, c.label, c.make);
-    }
-    if (os.perp && A) for (const l of straight){
-      const [a, b] = l.points, q = Spec.projectSeg(r.pts[a], r.pts[b], A);
-      if (q.t > 1e-6 && q.t < 1 - 1e-6) add("perp", q.x, q.y, `ตั้งฉาก ${l.id}`, () => Spec.addPoint(spec, { type:"between", a, b, t: Expr.num(q.t) }));
-    }
-    if (os.surf && ground && draw.tool !== "daylight"){
-      const g = ground.nearest(m.x, m.y);
-      if (g){
-        const from = A ? A.id : undefined, fx = A ? A.x : 0;
-        add("surf", g.x, g.y, "ผิวดิน", () => Spec.addPoint(spec, { type:"onSurface", ...(from ? { from } : {}), dx: Expr.num((g.x - fx) * F), target: "TargetSurface" }));
-      }
-    }
-    if (os.near) for (const l of straight){
-      const [a, b] = l.points, q = Spec.projectSeg(r.pts[a], r.pts[b], m);
-      if (q.t > 1e-6 && q.t < 1 - 1e-6) add("near", q.x, q.y, `บน ${l.id}`, () => Spec.addPoint(spec, { type:"between", a, b, t: Expr.num(q.t) }));
-    }
-  }
-  const order = ["end", "int", "mid", "ray", "perp", "surf", "near"];
-  cands.sort((p, q) => order.indexOf(p.kind) - order.indexOf(q.kind) || p.d - q.d);
-  if (cands.length) return cands[0];
-  if (onlyEnds) return null;
-  return freePoint(m, A, F);
+}
+// Tab ตอนวาด: มี snap ให้เลือก ≥ 2 ตัว = วนไปตัวถัดไป (คืน true) · ไม่งั้นให้ผู้เรียกเปิดช่องพิมพ์ค่า
+function cycleSnap(){
+  if (!draw.list || draw.list.length < 2 || draw.lastPx == null || draw.typing) return false;
+  draw.lastCyc = Snap.next(draw.list, draw.cyc);
+  refreshSnap();
+  return true;
+}
+// คำนวณ snap ใหม่ที่ตำแหน่งเมาส์ล่าสุด (กดปุ่ม OSNAP / Grid / Ortho / slope แล้วเห็นผลทันทีโดยไม่ต้องขยับเมาส์)
+function refreshSnap(){
+  if (draw.lastPx == null || draw.typing) return;
+  if (cmdPlacing()) cmdMove(draw.lastPx, draw.lastPy);
+  else if (state.editing && draw.tool) drawMove(draw.lastPx, draw.lastPy);
 }
 
 // ลาดจาก A ไปทางเมาส์ (slope ตามปุ่มที่ล็อก ไม่ล็อก = 1:2) จนชนดิน; ไม่มีผิวดิน/ไม่ชน = ยาวคงที่ตามที่ spec จะวาด
@@ -237,8 +246,7 @@ function daylightCand(m, A, F, ground){
 
 // ไม่ชน snap: ล็อก slope / Ortho / grid แล้วเก็บเป็น slopeLength หรือ delta จากจุดก่อนหน้า
 function freePoint(m, A, F){
-  const it = editItem(), spec = it.spec, sl = slopeLock();
-  const g = v => state.bar.snap ? Math.round(v / 0.05) * 0.05 : v;
+  const it = editItem(), spec = it.spec, sl = slopeLock(), g = snapV;
   if (A && sl && draw.tool !== "daylight"){
     const dirA = Math.sign(m.x - A.x) || 1, mag = Expr.value(slopeMag(sl), {}), s = (m.y < A.y ? -1 : 1) * mag;
     const run = g(Math.abs(m.x - A.x)), along = run * Math.sqrt(1 + s * s);
@@ -259,7 +267,7 @@ function drawLocal(px, py){
 }
 function drawMove(px, py){
   const it = editItem(); if (!it || !drawRes[it.id]) return;
-  draw.mouse = drawLocal(px, py);
+  draw.mouse = drawLocal(px, py); draw.lastPx = px; draw.lastPy = py;
   if (draw.typing) return;
   draw.cand = snapAt(draw.mouse);
   render();
@@ -269,12 +277,14 @@ function drawTip(px, py){
   const c = draw.cand, A = prevPoint();
   if (!c){ tip.style.display = "none"; return; }
   const lines = [];
-  if (c.label) lines.push((OSNAP_LABEL[c.kind] ? "Snap: " : "") + c.label);
+  const n = draw.list.length;
+  if (c.label) lines.push((OSNAP_LABEL[c.kind] ? `${OSNAP_LABEL[c.kind]}: ` : "") + c.label);
   if (A && draw.tool !== "shape"){
     const dx = c.x - A.x, dy = c.y - A.y;
     lines.push(`slope ${slopeText(dx, dy)}`, `ยาว ${f3(Math.hypot(dx, dy))} m · dx ${f3(dx)} · dy ${f3(dy)}`);
   } else lines.push(`offset ${f3(c.x)} · elev ${f3(c.y)} (เทียบ origin)`);
-  if (draw.tool !== "shape" && draw.tool !== "follow") lines.push("Tab = พิมพ์ค่า / ชื่อ parameter");
+  if (n >= 2) lines.push(`Tab = snap ตัวถัดไป (${draw.cyc.i + 1}/${n})`);
+  if (draw.tool !== "shape" && draw.tool !== "follow") lines.push(n >= 2 ? "พิมพ์ตัวเลข = พิมพ์ค่า" : "พิมพ์ตัวเลข / Tab = พิมพ์ค่า / ชื่อ parameter");
   showTip(px, py, lines.join("\n"));
 }
 
@@ -309,7 +319,7 @@ function commitPoint(make){
       if (draw.chain.length >= 3 && id === draw.chain[0]){ closeShape = true; return; }
       if (!draw.chain.includes(id)) draw.chain.push(id);
     }
-  });
+  }, null, `วาด ${TOOL_NAMES[t]}`);
   if (closeShape) finishShape();
   showBanner(drawBanner());
 }
@@ -324,13 +334,14 @@ function finishShape(){
     const links = ids.map((a, i) => Spec.addLink(spec, a, ids[(i + 1) % ids.length]));
     const sid = Spec.addShape(spec, links);
     state.sel = { type:"dshape", item: state.editing, id: sid };
-  });
+  }, null, "วาด Shape");
   showBanner(drawBanner());
 }
 
-// ---------------- พิมพ์ค่า (Tab) ----------------
+// ---------------- พิมพ์ค่า (Tab / พิมพ์ตัวเลขเลย แบบ Dynamic Input) ----------------
 // ช่องที่เว้นว่างใช้ค่าจากเมาส์ · slope พิมพ์แบบ 1:2 ได้ (ทิศขึ้น/ลงตามเมาส์) หรือเป็นนิพจน์มีเครื่องหมาย
-function openTyping(){
+// first = ตัวอักษรที่ผู้ใช้กดเปิดช่อง (ใส่ในช่องแรกให้เลย)
+function openTyping(first){
   if (!draw.tool || draw.tool === "shape" || draw.tool === "follow" || !draw.mouse) return;
   const it = editItem(), box = $("dyn");
   draw.typing = true;
@@ -357,7 +368,9 @@ function openTyping(){
   box.style.left = Math.max(4, Math.min(mr.width - 330, tp.left - mr.left)) + "px";
   box.style.top = Math.max(4, Math.min(mr.height - 120, tp.bottom - mr.top + 6)) + "px";
   box.hidden = false; tip.style.display = "none";
-  box.querySelector(draw.tool === "daylight" ? "[data-f=slope]" : "input").focus();
+  const inp = box.querySelector(draw.tool === "daylight" ? "[data-f=slope]" : "input");
+  inp.focus();
+  if (first){ inp.value = first; inp.dispatchEvent(new Event("input")); }
 }
 function closeTyping(){ draw.typing = false; const b = $("dyn"); if (b){ b.hidden = true; b.innerHTML = ""; } }
 function commitTyping(){
@@ -400,6 +413,22 @@ function renderDrawOverlay(){
   if (A && draw.tool !== "point" && draw.tool !== "shape") el("line", { x1: X(A), y1: Y(A), x2: X(c), y2: Y(c), class:"rubber" + (draw.tool === "follow" ? " follow" : "") }, svg);
   if (draw.tool === "shape" && draw.chain.length){ const P = r.pts[draw.chain[draw.chain.length - 1]]; if (P && !P.err) el("line", { x1: X(P), y1: Y(P), x2: X(c), y2: Y(c), class:"rubber" }, svg); }
   if (c.kind !== "free"){
-    el("rect", { x: X(c) - 8, y: Y(c) - 8, width: 16, height: 16, class:"osnap " + c.kind }, svg);
+    el("path", { d: osnapMarker(c.kind, X(c), Y(c)), class:"osnap " + c.kind }, svg);
+    el("text", { x: X(c) + 12, y: Y(c) - 10, class:"osnap-lbl" }, svg).textContent = OSNAP_LABEL[c.kind] + (draw.list.length >= 2 ? ` (${draw.cyc.i + 1}/${draw.list.length})` : "");
   } else el("circle", { cx: X(c), cy: Y(c), r: 3, class:"osnap free" }, svg);
+}
+// รูป marker ตามแบบ AutoCAD: □ Endpoint · △ Midpoint · ✕ Intersection · ⊠ ลาดชนดิน (แบบ Apparent intersection)
+//   ⊥ Perpendicular · ⧗ Nearest · เส้นดินมีขีด = Surface
+function osnapMarker(kind, x, y){
+  const k = 7, M = (a, b) => `M${x + a} ${y + b}`, L = (a, b) => `L${x + a} ${y + b}`;
+  switch (kind){
+    case "end": return M(-k, -k) + L(k, -k) + L(k, k) + L(-k, k) + "Z";
+    case "mid": return M(0, -k - 2) + L(k + 1, k) + L(-k - 1, k) + "Z";
+    case "int": return M(-k, -k) + L(k, k) + M(k, -k) + L(-k, k);
+    case "ray": return M(-k, -k) + L(k, -k) + L(k, k) + L(-k, k) + "Z" + M(-k, -k) + L(k, k) + M(k, -k) + L(-k, k);
+    case "perp": return M(-k, -k) + L(-k, k) + L(k, k) + M(-k, 0) + L(0, 0) + L(0, k);
+    case "near": return M(-k, -k) + L(k, -k) + L(-k, k) + L(k, k) + "Z";
+    case "surf": return M(-k - 2, 0) + L(k + 2, 0) + M(-k + 1, 0) + L(-k - 3, 6) + M(1, 0) + L(-3, 6) + M(k + 1, 0) + L(k - 3, 6);
+  }
+  return M(-k, -k) + L(k, -k) + L(k, k) + L(-k, k) + "Z";
 }

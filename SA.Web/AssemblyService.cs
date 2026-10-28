@@ -46,6 +46,7 @@ public class AssemblyReq
     public bool ExtendEnds { get; set; } = true;
     public bool LayoutMode { get; set; }
     public double Station { get; set; }
+    public bool Sites { get; set; } = true;          // เก็บบรรทัดที่เรียก Points / Links / Shapes.Add (CallSites)
     public List<ItemReq> Items { get; set; } = new();
 }
 
@@ -66,6 +67,10 @@ public class ItemResult
     public string? AttachNote { get; set; }
     public RunOutput? Result { get; set; }
     public bool Generated { get; set; }                // รันโค้ดที่สร้างจาก spec (รูปที่เว็บแสดงมาจาก JS ส่วนผลนี้ใช้ตรวจ)
+    // เลขบรรทัดในผลนี้ (sites ของจุด/link/shape และ DrawnLines) อ้างข้อความไหน:
+    //   file = ไฟล์บนดิสก์ · editor = โค้ดในแถบแก้ที่ส่งมา · preview = โค้ดที่สร้าง (ส่วนที่วาดยังไม่ได้ Save ลงไฟล์)
+    public string LinesFor { get; set; } = "file";
+    public Dictionary<string, List<int>>? DrawnLines { get; set; }   // id ที่วาด -> บรรทัด (CodeGenerator.SourceMap)
 }
 
 public class AssemblyService
@@ -155,7 +160,7 @@ public class AssemblyService
                 }
 
                 // 2) คอมไพล์และรัน
-                RunItem(item, res, world, bx, req.Datum, baselineElev);
+                RunItem(item, res, world, bx, req.Datum, baselineElev, req.Sites);
                 visiting.Remove(item.Id);
             }
 
@@ -167,9 +172,10 @@ public class AssemblyService
         return req.Items.Where(i => done.ContainsKey(i.Id)).Select(i => done[i.Id]).ToList();
     }
 
-    private void RunItem(ItemReq item, ItemResult res, SimWorld world, double bx, double datum, double baselineElev)
+    private void RunItem(ItemReq item, ItemResult res, SimWorld world, double bx, double datum, double baselineElev, bool sites)
     {
         string source, name;
+        string? disk = null;
         DrawingSpec? spec = null;
         try
         {
@@ -187,11 +193,13 @@ public class AssemblyService
             try { source = CodeGenerator.GenerateFile(spec, item.Spec!.Value.GetRawText(), name); }
             catch (FormatException e) { res.Stage = "generate"; res.File = name; res.Message = "สร้างโค้ดไม่ได้: " + e.Message; return; }
             res.Generated = true;
+            res.LinesFor = "preview";
         }
         else if (!string.IsNullOrEmpty(item.Source))
         {
             source = item.Source;
             name = Path.GetFileName(item.SourceName ?? "opened.cs");
+            res.LinesFor = "editor";
         }
         else if (!string.IsNullOrEmpty(item.File))
         {
@@ -203,7 +211,7 @@ public class AssemblyService
                 res.Message = $"ไม่พบไฟล์ {name} ในโฟลเดอร์";
                 return;
             }
-            source = FileUtil.ReadShared(path);
+            source = disk = FileUtil.ReadShared(path);
         }
         else
         {
@@ -217,7 +225,10 @@ public class AssemblyService
             try { source = CodeGenerator.ReplaceBlock(source, block, CodeGenerator.GenerateBlock(spec, item.Spec!.Value.GetRawText(), block.Indent)); }
             catch (FormatException e) { res.Stage = "generate"; res.Message = "สร้างโค้ดไม่ได้: " + e.Message; return; }
             res.Generated = true;
+            // ส่วนที่วาดตรงกับที่ Save ไว้ = ข้อความเดียวกับไฟล์ บรรทัดชี้ไฟล์ได้เลย
+            if (disk != null && source != disk) res.LinesFor = "preview";
         }
+        if (spec != null && res.Generated) res.DrawnLines = CodeGenerator.SourceMap(source);
 
         var compiled = _compiler.Compile(source, name);
         res.CompileMs = compiled.CompileMs;
@@ -236,10 +247,10 @@ public class AssemblyService
 
         double originOffset = res.OriginX - bx;
         double originElev = datum + res.OriginY;
-        var output = _runner.Run(type, item.Params, world, originOffset, originElev, baselineElev);
+        var output = _runner.Run(type, item.Params, world, originOffset, originElev, baselineElev, sites);
 
         // จุดเทียบ origin -> พิกัดบนจอ
-        output.Points = output.Points.Select(p => new OutPt(res.OriginX + p.X, res.OriginY + p.Y, p.Codes)).ToList();
+        output.Points = output.Points.Select(p => p with { X = res.OriginX + p.X, Y = res.OriginY + p.Y }).ToList();
         res.Result = output;
         res.Ok = true;
     }

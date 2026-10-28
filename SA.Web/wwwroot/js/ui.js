@@ -3,6 +3,7 @@
 
 // ---------------- การเลือก ----------------
 // state.sel.type: ws | surface | spt (จุด surface, i) | asm (asm) | item (item) | pt / link / shape (item, i) | params (item)
+//                 | dpt / dlink / dshape (item, id) | multi (ดู selList ใน core.js)
 function setSel(sel){
   state.sel = sel;
   hoverPt = -1; treeScroll = true;
@@ -14,22 +15,44 @@ function setSel(sel){
     if (f !== state.file){ state.file = f; if (ed.open) loadDoc(); }
   }
   persist(); renderAll();
+  syncCodeHighlight();       // แถบโค้ดเปิดอยู่: เน้นบรรทัดของ object ที่เลือก
 }
 function renderAll(){
   mapSelected();
   render(); renderTree(); renderProps(); renderDock(); renderProblem(); applyMarkers(); renderEditBar(); renderDrawer(); renderProjName();
   refreshGenerated();
 }
-const isSel = (type, a, b) => {
+const isSel = selHas;
+// ตั้งชุดที่เลือก: 0 ชิ้น = ตัวที่แก้อยู่ / Workspace · 1 ชิ้น = เลือกแบบเดิม · หลายชิ้น = multi
+function setSelList(list){
+  if (!list.length) return setSel(state.editing ? { type:"item", item: state.editing } : { type:"ws" });
+  if (list.length === 1) return setSel(list[0]);
+  setSel({ type:"multi", ...(state.editing ? { item: state.editing } : {}), list });
+}
+// ชิ้นที่รวมกับการเลือกครั้งต่อไปได้ (Edit mode = ส่วนที่วาด, นอก Edit = subassembly) — ที่เลือกอยู่แบบอื่นถูกแทนที่
+const pickable = s => state.editing ? /^d(pt|link|shape)$/.test(s.type) && s.item === state.editing : s.type === "item";
+const pickedList = () => selList().filter(pickable);
+// คลิก / คลุมเลือกบนรูป: เพิ่มเข้าชุด (แบบ AutoCAD) · Shift = เอาออก
+function pickAdd(list, remove){ setSelList(Select.merge(pickedList(), list, remove)); }
+function selectAll(){
+  if (state.editing){
+    const it = editItem(); if (!it || !it.spec) return;
+    setSelList([...it.spec.points.map(p => ({ type:"dpt", item: it.id, id: p.id })), ...it.spec.links.map(l => ({ type:"dlink", item: it.id, id: l.id })),
+                ...it.spec.shapes.map(s => ({ type:"dshape", item: it.id, id: s.id }))]);
+  } else setSelList(allItems().map(it => ({ type:"item", item: it.id })));
+}
+// Delete: Edit mode = ส่วนที่วาดที่เลือก · นอก Edit = subassembly ที่เลือก · จุด surface ที่เลือก = ลบจุดนั้น
+function deleteSelection(){
   const s = state.sel;
-  if (s.type !== type) return false;
-  if (type === "asm") return s.asm === a;
-  if (type === "item" || type === "params") return s.item === a;
-  if (type === "pt" || type === "link" || type === "shape") return s.item === a && s.i === b;
-  if (type === "dpt" || type === "dlink" || type === "dshape") return s.item === a && s.id === b;
-  if (type === "spt") return s.i === a;
-  return true;
-};
+  if (s.type === "spt") return deleteSurfacePoint(s.i);
+  if (state.editing){
+    const it = editItem(), list = selList().filter(o => DRAWN_KIND[o.type]);
+    if (it && list.length) deleteDrawnSet(it, list);
+    return;
+  }
+  const ids = selList().filter(o => o.type === "item").map(o => o.item);
+  if (ids.length) removeItems(ids);
+}
 
 // ---------------- 2 · ต้นไม้ ----------------
 // โหนดกาง/หุบเก็บใน state.open[key] (ค่าเริ่มต้นดู isOpen)
@@ -97,22 +120,26 @@ function treeItem(node, h, a, it, depth, editing){
   };
   // ส่วนที่วาด (P1, L1, S1 …) ก่อน ตามด้วยของที่โค้ดสร้าง (#0, L0 …)
   const errMeta = o => o && o.err ? "⚠" : "";
+  // code ซ้ำ (เช่น จาก Copy / Paste) — Civil 3D ยอมให้ซ้ำได้ แต่บอกไว้ในต้นไม้
+  const dupOf = list => { const n = {}; for (const o of list) for (const c of new Set(o.codes)) n[c] = (n[c] || 0) + 1; return o => o.codes.some(c => n[c] > 1); };
+  const dname = (o, dup) => esc(o.codes.length ? `${o.id} ${o.codes.join(", ")}` : o.id) + (dup && dup(o) ? ' <small class="dup" title="มี point / link / shape อื่นใช้ code นี้ด้วย">code ซ้ำ</small>' : "");
   const dp = sp ? sp.points : [], dl = sp ? sp.links : [], ds = sp ? sp.shapes : [];
   const code = res && !(rr && rr.generated) ? res : null;     // โค้ดที่สร้างจาก spec = ซ้ำกับที่วาด ไม่ต้องแสดง
   const cp = code ? code.points : [], cl = code ? code.links : [], cs = code ? code.shapes : [];
+  const dupP = dupOf(dp), dupL = dupOf(dl), dupS = dupOf(ds);
   grp(ik + ":pts", "Points", dp.length + cp.length, () => {
     dp.forEach(p => node({ depth: d2 + 1, cls:"leaf drawn", s:{type:"dpt", item:it.id, id:p.id}, sel: isSel("dpt", it.id, p.id),
-                           name: `${p.id} ${esc(p.codes.join(", ") || "")}`, meta: errMeta(dr && dr.pts[p.id]) || Spec.POINT_TYPES[p.def.type], metaCls: dr && dr.pts[p.id] && dr.pts[p.id].err ? "warn" : "" }));
+                           name: dname(p, dupP), meta: errMeta(dr && dr.pts[p.id]) || Spec.POINT_TYPES[p.def.type], metaCls: dr && dr.pts[p.id] && dr.pts[p.id].err ? "warn" : "" }));
     cp.forEach((p, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"pt", item:it.id, i}, sel: isSel("pt", it.id, i), name: `#${i} ${esc(p.codes.join(", ") || "—")}`, meta: "โค้ด" }));
   });
   grp(ik + ":links", "Links", dl.length + cl.length, () => {
     dl.forEach(l => node({ depth: d2 + 1, cls:"leaf drawn", s:{type:"dlink", item:it.id, id:l.id}, sel: isSel("dlink", it.id, l.id),
-                           name: `${l.id} ${esc(l.codes.join(", ") || "")}`, meta: errMeta(dr && dr.links[l.id]) || Spec.linkEnds(l).join("→") + (l.type === "followSurface" ? " ตามดิน" : "") }));
+                           name: dname(l, dupL), meta: errMeta(dr && dr.links[l.id]) || Spec.linkEnds(l).join("→") + (l.type === "followSurface" ? " ตามดิน" : "") }));
     cl.forEach((l, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"link", item:it.id, i}, sel: isSel("link", it.id, i), name: `L${i} ${esc(l.codes.join(", ") || "—")}`, meta: "#" + l.pts.join("→#") }));
   });
   grp(ik + ":shapes", "Shapes", ds.length + cs.length, () => {
     ds.forEach(s => node({ depth: d2 + 1, cls:"leaf drawn", s:{type:"dshape", item:it.id, id:s.id}, sel: isSel("dshape", it.id, s.id),
-                           name: `${s.id} ${esc(s.codes.join(", ") || "")}`, meta: errMeta(dr && dr.shapes[s.id]) || s.links.join(",") }));
+                           name: dname(s, dupS), meta: errMeta(dr && dr.shapes[s.id]) || s.links.join(",") }));
     cs.forEach((s, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"shape", item:it.id, i}, sel: isSel("shape", it.id, i), name: `S${i} ${esc(s.codes.join(", ") || "—")}`, meta: "โค้ด" }));
   });
   const np = (res ? res.params.length : 0) + (sp ? sp.params.length : 0);
@@ -125,6 +152,8 @@ $("tree").addEventListener("click", e => {
   const n = e.target.closest(".tn"); if (!n) return;
   const s = JSON.parse(n.dataset.sel);
   if (state.editing && s.item && s.item !== state.editing) return;     // Edit mode: ตัวอื่นแก้ไม่ได้
+  // Ctrl+คลิก = เพิ่ม / เอาออกจากชุดที่เลือก (คลิกธรรมดาในต้นไม้ = เลือกชิ้นเดียว)
+  if ((e.ctrlKey || e.metaKey) && pickable(s)) return pickAdd([s], selList().some(o => Select.key(o) === Select.key(s)));
   setSel(s);
 });
 $("tree").addEventListener("dblclick", e => {
@@ -147,6 +176,8 @@ function ctxItems(kind, id, extra){
     const it = itemById(id), k = { dpt: "point", dlink: "link", dshape: "shape" }[extra.type];
     return [
       { h: `${itemLabel(it)} · ${extra.id}` },
+      { label:"Move", cmd: () => startCmd("move"), disabled: state.editing !== id, note: "M" },
+      { label:"Copy", cmd: () => startCmd("copy"), disabled: state.editing !== id, note: "C" },
       { label:`ลบ ${extra.id}`, cmd: () => deleteDrawn(it, k, extra.id), disabled: state.editing !== id, note: state.editing !== id ? "เข้า Edit ก่อน" : "Delete" }
     ];
   }
@@ -160,6 +191,8 @@ function ctxItems(kind, id, extra){
       { label:"Rename…", cmd: () => renameItem(id) },
       { label:"Save เป็น .cs", cmd: () => saveDrawing(it), disabled: !canSaveDrawing(it),
         note: canSaveDrawing(it) ? (drawingDirty(it) ? "ยังไม่ได้ save" : "") : it.spec ? "Milestone 4" : "ไม่มีส่วนที่วาด" },
+      { label:"Move", cmd: () => { if (!selHas("item", id)) setSel({ type:"item", item:id }); startCmd("move"); }, disabled: !!state.editing, note: "M" },
+      { label:"Copy", cmd: () => { if (!selHas("item", id)) setSel({ type:"item", item:id }); startCmd("copy"); }, disabled: !!state.editing, note: "C" },
       { label:"Mirror", cmd: () => mirrorItem(id), disabled: !!state.editing },
       { label:"เพิ่มเข้า \"รูปทรงของฉัน\"", disabled: true, note:"ระยะสอง" },
       { sep: true },
@@ -224,17 +257,20 @@ function renameItem(id){
 // ไฟล์ที่เขียนเอง: ส่วนที่วาดเก็บแยกใน it.spec (Milestone 4 จะเขียนลงไฟล์ในช่วงที่มีป้ายกำกับ)
 function enterEdit(id){
   const it = itemById(id); if (!it) return;
-  if (!it.spec) it.spec = Spec.specForImported((asmRes[id] && asmRes[id].className || "").split(".").pop() || "Imported", codeParamsOf(it));
+  if (cmd.name) endCmd();
+  // spec ว่างที่สร้างตอนเข้า Edit ไม่นับเป็นการกระทำ
+  if (!it.spec){ it.spec = Spec.specForImported((asmRes[id] && asmRes[id].className || "").split(".").pop() || "Imported", codeParamsOf(it)); History.rebase(); }
   state.editing = id; setAddMode(false);
   state.open["i:" + id] = true; state.open["i:" + id + ":pts"] = true;
   setSel({ type:"item", item:id });
 }
 function exitEdit(){
+  if (cmd.name) endCmd();
   const id = state.editing; state.editing = null;
   setTool(null);
   // ไฟล์ import ที่เข้า Edit แล้วไม่ได้วาดอะไร: ไม่ต้องเก็บ spec ว่างไว้
   const it = itemById(id);
-  if (it && it.spec && hasCode(it) && !it.spec.points.length && !it.spec.params.length) delete it.spec;
+  if (it && it.spec && hasCode(it) && !it.spec.points.length && !it.spec.params.length){ delete it.spec; History.rebase(); }
   setSel(id ? { type:"item", item:id } : { type:"ws" });
 }
 function renderEditBar(){
@@ -299,6 +335,7 @@ async function loadSpecFromFile(it){
   if (!r || !r.ok || !r.spec) return;
   it.spec = r.spec; it.generatedFile = true; it.specEdited = !!r.edited;
   it.savedSpec = JSON.stringify(r.spec);
+  History.rebase();          // ส่วนของการ Import (ก้อน Undo "เพิ่ม …" เดียวกัน)
   persist(); run();
 }
 
@@ -336,17 +373,27 @@ function renderProps(force){
   if (s.type === "ws"){ of = "Workspace"; propsWorkspace(box); }
   else if (s.type === "surface" || s.type === "spt"){ of = s.type === "spt" ? `Surface #${s.i}` : "Surface: EG"; propsSurface(box); }
   else if (s.type === "asm"){ const a = asmById(s.asm); if (a){ of = a.name; propsAsm(box, a); } }
+  else if (s.type === "multi"){ of = `${s.list.length} objects`; propsMulti(box, s.list); }
   else if (it){
     of = itemLabel(it);
-    if (s.type === "pt" && res && res.points[s.i]){ of += ` · #${s.i}`; propsPoint(box, it, rr, s.i); }
-    else if (s.type === "link" && res && res.links[s.i]){ of += ` · L${s.i}`; propsLink(box, it, rr, s.i); }
-    else if (s.type === "shape" && res && res.shapes[s.i]){ of += ` · S${s.i}`; propsShape(box, it, rr, s.i); }
+    if (s.type === "pt" && res && res.points[s.i]){ of += ` · #${s.i}`; propsPoint(box, it, rr, s.i); propsCode(box, it, s); }
+    else if (s.type === "link" && res && res.links[s.i]){ of += ` · L${s.i}`; propsLink(box, it, rr, s.i); propsCode(box, it, s); }
+    else if (s.type === "shape" && res && res.shapes[s.i]){ of += ` · S${s.i}`; propsShape(box, it, rr, s.i); propsCode(box, it, s); }
     else if (/^d(pt|link|shape)$/.test(s.type) && specObj(it, s)){ of += " · " + s.id; propsDrawn(box, it, s); }
     else propsItem(box, it, rr, s.type === "params");
   } else { of = "Workspace"; state.sel = { type:"ws" }; propsWorkspace(box); }
   $("props-of").textContent = of;
 }
-$("props").addEventListener("focusout", () => setTimeout(() => { if (!$("props").contains(document.activeElement)) renderProps(true); }, 0));
+// Undo: เข้าช่อง = ตั้งชื่อการกระทำจากชื่อช่อง · ออกจากช่อง = นับเป็น 1 ก้อน (ระหว่างพิมพ์ persist ไม่นับ)
+$("props").addEventListener("focusin", e => {
+  const lb = e.target.closest(".row") && e.target.closest(".row").querySelector("label");
+  const field = lb && lb.firstChild ? lb.firstChild.textContent.trim() : "";
+  History.act(`แก้ ${field || "ค่าใน Properties"} · ${$("props-of").textContent}`);
+});
+$("props").addEventListener("focusout", () => {
+  History.track();
+  setTimeout(() => { if (!$("props").contains(document.activeElement)) renderProps(true); }, 0);
+});
 
 const div = (cls, html, parent) => { const d = document.createElement("div"); if (cls) d.className = cls; if (html != null) d.innerHTML = html; if (parent) parent.appendChild(d); return d; };
 function kv(parent, rows){
@@ -547,12 +594,8 @@ function propsShape(box, it, rr, i){
 }
 
 // ---------------- Properties ของสิ่งที่วาด ----------------
-// ช่องพิมพ์: แก้แล้วรูปเปลี่ยนทันที (ถ้านิพจน์ถูก) · Undo 1 ครั้ง = ย้อนการแก้ 1 ช่อง
-let liveSnap = null;
-function liveEdit(it, fn){
-  if (liveSnap && liveSnap.id === it.id){ undoStack.push(liveSnap); redoStack.length = 0; liveSnap = null; }
-  fn(it.spec); persist(); renderAll();
-}
+// ช่องพิมพ์: แก้แล้วรูปเปลี่ยนทันที (ถ้านิพจน์ถูก) · Undo 1 ครั้ง = ย้อนการแก้ 1 ช่อง (นับตอนออกจากช่อง ดู persist)
+function liveEdit(it, fn){ fn(it.spec); persist(); renderAll(); }
 const canEdit = it => state.editing === it.id;
 function exprRow(parent, it, label, small, value, onValid, opts = {}){
   const row = div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, parent);
@@ -566,9 +609,7 @@ function exprRow(parent, it, label, small, value, onValid, opts = {}){
     inp.classList.toggle("bad", !r.ok); err.textContent = r.ok ? "" : r.error;
     return r.ok;
   };
-  inp.addEventListener("focus", () => liveSnap = { id: it.id, json: JSON.stringify(it.spec) });
   inp.addEventListener("input", () => { if (check()) liveEdit(it, () => onValid(opts.slope ? inp.value.trim().replace(/^(-?)1:/, "$11/") : inp.value.trim())); });
-  inp.addEventListener("blur", () => { liveSnap = null; });
   row.appendChild(inp); check();
   return inp;
 }
@@ -588,12 +629,46 @@ function codesRow(parent, it, obj){
   row.appendChild(inp);
 }
 
+// เลือกหลายชิ้น: จำนวนแยกชนิด, ปุ่มคำสั่ง, codes ร่วม (Edit mode), รายการ (คลิก = เลือกเฉพาะชิ้นนั้น · × = เอาออก)
+const PICK_NAMES = { dpt: "point", dlink: "link", dshape: "shape", item: "subassembly" };
+function propsMulti(box, list){
+  const count = {};
+  for (const o of list) count[o.type] = (count[o.type] || 0) + 1;
+  const g = group(box, `เลือก ${list.length} objects`);
+  kv(g, Object.entries(count).map(([t, n]) => [PICK_NAMES[t] || t, String(n)]));
+  div("btns", null, g).append(btn("Move (M)", () => startCmd("move"), false, "คลิกจุดฐาน แล้วคลิกปลายทาง"),
+                              btn("Copy (C)", () => startCmd("copy"), false, "คลิกจุดฐาน แล้วคลิกปลายทาง (วางได้หลายครั้ง Enter = จบ)"),
+                              btn("Delete", deleteSelection, false, "ลบทุกชิ้นที่เลือก (Delete) — Ctrl+Z ย้อนได้"));
+  const it = state.editing ? editItem() : null;
+  if (it && it.spec){
+    const objs = list.map(o => specObj(it, o)).filter(Boolean), txt = objs.map(o => o.codes.join(", "));
+    const same = txt.every(c => c === txt[0]);
+    const row = div("row", `<label>Codes<small>ทุกชิ้นที่เลือก · คั่นด้วย ,</small></label>`, g);
+    const inp = document.createElement("input"); inp.type = "text";
+    inp.value = same ? txt[0] : ""; inp.placeholder = same ? "" : "(ต่างกัน — พิมพ์เพื่อแทนทั้งหมด)";
+    inp.onchange = () => specEdit(() => { const c = inp.value.split(",").map(x => x.trim()).filter(Boolean); for (const o of objs) o.codes = c.slice(); }, it);
+    row.appendChild(inp);
+  }
+  div("hint", "คลิก / คลุมเพิ่ม = เพิ่มเข้าชุด · Shift = เอาออก · Ctrl+คลิกในต้นไม้ = เพิ่ม/เอาออก · Esc = ยกเลิกการเลือก", g);
+  const g2 = group(box, "รายการ");
+  const pl = div("pick-list", null, g2);
+  for (const o of list){
+    const r = div("pk", null, pl);
+    const name = o.type === "item" ? itemLabel(itemById(o.item)) : o.id;
+    r.innerHTML = `<span>${esc(name)}</span><small>${PICK_NAMES[o.type] || ""}</small>`;
+    r.onclick = () => setSel(o);
+    const x = btn("×", ev => { ev.stopPropagation(); pickAdd([o], true); }, false, "เอาออกจากที่เลือก");
+    r.appendChild(x);
+  }
+}
+
 function propsDrawn(box, it, s){
   const sp = it.spec, r = drawRes[it.id];
   if (!canEdit(it)) div("hint", "เข้า Edit (คลิกขวาที่ subassembly) เพื่อแก้ค่า", box);
-  if (s.type === "dpt") return propsDrawnPoint(box, it, Spec.byId(sp.points, s.id), r);
-  if (s.type === "dlink") return propsDrawnLink(box, it, Spec.byId(sp.links, s.id), r);
-  return propsDrawnShape(box, it, Spec.byId(sp.shapes, s.id), r);
+  if (s.type === "dpt") propsDrawnPoint(box, it, Spec.byId(sp.points, s.id), r);
+  else if (s.type === "dlink") propsDrawnLink(box, it, Spec.byId(sp.links, s.id), r);
+  else propsDrawnShape(box, it, Spec.byId(sp.shapes, s.id), r);
+  propsCode(box, it, s);
 }
 function propsDrawnPoint(box, it, p, r){
   const sp = it.spec, d = p.def, q = r && r.pts[p.id], a = asmOfItem(it.id);
@@ -862,13 +937,17 @@ function renderBar(){
   }
   for (const t of document.querySelectorAll("#bar [data-os]")){
     t.classList.toggle("on", !!b.osnap[t.dataset.os]);
-    t.title = "OSNAP " + t.textContent + " — ใช้ตอนวาดใน Milestone 2";
+    t.classList.toggle("muted", !b.osOn);
+    t.title = `OSNAP ${t.textContent}: ${OSNAP_HELP[t.dataset.os]} — ใช้ตอนวาด${b.osOn ? "" : " (ตอนนี้ปิด OSNAP ทั้งหมดอยู่ กด F3)"}`;
   }
+  const gs = $("b-gsnap");
+  gs.textContent = `Grid snap ${+b.gridStep} (F9)`;
+  gs.title = `ปัดค่าเป็นทุก ${+b.gridStep} m (F9) — ตอนวาดจุดอิสระ (dx / dy / ระยะตามลาด) และตอนลาก surface / แกน / subassembly ที่ลอยอยู่\nไม่ใช่ object snap (ดูปุ่ม OSNAP) · ดับเบิลคลิก = ตั้งระยะ`;
   const sl = $("slopes"); sl.innerHTML = "";
   b.slopes.forEach((s, i) => {
     const x = document.createElement("button");
     x.className = "tg" + (b.slope === i ? " on" : ""); x.textContent = s;
-    x.onclick = () => { b.slope = b.slope === i ? -1 : i; persist(); renderBar(); };
+    x.onclick = () => { b.slope = b.slope === i ? -1 : i; persist(); renderBar(); refreshSnap(); };
     x.ondblclick = () => {
       const v = prompt("slope สำเร็จรูป (แบบ 1:x ดิ่ง:ราบ)", s);
       if (v && /^\s*1\s*:\s*\d+(\.\d+)?\s*$/.test(v)){ b.slopes[i] = v.replace(/\s+/g, ""); persist(); renderBar(); }
@@ -886,8 +965,25 @@ $("bar").addEventListener("click", e => {
     if (k === "codes"){ state.showCodes = !state.showCodes; render(); }
     else { state.bar[k] = !state.bar[k]; if (k === "grid") render(); }
   }
-  persist(); renderBar();
+  persist(); renderBar(); refreshSnap();
 });
+const OSNAP_HELP = { end: "จุดที่วาด / จุดของโค้ดเดิม / origin", mid: "กึ่งกลาง link", int: "จุดตัดของ 2 link",
+  surf: "จุดบนผิวดินที่ใกล้เมาส์ (ล็อก slope อยู่ = จุดที่ลาดชนดิน)", perp: "ตั้งฉากจากจุดก่อนหน้าไปยัง link", near: "จุดบน link ที่ใกล้เมาส์" };
+$("b-gsnap").ondblclick = () => {
+  const v = prompt("ระยะ Grid snap (m)", state.bar.gridStep);
+  if (v == null) return;
+  const n = +v;
+  if (!(n > 0)) return alert("ใส่ตัวเลขมากกว่า 0 เช่น 0.05");
+  state.bar.gridStep = n; persist(); renderBar(); refreshSnap();
+};
+// F3 / F8 / F9 (เรียกจาก main.js)
+function toggleBar(k){ state.bar[k] = !state.bar[k]; persist(); renderBar(); refreshSnap(); showBanner(barBanner(k)); }
+function barBanner(k){
+  const on = state.bar[k] ? "เปิด" : "ปิด";
+  const t = { osOn: `OSNAP ${on}`, snap: `Grid snap ${on} (${+state.bar.gridStep} m)`, ortho: `Ortho ${on}` }[k];
+  setTimeout(() => { if ($("banner").textContent === t) showBanner(draw.tool ? drawBanner() : ""); }, 1200);
+  return t;
+}
 $("ve").onchange = () => { state.view.ve = +$("ve").value; persist(); render(); };
 $("b-fit").onclick = fit;
 
@@ -979,6 +1075,7 @@ function projContent(){
   return { version: 2, ...common, assemblies: asms().map(a => ({ id: a.id, name: a.name, baseline: a.baseline, items: items(a) })) };
 }
 function loadProjContent(c, name){
+  History.act(name ? `โหลด ${name}` : "โหลด workspace");
   if (c.originElevation != null) state.originElevation = c.originElevation;
   if (c.surface) state.surface = c.surface;
   if (c.surfaceOn != null) state.surfaceOn = c.surfaceOn;

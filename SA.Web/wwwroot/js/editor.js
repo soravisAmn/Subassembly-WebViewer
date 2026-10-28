@@ -54,9 +54,11 @@ function monacoEditor(monaco){
   dark.addEventListener("change", e => monaco.editor.setTheme(e.matches ? "vs-dark" : "vs"));
   const sev = { Error: monaco.MarkerSeverity.Error, Warning: monaco.MarkerSeverity.Warning };
   const eolOf = t => t.includes("\r\n") ? monaco.editor.EndOfLineSequence.CRLF : monaco.editor.EndOfLineSequence.LF;
+  let decos = [];
   return {
     get: () => model.getValue(),
     set(text, keepUndo){
+      decos = editor.deltaDecorations(decos, []);
       if (keepUndo){
         // แยกเป็น undo ก้อนของตัวเอง: Ctrl+Z ครั้งเดียวกลับไปฉบับก่อนโหลด
         model.pushStackElement();
@@ -79,6 +81,15 @@ function monacoEditor(monaco){
       }));
     },
     goto(line, col){ editor.revealLineInCenter(line); editor.setPosition({ lineNumber: line, column: col || 1 }); editor.focus(); },
+    // เน้นบรรทัดของ object ที่เลือก (ทั้งบรรทัด + แถบสีที่ขอบซ้าย) · [] = เอาออก
+    highlight(lines){
+      const n = model.getLineCount();
+      decos = editor.deltaDecorations(decos, (lines || []).filter(l => l >= 1 && l <= n).map(l => ({
+        range: new monaco.Range(l, 1, l, 1), options: { isWholeLine: true, className: "sa-hl-line", linesDecorationsClassName: "sa-hl-gutter" } })));
+    },
+    reveal(line){ editor.revealLineInCenterIfOutsideViewport(line); },
+    // เคอร์เซอร์ย้ายบรรทัด (คลิก / ลูกศร) -> cb(บรรทัด)
+    onCursor(cb){ editor.onDidChangeCursorPosition(e => { if (e.source !== "api") cb(e.position.lineNumber); }); },
     focus(){ editor.focus(); },
     readOnly(on){ editor.updateOptions({ readOnly: !!on }); }
   };
@@ -106,6 +117,12 @@ function plainEditor(){
       ta.focus(); ta.setSelectionRange(p, p);
       ta.scrollTop = Math.max(0, line - 6) * (ta.scrollHeight / Math.max(lines.length, 1));
     },
+    highlight(){},                     // textarea เน้นบรรทัดไม่ได้ — ไปที่โค้ดเลื่อนไปบรรทัดอย่างเดียว
+    reveal(line){ const n = ta.value.split("\n").length; ta.scrollTop = Math.max(0, line - 6) * (ta.scrollHeight / Math.max(n, 1)); },
+    onCursor(cb){
+      const f = () => cb(ta.value.slice(0, ta.selectionStart).split("\n").length);
+      ta.addEventListener("click", f); ta.addEventListener("keyup", e => { if (/Arrow|Page|Home|End/.test(e.key)) f(); });
+    },
     focus(){ ta.focus(); },
     readOnly(on){ ta.readOnly = !!on; }
   };
@@ -120,7 +137,7 @@ async function openEditor(){
   document.body.classList.add("editing"); $("b-edit").classList.add("on");
   renderEditorBar();
   E = await loadEditor();
-  if (!ed.hooked){ ed.hooked = true; E.onChange(onEdit); }
+  if (!ed.hooked){ ed.hooked = true; E.onChange(onEdit); E.onCursor(codeCursor); }
   if (!ed.open) return;
   ed.key = null;                     // บังคับโหลดเนื้อหาไฟล์ล่าสุด
   await loadDoc();
@@ -154,10 +171,11 @@ async function loadDoc(){
   } else if (state.file.startsWith(GENERATED)){
     // โค้ดที่สร้างจากส่วนที่วาด (ยังไม่มีไฟล์): อ่านอย่างเดียว อัปเดตตามการวาด
     const it = itemById(state.file.slice(GENERATED.length));
+    const sent = it && it.spec ? JSON.stringify(it.spec) : null;   // spec ที่ส่งไปจริง (วาดต่อระหว่างรอ -> refreshGenerated ดึงใหม่)
     const r = it && it.spec ? await fetchGenerated(it) : { ok: false, message: "ไม่มีส่วนที่วาด" };
     if (ed.key !== key) return;
     if (!r || !r.ok){ ed.loading = false; ed.error = r ? r.message : "server ไม่ตอบ"; renderEditorBar(); return; }
-    ed.kind = "generated"; ed.name = it.fileName || it.spec.className + ".cs"; ed.genSpec = JSON.stringify(it.spec);
+    ed.kind = "generated"; ed.name = it.fileName || it.spec.className + ".cs"; ed.genSpec = sent;
     setText(r.source); ed.savedText = r.source;
   } else {
     const r = await fetch("/api/source?file=" + encodeURIComponent(state.file)).then(r => r.json()).catch(() => null);
@@ -169,7 +187,7 @@ async function loadDoc(){
   ed.loading = false; ed.ready = true;
   if (E.readOnly) E.readOnly(ed.kind === "generated");
   $("ed-empty").hidden = true;
-  renderEditorBar(); renderProblem(); run();
+  renderEditorBar(); renderProblem(); run(); syncCodeHighlight();
 }
 
 const fetchGenerated = it => fetch("/api/drawing/code", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -184,7 +202,7 @@ function refreshGenerated(){
   genT = setTimeout(async () => {
     const key = ed.key, spec = JSON.stringify(it.spec), r = await fetchGenerated(it);
     if (ed.key !== key || !r || !r.ok) return;
-    ed.genSpec = spec; setText(r.source, true); ed.savedText = r.source; applyMarkers();
+    ed.genSpec = spec; setText(r.source, true); ed.savedText = r.source; applyMarkers(); syncCodeHighlight();
   }, 400);
 }
 

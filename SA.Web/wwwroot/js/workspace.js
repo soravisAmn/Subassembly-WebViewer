@@ -105,16 +105,19 @@ function render(){
   for (const a of asms()) el("line", {x1:sx(a.baseline.x), x2:sx(a.baseline.x), y1:0, y2:H, class:"bl-line"}, svg);
 
   const s = state.sel, selId = selItemId(), editing = state.editing;
+  // subassembly ที่เลือก (ตัวเดียว หรือหลายตัวแบบ multi)
+  const selIds = new Set(selList().map(x => x.item).filter(Boolean));
   const dragId = drag && drag.type === "item" ? drag.id : null;
   evalAll();
   for (const it of allItems()){
     const rr = asmRes[it.id], dr = drawRes[it.id];
     const res = rr && rr.result ? rr.result : null, P = res ? res.points : [];
     if (!res && !dr) continue;
-    const isSel = it.id === selId;
+    const isSel = selIds.has(it.id);
     let cls = "item";
     if (editing) cls += it.id === editing ? " editing-item" : " locked";
-    else if (selId && !isSel && dragId !== it.id) cls += " dim";
+    else if (selIds.size && !isSel && dragId !== it.id) cls += " dim";
+    if (!editing && isSel && s.type === "multi") cls += " picked";
     if (dragId === it.id) cls += " drag";
     const grp = el("g", {class: cls}, svg);
     if (dr) renderSpec(it, dr, grp, isSel);
@@ -162,7 +165,7 @@ function render(){
     const ox = dragging ? drag.ox : org.x;
     const oy = dragging ? drag.oy : org.y;
     const st = dragging ? drag.attach.type : (rr ? rr.attachState : it.attach.type);
-    const z = it.id === selId ? 7 : 5.5;
+    const z = selIds.has(it.id) ? 7 : 5.5;
     el("path", {d:`M${sx(ox)} ${sy(oy)-z} L${sx(ox)+z} ${sy(oy)} L${sx(ox)} ${sy(oy)+z} L${sx(ox)-z} ${sy(oy)} Z`,
       class:"org" + (st === "free" ? " free" : st === "lost" ? " lost" : ""), "data-kind":"item", "data-id":it.id}, svg);
   }
@@ -186,7 +189,10 @@ function render(){
     el("rect", {x:sx(p.x)-5, y:sy(p.y)-5, width:10, height:10, rx:2, class:"h" + (s.type === "spt" && s.i === i ? " sel" : ""), "data-kind":"h", "data-i":i}, svg);
   });
 
+  renderCodeHot();
   renderDrawOverlay();
+  renderCmdOverlay();
+  renderSelBox();
   $("welcome").style.display = allItems().length ? "none" : "flex";
   renderLegend();
 }
@@ -215,9 +221,52 @@ function renderSpec(it, r, grp, isSel){
     if (lbl) el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl"}, grp).textContent = lbl;
   }
   if (!isSel) return;
-  if (s.type === "dshape" && r.shapes[s.id] && r.shapes[s.id].poly) el("polygon", {points: r.shapes[s.id].poly.map(p => X(p) + "," + Y(p)).join(" "), class:"sel-shape"}, svg);
-  else if (s.type === "dlink" && r.links[s.id] && r.links[s.id].path) el("path", {d: r.links[s.id].path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" "), class:"sel-link"}, svg);
-  else if (s.type === "dpt" && r.pts[s.id] && !r.pts[s.id].err) el("circle", {cx:X(r.pts[s.id]), cy:Y(r.pts[s.id]), r:9, class:"sel-pt"}, svg);
+  for (const o of selList()){
+    if (o.item !== it.id) continue;
+    if (o.type === "dshape" && r.shapes[o.id] && r.shapes[o.id].poly) el("polygon", {points: r.shapes[o.id].poly.map(p => X(p) + "," + Y(p)).join(" "), class:"sel-shape"}, svg);
+    else if (o.type === "dlink" && r.links[o.id] && r.links[o.id].path) el("path", {d: r.links[o.id].path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" "), class:"sel-link"}, svg);
+    else if (o.type === "dpt" && r.pts[o.id] && !r.pts[o.id].err) el("circle", {cx:X(r.pts[o.id]), cy:Y(r.pts[o.id]), r:9, class:"sel-pt"}, svg);
+  }
+}
+
+// ---------------- คลุมเลือก (Window / Crossing) ----------------
+// object ที่คลุมเลือกได้ เป็น px บนจอ: Edit mode = point / link / shape ที่วาดของตัวที่แก้ · นอก Edit = subassembly ทั้งตัว
+function pickables(){
+  const out = [];
+  const drawnGeoms = (it, r) => {
+    const X = p => ({ x: sx(r.ox + p.x), y: sy(r.oy + p.y) }), sp = it.spec, g = [];
+    for (const p of sp.points){ const q = r.pts[p.id]; if (q && !q.err) g.push({ sel:{ type:"dpt", item: it.id, id: p.id }, geoms:[{ pts:[X(q)] }] }); }
+    for (const l of sp.links){ const q = r.links[l.id]; if (q && !q.err && q.path) g.push({ sel:{ type:"dlink", item: it.id, id: l.id }, geoms:[{ pts: q.path.map(X) }] }); }
+    for (const s of sp.shapes){ const q = r.shapes[s.id]; if (q && q.poly) g.push({ sel:{ type:"dshape", item: it.id, id: s.id }, geoms:[{ pts: q.poly.map(X), closed: true }] }); }
+    return g;
+  };
+  if (state.editing){
+    const it = editItem(), r = it && drawRes[it.id];
+    return it && it.spec && r ? drawnGeoms(it, r) : out;
+  }
+  for (const it of allItems()){
+    const rr = asmRes[it.id], res = rr && rr.result, geoms = [];
+    if (res && !rr.generated){
+      const P = res.points.map(p => ({ x: sx(p.x), y: sy(p.y) }));
+      P.forEach(p => geoms.push({ pts:[p] }));
+      res.links.forEach(l => geoms.push({ pts: l.pts.map(k => P[k]) }));
+    }
+    const r = drawRes[it.id];
+    if (it.spec && r) for (const o of drawnGeoms(it, r)) geoms.push(...o.geoms);
+    if (!geoms.length){ const o = itemOrigin(it); geoms.push({ pts:[{ x: sx(o.x), y: sy(o.y) }] }); }
+    out.push({ sel:{ type:"item", item: it.id }, geoms });
+  }
+  return out;
+}
+function renderSelBox(){
+  if (!drag || drag.type !== "box" || !drag.moved) return;
+  const b = Select.box(drag.px, drag.py, drag.qx, drag.qy), cross = Select.mode(drag.px, drag.qx) === "crossing";
+  el("rect", { x: b.l, y: b.t, width: b.r - b.l, height: b.b - b.t, class:"selbox" + (cross ? " cross" : "") }, svg);
+}
+function endSelBox(d, shift){
+  const b = Select.box(d.px, d.py, d.qx, d.qy);
+  const hits = Select.pick(pickables(), b, Select.mode(d.px, d.qx) === "crossing");
+  pickAdd(hits, shift);
 }
 
 function renderLegend(){
@@ -244,6 +293,7 @@ function addItem(props, a){
   const attach = n ? { type:"free", x: a.baseline.x + 2 + (n % 4) * 1.5, y: a.baseline.y + 2.5 }
                    : { type:"baseline", x: a.baseline.x, y: a.baseline.y };
   const it = Object.assign({ id: newId(), className: null, params: {}, attach }, props);
+  History.act(`เพิ่ม ${itemLabel(it)}`);
   a.items.push(it);
   setSel({ type:"item", item: it.id });
   run();
@@ -251,8 +301,15 @@ function addItem(props, a){
   return it;
 }
 
+// ลบหลายตัวพร้อมกัน = Undo ก้อนเดียว
+function removeItems(ids){
+  const n = ids.length;
+  History.batch(n === 1 ? `ลบ ${itemLabel(itemById(ids[0]))}` : `ลบ ${n} subassembly`, () => ids.forEach(removeItem));
+  setSelList([]);
+}
 function removeItem(id){
   const a = asmOfItem(id); if (!a) return;
+  History.act(`เอา ${itemLabel(itemById(id))} ออก`);
   if (state.editing === id) state.editing = null;
   // ตัวที่เกาะอยู่กับตัวนี้: ปลดให้ลอยอยู่ที่ตำแหน่งเดิม
   for (const k of a.items) if (k.attach.type === "point" && k.attach.parent === id){
@@ -268,6 +325,7 @@ function removeItem(id){
 function mirrorItem(id){
   const a = asmOfItem(id); if (!a) return;
   const ids = [id, ...descendants(id)], map = {};
+  History.act(`Mirror ${itemLabel(itemById(id))}`);
   ids.forEach(x => map[x] = newId());
   const clones = ids.map(x => {
     const src = itemById(x);
@@ -296,6 +354,7 @@ function moveToAsm(id, target){
 
 function removeAsm(id){
   const a = asmById(id); if (!a) return;
+  History.act(`ลบ ${a.name}`);
   if (a.items.some(i => i.id === state.editing)) state.editing = null;
   WS().assemblies = asms().filter(x => x.id !== id);
   if (!asms().length) WS().assemblies.push(newAssembly("Assembly 1"));
@@ -305,6 +364,7 @@ function removeAsm(id){
 function addAsm(){
   const xs = asms().map(a => a.baseline.x);
   const a = newAssembly("Assembly " + (asms().length + 1), { x: (xs.length ? Math.max(...xs) : 0) + 20, y: asms()[0] ? asms()[0].baseline.y : 0 });
+  History.act(`เพิ่ม ${a.name}`);
   asms().push(a);
   setSel({ type:"asm", asm: a.id });
   fit();
@@ -336,6 +396,7 @@ function insertOnSurface(px){
   for (let i = 0; i < s.length - 1; i++){
     if (x > s[i].x && x < s[i+1].x){
       const t = (x - s[i].x) / (s[i+1].x - s[i].x);
+      History.act("เพิ่มจุด surface");
       s.splice(i + 1, 0, { x: snapV(x), y: s[i].y + t * (s[i+1].y - s[i].y) });
       state.sel = { type:"spt", i: i + 1 };
       changed(); renderTree();
@@ -345,6 +406,7 @@ function insertOnSurface(px){
 }
 function deleteSurfacePoint(i){
   if (i == null || i < 0 || state.surface.length <= 2) return;
+  History.act(`ลบจุด surface #${i}`);
   state.surface.splice(i, 1);
   state.sel = { type:"surface" };
   changed(); renderTree();
@@ -361,43 +423,52 @@ function showBanner(t){
 }
 
 // ---------------- เมาส์ ----------------
+// pan = ปุ่มกลางเมาส์ลาก (แบบ AutoCAD) หรือ Space ค้าง + ลากปุ่มซ้าย (touchpad)
+// ลากพื้นหลังด้วยปุ่มซ้าย = คลุมเลือก (Window ซ้าย→ขวา / Crossing ขวา→ซ้าย)
 const ITEM_KINDS = ["item", "link", "pt", "shape", "dpt", "dlink", "dshape"];
+let spaceDown = false;
+function setSpace(on){ spaceDown = on; svg.classList.toggle("space", on); }
 svg.addEventListener("pointerdown", e => {
   const t = e.target, kind = t.dataset.kind, { px, py } = evtPos(e);
-  if (e.button === 1){      // ปุ่มกลาง = pan เสมอ (ใช้ตอนวาดอยู่)
-    drag = { type:"pan", px, py, cx: state.view.cx, cy: state.view.cy, moved:false, quiet:true };
+  if (e.button === 1 || (e.button === 0 && spaceDown)){
+    drag = { type:"pan", px, py, cx: state.view.cx, cy: state.view.cy, moved:false };
     svg.setPointerCapture(e.pointerId); e.preventDefault(); return;
   }
   if (e.button !== 0) return;
   closeMenus();
+  if (cmdPlacing()){ cmdClick(px, py); e.preventDefault(); return; }       // Move / Copy / Paste: จุดฐาน / ปลายทาง
   if (state.editing && draw.tool){ if (draw.typing) closeTyping(); drawClick(px, py); e.preventDefault(); return; }
   if (kind === "h"){
     const i = +t.dataset.i;
     state.sel = { type:"spt", i };
     drag = { type:"spt", i };
+    History.act(`ลากจุด surface #${i}`);
     renderAll();
   } else if (kind === "seg"){
     const now = performance.now(), dbl = lastSegDown && now - lastSegDown.t < 350 && Math.hypot(px - lastSegDown.px, py - lastSegDown.py) < 6;
     lastSegDown = { t: now, px, py };
     if (addMode || dbl){ lastSegDown = null; insertOnSurface(px); return; }
     drag = { type:"all", py, px, ys: state.surface.map(p => p.y), moved:false };
+    History.act("เลื่อน surface");
   } else if (kind === "baseline"){
     const a = asmById(t.dataset.asm);
     drag = { type:"baseline", asm: a.id, px, py, x0: a.baseline.x, y0: a.baseline.y, moved:false };
+    History.act(`ย้ายแกน ${a.name}`);
   } else if (ITEM_KINDS.includes(kind)){
     const id = t.dataset.id, it = itemById(id);
     if (!it) return;
     const obj = kind === "item" ? null : kind[0] === "d" ? { type: kind, id: t.dataset.sid } : { type: kind, i: +t.dataset.i };
-    // Edit mode: ตัวที่แก้อยู่ไม่ลากทั้งตัว (คลิกเพื่อเลือก object เท่านั้น)
+    // Edit mode: ตัวที่แก้อยู่ไม่ลากทั้งตัว — คลิก = เลือก object, ลาก = คลุมเลือก (เริ่มบน object ได้)
     if (state.editing){
-      if (id === state.editing) setSel(obj ? { ...obj, item: id } : { type:"item", item: id });
-      return;
+      const hit = id !== state.editing ? null : obj ? { ...obj, item: id } : { type:"item", item: id };
+      drag = { type:"box", px, py, qx: px, qy: py, moved:false, hit, locked: id !== state.editing };
+    } else {
+      const { x: ox, y: oy } = itemOrigin(it);
+      drag = { type:"item", id, obj, px, py, ox, oy, ox0: ox, oy0: oy, moved:false, attach: it.attach, cands: snapCandidates(id), hot:null };
+      History.act(`ย้าย / เกาะ ${itemLabel(it)}`);
     }
-    const { x: ox, y: oy } = itemOrigin(it);
-    drag = { type:"item", id, obj, px, py, ox, oy, ox0: ox, oy0: oy, moved:false, attach: it.attach, cands: snapCandidates(id), hot:null };
-    if (selItemId() !== id) setSel({ type:"item", item: id });
   } else {
-    drag = { type:"pan", px, py, cx: state.view.cx, cy: state.view.cy, moved:false };
+    drag = { type:"box", px, py, qx: px, qy: py, moved:false, hit: null };
   }
   svg.setPointerCapture(e.pointerId); e.preventDefault();
 });
@@ -405,6 +476,7 @@ svg.addEventListener("pointerdown", e => {
 svg.addEventListener("pointermove", e => {
   const { px, py } = evtPos(e);
   renderXY(px, py);
+  if (!drag && cmdPlacing()){ cmdMove(px, py); return; }
   if (!drag && state.editing && draw.tool){ drawMove(px, py); return; }
   if (!drag){ hoverTip(e, px, py); return; }
   if (!drag.moved && Math.hypot(px - drag.px, py - drag.py) >= 4) drag.moved = true;
@@ -413,6 +485,11 @@ svg.addEventListener("pointermove", e => {
     tip.style.display = "none";
     state.view.cx = drag.cx - (px - drag.px) / state.view.scale;
     state.view.cy = drag.cy + (py - drag.py) / (state.view.scale * state.view.ve);
+    render();
+  } else if (drag.type === "box"){
+    if (!drag.moved) return;
+    drag.qx = px; drag.qy = py;
+    tip.style.display = "none";
     render();
   } else if (drag.type === "spt"){
     const s = state.surface, p = s[drag.i];
@@ -456,10 +533,16 @@ svg.addEventListener("pointermove", e => {
   }
 });
 
-function endDrag(){
+// คลิก (ไม่ได้ลาก) = เลือก: object ที่รวมชุดได้ = เพิ่มเข้าชุด (แบบ AutoCAD) · Shift = เอาออก · คลิกที่ว่าง = ยกเลิกการเลือก
+function endDrag(e){
   if (!drag) return;
-  const d = drag;
+  const d = drag, shift = !!(e && e.shiftKey);
   drag = null;
+  // คลุมเลือก: ใช้ตำแหน่งตอนปล่อยด้วย (ลากเร็วจน pointermove ไม่ทัน)
+  if (d.type === "box" && e && e.clientX != null){
+    const { px, py } = evtPos(e);
+    if (Math.hypot(px - d.px, py - d.py) >= 4){ d.qx = px; d.qy = py; d.moved = true; }
+  }
   tip.style.display = "none";
   if (d.type === "item"){
     const it = itemById(d.id);
@@ -467,19 +550,28 @@ function endDrag(){
       it.attach = d.attach;
       if (d.target) moveToAsm(d.id, asmById(d.target));
       showBanner("");
-      persist(); renderTree(); run();
-    } else if (d.obj) setSel({ ...d.obj, item: d.id });     // คลิกเฉยๆ ที่จุด / link / shape = เลือก object นั้น
+      setSel({ type:"item", item: d.id }); run();
+    } else if (shift) pickAdd([{ type:"item", item: d.id }], true);
+    // คลิกซ้ำที่ตัวที่เลือกอยู่ตัวเดียว = เลือกจุด / link / shape ข้างใน (ดูค่าใน Properties)
+    else if (d.obj && state.sel.type !== "multi" && selItemId() === d.id) setSel({ ...d.obj, item: d.id });
+    else pickAdd([{ type:"item", item: d.id }]);
+  } else if (d.type === "box"){
+    if (d.moved){ endSelBox(d, shift); render(); }
+    else if (d.hit && pickable(d.hit)) pickAdd([d.hit], shift);
+    else if (d.hit){ if (!shift) setSel(d.hit); }           // จุด / link ของโค้ดเดิม, origin = เลือกแบบเดิม (ไม่รวมชุด)
+    else if (!d.locked && !shift) setSelList([]);
+    else render();
   } else if (d.type === "baseline" && !d.moved) setSel({ type:"asm", asm: d.asm });
   else if (d.type === "all" && !d.moved) setSel({ type:"surface" });
-  else if (d.type === "pan" && !d.moved && !d.quiet && !state.editing) setSel({ type:"ws" });
   else { persist(); renderTree(); renderProps(); }
 }
 svg.addEventListener("pointerup", endDrag);
-svg.addEventListener("pointercancel", endDrag);
+svg.addEventListener("pointercancel", () => endDrag());
 svg.addEventListener("pointerleave", () => { if (!drag) $("bar-xy").textContent = "—"; });
 svg.addEventListener("contextmenu", e => {
   e.preventDefault();
   const t = e.target, k = t.dataset.kind;
+  if (cmd.name) return cmdEnter();                            // Move / Copy: คลิกขวา = Enter (แบบ AutoCAD)
   if (state.editing && draw.tool) return finishChain();     // ตอนวาด: คลิกขวา = จบเส้น
   if (k === "h") return deleteSurfacePoint(+t.dataset.i);
   if (ITEM_KINDS.includes(k)){

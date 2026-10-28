@@ -22,7 +22,8 @@ public class WorldInput
 public record SurfacePt(double X, double Y);
 
 // จุดผลลัพธ์: X/Y เทียบ origin ของ subassembly (AssemblyService แปลงเป็นพิกัดบนจอให้)
-public record OutPt(double X, double Y, string[] Codes);
+// Sites = บรรทัดในไฟล์ของผู้ใช้ที่เรียก Points.Add (ในสุดก่อน) — null เมื่อไม่ได้เก็บ
+public record OutPt(double X, double Y, string[] Codes, CallSite[]? Sites = null);
 
 public class ParamDef
 {
@@ -81,8 +82,9 @@ public class SubassemblyRunner
 
     // originOffset / originElevation = ตำแหน่งจริงของจุดเกาะ (origin) ของ subassembly ตัวนี้
     // baselineElevation = ระดับจริงของแกน assembly (alignment อยู่ที่ offset 0)
+    // sites = เก็บบรรทัดที่เรียก Points / Links / Shapes.Add (ดู CallSites ในตัวจำลอง)
     public RunOutput Run(Type type, Dictionary<string, JsonElement>? values, SimWorld world,
-                         double originOffset, double originElevation, double baselineElevation)
+                         double originOffset, double originElevation, double baselineElevation, bool sites = true)
     {
         lock (_gate)
         {
@@ -108,6 +110,7 @@ public class SubassemblyRunner
                 var task = Task.Run(() =>
                 {
                     SimHost.Current = cs;
+                    CallSites.Enabled = sites;
                     RunGuard.Begin(GuardLimit);
                     try
                     {
@@ -135,6 +138,7 @@ public class SubassemblyRunner
                         guardTripped = RunGuard.Tripped;
                         guardStack = RunGuard.TrippedStack;
                         RunGuard.End();
+                        CallSites.Enabled = false;
                     }
                 });
 
@@ -260,11 +264,11 @@ public class SubassemblyRunner
     private static void CollectGeometry(CorridorState cs, RunOutput o)
     {
         foreach (var p in cs.Points)
-            o.Points.Add(new OutPt(p.Offset, p.Elevation, p.Codes.ToArray()));
+            o.Points.Add(new OutPt(p.Offset, p.Elevation, p.Codes.ToArray(), CallSites.Of(p)));
         foreach (var l in cs.Links)
-            o.Links.Add(new { pts = l.Points.Select(p => p.Index).ToArray(), codes = l.Codes.ToArray() });
+            o.Links.Add(new { pts = l.Points.Select(p => p.Index).ToArray(), codes = l.Codes.ToArray(), sites = CallSites.Of(l) });
         foreach (var s in cs.Shapes)
-            o.Shapes.Add(new { links = s.Links.Select(l => l.Index).ToArray(), codes = s.Codes.ToArray(), polygon = ChainPolygon(s) });
+            o.Shapes.Add(new { links = s.Links.Select(l => l.Index).ToArray(), codes = s.Codes.ToArray(), polygon = ChainPolygon(s), sites = CallSites.Of(s) });
     }
 
     // เรียง link ของ shape ให้ต่อกันเป็นรูปปิด (สำหรับระบายสี) ถ้าต่อไม่ได้คืน null

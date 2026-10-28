@@ -23,7 +23,8 @@ const store = {
 };
 function newId(prefix){ return (prefix || "s") + Math.random().toString(36).slice(2, 8); }
 function defaultBar(){
-  return { grid: true, snap: false, ortho: false, slopes: ["1:1.5", "1:2", "1:3"], slope: -1,
+  // snap = Grid snap (F9) ทีละ gridStep m · osOn = OSNAP ทั้งหมด (F3) · osnap = ชนิดที่เปิดอยู่
+  return { grid: true, snap: false, gridStep: 0.05, ortho: false, slopes: ["1:1.5", "1:2", "1:3"], slope: -1, osOn: true,
            osnap: { end: true, mid: false, int: true, surf: true, perp: false, near: false } };
 }
 function newAssembly(name, baseline){ return { id: newId("a"), name, baseline: baseline || { x: 0, y: 0 }, items: [] }; }
@@ -70,7 +71,12 @@ function loadState(){
   return st;
 }
 const state = loadState();
-const persist = () => store.set("sa3.state", state);
+// บันทึกลงเบราว์เซอร์ + นับก้อน Undo (history.js) — ระหว่างลาก / พิมพ์ในช่อง Properties ยังไม่นับ
+const persist = () => { store.set("sa3.state", state); if (!drag && !typingInProps()) History.track(); };
+function typingInProps(){
+  const a = document.activeElement;
+  return !!a && a.tagName === "INPUT" && a.type !== "checkbox" && !!a.closest("#props");
+}
 
 let files = [], projFiles = [], opened = null;   // opened = {name, text, handle, lastModified}
 let asmRes = {};                                  // item id -> ผลจาก /api/assembly
@@ -91,10 +97,23 @@ const fileOf = it => it ? (it.file || it.sourceName || "") : "";
 const fileKey = () => state.file === OPENED ? "opened:" + (opened ? opened.name : "") : state.file || "";
 const selItemId = () => state.sel.item || null;
 const selItem = () => itemById(selItemId());
+// เลือกหลายชิ้น: state.sel = { type:"multi", item (ตัวที่ Edit อยู่ | ไม่มี), list:[{type, item, id | i}] }
+//   Edit mode = point / link / shape ที่วาดของตัวที่แก้ · นอก Edit mode = subassembly ทั้งตัว (type "item")
+const selList = () => state.sel.type === "multi" ? state.sel.list : [state.sel];
+function selMatch(s, type, a, b){
+  if (s.type !== type) return false;
+  if (type === "asm") return s.asm === a;
+  if (type === "item" || type === "params") return s.item === a;
+  if (type === "pt" || type === "link" || type === "shape") return s.item === a && s.i === b;
+  if (type === "dpt" || type === "dlink" || type === "dshape") return s.item === a && s.id === b;
+  if (type === "spt") return s.i === a;
+  return true;
+}
+const selHas = (type, a, b) => selList().some(s => selMatch(s, type, a, b));
 // assembly ที่ใช้อ้างอิง: ของสิ่งที่เลือก ถ้าไม่ได้เลือกใช้ตัวแรก
 function curAsm(){
   const s = state.sel;
-  return (s.asm && asmById(s.asm)) || (s.item && asmOfItem(s.item)) || asms()[0];
+  return (s.asm && asmById(s.asm)) || (s.item && asmOfItem(s.item)) || (s.list && s.list[0] && asmOfItem(s.list[0].item)) || asms()[0];
 }
 // ลูกหลานของ item (ใช้กันเกาะวน, mirror, ย้าย assembly)
 function descendants(id){
@@ -149,7 +168,7 @@ function colorFor(code){
 const primaryCode = codes => codes.find(c => c !== "Datum") || codes[0] || "";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const f3 = v => (Math.abs(v) < 5e-4 ? 0 : v).toFixed(3);
-const snapV = v => state.bar.snap ? Math.round(v / 0.05) * 0.05 : v;
+const snapV = v => { const g = state.bar.gridStep; return state.bar.snap && g > 0 ? +(Math.round(v / g) * g).toFixed(9) : v; };
 // slope dy/dx -> "1:x" (ดิ่ง:ราบ) และ %
 function slopeText(dx, dy){
   if (Math.abs(dx) < 1e-9) return "ดิ่ง";

@@ -650,6 +650,43 @@ public static class CodeGenerator
         return source[..block.Start] + nb + source[block.End..];
     }
 
+    // source map: id ของ point / link / shape ที่วาด -> เลขบรรทัด (1-based) ในข้อความทั้งไฟล์
+    //   point = บรรทัดคำนวณพิกัด (Pt? P3 = ...) + บรรทัดเพิ่มลง CorridorState (AddPoint(cs, P3 ...))
+    //   link = บรรทัด AddLink / FollowSurface · shape = บรรทัด AddShape
+    // อ่านจากช่วง SA-DRAWING ของข้อความจริง จึงตรงกับไฟล์เสมอ ทั้งไฟล์ที่สร้างใหม่และไฟล์ที่ช่วงนี้อยู่กลางไฟล์
+    // (นับรวมบรรทัด CALL / PARAM / TARGET ที่อยู่ก่อนหน้าแล้ว)
+    private static readonly System.Text.RegularExpressions.Regex[] MapPatterns =
+    {
+        new(@"^\s*Pt\? (\w+) = (?!null;)"),
+        new(@"^\s*Point \w+ = AddPoint\(cs, (\w+)"),
+        new(@"^\s*Link \w+ = (?:AddLink|FollowSurface)\(cs, ""([^""]+)"""),
+        new(@"^\s*Link \w+ = null;\s+// ([^:]+):"),
+        new(@"^\s*AddShape\(cs, ""([^""]+)"""),
+        new(@"^\s*// (\w+): มี link ที่ไม่มีอยู่จริง"),
+    };
+    public static Dictionary<string, List<int>> SourceMap(string source)
+    {
+        var map = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+        var block = FindBlock(source);
+        if (block == null) return map;
+        int line = 1;
+        for (int i = 0; i < block.Start; i++) if (source[i] == '\n') line++;
+        foreach (var raw in block.Text.Split('\n'))
+        {
+            foreach (var re in MapPatterns)
+            {
+                var m = re.Match(raw);
+                if (!m.Success) continue;
+                var id = m.Groups[1].Value;
+                if (!map.TryGetValue(id, out var list)) map[id] = list = new List<int>();
+                list.Add(line);
+                break;
+            }
+            line++;
+        }
+        return map;
+    }
+
     // ช่วงมีป้ายในไฟล์ยังตรงกับที่ spec สร้างไหม (ไม่ตรง = มีคนแก้ด้วยมือ)
     public static bool BlockMatchesSpec(Block block)
     {

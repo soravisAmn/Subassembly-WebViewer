@@ -37,6 +37,10 @@ public static class CodeGenerator
     public static readonly HashSet<string> Reserved = new(StringComparer.Ordinal)
     {
         "cs", "F", "Deg", "Pt", "Measure", "Source", "surface",
+        // ชื่อตัวช่วยในโค้ดที่สร้าง (ตัวแปรชื่อเดียวกันจะบังเมธอด / ชนิด)
+        "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Tangent", "Rotate",
+        "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
+        "GetLong", "GetDouble", "Elevation",
         "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue","decimal","default",
         "delegate","do","double","else","enum","event","explicit","extern","false","finally","fixed","float","for","foreach","goto",
         "if","implicit","in","int","interface","internal","is","lock","long","namespace","new","null","object","operator","out",
@@ -295,16 +299,51 @@ public static class CodeGenerator
                 L($"        Pt? {id} = null;");
                 L($"        Warn(cs, CorridorError.Failure, \"{id}: จุด {id} อ้างถึงตัวเองเป็นวง\");");
             }
-            foreach (var p in order) PointLine(p);
+            foreach (var o in order)
+            {
+                if (o is SpecPoint p) PointLine(p);
+                else RotationLines((SpecRotation)o);
+            }
             L();
 
             L("        // ---- เพิ่มจุด / link / shape ลง CorridorState ----");
             foreach (var p in _s.Points)
-                L($"        Point {Lc(p.Id)} = AddPoint(cs, {p.Id}{Codes(p.Codes)});");
+                // จุด auxiliary: ไม่ประกาศตัวแปร Point (ไม่มีใครใช้ — กันคำเตือน CS0219 ของ compiler)
+                L(p.Auxiliary ? $"        // {p.Id} auxiliary: ใช้คำนวณอย่างเดียว ไม่เพิ่มลง Civil 3D"
+                              : $"        Point {Lc(p.Id)} = AddPoint(cs, {p.Id}{Codes(p.Codes)});");
             foreach (var l in _s.Links)
             {
                 var (a, b) = l.Ends;
-                if (!Exists(a) || !Exists(b)) { L($"        Link {Lc(l.Id)} = null;   // {l.Id}: ไม่มีจุดปลาย {(!Exists(a) ? a : b)}"); continue; }
+                // link auxiliary: ไม่มีตัวแปร Link / ไม่ Links.Add (และโค้งไม่ Points.Add จุดระหว่างทาง) — บรรทัดนี้ไว้ให้ codelink กระโดดมา
+                if (l.Auxiliary) { L($"        // {l.Id} auxiliary: ใช้อ้างอิงอย่างเดียว ไม่เพิ่มลง Civil 3D"); continue; }
+                // เส้นโค้ง = หลายท่อน: ตัวแปรเป็น Link[]
+                string lt = l.IsArc ? "Link[]" : "Link";
+                var need = new[] { a, b }.Concat(l.Type == "arc3" ? new[] { l.Via ?? "" } : l.Type == "fillet" ? new[] { l.Corner ?? "" } : Array.Empty<string>());
+                var missing = need.FirstOrDefault(id => !Exists(id));
+                // link ที่ข้าม: ประกาศตัวแปร null เฉพาะเมื่อ shape ใช้ (ไม่งั้น compiler เตือน CS0219)
+                bool used = _s.Shapes.Any(sh => sh.Links.Contains(l.Id));
+                string skip = used ? $"        {lt} {Lc(l.Id)} = null;   // " : "        // ";
+                if (missing != null) { L($"{skip}{l.Id}: ไม่มีจุด {missing}"); continue; }
+                var aux = new[] { a, b }.FirstOrDefault(id => _s.Points.First(p => p.Id == id).Auxiliary);
+                if (aux != null)
+                {
+                    L($"{skip}{l.Id}: ปลาย {aux} เป็นจุด auxiliary");
+                    L($"        Warn(cs, CorridorError.Failure, \"{l.Id}: ปลาย {aux} เป็นจุด auxiliary (ไม่อยู่ใน Civil 3D)\");");
+                    continue;
+                }
+                if (l.IsArc)
+                {
+                    var sg = l.Seg ?? new SpecSeg();
+                    string seg = $"{(sg.By == "count" ? "Seg.Count" : "Seg.Chord")}, {X(sg.Value ?? "0.05", "ท่อนโค้ง", l.Id)}";
+                    string cc = Codes(l.Codes);
+                    if (l.Type == "arc3")
+                        L($"        Link[] {Lc(l.Id)} = Arc3(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Via}, {b}, {Lc(b)}, {seg}{cc});   // {l.Id} โค้งผ่าน {a} {l.Via} {b}");
+                    else if (l.Type == "arcR")
+                        L($"        Link[] {Lc(l.Id)} = ArcR(cs, \"{l.Id}\", {a}, {Lc(a)}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {(l.Sweep == "cw" ? "false" : "true")}, {(l.Large ? "true" : "false")}, F, {seg}{cc});   // {l.Id} โค้งรัศมี {(l.Sweep == "cw" ? "ตามเข็ม" : "ทวนเข็ม")}{(l.Large ? " ทางยาว" : "")} (กรอบ Side = Right)");
+                    else
+                        L($"        Link[] {Lc(l.Id)} = Fillet(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Corner}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {seg}{cc});   // {l.Id} Fillet ที่มุม {l.Corner}");
+                    continue;
+                }
                 if (l.Follow)
                     L($"        Link {Lc(l.Id)} = FollowSurface(cs, \"{l.Id}\", {SurfVar(l.Target)}, {a}, {Lc(a)}, {b}, {Lc(b)}{Codes(l.Codes)});   // {l.Id} วิ่งตามผิวดิน");
                 else
@@ -313,7 +352,19 @@ public static class CodeGenerator
             foreach (var sh in _s.Shapes)
             {
                 var ok = sh.Links.All(id => _s.Links.Any(l => l.Id == id));
-                L(ok ? $"        AddShape(cs, \"{sh.Id}\", new[] {{ {string.Join(", ", sh.Links.Select(Lc))} }}{Codes(sh.Codes)});"
+                // shape ใน Civil 3D ประกอบจาก link จริงเท่านั้น
+                var ax = ok ? sh.Links.FirstOrDefault(id => _s.Links.First(l => l.Id == id).Auxiliary) : null;
+                if (ax != null)
+                {
+                    L($"        // {sh.Id}: ใช้ link auxiliary {ax} — ข้าม");
+                    L($"        Warn(cs, CorridorError.Failure, \"{sh.Id}: ใช้ link auxiliary {ax} ไม่ได้ (ไม่อยู่ใน Civil 3D)\");");
+                    continue;
+                }
+                // มีเส้นโค้ง (Link[]) = ต่อ array ตามลำดับด้วย Join
+                bool arcs = sh.Links.Any(id => _s.Links.Any(l => l.Id == id && l.IsArc));
+                string list = arcs ? $"Join({string.Join(", ", sh.Links.Select(id => _s.Links.First(l => l.Id == id).IsArc ? Lc(id) : $"new[] {{ {Lc(id)} }}"))})"
+                                   : $"new[] {{ {string.Join(", ", sh.Links.Select(Lc))} }}";
+                L(ok ? $"        AddShape(cs, \"{sh.Id}\", {list}{Codes(sh.Codes)});"
                      : $"        // {sh.Id}: มี link ที่ไม่มีอยู่จริง ข้าม");
             }
             L("    }");
@@ -338,6 +389,9 @@ public static class CodeGenerator
                 case "delta":
                     L($"        Pt? {id} = Delta(cs, {Q}, {From(d.From)}, F * {Ex(d.Dx, "dx", 1)}, {Ex(d.Dy, "dy")});   // {id} ห่างจาก {d.From ?? "origin"}");
                     break;
+                case "polar":
+                    L($"        Pt? {id} = Polar(cs, {Q}, {From(d.From)}, {Ex(d.Length, "length")}, {Ex(d.Angle, "angle")}, F);   // {id} ระยะ + มุม จาก {d.From ?? "origin"}");
+                    break;
                 case "slopeLength":
                     var m = d.Measure switch { "dx" => "Measure.Dx", "dy" => "Measure.Dy", _ => "Measure.Along" };
                     L($"        Pt? {id} = SlopeLength(cs, {Q}, {From(d.From)}, {Ex(d.Slope, "slope")}, {Ex(d.Length, "length")}, {Dir()}, {m});   // {id} ลาด + ความยาว จาก {d.From ?? "origin"}");
@@ -354,6 +408,9 @@ public static class CodeGenerator
                 case "intersect":
                     L($"        Pt? {id} = Intersect(cs, {Q}, {From(d.A1)}, {From(d.A2)}, {From(d.B1)}, {From(d.B2)});   // {id} จุดตัด {d.A1}-{d.A2} กับ {d.B1}-{d.B2}");
                     break;
+                case "tangent":
+                    L($"        Pt? {id} = Tangent(cs, {Q}, {From(d.Corner)}, {From(d.Toward)}, {From(d.Other)}, {Ex(d.Radius, "radius")});   // {id} จุดสัมผัสของ Fillet ที่มุม {d.Corner}");
+                    break;
                 case "external":
                     throw new FormatException($"{id}: จุดจากโค้ดเดิม (external) ใช้ได้กับไฟล์ที่เขียนเองเท่านั้น — รองรับใน Milestone 4");
                 default:
@@ -361,11 +418,56 @@ public static class CodeGenerator
             }
         }
 
-        // จุดที่ต้องคำนวณก่อน (from / a / b ...) มาก่อน; ไม่พึ่งกันคงลำดับเดิม; อ้างกันเป็นวง -> cyclic
-        private List<SpecPoint> TopoOrder(out List<string> cyclic)
+        // กลุ่มหมุน: สมาชิกคำนวณตาม def ก่อน (ค่าก่อนหมุน) แล้ว Rotate ทีละจุดรอบ pivot
+        private void RotationLines(SpecRotation g)
         {
-            var done = new HashSet<string>(); var order = new List<SpecPoint>(); var cyc = new List<string>();
+            string pv = Exists(g.Pivot) ? g.Pivot : "null", a = X(g.Angle, "มุมหมุน", g.Id, 1);
+            L($"        // กลุ่มหมุน {g.Id}: หมุนรอบ {g.Pivot} มุม {g.Angle}° (ทวนเข็ม + ในกรอบ Side = Right)");
+            foreach (var m in g.Points.Where(Exists))
+                L($"        {m} = Rotate(cs, \"{m}\", {m}, {pv}, F * {a});");
+        }
+
+        // ลำดับคำนวณ: จุด (SpecPoint) + บรรทัดหมุนของกลุ่ม (SpecRotation) — จุดที่ต้องคำนวณก่อน (from / a / b ...) มาก่อน;
+        // ไม่พึ่งกันคงลำดับเดิม; อ้างกันเป็นวง -> cyclic
+        // จุดที่อ้างสมาชิกกลุ่มหมุน: สมาชิกกลุ่มเดียวกัน / จุดที่ pivot อ้าง (ทางอ้อมด้วย) = ก่อนบรรทัดหมุน (เห็นค่าก่อนหมุน)
+        //   อื่นๆ = หลังบรรทัดหมุน (เห็นค่าที่หมุนแล้ว) — ตรงกับ evaluate ใน wwwroot/js/spec.js
+        private List<object> TopoOrder(out List<string> cyclic)
+        {
+            var groupOf = new Dictionary<string, SpecRotation>();
+            foreach (var g in _s.Rotations) foreach (var id in g.Points) groupOf[id] = g;
+            var pre = new Dictionary<string, HashSet<string>>();
+            foreach (var g in _s.Rotations)
+            {
+                var s = pre[g.Id] = new HashSet<string>();
+                var stack = new Stack<string>(); stack.Push(g.Pivot);
+                while (stack.Count > 0)
+                {
+                    var id = stack.Pop();
+                    if (string.IsNullOrEmpty(id) || s.Contains(id) || groupOf.GetValueOrDefault(id) == g) continue;
+                    s.Add(id);
+                    var p = _s.Points.FirstOrDefault(x => x.Id == id);
+                    if (p != null) foreach (var r in p.Def.Refs()) stack.Push(r);
+                }
+            }
+            var done = new HashSet<string>(); var order = new List<object>(); var cyc = new List<string>();
             var state = new Dictionary<string, int>();
+            bool VisitRot(SpecRotation g)
+            {
+                string key = "#" + g.Id;
+                if (done.Contains(key)) return true;
+                if (state.GetValueOrDefault(key) == 1) return false;
+                state[key] = 1;
+                bool ok = true;
+                foreach (var id in g.Points.Append(g.Pivot))
+                {
+                    var q = _s.Points.FirstOrDefault(x => x.Id == id);
+                    if (q != null && !Visit(q)) ok = false;
+                }
+                state[key] = 2;
+                if (ok) { done.Add(key); order.Add(g); }
+                else foreach (var id in g.Points) if (!cyc.Contains(id)) cyc.Add(id);
+                return ok;
+            }
             bool Visit(SpecPoint p)
             {
                 if (done.Contains(p.Id)) return true;
@@ -375,16 +477,20 @@ public static class CodeGenerator
                 foreach (var r in p.Def.Refs())
                 {
                     var q = _s.Points.FirstOrDefault(x => x.Id == r);
-                    if (q != null && !Visit(q)) ok = false;
+                    if (q == null) continue;
+                    if (!Visit(q)) ok = false;
+                    // อ้างสมาชิกกลุ่มหมุนแบบเห็นค่าที่หมุนแล้ว = ต้องอยู่หลังบรรทัดหมุนของกลุ่มนั้น
+                    if (groupOf.TryGetValue(r, out var g) && groupOf.GetValueOrDefault(p.Id) != g && !pre[g.Id].Contains(p.Id) && !VisitRot(g)) ok = false;
                 }
                 state[p.Id] = 2;
                 if (ok) { done.Add(p.Id); order.Add(p); } else if (!cyc.Contains(p.Id)) cyc.Add(p.Id);
                 return ok;
             }
             foreach (var p in _s.Points) Visit(p);
+            foreach (var g in _s.Rotations) VisitRot(g);
             // จุดที่พึ่งจุดในวงก็คำนวณไม่ได้ (อยู่ใน order แต่ from = null) — ประกาศจุดในวงไว้ก่อน
             cyclic = cyc;
-            return order.Where(p => !cyc.Contains(p.Id)).ToList();
+            return order.Where(o => o is not SpecPoint p || !cyc.Contains(p.Id)).ToList();
         }
 
         private void Helpers()
@@ -406,6 +512,13 @@ public static class CodeGenerator
     {
         if (from == null) return null;
         return Check(cs, id, new Pt(from.Value.X + dx, from.Value.Y + dy));
+    }
+
+    // ห่าง length ทำมุม angle (องศา ทวนเข็มจาก +x ในกรอบ Side = Right) · F = -1 (Left) กลับด้านแนวราบ
+    private static Pt? Polar(CorridorState cs, string id, Pt? from, double length, double angle, double F)
+    {
+        if (from == null) return null;
+        return Check(cs, id, new Pt(from.Value.X + F * length * Math.Cos(angle * Deg), from.Value.Y + length * Math.Sin(angle * Deg)));
     }
 
     // ลาด slope (ระดับที่เปลี่ยน / ระยะราบ) ไปทาง dir ยาว length ตามแนวลาด / ระยะราบ / ระยะดิ่ง
@@ -488,6 +601,15 @@ public static class CodeGenerator
         return Check(cs, id, new Pt(p.X + t * (q.X - p.X), p.Y + t * (q.Y - p.Y)));
     }
 
+    // หมุนจุด p รอบ pivot ด้วยมุม angle (องศา ทวนเข็ม +) — สมาชิกกลุ่มหมุน
+    private static Pt? Rotate(CorridorState cs, string id, Pt? p, Pt? pivot, double angle)
+    {
+        if (p == null) return null;
+        if (pivot == null) { Warn(cs, CorridorError.Failure, id + ": ข้ามเพราะหาจุดหมุนไม่ได้"); return null; }
+        double r = angle * Deg, c = Math.Cos(r), s = Math.Sin(r), dx = p.Value.X - pivot.Value.X, dy = p.Value.Y - pivot.Value.Y;
+        return Check(cs, id, new Pt(pivot.Value.X + dx * c - dy * s, pivot.Value.Y + dx * s + dy * c));
+    }
+
     private static Pt? Check(CorridorState cs, string id, Pt p)
     {
         if (double.IsNaN(p.X) || double.IsNaN(p.Y) || double.IsInfinity(p.X) || double.IsInfinity(p.Y))
@@ -554,6 +676,172 @@ public static class CodeGenerator
         foreach (string code in codes)
             link.Codes.TryAdd(code);
         return link;
+    }
+
+    // ---- เส้นโค้ง: link ใน Civil 3D เป็นเส้นตรงเท่านั้น -> จุดระหว่างทาง (ไม่มี code) + link ตรงทีละท่อน (code เดียวกันทุกท่อน) ----
+    // เรขาคณิตตรงกับ wwwroot/js/spec.js (tangentPoint / arcGeom / segCount / arcPoints)
+
+    private enum Seg { Chord, Count }
+
+    private struct Arc
+    {
+        public double Cx, Cy, R, A1, Sw;   // ศูนย์กลาง, รัศมี, มุมเริ่ม (rad), มุมกวาด (rad, + = ทวนเข็ม)
+    }
+
+    private static double Mod(double a, double m) => ((a % m) + m) % m;
+
+    // จุดสัมผัสบนเส้น corner→toward ของโค้งรัศมี radius ที่มุม corner (อีกเส้นไปทาง other)
+    // ขนานกัน / รัศมีใหญ่เกินเส้น = เตือน + ใช้มุมแหลมเดิม
+    private static Pt? Tangent(CorridorState cs, string id, Pt? corner, Pt? toward, Pt? other, double radius)
+    {
+        if (corner == null || toward == null || other == null) return null;
+        Pt c = corner.Value, t = toward.Value, o = other.Value;
+        double l1 = Math.Sqrt((t.X - c.X) * (t.X - c.X) + (t.Y - c.Y) * (t.Y - c.Y));
+        double l2 = Math.Sqrt((o.X - c.X) * (o.X - c.X) + (o.Y - c.Y) * (o.Y - c.Y));
+        string warn = null;
+        Pt r = c;
+        if (l1 < 1e-9 || l2 < 1e-9) warn = "เส้นยาวเป็นศูนย์";
+        else
+        {
+            double ux = (t.X - c.X) / l1, uy = (t.Y - c.Y) / l1, vx = (o.X - c.X) / l2, vy = (o.Y - c.Y) / l2;
+            double al = Math.Acos(Math.Max(-1.0, Math.Min(1.0, ux * vx + uy * vy)));
+            if (al < 1e-6 || Math.PI - al < 1e-6) warn = "สองเส้นขนานกัน";
+            else if (!(radius > 0.0)) warn = "รัศมี " + radius + " ต้องมากกว่า 0";
+            else
+            {
+                double d = radius / Math.Tan(al / 2.0);
+                if (d > l1 + 1e-9 || d > l2 + 1e-9) warn = "รัศมี " + radius + " ใหญ่เกิน (จุดสัมผัสเลยปลายเส้น)";
+                else r = new Pt(c.X + ux * d, c.Y + uy * d);
+            }
+        }
+        if (warn != null) Warn(cs, CorridorError.ValueTooLarge, id + " จุดสัมผัส: " + warn + " — ใช้มุมแหลมเดิม");
+        return Check(cs, id, r);
+    }
+
+    // วงกลมของโค้งจาก a ถึง b · kind: 0 = ผ่าน 3 จุด (extra = จุดผ่าน), 1 = รัศมี (ccw = ทิศบนจอจริง), 2 = fillet (extra = จุดมุม)
+    // คืนข้อความเตือนเมื่อเป็นไปไม่ได้ (ผู้เรียกใช้เส้นตรงแทน) · null = ได้ g
+    private static string ArcGeom(int kind, Pt a, Pt b, Pt extra, double radius, bool ccw, bool large, out Arc g)
+    {
+        g = new Arc();
+        double TAU = 2.0 * Math.PI;
+        if (kind == 0)
+        {
+            Pt v = extra;
+            double d = 2.0 * (a.X * (v.Y - b.Y) + v.X * (b.Y - a.Y) + b.X * (a.Y - v.Y));
+            double size = Math.Max(Math.Max(Math.Sqrt((v.X - a.X) * (v.X - a.X) + (v.Y - a.Y) * (v.Y - a.Y)), Math.Sqrt((b.X - a.X) * (b.X - a.X) + (b.Y - a.Y) * (b.Y - a.Y))), 1e-9);
+            if (Math.Abs(d) < 1e-9 * size * size) return "3 จุดเรียงเป็นเส้นตรง";
+            double a2 = a.X * a.X + a.Y * a.Y, v2 = v.X * v.X + v.Y * v.Y, b2 = b.X * b.X + b.Y * b.Y;
+            g.Cx = (a2 * (v.Y - b.Y) + v2 * (b.Y - a.Y) + b2 * (a.Y - v.Y)) / d;
+            g.Cy = (a2 * (b.X - v.X) + v2 * (a.X - b.X) + b2 * (v.X - a.X)) / d;
+            g.R = Math.Sqrt((a.X - g.Cx) * (a.X - g.Cx) + (a.Y - g.Cy) * (a.Y - g.Cy));
+            g.A1 = Math.Atan2(a.Y - g.Cy, a.X - g.Cx);
+            double s2 = Mod(Math.Atan2(b.Y - g.Cy, b.X - g.Cx) - g.A1, TAU), sv = Mod(Math.Atan2(v.Y - g.Cy, v.X - g.Cx) - g.A1, TAU);
+            g.Sw = sv < s2 ? s2 : s2 - TAU;
+            return null;
+        }
+        if (kind == 1)
+        {
+            double c = Math.Sqrt((b.X - a.X) * (b.X - a.X) + (b.Y - a.Y) * (b.Y - a.Y));
+            if (c < 1e-9) return "จุดเริ่มกับจุดปลายเป็นจุดเดียวกัน";
+            if (!(radius > 0.0) || radius < c / 2.0 - 1e-9) return "รัศมี " + radius + " น้อยกว่าครึ่งระยะเริ่ม-ปลาย (" + (c / 2.0) + ")";
+            double h = Math.Sqrt(Math.Max(0.0, radius * radius - c * c / 4.0)), mx = (a.X + b.X) / 2.0, my = (a.Y + b.Y) / 2.0;
+            double nx = -(b.Y - a.Y) / c, ny = (b.X - a.X) / c;   // ด้านซ้ายของทิศ a→b
+            double side = ccw != large ? 1.0 : -1.0;
+            g.Cx = mx + side * h * nx; g.Cy = my + side * h * ny; g.R = radius;
+            g.A1 = Math.Atan2(a.Y - g.Cy, a.X - g.Cx);
+            double s = Mod(Math.Atan2(b.Y - g.Cy, b.X - g.Cx) - g.A1, TAU);
+            g.Sw = ccw ? s : s - TAU;
+            return null;
+        }
+        // fillet: ศูนย์กลางบนเส้นแบ่งครึ่งมุม ห่างมุม R / sin(α/2) · จุดสัมผัสเป็นมุมแหลมเดิม = เส้นตรง
+        Pt k = extra;
+        double L1 = Math.Sqrt((a.X - k.X) * (a.X - k.X) + (a.Y - k.Y) * (a.Y - k.Y)), L2 = Math.Sqrt((b.X - k.X) * (b.X - k.X) + (b.Y - k.Y) * (b.Y - k.Y));
+        if (L1 < 1e-9 || L2 < 1e-9) return "จุดสัมผัสอยู่ที่มุม (ดูคำเตือนของจุดสัมผัส)";
+        if (!(radius > 0.0)) return "รัศมี " + radius + " ต้องมากกว่า 0";
+        double ux = (a.X - k.X) / L1, uy = (a.Y - k.Y) / L1, wx = (b.X - k.X) / L2, wy = (b.Y - k.Y) / L2;
+        double al = Math.Acos(Math.Max(-1.0, Math.Min(1.0, ux * wx + uy * wy)));
+        if (al < 1e-6 || Math.PI - al < 1e-6) return "สองเส้นขนานกัน";
+        double bl = Math.Sqrt((ux + wx) * (ux + wx) + (uy + wy) * (uy + wy)), dist = radius / Math.Sin(al / 2.0);
+        g.Cx = k.X + (ux + wx) / bl * dist; g.Cy = k.Y + (uy + wy) / bl * dist; g.R = radius;
+        g.A1 = Math.Atan2(a.Y - g.Cy, a.X - g.Cx);
+        g.Sw = Mod(Math.Atan2(b.Y - g.Cy, b.X - g.Cx) - g.A1 + Math.PI, TAU) - Math.PI;   // ทางสั้น (< 180°)
+        return null;
+    }
+
+    // จำนวนท่อน: Chord = ท่อนยาว (วัดตามโค้ง) ไม่เกิน value · Count = value ท่อน · จำกัด 2–180
+    private static int SegCount(Seg by, double value, double r, double sw)
+    {
+        double n = by == Seg.Count ? Math.Round(value, MidpointRounding.AwayFromZero) : Math.Ceiling(r * Math.Abs(sw) / value - 1e-9);
+        return (int)Math.Max(2.0, Math.Min(180.0, n));
+    }
+
+    // จุดระหว่างทาง + link ทีละท่อน (warn = เรขาคณิตเป็นไปไม่ได้ -> เส้นตรงท่อนเดียว)
+    private static Link[] ArcLinks(CorridorState cs, string id, string kind, Point a, Point b, string warn, Arc g, Seg by, double value, string[] codes)
+    {
+        var path = new List<Point> { a };
+        if (warn != null) Warn(cs, CorridorError.Failure, id + " " + kind + ": " + warn + " — ใช้เส้นตรงแทน");
+        else
+        {
+            if (!(value > 0.0))
+            {
+                Warn(cs, CorridorError.ValueShouldNotBeLessThanOrEqualToZero, id + ": ค่าท่อนโค้ง " + value + " ใช้ไม่ได้ — ใช้ท่อนยาว 0.05 m");
+                value = 0.05; by = Seg.Chord;
+            }
+            int n = SegCount(by, value, g.R, g.Sw);
+            for (int i = 1; i < n; i++)
+            {
+                double t = g.A1 + g.Sw * i / n;
+                path.Add(cs.Points.Add(g.Cx + g.R * Math.Cos(t), g.Cy + g.R * Math.Sin(t), ""));
+            }
+        }
+        path.Add(b);
+        var links = new Link[path.Count - 1];
+        for (int i = 0; i < links.Length; i++)
+        {
+            links[i] = cs.Links.Add(new[] { path[i], path[i + 1] }, "");
+            foreach (string code in codes)
+                links[i].Codes.TryAdd(code);
+        }
+        return links;
+    }
+
+    // โค้งผ่าน 3 จุด (pv = จุดผ่าน) · 3 จุดเรียงเส้นตรง = เตือน + เส้นตรง
+    private static Link[] Arc3(CorridorState cs, string id, Pt? pa, Point a, Pt? pv, Pt? pb, Point b, Seg by, double value, params string[] codes)
+    {
+        if (a == null || b == null) return null;
+        if (pv == null) { Warn(cs, CorridorError.Failure, id + ": ข้ามเพราะหาจุดที่โค้งผ่านไม่ได้"); return null; }
+        string warn = ArcGeom(0, pa.Value, pb.Value, pv.Value, 0.0, false, false, out Arc g);
+        return ArcLinks(cs, id, "โค้งผ่าน 3 จุด", a, b, warn, g, by, value, codes);
+    }
+
+    // โค้งเริ่ม-ปลาย-รัศมี · ccw = ทวนเข็มในกรอบ Side = Right (ฝั่ง Left ภาพกระจก = ทิศกลับ) · large = ทางยาว
+    // รัศมี < ครึ่งระยะเริ่ม-ปลาย = เตือน + เส้นตรง
+    private static Link[] ArcR(CorridorState cs, string id, Pt? pa, Point a, Pt? pb, Point b, double radius, bool ccw, bool large, double F, Seg by, double value, params string[] codes)
+    {
+        if (a == null || b == null) return null;
+        string warn = ArcGeom(1, pa.Value, pb.Value, pa.Value, radius, ccw == (F > 0.0), large, out Arc g);
+        return ArcLinks(cs, id, "โค้ง เริ่ม-ปลาย-รัศมี", a, b, warn, g, by, value, codes);
+    }
+
+    // โค้ง Fillet จากจุดสัมผัส pa ถึง pb ที่มุม pc
+    private static Link[] Fillet(CorridorState cs, string id, Pt? pa, Point a, Pt? pc, Pt? pb, Point b, double radius, Seg by, double value, params string[] codes)
+    {
+        if (a == null || b == null) return null;
+        if (pc == null) { Warn(cs, CorridorError.Failure, id + ": ข้ามเพราะหาจุดมุมไม่ได้"); return null; }
+        string warn = ArcGeom(2, pa.Value, pb.Value, pc.Value, radius, false, false, out Arc g);
+        return ArcLinks(cs, id, "โค้ง Fillet", a, b, warn, g, by, value, codes);
+    }
+
+    // ต่อ link ของ shape ตามลำดับ (เส้นโค้ง = หลายท่อน) · ส่วนที่วาดไม่ได้ (null) ให้ AddShape ข้าม + เตือน
+    private static Link[] Join(params Link[][] parts)
+    {
+        var all = new List<Link>();
+        foreach (Link[] p in parts)
+        {
+            if (p == null) all.Add(null);
+            else all.AddRange(p);
+        }
+        return all.ToArray();
     }
 
     private static void AddShape(CorridorState cs, string id, Link[] links, params string[] codes)
@@ -660,7 +948,12 @@ public static class CodeGenerator
         new(@"^\s*Pt\? (\w+) = (?!null;)"),
         new(@"^\s*Point \w+ = AddPoint\(cs, (\w+)"),
         new(@"^\s*Link \w+ = (?:AddLink|FollowSurface)\(cs, ""([^""]+)"""),
-        new(@"^\s*Link \w+ = null;\s+// ([^:]+):"),
+        new(@"^\s*Link\[\] \w+ = (?:Arc3|ArcR|Fillet)\(cs, ""([^""]+)"""),
+        new(@"^\s*\w+ = Rotate\(cs, ""([^""]+)"""),
+        new(@"^\s*Link(?:\[\])? \w+ = null;\s+// ([^:]+):"),
+        new(@"^\s*// (\w+): (?:ไม่มีจุด|ปลาย \w+ เป็นจุด auxiliary)"),
+        new(@"^\s*// (\w+) auxiliary:"),
+        new(@"^\s*// (\w+): ใช้ link auxiliary"),
         new(@"^\s*AddShape\(cs, ""([^""]+)"""),
         new(@"^\s*// (\w+): มี link ที่ไม่มีอยู่จริง"),
     };

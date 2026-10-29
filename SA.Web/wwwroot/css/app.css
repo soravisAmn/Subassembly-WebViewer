@@ -109,6 +109,7 @@ aside{background:var(--panel);overflow-y:auto;min-height:0}
 .tn .nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
 .tn .nm small{color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:11px;margin-left:4px}
 .tn .nm{flex:0 0 auto;max-width:65%}
+.tn.aux .nm{color:#8b9098;font-style:italic}
 .tn .meta{margin-left:auto;padding-left:6px;color:var(--muted);font-size:11px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .tn .meta.warn{color:var(--warn)}
 .tn.sub .nm{font-weight:500}
@@ -247,6 +248,9 @@ svg#view{width:100%;height:100%;display:block;touch-action:none;user-select:none
 /* ส่วนที่วาด (DrawingSpec) */
 .dlink{stroke-width:3}
 .dlink.follow{stroke-dasharray:7 3}
+/* Auxiliary (ช่วยสร้าง): เส้นประเทาบาง · link จริงที่ปลายเป็นจุด aux = ประแดง */
+.dlink.aux{stroke:#8b9098;stroke-width:1.4;stroke-dasharray:5 4}
+.dlink.bad{stroke:var(--err);stroke-width:1.6;stroke-dasharray:3 3}
 .dpt{fill:var(--paper);stroke:var(--ink);stroke-width:1.4}
 .editing-item .dpt{cursor:pointer}
 .item .dpt{cursor:move}
@@ -254,6 +258,10 @@ svg#view{width:100%;height:100%;display:block;touch-action:none;user-select:none
 .rubber{stroke:var(--ok);stroke-width:2;stroke-dasharray:6 4;pointer-events:none}
 .rubber.follow{stroke:var(--ground)}
 .rubber-fill{fill:color-mix(in srgb,var(--ok) 15%,transparent);stroke:none;pointer-events:none}
+.rubber.close{stroke-dasharray:2 4;opacity:.7}
+.fillet-pick{fill:none;stroke:var(--ok);stroke-width:6;stroke-opacity:.35;pointer-events:none}
+.fillet-pick.on{stroke-opacity:.7}
+.rubber-fill.ngon{stroke:var(--ok);stroke-width:1.5;stroke-dasharray:6 4}
 .osnap{fill:none;stroke:var(--hot);stroke-width:2;pointer-events:none}
 .osnap.free{fill:var(--ok);stroke:none}
 .selbox{fill:color-mix(in srgb,#3b82f6 14%,transparent);stroke:#3b82f6;stroke-width:1.2;pointer-events:none}
@@ -270,6 +278,8 @@ svg#view.space,svg#view.space *{cursor:grab !important}
 .mode-banner:has(.banner-warn){border-radius:10px;max-width:calc(100% - 24px)}
 .mode-banner .banner-warn{margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
 .mode-banner .banner-warn button{padding:1px 8px;font-size:11.5px}
+/* โหมดวาด Auxiliary (X): banner สีเทาเส้นประ เห็นชัดว่าของที่สร้างจะไม่ลง Civil 3D */
+.aux-mode .mode-banner{background:#5f6670;outline:2px dashed #c3c8cf;outline-offset:2px}
 .code-hot{fill:none;stroke:#a855f7;stroke-width:4;opacity:.8;pointer-events:none;stroke-linecap:round;stroke-linejoin:round}
 .code-hot.area{fill:color-mix(in srgb,#a855f7 18%,transparent);stroke-width:2}
 .code-ref{font-size:12px;line-height:1.7;word-break:break-word}
@@ -283,6 +293,8 @@ svg#view.space,svg#view.space *{cursor:grab !important}
 .dyn-h{width:100%;font-size:11px;color:#6b5a1f}
 .dyn label{display:flex;align-items:center;gap:4px;font-family:"IBM Plex Mono",monospace}
 .dyn input{width:90px;font:12px "IBM Plex Mono",monospace;padding:2px 4px;border:1px solid #c9a227;border-radius:3px;background:#fff;color:#1d2025}
+.dyn .dyn-chk input{width:auto}
+.dyn-par,.par-btn{padding:0 6px;font:12px "IBM Plex Mono",monospace;cursor:pointer}
 .dyn input.bad,input.expr.bad{border-color:var(--err);background:var(--err-soft);color:var(--err)}
 input.expr{font-family:"IBM Plex Mono",monospace}
 .expr-err{font-size:11.5px;color:var(--err);margin:-4px 0 6px;min-height:0}
@@ -302,7 +314,33 @@ input.expr{font-family:"IBM Plex Mono",monospace}
 #bar .xy{color:#b8bcc3;min-width:220px;margin-right:8px}
 #bar .tg{border:0;background:#3a4048;color:#e7e5df;padding:3px 9px;border-radius:3px;font-size:12px;font-weight:400}
 #bar .tg.on{background:#1d5fd1;color:#fff}
-#bar .tg.os.muted{opacity:.45}
+/* จุด Auxiliary (ช่วยสร้าง) + Object snap tracking */
+.dcons{stroke:#8b9098;stroke-width:1.4;fill:none;pointer-events:none}
+.dcons-hit{fill:transparent;stroke:none;cursor:pointer}
+.d-lbl.cons{fill:#8b9098}
+.trk-acq{stroke:#4fd2e0;stroke-width:2;fill:none;pointer-events:none}
+.trk-acq.main{stroke-width:3}
+.trk-line{stroke:#4fd2e0;stroke-width:1;stroke-dasharray:3 4;opacity:.8;pointer-events:none}
+.osnap.trk{stroke:#4fd2e0}
+.osmenu .trkms{display:flex;align-items:center;gap:6px;padding:2px 8px 4px 34px;color:#b8bcc3;font-size:11.5px}
+.osmenu .trkms input{width:56px;background:#3a4048;color:#e7e5df;border:1px solid #4a5059;padding:1px 4px;font-size:11.5px}
+
+/* OSNAP (F3) + ▾ เมนู แบบ status bar ของ AutoCAD */
+.osgrp{display:inline-flex;gap:1px}
+#bar .osgrp .tg[data-tg="osOn"]{border-radius:3px 0 0 3px}
+#bar .osgrp .osarrow{border-radius:0 3px 3px 0;padding:3px 6px}
+.osmenu{position:fixed;z-index:35;background:#2a2f35;color:#e7e5df;border:1px solid #4a5059;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.35);
+  padding:4px;min-width:230px;font-size:12.5px;display:flex;flex-direction:column}
+.osrow{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:4px;cursor:pointer;white-space:nowrap}
+.osrow:hover{background:#3a4048}
+.osrow input{margin:0;accent-color:#6ea4ff}
+.osic{width:18px;height:18px;flex:none;fill:none;stroke:#ffd34d;stroke-width:1.8;stroke-linejoin:round}
+.osic.trk{stroke:#4fd2e0}
+.osmenu hr{border:0;border-top:1px solid #4a5059;margin:4px 2px}
+.osnote{font-size:11.5px;color:#ffc266;padding:4px 8px}
+.osbtns{display:flex;gap:4px;padding:2px 4px}
+.osbtns button{flex:1;background:#3a4048;color:#e7e5df;border:0;font-size:12px;padding:4px 6px}
+.osbtns button:hover{background:#4a5059}
 #bar .lbl{color:#b8bcc3;display:inline-flex;align-items:center;gap:4px;margin:0 2px}
 #bar select{width:auto;padding:1px 4px;background:#3a4048;color:#e7e5df;border-color:#4a5059}
 #bar .vsep{width:1px;height:18px;background:#4a5059;margin:0 6px;flex:none}

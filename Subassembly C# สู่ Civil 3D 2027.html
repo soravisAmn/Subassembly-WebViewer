@@ -1,0 +1,414 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Subassembly C# สู่ Civil 3D 2027</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&family=Sarabun:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: เอกสารคอลัมน์เดียวแบบคู่มือภาคสนาม — แถบความคืบหน้าด้านบน, ขั้นตอนเรียงลำดับพร้อมเลขขั้นที่หมายถึงลำดับจริง */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --sunk:#e8ecea; --fg:#18201d; --muted:#56635d;
+  --line:#cfd8d4; --accent:#0e7a6a; --accent-ink:#ffffff; --accent-soft:#d8efe9;
+  --warn:#9a5b00; --warn-soft:#fbf0dc; --code-bg:#14201c; --code-fg:#dbe9e4; --code-dim:#7f9a90;
+  --f-display:"Anuphan","Sarabun",system-ui,sans-serif;
+  --f-body:"Sarabun",system-ui,"Leelawadee UI","Tahoma",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101614; --surface:#18201d; --sunk:#1f2925; --fg:#e4ece8; --muted:#9aaba4;
+  --line:#2c3a35; --accent:#4cc3ad; --accent-ink:#0b1412; --accent-soft:#163a33;
+  --warn:#f0b75c; --warn-soft:#2e2414; --code-bg:#0a100e; --code-fg:#d5e6df; --code-dim:#6f8a80;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101614; --surface:#18201d; --sunk:#1f2925; --fg:#e4ece8; --muted:#9aaba4;
+  --line:#2c3a35; --accent:#4cc3ad; --accent-ink:#0b1412; --accent-soft:#163a33;
+  --warn:#f0b75c; --warn-soft:#2e2414; --code-bg:#0a100e; --code-fg:#d5e6df; --code-dim:#6f8a80;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 17px/1.75 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:820px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.3;margin:0}
+p{margin:0}
+code{font-family:var(--f-mono);font-size:.86em;background:var(--sunk);padding:.1em .4em;border-radius:4px;overflow-wrap:anywhere}
+a{color:var(--accent)}
+
+/* Header */
+header{padding-block:48px 28px;display:grid;gap:14px}
+.eyebrow{font:600 13px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(28px,5vw,40px);font-weight:700}
+.lede{color:var(--muted);max-width:62ch}
+.specs{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.spec{font:500 13px/1 var(--f-mono);border:1px solid var(--line);background:var(--surface);padding:8px 10px;border-radius:6px}
+.spec b{color:var(--accent);font-weight:500}
+
+/* Pipeline */
+.pipe{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 28px;font:500 13px/1.2 var(--f-mono)}
+.pipe span{padding:7px 10px;border-radius:5px;background:var(--sunk);white-space:nowrap}
+.pipe i{font-style:normal;color:var(--muted)}
+.pipe .end{background:var(--accent);color:var(--accent-ink)}
+
+/* Progress bar */
+.progress{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px;border-bottom:1px solid var(--line);margin-bottom:28px;display:flex;align-items:center;gap:12px;font:500 14px/1 var(--f-body)}
+.bar{flex:1;height:6px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.bar div{height:100%;width:0;background:var(--accent);transition:width .3s}
+.progress output{font-variant-numeric:tabular-nums;color:var(--muted);min-width:5.5em;text-align:right}
+@media (prefers-reduced-motion:reduce){.bar div{transition:none}}
+
+/* Steps */
+.steps{display:grid;gap:22px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px 22px 24px;display:grid;gap:14px;min-width:0}
+.step.done{border-color:var(--accent)}
+.step-head{display:flex;gap:14px;align-items:flex-start}
+.num{flex:none;width:38px;height:38px;border-radius:8px;display:grid;place-items:center;font:700 18px/1 var(--f-display);background:var(--sunk);color:var(--fg);font-variant-numeric:tabular-nums}
+.step.done .num{background:var(--accent);color:var(--accent-ink)}
+.step-head h2{font-size:21px;font-weight:600;flex:1;padding-top:4px}
+.check{flex:none;display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted);cursor:pointer;padding-top:8px;user-select:none}
+.check input{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+.step > *{min-width:0}
+.step ol,.step ul{margin:0;padding-left:1.4em;display:grid;gap:6px}
+.step h3{font-size:16px;font-weight:600;color:var(--muted);margin-top:4px}
+
+/* Code */
+.code{position:relative;background:var(--code-bg);border-radius:8px;min-width:0}
+.code-top{display:flex;justify-content:space-between;align-items:center;padding:8px 10px 0 14px;font:500 12px/1 var(--f-mono);color:var(--code-dim)}
+.code pre{margin:0;padding:10px 14px 14px;overflow-x:auto;font:400 13.5px/1.6 var(--f-mono);color:var(--code-fg);tab-size:2}
+.code pre .c{color:var(--code-dim)}
+.copy{font:500 12px/1 var(--f-body);background:transparent;color:var(--code-fg);border:1px solid var(--code-dim);border-radius:5px;padding:6px 10px;cursor:pointer}
+.copy:hover{border-color:var(--code-fg)}
+.copy:focus-visible,.check input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Notes */
+.note{border-radius:8px;padding:12px 14px;font-size:15.5px;display:grid;gap:4px}
+.note strong{font-family:var(--f-display);font-weight:600}
+.note.tip{background:var(--accent-soft)}
+.note.warn{background:var(--warn-soft)}
+.note.warn strong{color:var(--warn)}
+
+dl.explain{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:15.5px}
+dl.explain dt{font-family:var(--f-mono);font-size:13.5px;color:var(--accent);padding-top:3px}
+dl.explain dd{margin:0}
+@media (max-width:560px){dl.explain{grid-template-columns:1fr}dl.explain dd{margin-bottom:6px}}
+
+.props{display:grid;grid-template-columns:auto 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:15px}
+.props div{padding:9px 12px;border-top:1px solid var(--line)}
+.props div:nth-child(-n+2){border-top:0}
+.props div:nth-child(odd){background:var(--sunk);font-weight:600}
+
+/* Trouble table */
+section.extra{margin-top:40px;display:grid;gap:14px}
+section.extra h2{font-size:24px;font-weight:700}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:15.5px}
+th,td{text-align:left;padding:11px 14px;vertical-align:top;border-top:1px solid var(--line)}
+th{font-family:var(--f-display);font-weight:600;background:var(--sunk);border-top:0}
+td:first-child{font-weight:600;width:36%}
+
+footer{margin-top:40px;color:var(--muted);font-size:14px}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Civil 3D 2027 · .NET Subassembly</div>
+  <h1>จากไฟล์ .cs สู่ Subassembly ใน Civil 3D</h1>
+  <p class="lede">ขั้นตอนตั้งแต่สร้างโปรเจกต์ C# ด้วย Antigravity และ .NET 10 SDK, build เป็น .dll, ไปจนถึงวาง subassembly ลงบน Assembly และ Corridor</p>
+  <div class="specs">
+    <span class="spec">Civil 3D <b>2027</b></span>
+    <span class="spec">Target <b>net10.0-windows</b></span>
+    <span class="spec">Platform <b>x64</b></span>
+    <span class="spec">Editor <b>Antigravity + dotnet CLI</b></span>
+  </div>
+</header>
+
+<div class="pipe" aria-label="ภาพรวมขั้นตอน">
+  <span>.cs</span><i>→</i><span>.csproj</span><i>→</i><span>dotnet build</span><i>→</i><span>.dll</span><i>→</i><span>Trusted Location</span><i>→</i><span>Tool Palette</span><i>→</i><span class="end">Assembly</span>
+</div>
+
+<div class="progress" role="status">
+  <span>ความคืบหน้า</span>
+  <div class="bar"><div id="barFill"></div></div>
+  <output id="count">0 / 8</output>
+</div>
+
+<div class="steps" id="steps">
+
+<!-- 1 -->
+<article class="step" data-id="s1">
+  <div class="step-head"><div class="num">1</div><h2>ตรวจเครื่องมือให้พร้อม</h2>
+    <label class="check"><input type="checkbox" id="chk-s1">เสร็จแล้ว</label></div>
+  <p>เปิด Terminal ใน Antigravity (<code>Ctrl+`</code>) หรือ PowerShell แล้วตรวจว่ามี .NET 10 <strong>SDK</strong> หรือยัง</p>
+  <div class="code"><div class="code-top">PowerShell<button class="copy">คัดลอก</button></div><pre>dotnet --list-sdks</pre></div>
+  <p>ต้องเห็นบรรทัดที่ขึ้นต้นด้วย <code>10.</code> เช่น <code>10.0.100 [C:\Program Files\dotnet\sdk]</code></p>
+  <ul>
+    <li>ถ้าไม่มี ให้ดาวน์โหลด <strong>.NET 10 SDK</strong> (x64) จากเว็บ Microsoft ระวังอย่าเลือกตัวที่เป็น Runtime เพราะ build ไม่ได้</li>
+    <li>ใน Antigravity ให้ติดตั้ง extension ภาษา C# (C# Dev Kit หรือตัว C# ที่มีใน marketplace) เพื่อให้มี IntelliSense และขีดเส้นใต้ error</li>
+  </ul>
+  <div class="note tip"><strong>ทำไมต้อง .NET 10</strong>Civil 3D 2025 และ 2026 ใช้ .NET 8 ส่วน 2027 เปลี่ยนเป็น .NET 10 และไม่มี binary compatibility กับ add-in ของปี 2026 ดังนั้น DLL ทุกตัวต้อง build ใหม่สำหรับ 2027</div>
+</article>
+
+<!-- 2 -->
+<article class="step" data-id="s2">
+  <div class="step-head"><div class="num">2</div><h2>หาไฟล์ SATemplate จากตัวอย่างของ Autodesk</h2>
+    <label class="check"><input type="checkbox" id="chk-s2">เสร็จแล้ว</label></div>
+  <p>Subassembly แบบ .NET ทุกตัวต้อง inherit คลาส <code>SATemplate</code> แต่คลาสนี้<strong>ไม่ได้อยู่ใน DLL ของ Civil 3D</strong> มันมาเป็น source code ในโปรเจกต์ตัวอย่าง ซึ่งปกติอยู่ที่</p>
+  <div class="code"><div class="code-top">path<button class="copy">คัดลอก</button></div><pre>C:\Program Files\Autodesk\AutoCAD 2027\C3D\Sample\Civil 3D API\C3DStockSubAssemblies\</pre></div>
+  <p>ไฟล์ที่ต้องใช้:</p>
+  <ul>
+    <li><code>SATemplate.cs</code> คือคลาสแม่</li>
+    <li><code>Utilities.cs</code> มีฟังก์ชันช่วยเพิ่ม point, link, shape</li>
+    <li>ไฟล์อื่นที่สองไฟล์นี้เรียกใช้ เช่น <code>CodesSpecific.cs</code> (ขึ้นกับเวอร์ชัน)</li>
+  </ul>
+  <div class="note warn"><strong>ถ้าหาโฟลเดอร์ไม่เจอ</strong>ให้ค้นชื่อไฟล์ <code>SATemplate.cs</code> ในโฟลเดอร์ <code>C:\Program Files\Autodesk\AutoCAD 2027</code> ทั้งหมด บางเครื่องจะเป็นไฟล์ zip ที่ต้องแตกก่อน</div>
+  <p>เปิด <code>SATemplate.cs</code> ดูว่าประกาศ <code>namespace</code> ชื่ออะไร (เช่น <code>Subassembly</code>) เพราะต้องใส่ <code>using</code> ตัวนี้ในไฟล์ของคุณ</p>
+</article>
+
+<!-- 3 -->
+<article class="step" data-id="s3">
+  <div class="step-head"><div class="num">3</div><h2>สร้างโปรเจกต์ Class Library</h2>
+    <label class="check"><input type="checkbox" id="chk-s3">เสร็จแล้ว</label></div>
+  <div class="code"><div class="code-top">PowerShell<button class="copy">คัดลอก</button></div><pre>mkdir C:\Dev\MySA
+cd C:\Dev\MySA
+dotnet new classlib -n MySA -f net10.0</pre></div>
+  <p>จะได้โครงสร้างประมาณนี้</p>
+  <div class="code"><div class="code-top">โครงสร้างโฟลเดอร์</div><pre>C:\Dev\MySA\
+└─ MySA\
+   ├─ MySA.csproj
+   ├─ Class1.cs          <span class="c">← ลบทิ้ง</span>
+   ├─ SATemplate.cs      <span class="c">← copy มาจากขั้นที่ 2</span>
+   ├─ Utilities.cs       <span class="c">← copy มาจากขั้นที่ 2</span>
+   ├─ CodesSpecific.cs   <span class="c">← ถ้ามี</span>
+   └─ Levee.cs           <span class="c">← subassembly ของคุณ</span></pre></div>
+  <p>ใน Antigravity ใช้ <strong>File → Open Folder</strong> แล้วเลือก <code>C:\Dev\MySA</code></p>
+</article>
+
+<!-- 4 -->
+<article class="step" data-id="s4">
+  <div class="step-head"><div class="num">4</div><h2>แก้ไฟล์ MySA.csproj</h2>
+    <label class="check"><input type="checkbox" id="chk-s4">เสร็จแล้ว</label></div>
+  <p>ขั้นนี้สำคัญที่สุด ให้แทนที่เนื้อหาเดิมทั้งหมดด้วยข้อความนี้</p>
+  <div class="code"><div class="code-top">MySA.csproj<button class="copy">คัดลอก</button></div><pre>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net10.0-windows&lt;/TargetFramework&gt;
+    &lt;PlatformTarget&gt;x64&lt;/PlatformTarget&gt;
+    &lt;UseWindowsForms&gt;true&lt;/UseWindowsForms&gt;
+    &lt;UseWPF&gt;true&lt;/UseWPF&gt;
+    &lt;ImplicitUsings&gt;disable&lt;/ImplicitUsings&gt;
+    &lt;Nullable&gt;disable&lt;/Nullable&gt;
+    &lt;EnableDynamicLoading&gt;true&lt;/EnableDynamicLoading&gt;
+    &lt;AppendTargetFrameworkToOutputPath&gt;false&lt;/AppendTargetFrameworkToOutputPath&gt;
+    &lt;Acad&gt;C:\Program Files\Autodesk\AutoCAD 2027&lt;/Acad&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;Reference Include="accoremgd"&gt;
+      &lt;HintPath&gt;$(Acad)\accoremgd.dll&lt;/HintPath&gt;
+      &lt;Private&gt;false&lt;/Private&gt;
+    &lt;/Reference&gt;
+    &lt;Reference Include="acdbmgd"&gt;
+      &lt;HintPath&gt;$(Acad)\acdbmgd.dll&lt;/HintPath&gt;
+      &lt;Private&gt;false&lt;/Private&gt;
+    &lt;/Reference&gt;
+    &lt;Reference Include="acmgd"&gt;
+      &lt;HintPath&gt;$(Acad)\acmgd.dll&lt;/HintPath&gt;
+      &lt;Private&gt;false&lt;/Private&gt;
+    &lt;/Reference&gt;
+    &lt;Reference Include="AecBaseMgd"&gt;
+      &lt;HintPath&gt;$(Acad)\ACA\AecBaseMgd.dll&lt;/HintPath&gt;
+      &lt;Private&gt;false&lt;/Private&gt;
+    &lt;/Reference&gt;
+    &lt;Reference Include="AeccDbMgd"&gt;
+      &lt;HintPath&gt;$(Acad)\C3D\AeccDbMgd.dll&lt;/HintPath&gt;
+      &lt;Private&gt;false&lt;/Private&gt;
+    &lt;/Reference&gt;
+  &lt;/ItemGroup&gt;
+
+  <span class="c">&lt;!-- copy DLL ไปโฟลเดอร์ใช้งานอัตโนมัติทุกครั้งที่ build (ดูขั้นที่ 6) --&gt;</span>
+  &lt;Target Name="CopyToC3D" AfterTargets="Build"&gt;
+    &lt;Copy SourceFiles="$(TargetPath)" DestinationFolder="C:\C3D_Custom\SA\" /&gt;
+  &lt;/Target&gt;
+
+&lt;/Project&gt;</pre></div>
+  <dl class="explain">
+    <dt>net10.0-windows</dt><dd>ต้องเป็น .NET 10 เท่านั้นจึงจะตรงกับ Civil 3D 2027 ส่วน <code>-windows</code> เปิดให้ใช้ API ฝั่ง Windows ได้</dd>
+    <dt>x64</dt><dd>Civil 3D เป็นโปรแกรม 64-bit ถ้าเป็น AnyCPU อาจขึ้น warning หรือโหลดผิดพลาด</dd>
+    <dt>Private=false</dt><dd>สั่งไม่ให้ copy DLL ของ Autodesk ออกมาไว้ข้าง DLL ของเรา ถ้าลืมใส่ มักเกิด error ตอนโหลด</dd>
+    <dt>$(Acad)</dt><dd>path ที่ติดตั้ง Civil 3D ถ้าติดตั้งไว้ที่อื่นให้แก้บรรทัดนี้บรรทัดเดียว</dd>
+    <dt>AeccDbMgd</dt><dd>DLL หลักของ Civil 3D มีคลาส <code>CorridorState</code>, <code>ParamDoubleCollection</code> ฯลฯ</dd>
+  </dl>
+  <div class="note warn"><strong>เช็กว่าไฟล์อยู่จริง</strong>เปิด File Explorer ไปที่ <code>C:\Program Files\Autodesk\AutoCAD 2027\C3D\</code> แล้วดูว่ามี <code>AeccDbMgd.dll</code> ถ้าชื่อโฟลเดอร์ต่างจากนี้ให้แก้ HintPath ให้ตรง</div>
+</article>
+
+<!-- 5 -->
+<article class="step" data-id="s5">
+  <div class="step-head"><div class="num">5</div><h2>ตรวจโครงคลาสใน .cs ของคุณ</h2>
+    <label class="check"><input type="checkbox" id="chk-s5">เสร็จแล้ว</label></div>
+  <p>โครงขั้นต่ำของ subassembly มีหน้าตาประมาณนี้ ให้เทียบกับไฟล์ตัวอย่างจริง เช่น <code>BasicLane.cs</code> ในโฟลเดอร์จากขั้นที่ 2 เพราะชื่อฟังก์ชันใน <code>Utilities</code> อาจต่างกันในแต่ละเวอร์ชัน</p>
+  <div class="code"><div class="code-top">Levee.cs (โครง)<button class="copy">คัดลอก</button></div><pre>using Autodesk.Civil.Runtime;
+using Autodesk.Civil.DatabaseServices;
+using Subassembly;   <span class="c">// namespace ของ SATemplate.cs (เปิดไฟล์ดูให้ตรง)</span>
+
+namespace MySA
+{
+    public class Levee : SATemplate
+    {
+        <span class="c">// พารามิเตอร์ที่จะโชว์ในแท็บ Parameters ของ Civil 3D</span>
+        protected override void GetInputParametersImplement(CorridorState corridorState)
+        {
+            ParamDoubleCollection p = corridorState.ParamsDouble;
+            p.Add("CrestWidth", 4.0);
+            p.Add("SideSlope", 2.0);
+        }
+
+        <span class="c">// วาด point / link / shape ที่นี่</span>
+        protected override void DrawImplement(CorridorState corridorState)
+        {
+            double crest = corridorState.ParamsDouble.Value("CrestWidth");
+            <span class="c">// ... ใช้ Utilities.AddPoint / AddLink ตามตัวอย่างใน BasicLane.cs</span>
+        }
+    }
+}</pre></div>
+  <p>จดชื่อเต็มของคลาสไว้ใช้ในขั้นที่ 7 คือ <code>namespace.ClassName</code> ในตัวอย่างนี้คือ <code>MySA.Levee</code></p>
+</article>
+
+<!-- 6 -->
+<article class="step" data-id="s6">
+  <div class="step-head"><div class="num">6</div><h2>Build เป็น .dll</h2>
+    <label class="check"><input type="checkbox" id="chk-s6">เสร็จแล้ว</label></div>
+  <ol>
+    <li>สร้างโฟลเดอร์ปลายทาง <code>C:\C3D_Custom\SA\</code> ไว้ก่อน (target <code>CopyToC3D</code> ใน csproj จะ copy มาไว้ที่นี่)</li>
+    <li><strong>ปิด Civil 3D</strong> ก่อนทุกครั้ง เพราะถ้าเปิดค้างไว้ ไฟล์ DLL จะถูกล็อกและ copy ทับไม่ได้</li>
+    <li>รันคำสั่ง build</li>
+  </ol>
+  <div class="code"><div class="code-top">PowerShell<button class="copy">คัดลอก</button></div><pre>cd C:\Dev\MySA\MySA
+dotnet build -c Release</pre></div>
+  <p>ถ้าขึ้น <code>Build succeeded</code> จะได้ไฟล์สองที่</p>
+  <ul>
+    <li><code>C:\Dev\MySA\MySA\bin\Release\MySA.dll</code> (ต้นฉบับ)</li>
+    <li><code>C:\C3D_Custom\SA\MySA.dll</code> (ตัวที่ Civil 3D จะใช้)</li>
+  </ul>
+  <h3>error ที่พบบ่อยตอน build</h3>
+  <ul>
+    <li><code>The type or namespace 'SATemplate' could not be found</code> หมายถึงยังไม่ได้ copy ไฟล์จากขั้นที่ 2 หรือ <code>using</code> namespace ไม่ตรง</li>
+    <li><code>Autodesk.Civil... could not be found</code> หมายถึง HintPath ใน csproj ผิด</li>
+    <li>ขึ้นว่าหาคลาสบางตัวไม่เจอ (เช่น <code>Codes</code>) ให้ไปหาไฟล์ที่มีคลาสนั้นในโฟลเดอร์ตัวอย่างแล้ว copy มาเพิ่ม</li>
+    <li><code>The process cannot access the file</code> หมายถึง Civil 3D ยังเปิดอยู่</li>
+  </ul>
+</article>
+
+<!-- 7 -->
+<article class="step" data-id="s7">
+  <div class="step-head"><div class="num">7</div><h2>ตั้ง Trusted Location และสร้างเครื่องมือบน Tool Palette</h2>
+    <label class="check"><input type="checkbox" id="chk-s7">เสร็จแล้ว</label></div>
+  <h3>7.1 Trusted Location</h3>
+  <ol>
+    <li>เปิด Civil 3D แล้วพิมพ์ <code>OPTIONS</code></li>
+    <li>แท็บ <strong>Files</strong> → ขยาย <strong>Trusted Locations</strong> → <strong>Add</strong> → เลือก <code>C:\C3D_Custom\SA</code></li>
+    <li>กด OK ถ้าไม่ทำขั้นนี้ จะมีคำเตือนเรื่องความปลอดภัยทุกครั้ง หรือบางเครื่องจะถูกบล็อกไม่ให้โหลด</li>
+  </ol>
+  <h3>7.2 สร้างเครื่องมือ (ไม่ต้องใช้ NETLOAD)</h3>
+  <ol>
+    <li>กด <code>Ctrl+3</code> เพื่อเปิด Tool Palettes แล้วคลิกขวาที่แถบชื่อ palette → <strong>New Palette</strong> ตั้งชื่อ เช่น “My SA”</li>
+    <li>ไปที่ palette ของ stock subassembly (เช่น Basic) คลิกขวาที่ <strong>BasicLane</strong> → <strong>Copy</strong></li>
+    <li>กลับไปที่ palette “My SA” คลิกขวาในพื้นที่ว่าง → <strong>Paste</strong></li>
+    <li>คลิกขวาที่เครื่องมือที่เพิ่ง paste → <strong>Properties</strong> แล้วแก้ค่าในหมวด Subassembly ตามตารางนี้</li>
+  </ol>
+  <div class="props">
+    <div>Name</div><div>Levee (ชื่อที่จะโชว์บน palette)</div>
+    <div>Assembly</div><div><code>C:\C3D_Custom\SA\MySA.dll</code></div>
+    <div>Class name</div><div><code>MySA.Levee</code> ต้องตรงกับในโค้ดทุกตัวอักษร รวมถึงตัวพิมพ์เล็ก-ใหญ่</div>
+    <div>Image</div><div>คลิกขวาที่เครื่องมือ → Specify Image เพื่อเปลี่ยนไอคอน (ไม่บังคับ)</div>
+  </div>
+  <div class="note tip"><strong>Civil 3D โหลด DLL ให้เอง</strong>ตอนวาง subassembly ครั้งแรก Civil 3D จะอ่าน Assembly กับ Class name แล้วโหลด DLL เอง จึงไม่ต้อง NETLOAD</div>
+  <div class="note warn"><strong>ถ้าต้องการแจกให้ทีม</strong>วิธี copy เครื่องมือเดิมเหมาะกับการใช้เองบนเครื่องตัวเอง ถ้าจะติดตั้งให้คนอื่น ควรทำเป็นไฟล์ Tool Catalog (<code>.atc</code>) ดูตัวอย่างได้ในโฟลเดอร์ <code>C:\ProgramData\Autodesk\C3D 2027\</code> ซึ่งจะมี tag ระบุ DLL และชื่อคลาสคล้ายกับในตารางด้านบน</div>
+</article>
+
+<!-- 8 -->
+<article class="step" data-id="s8">
+  <div class="step-head"><div class="num">8</div><h2>ทดสอบบน Assembly</h2>
+    <label class="check"><input type="checkbox" id="chk-s8">เสร็จแล้ว</label></div>
+  <ol>
+    <li>พิมพ์ <code>CREATEASSEMBLY</code> แล้วคลิกวาง assembly ในแบบ</li>
+    <li>คลิกเครื่องมือ “Levee” ใน palette แล้วคลิกที่ marker ของ assembly</li>
+    <li>เลือก subassembly ที่วาง → คลิกขวา → <strong>Subassembly Properties</strong> → แท็บ <strong>Parameters</strong> แล้วตรวจว่าเห็น <code>CrestWidth</code>, <code>SideSlope</code> ของเรา</li>
+    <li>ลองแก้ค่าพารามิเตอร์แล้วดูว่ารูปตัดเปลี่ยนตาม</li>
+    <li>เมื่อทุกอย่างถูกต้อง ค่อยนำ assembly ไปใช้ใน Corridor</li>
+  </ol>
+  <div class="note warn"><strong>ถ้าพารามิเตอร์ยังเป็นของ BasicLane</strong>ให้ลบ subassembly ตัวนั้นแล้ววางใหม่จาก palette ถ้ายังไม่หาย ให้ลบเครื่องมือแล้วทำขั้น 7.2 ใหม่ หรือเปลี่ยนไปใช้วิธีไฟล์ .atc</div>
+  <div class="note tip"><strong>ดู error จากโค้ดของเรา</strong>ถ้า subassembly ไม่แสดงผลหรือแสดงผิด ให้เปิด <strong>Event Viewer</strong> ของ Civil 3D (Toolspace → Panorama) เพราะ exception จากโค้ดจะไปแสดงที่นั่น</div>
+</article>
+
+</div>
+
+<section class="extra">
+  <h2>วงจรแก้โค้ดรอบถัดไป</h2>
+  <p>หลังจากตั้งค่าเสร็จแล้ว รอบต่อไปจะเหลือแค่ 4 ขั้น</p>
+  <div class="pipe" aria-label="วงจรแก้โค้ด">
+    <span>ปิด Civil 3D</span><i>→</i><span>แก้ .cs</span><i>→</i><span>dotnet build -c Release</span><i>→</i><span class="end">เปิด Civil 3D ทดสอบ</span>
+  </div>
+  <p>Civil 3D จะโหลด DLL แค่ครั้งเดียวต่อการเปิดโปรแกรมหนึ่งครั้ง ถ้าแก้โค้ดแล้วผลไม่เปลี่ยน แสดงว่ายังไม่ได้ปิดเปิดโปรแกรมใหม่</p>
+</section>
+
+<section class="extra">
+  <h2>อาการและวิธีแก้</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>อาการ</th><th>สาเหตุ / วิธีแก้</th></tr></thead>
+    <tbody>
+      <tr><td>Build แล้ว copy ทับ DLL ไม่ได้</td><td>Civil 3D ล็อกไฟล์อยู่ ต้องปิดโปรแกรมก่อน build ทุกครั้ง</td></tr>
+      <tr><td>แก้โค้ดแล้วผลใน Civil 3D ไม่เปลี่ยน</td><td>DLL เก่ายังโหลดค้างอยู่ ให้ปิดแล้วเปิด Civil 3D ใหม่ และตรวจว่า DLL ใน <code>C:\C3D_Custom\SA</code> มีเวลาแก้ไขล่าสุด</td></tr>
+      <tr><td>Could not load file or assembly</td><td>target ไม่ใช่ <code>net10.0-windows</code> หรือลืมใส่ <code>&lt;Private&gt;false&lt;/Private&gt;</code></td></tr>
+      <tr><td>หาคลาสไม่เจอตอนวาง subassembly</td><td>Class name บน palette ไม่ตรงกับ <code>namespace.Class</code> ในโค้ด</td></tr>
+      <tr><td>มีคำเตือนความปลอดภัยทุกครั้งที่โหลด</td><td>ยังไม่ได้เพิ่มโฟลเดอร์ใน Trusted Locations</td></tr>
+      <tr><td>DLL ที่ใช้กับ 2025/2026 ได้ แต่ 2027 ใช้ไม่ได้</td><td>ต้อง build ใหม่เป็น .NET 10 กับ DLL อ้างอิงของ 2027</td></tr>
+      <tr><td>วางได้แต่รูปตัดไม่ขึ้น</td><td>เกิด exception ใน <code>DrawImplement</code> ให้ดูข้อความใน Event Viewer</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>อ้างอิงเวอร์ชันจาก Autodesk Developer Blog: AutoCAD 2027 SDK กำหนดให้ managed add-in target .NET 10 · path ติดตั้งอาจต่างกันในแต่ละเครื่อง</footer>
+</div>
+
+<script>
+(function(){
+  var KEY='c3d-sa-guide-v1';
+  var state={};
+  try{state=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){state={}}
+  var steps=[].slice.call(document.querySelectorAll('.step'));
+  function render(){
+    var n=0;
+    steps.forEach(function(s){
+      var id=s.dataset.id, cb=s.querySelector('input[type=checkbox]');
+      var on=!!state[id]; cb.checked=on; s.classList.toggle('done',on); if(on)n++;
+    });
+    document.getElementById('barFill').style.width=(n/steps.length*100)+'%';
+    document.getElementById('count').textContent=n+' / '+steps.length;
+  }
+  steps.forEach(function(s){
+    s.querySelector('input[type=checkbox]').addEventListener('change',function(e){
+      state[s.dataset.id]=e.target.checked;
+      try{localStorage.setItem(KEY,JSON.stringify(state))}catch(err){}
+      render();
+    });
+  });
+  render();
+
+  document.querySelectorAll('.copy').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var pre=btn.closest('.code').querySelector('pre');
+      var text=pre.innerText;
+      function done(msg){var o=btn.textContent;btn.textContent=msg;setTimeout(function(){btn.textContent=o},1400)}
+      function fallback(){
+        var r=document.createRange();r.selectNodeContents(pre);
+        var sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
+        done('เลือกแล้ว กด Ctrl+C');
+      }
+      try{
+        navigator.clipboard.writeText(text).then(function(){done('คัดลอกแล้ว')},fallback);
+      }catch(e){fallback()}
+    });
+  });
+})();
+</script>
+
+</body></html>

@@ -1,21 +1,23 @@
 // OSNAP: หา/จัดลำดับจุด snap แบบ AutoCAD — ฟังก์ชันล้วน ไม่แตะ DOM / state (ทดสอบด้วย node ได้: SA.Tests/js/snap.test.js)
 //
-// ลำดับ: snap แม่น (Endpoint, Intersection, Midpoint, ลาดชนดิน, Perpendicular) เลือกตัวที่ใกล้เมาส์ที่สุด
+// ลำดับ: snap แม่น (Endpoint, Center, Intersection, Midpoint, ลาดชนดิน, Perpendicular) เลือกตัวที่ใกล้เมาส์ที่สุด
 //   ระยะเท่ากัน (ต่างกันไม่เกิน TIE px) ให้ชนิดที่อยู่ก่อนใน PRECISE ชนะ (Endpoint ชนะเสมอ)
 //   snap แบบ "ใกล้สุด" (Nearest, Surface) อยู่ท้ายสุด ใช้เมื่อไม่มี snap แม่นในรัศมี (แบบ Nearest ของ AutoCAD)
 // Tab = วนเลือกตัวถัดไปในรายการ (keep / next) — ขยับเมาส์แล้วรายการเปลี่ยน = เริ่มที่ตัวแรกใหม่
 "use strict";
 
 const Snap = (() => {
-  const PRECISE = ["end", "int", "mid", "ray", "perp"];
+  const PRECISE = ["end", "cen", "int", "mid", "ray", "perp"];
   const LOOSE = ["near", "surf"];
   const TIE = 0.5;
 
   // in = {
   //   mouse {x,y}, scale {x,y} (px ต่อเมตร แนวราบ/ดิ่ง รวม VE), R (รัศมี px),
-  //   os { on, end, mid, int, surf, perp, near },
+  //   os { on, end, mid, cen, int, surf, perp, near },
   //   points [{x, y, label, ...}]            จุดที่ snap Endpoint ได้ (ตัวแรกชนะเมื่อซ้อนกัน)
-  //   segs   [{id, a{x,y}, b{x,y}, ...}]     เส้นตรงสำหรับ Mid / Int / Perp / Near
+  //   centers [{x, y, label, ...}]           ศูนย์กลางของโค้ง / polygon ด้านเท่า (Center)
+  //   segs   [{id, a{x,y}, b{x,y}, ...}]     เส้นตรงสำหรับ Mid / Int / Perp / Near (curve = ท่อนย่อยของโค้ง: ไม่มี Mid รายท่อน)
+  //   mids   [{x, y, label, ...}]           กึ่งกลางของทั้งโค้ง (Midpoint)
   //   from {x,y} | null                       จุดก่อนหน้า (Perpendicular)
   //   ground { nearest(x,y) } | null          ผิวดิน (Surface)
   //   ray {x, y, label, ...} | null           จุดที่ลาดชนดิน (มีเมื่อล็อก slope) — มีในรัศมีแล้วไม่ต้องมี Surface
@@ -35,13 +37,15 @@ const Snap = (() => {
     const segs = inp.segs || [];
 
     if (os.end) for (const p of inp.points || []) add("end", p, { label: p.label, point: p });
+    if (os.cen) for (const c of inp.centers || []) add("cen", c, { label: c.label, center: c });
     if (os.int) for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++){
       const s1 = segs[i], s2 = segs[j];
       if (touch(s1, s2)) continue;                     // ต่อกันที่ปลาย = Endpoint อยู่แล้ว
       const x = Spec.lineX(s1.a, s1.b, s2.a, s2.b);
       if (x && onSeg(s1, x) && onSeg(s2, x)) add("int", x, { label: `จุดตัด ${s1.id} × ${s2.id}`, segs: [s1, s2] });
     }
-    if (os.mid) for (const s of segs) add("mid", { x: (s.a.x + s.b.x) / 2, y: (s.a.y + s.b.y) / 2 }, { label: `กึ่งกลาง ${s.id}`, seg: s, t: 0.5 });
+    if (os.mid) for (const s of segs) if (!s.curve) add("mid", { x: (s.a.x + s.b.x) / 2, y: (s.a.y + s.b.y) / 2 }, { label: `กึ่งกลาง ${s.id}`, seg: s, t: 0.5 });
+    if (os.mid) for (const q of inp.mids || []) add("mid", q, { label: q.label, midpt: q });
     let ray = false;
     if (os.surf && inp.ray && px(inp.ray) <= 2.5 * R){ add("ray", inp.ray, { ...inp.ray }, 2.5 * R); ray = true; }
     if (os.perp && inp.from) for (const s of segs){

@@ -98,6 +98,25 @@ static class DrawingTests
             var r = CodeGenerator.ReplaceBlock(lf, b, CodeGenerator.GenerateBlock(DrawingSpec.Parse(json), json, b.Indent));
             if (r.Contains('\r')) throw new Exception("มี CR หลุดเข้ามา");
         });
+        test("object → บรรทัดโค้ด ครบทุกชนิด (polar, polygon, โค้ง, Fillet, กลุ่มหมุน, auxiliary) ในทุกกรณีทดสอบ", () =>
+        {
+            foreach (var c in cases)
+            {
+                if (c!["spec"] == null) continue;
+                var json = c["spec"]!.ToJsonString();
+                var s = DrawingSpec.Parse(json);
+                var src = CodeGenerator.GenerateFile(s, json, "Map.cs");
+                var map = CodeGenerator.SourceMap(src);
+                var lines = src.Replace("\r\n", "\n").Split('\n');
+                foreach (var id in s.Points.Select(p => p.Id).Concat(s.Links.Select(l => l.Id)).Concat(s.Shapes.Select(x => x.Id)))
+                {
+                    if (!map.TryGetValue(id, out var at) || at.Count == 0) throw new Exception($"{s.ClassName}: {id} ไม่มีบรรทัดในโค้ด");
+                    foreach (var n in at)
+                        if (!System.Text.RegularExpressions.Regex.IsMatch(lines[n - 1], $@"\b{id}\b"))
+                            throw new Exception($"{s.ClassName}: {id} ชี้บรรทัด {n} ที่ไม่มี {id}: {lines[n - 1].Trim()}");
+                }
+            }
+        });
         test("ชื่อ parameter ที่โค้ดใช้เอง (เช่น F, P1, cs) ใช้ไม่ได้", () =>
         {
             var spec = JsonNode.Parse(cases[0]!["spec"]!.ToJsonString())!;
@@ -113,15 +132,21 @@ static class DrawingTests
     {
         const double tol = 1e-6;
         var exp = new List<(double X, double Y, string What)>();
-        foreach (var p in js["points"]!.AsArray())
-            if (p!["err"] == null) exp.Add(((double)p["x"]!, (double)p["y"]!, (string)p["id"]!));
+        foreach (var p in js["points"]!.AsArray())    // จุด auxiliary ไม่ Points.Add
+            if (p!["err"] == null && !(p["auxiliary"] is JsonNode c && (bool)c)) exp.Add(((double)p["x"]!, (double)p["y"]!, (string)p["id"]!));
         foreach (var l in js["links"]!.AsArray())
         {
             if (l!["err"] != null) continue;
+            // เส้นโค้งแตกเป็นท่อน: ท่อนแรกมี mids = จุดระหว่างทางของทั้งโค้ง
+            if (l["mids"] is JsonArray mids)
+            {
+                for (int i = 0; i < mids.Count; i++) exp.Add(((double)mids[i]![0]!, (double)mids[i]![1]!, $"{l["id"]} จุดบนโค้ง {i + 1}"));
+                continue;
+            }
             var path = l["path"]!.AsArray();
             for (int i = 1; i < path.Count - 1; i++) exp.Add(((double)path[i]![0]!, (double)path[i]![1]!, $"{l["id"]} จุดกลาง {i}"));
         }
-        // straight link ไม่มีจุดกลาง -> จำนวนจุดกลางที่คาด = เฉพาะ followSurface
+        // straight link ไม่มีจุดกลาง -> จำนวนจุดกลางที่คาด = followSurface + จุดบนโค้ง
         if (o.Points.Count != exp.Count)
             throw new Exception($"จำนวนจุด: JS {exp.Count} / C# {o.Points.Count} — C#: {string.Join(" ", o.Points.Select(p => $"({p.X:0.###},{p.Y:0.###})"))}");
         for (int i = 0; i < exp.Count; i++)

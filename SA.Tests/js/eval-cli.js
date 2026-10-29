@@ -15,8 +15,17 @@ const out = cases.map(c => {
   });
   return {
     name: c.name,
-    points: c.spec.points.map(p => r.pts[p.id] && !r.pts[p.id].err ? { id: p.id, x: r.pts[p.id].x, y: r.pts[p.id].y } : { id: p.id, err: (r.pts[p.id] || {}).err || "?" }),
-    links: c.spec.links.map(l => r.links[l.id] && !r.links[l.id].err ? { id: l.id, path: r.links[l.id].path.map(p => [p.x, p.y]) } : { id: l.id, err: true }),
+    points: c.spec.points.map(p => r.pts[p.id] && !r.pts[p.id].err ? { id: p.id, x: r.pts[p.id].x, y: r.pts[p.id].y, auxiliary: ctx.Spec.isAux(p) } : { id: p.id, err: (r.pts[p.id] || {}).err || "?" }),
+    // เส้นโค้ง = link ตรงทีละท่อนในโค้ด C# -> แตกเป็นท่อนให้เทียบทีละ link
+    links: c.spec.links.flatMap(l => {
+      const q = r.links[l.id];
+      if (ctx.Spec.isAux(l)) return [];                      // link auxiliary ไม่ Links.Add
+      if (!q || q.err) return [{ id: l.id, err: true }];
+      const path = q.path.map(p => [p.x, p.y]);
+      // ท่อนแรกพกจุดระหว่างทางของทั้งโค้ง (mids) ไว้ให้นับจุดที่ C# Points.Add ตามลำดับ
+      return ctx.Spec.isArc(l) ? path.slice(1).map((p, k) => ({ id: `${l.id} ท่อน ${k + 1}`, path: [path[k], p], ...(k ? {} : { mids: path.slice(1, -1) }) }))
+                               : [{ id: l.id, path }];
+    }),
     shapes: c.spec.shapes.map(s => r.shapes[s.id] && !r.shapes[s.id].err ? { id: s.id, poly: r.shapes[s.id].poly ? r.shapes[s.id].poly.map(p => [p.x, p.y]) : null } : { id: s.id, err: true }),
     issues: r.issues.length
   };

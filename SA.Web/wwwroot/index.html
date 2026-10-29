@@ -115,6 +115,10 @@
       <button class="tool" data-tool="point" disabled><svg viewBox="0 0 28 22" aria-hidden="true"><circle cx="14" cy="11" r="3" class="fill"/><path d="M14 3v4M14 15v4M6 11h4M18 11h4"/></svg>Point</button>
       <button class="tool" data-tool="link" disabled><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M5 17L23 5"/><circle cx="5" cy="17" r="2.2" class="hollow"/><circle cx="23" cy="5" r="2.2" class="hollow"/></svg>Link</button>
       <button class="tool" data-tool="shape" disabled><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M4 6H24L20 17H8Z" class="tint"/></svg>Shape</button>
+      <button class="tool" data-tool="polygon" disabled title="คลิกจุดไปเรื่อยๆ แล้วปิดรูป (คลิกจุดแรก / Enter / C) = ได้จุด + link + shape"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M5 17L4 7L13 3L24 8L20 18Z" class="tint"/><circle cx="5" cy="17" r="1.6" class="hollow"/><circle cx="4" cy="7" r="1.6" class="hollow"/><circle cx="13" cy="3" r="1.6" class="hollow"/><circle cx="24" cy="8" r="1.6" class="hollow"/><circle cx="20" cy="18" r="1.6" class="hollow"/></svg>Polygon</button>
+      <button class="tool" data-tool="ngon" disabled title="Polygon ด้านเท่า: คลิกจุดศูนย์กลาง แล้วลากรัศมี / มุม (Tab = พิมพ์ N, R, θ)"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M14 2L23 8.5L19.6 19H8.4L5 8.5Z" class="tint"/><path d="M12.5 11H15.5M14 9.5V12.5"/></svg>ด้านเท่า</button>
+      <button class="tool" data-tool="arc" disabled title="Arc: 3 จุด (T) หรือ เริ่ม-ปลาย-รัศมี (E) · Tab = พิมพ์ค่า"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M4 18C6 8 22 8 24 18"/><circle cx="4" cy="18" r="1.8" class="hollow"/><circle cx="14" cy="10.5" r="1.6" class="hollow"/><circle cx="24" cy="18" r="1.8" class="hollow"/></svg>Arc</button>
+      <button class="tool" data-tool="fillet" disabled title="Fillet: ตั้งรัศมี (Tab) แล้วคลิก link 2 เส้นที่ต่อกันที่มุม"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M4 4V12" /><path d="M12 19H24"/><path d="M4 12C4 16 8 19 12 19" class="warm"/><path d="M4 12V19H12" stroke-dasharray="2 2"/></svg>Fillet</button>
       <button class="tool" data-tool="marked" disabled data-later="ระยะสอง"><svg viewBox="0 0 28 22" aria-hidden="true"><circle cx="14" cy="11" r="3"/><path d="M14 2v3M14 17v3M5 11h3M20 11h3"/><path d="M19 3h6v4" class="warm"/></svg>Marked point</button>
     </div>
     <div class="dgroup">Surface</div>
@@ -145,14 +149,11 @@
   <button class="tg" data-tg="ortho" title="ล็อกแนวราบ/ดิ่งตอนวาดจุดอิสระ (F8)">Ortho (F8)</button>
   <span class="slopes" id="slopes" title="slope สำเร็จรูป: คลิก = ล็อกมุมตอนวาด · ดับเบิลคลิก = แก้ค่า"></span>
   <span class="vsep"></span>
-  <button class="tg" data-tg="osOn" title="Object snap เปิด/ปิดทั้งหมด (F3) — ปิด = ไม่จับจุดเลย ไม่ว่าปุ่มชนิดด้านขวาจะเปิดอยู่หรือไม่">OSNAP (F3)</button>
-  <button class="tg os" data-os="end">Endpoint</button>
-  <button class="tg os" data-os="mid">Midpoint</button>
-  <button class="tg os" data-os="int">Intersection</button>
-  <button class="tg os" data-os="surf">Surface</button>
-  <button class="tg os" data-os="perp">Perpendicular</button>
-  <button class="tg os" data-os="near">Nearest</button>
+  <!-- OSNAP แบบ AutoCAD: ปุ่มเปิด/ปิดทั้งหมด (F3) + ▾ เมนูเลือกชนิด (คลิกขวาที่ปุ่ม OSNAP ก็เปิดเมนูได้) -->
+  <span class="osgrp"><button class="tg" data-tg="osOn" id="b-osnap">OSNAP (F3)</button><button class="tg osarrow" id="b-osmenu" aria-haspopup="true" aria-expanded="false" aria-label="เลือกชนิด object snap">▾</button></span>
   <span class="spacer"></span>
+  <button class="tg" data-tg="aux" id="b-aux" title="แสดง / ซ่อน Auxiliary (ช่วยสร้าง) ทั้งหมด — ซ่อนแล้ว snap / คลุมเลือกไม่ได้ด้วย">Aux</button>
+  <button class="tg" data-tg="c3d" id="b-c3d" title="ดูแบบ Civil 3D: ซ่อน Auxiliary และสิ่งที่จะไม่ถูกส่งออก — เห็นเฉพาะที่จะออกไปจริง">ดูแบบ Civil 3D</button>
   <button class="tg" data-tg="codes" title="แสดง point code บนรูป">codes</button>
   <label class="lbl">VE <select id="ve"><option>1</option><option>2</option><option>5</option></select></label>
   <button class="tg" id="b-fit" title="ดูทั้งหมด (F)">Fit</button>
@@ -160,15 +161,18 @@
 </footer>
 
 <div class="ctx" id="ctx" hidden role="menu"></div>
+<div class="osmenu" id="osmenu" hidden role="menu" aria-label="Object snap"></div>
 <div class="modal" id="modal" hidden><div class="dlg" role="dialog" aria-modal="true">
   <div class="dlg-h"><span id="dlg-title"></span><span class="spacer"></span><button class="ghost" id="dlg-x" aria-label="ปิด">×</button></div>
   <div class="dlg-b" id="dlg-body"></div>
 </div></div>
 
+<script src="js/view.js"></script>
 <script src="js/core.js"></script>
 <script src="js/expr.js"></script>
 <script src="js/spec.js"></script>
 <script src="js/snap.js"></script>
+<script src="js/track.js"></script>
 <script src="js/select.js"></script>
 <script src="js/ops.js"></script>
 <script src="js/workspace.js"></script>

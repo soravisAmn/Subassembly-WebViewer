@@ -128,13 +128,13 @@ function treeItem(node, h, a, it, depth, editing){
   const cp = code ? code.points : [], cl = code ? code.links : [], cs = code ? code.shapes : [];
   const dupP = dupOf(dp), dupL = dupOf(dl), dupS = dupOf(ds);
   grp(ik + ":pts", "Points", dp.length + cp.length, () => {
-    dp.forEach(p => node({ depth: d2 + 1, cls:"leaf drawn", s:{type:"dpt", item:it.id, id:p.id}, sel: isSel("dpt", it.id, p.id),
-                           name: dname(p, dupP), meta: errMeta(dr && dr.pts[p.id]) || Spec.POINT_TYPES[p.def.type], metaCls: dr && dr.pts[p.id] && dr.pts[p.id].err ? "warn" : "" }));
+    dp.forEach(p => node({ depth: d2 + 1, cls:"leaf drawn" + (Spec.isAux(p) ? " aux" : ""), s:{type:"dpt", item:it.id, id:p.id}, sel: isSel("dpt", it.id, p.id),
+                           name: dname(p, dupP), meta: errMeta(dr && dr.pts[p.id]) || (Spec.isAux(p) ? "aux · " : "") + (Spec.rotationOf(sp, p.id) ? `หมุน ${Spec.rotationOf(sp, p.id).id} · ` : "") + Spec.POINT_TYPES[p.def.type], metaCls: dr && dr.pts[p.id] && dr.pts[p.id].err ? "warn" : "" }));
     cp.forEach((p, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"pt", item:it.id, i}, sel: isSel("pt", it.id, i), name: `#${i} ${esc(p.codes.join(", ") || "—")}`, meta: "โค้ด" }));
   });
   grp(ik + ":links", "Links", dl.length + cl.length, () => {
-    dl.forEach(l => node({ depth: d2 + 1, cls:"leaf drawn", s:{type:"dlink", item:it.id, id:l.id}, sel: isSel("dlink", it.id, l.id),
-                           name: dname(l, dupL), meta: errMeta(dr && dr.links[l.id]) || Spec.linkEnds(l).join("→") + (l.type === "followSurface" ? " ตามดิน" : "") }));
+    dl.forEach(l => node({ depth: d2 + 1, cls:"leaf drawn" + (Spec.isAux(l) ? " aux" : ""), s:{type:"dlink", item:it.id, id:l.id}, sel: isSel("dlink", it.id, l.id),
+                           name: dname(l, dupL), meta: errMeta(dr && dr.links[l.id]) || (Spec.isAux(l) ? "aux · " : "") + Spec.linkEnds(l).join("→") + (l.type === "followSurface" ? " ตามดิน" : Spec.isArc(l) ? " " + Spec.LINK_TYPES[l.type] : "") }));
     cl.forEach((l, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"link", item:it.id, i}, sel: isSel("link", it.id, i), name: `L${i} ${esc(l.codes.join(", ") || "—")}`, meta: "#" + l.pts.join("→#") }));
   });
   grp(ik + ":shapes", "Shapes", ds.length + cs.length, () => {
@@ -178,6 +178,8 @@ function ctxItems(kind, id, extra){
       { h: `${itemLabel(it)} · ${extra.id}` },
       { label:"Move", cmd: () => startCmd("move"), disabled: state.editing !== id, note: "M" },
       { label:"Copy", cmd: () => startCmd("copy"), disabled: state.editing !== id, note: "C" },
+      { label:"Rotate", cmd: () => startCmd("rotate"), disabled: state.editing !== id, note: "R" },
+      ...(k !== "shape" ? [auxMenuItem(it, extra, state.editing !== id)] : []),
       { label:`ลบ ${extra.id}`, cmd: () => deleteDrawn(it, k, extra.id), disabled: state.editing !== id, note: state.editing !== id ? "เข้า Edit ก่อน" : "Delete" }
     ];
   }
@@ -241,8 +243,9 @@ function openCtx(e, kind, id, extra){
   box.style.left = Math.min(e.clientX, innerWidth - r.width - 6) + "px";
   box.style.top = Math.min(e.clientY, innerHeight - r.height - 6) + "px";
 }
-function closeMenus(){ $("ctx").hidden = true; $("dd-file").hidden = true; }
-document.addEventListener("pointerdown", e => { if (!e.target.closest(".ctx,.dropdown,#m-file")) closeMenus(); });
+function closeMenus(){ $("ctx").hidden = true; $("dd-file").hidden = true; if (!$("osmenu").hidden) closeOsMenu(); }
+// คลิกข้างนอกเมนู = ปิด (ปุ่ม OSNAP / ▾ จัดการเมนู OSNAP เอง)
+document.addEventListener("pointerdown", e => { if (!e.target.closest(".ctx,.dropdown,#m-file,.osmenu,#b-osmenu,#b-osnap")) closeMenus(); });
 
 function renameItem(id){
   const it = itemById(id);
@@ -333,7 +336,7 @@ async function loadSpecFromFile(it){
   if (!it || !it.file) return;
   const r = await fetch("/api/drawing/spec?file=" + encodeURIComponent(it.file)).then(r => r.json()).catch(() => null);
   if (!r || !r.ok || !r.spec) return;
-  it.spec = r.spec; it.generatedFile = true; it.specEdited = !!r.edited;
+  it.spec = Spec.normalize(r.spec); it.generatedFile = true; it.specEdited = !!r.edited;
   it.savedSpec = JSON.stringify(r.spec);
   History.rebase();          // ส่วนของการ Import (ก้อน Undo "เพิ่ม …" เดียวกัน)
   persist(); run();
@@ -622,9 +625,11 @@ function selectRow(parent, it, label, options, value, onChange, small){
   row.appendChild(sel);
   return sel;
 }
+// auxiliary: code ไม่ถูกส่งออก (Civil 3D ไม่เห็นอยู่แล้ว) — ช่องปิดไว้แต่ไม่ลบ code เดิม (สลับกลับเป็นของจริงแล้ว code กลับมา)
 function codesRow(parent, it, obj){
-  const row = div("row", `<label>Codes<small>คั่นด้วย ,</small></label>`, parent);
-  const inp = document.createElement("input"); inp.type = "text"; inp.value = obj.codes.join(", "); inp.disabled = !canEdit(it);
+  const aux = Spec.isAux(obj);
+  const row = div("row", `<label>Codes<small>${aux ? "auxiliary: ไม่ส่งออก (เก็บไว้)" : "คั่นด้วย ,"}</small></label>`, parent);
+  const inp = document.createElement("input"); inp.type = "text"; inp.value = obj.codes.join(", "); inp.disabled = !canEdit(it) || aux;
   inp.onchange = () => specEdit(() => { obj.codes = inp.value.split(",").map(c => c.trim()).filter(Boolean); }, it);
   row.appendChild(inp);
 }
@@ -638,6 +643,8 @@ function propsMulti(box, list){
   kv(g, Object.entries(count).map(([t, n]) => [PICK_NAMES[t] || t, String(n)]));
   div("btns", null, g).append(btn("Move (M)", () => startCmd("move"), false, "คลิกจุดฐาน แล้วคลิกปลายทาง"),
                               btn("Copy (C)", () => startCmd("copy"), false, "คลิกจุดฐาน แล้วคลิกปลายทาง (วางได้หลายครั้ง Enter = จบ)"),
+                              ...(state.editing ? [btn("Rotate (R)", () => startCmd("rotate"), false, "คลิกจุดหมุน แล้วลากมุม / พิมพ์มุม"),
+                                                   btn("Auxiliary (X)", toggleAuxSel, false, "สลับ Auxiliary ของ point / link ที่เลือก")] : []),
                               btn("Delete", deleteSelection, false, "ลบทุกชิ้นที่เลือก (Delete) — Ctrl+Z ย้อนได้"));
   const it = state.editing ? editItem() : null;
   if (it && it.spec){
@@ -668,7 +675,68 @@ function propsDrawn(box, it, s){
   if (s.type === "dpt") propsDrawnPoint(box, it, Spec.byId(sp.points, s.id), r);
   else if (s.type === "dlink") propsDrawnLink(box, it, Spec.byId(sp.links, s.id), r);
   else propsDrawnShape(box, it, Spec.byId(sp.shapes, s.id), r);
+  const pg = Spec.polygonOf(sp, DRAWN_KIND[s.type], s.id, true);
+  if (pg) propsPolygon(box, it, pg);
+  for (const rg of rotationsFor(sp, s)) propsRotation(box, it, rg);
   propsCode(box, it, s);
+}
+// กลุ่มหมุนที่เกี่ยวกับ object ที่เลือก: จุด = กลุ่มของมันเอง / กลุ่มที่ใช้มันเป็นจุดหมุน · link / shape = กลุ่มของจุดปลาย
+function rotationsFor(sp, s){
+  const ids = s.type === "dpt" ? [s.id] : s.type === "dlink" ? Spec.linkRefs(Spec.byId(sp.links, s.id))
+    : Spec.byId(sp.shapes, s.id).links.flatMap(l => { const o = Spec.byId(sp.links, l); return o ? Spec.linkRefs(o) : []; });
+  return (sp.rotations || []).filter(g => ids.some(id => g.points.includes(id)) || (s.type === "dpt" && g.pivot === s.id));
+}
+// กลุ่มหมุน: แก้มุม (นิพจน์ / parameter) / จุดหมุน ทีหลังได้ · เลิกหมุน = สมาชิกกลับตำแหน่งก่อนหมุน
+function propsRotation(box, it, g){
+  const sp = it.spec;
+  const gr = group(box, `กลุ่มหมุน ${g.id}`, canEdit(it) ? { label:"เลิกหมุน", title:"ลบกลุ่มหมุน — จุดกลับไปตำแหน่งก่อนหมุน (Ctrl+Z ย้อนได้)",
+    cmd: () => { specEdit(s => { s.rotations = s.rotations.filter(x => x.id !== g.id); }, it, `เลิกหมุน ${g.id}`); renderProps(true); } } : null);
+  kv(gr, [["สมาชิก", g.points.join(", ")]]);
+  const opts = sp.points.filter(p => !g.points.includes(p.id)).map(p => [p.id, p.id + (Spec.isAux(p) ? " (aux)" : "")]);
+  selectRow(gr, it, "จุดหมุน", opts, g.pivot, v => { g.pivot = v; });
+  const inp = exprRow(gr, it, "มุม (องศา)", "ทวนเข็ม + ในกรอบ Side = Right", g.angle, v => { g.angle = v; });
+  if (canEdit(it)){
+    const b = btn("+", () => {
+      const name = newParamFromValue(it, inp.value.trim() || g.angle, "Ang");
+      if (name){ specEdit(() => { g.angle = name; }, it, `${g.id} ใช้ parameter ${name}`); renderProps(true); }
+    }, false, "สร้าง parameter ใหม่จากช่องนี้ (default = ค่าตอนนี้)");
+    b.classList.add("par-btn"); inp.parentElement.appendChild(b);
+    div("btns", null, gr).append(btn("เลือกทั้งกลุ่ม", () => setSelList(g.points.map(id => ({ type:"dpt", item: it.id, id }))), false, "เลือกจุดทุกจุดในกลุ่ม"));
+  }
+  div("hint", "จุดในกลุ่มคำนวณตามความหมายเดิม (dx / dy ฯลฯ ในกรอบก่อนหมุน) แล้วหมุนรอบจุดหมุน · Move ทั้งกลุ่มได้ · ฝั่ง Left มุมกลับเอง", gr);
+}
+// Polygon ด้านเท่า: แก้ N / R / θ / โหมด ทีหลังได้ (จุดยอดเป็น polar จากจุดศูนย์กลาง — id เดิม ของที่อ้างจุดยอดไม่หลุด)
+function propsPolygon(box, it, g){
+  const sp = it.spec;
+  const gr = group(box, `Polygon ด้านเท่า ${g.id}`);
+  kv(gr, [["ศูนย์กลาง", g.center], ["จุดยอด", g.points.join(", ")], ["Shape", g.shape || "—"]]);
+  const row = div("row", `<label>N<small>จำนวนด้าน 3–24</small></label>`, gr);
+  const n = document.createElement("input"); n.type = "number"; n.min = 3; n.max = 24; n.step = 1; n.value = g.n; n.disabled = !canEdit(it);
+  n.onchange = () => {
+    const v = Math.round(+n.value);
+    if (!(v >= 3 && v <= 24)){ n.value = g.n; return flashBanner("N ต้องเป็นจำนวนเต็ม 3–24"); }
+    if (v === g.n) return;
+    // ลองกับสำเนาก่อน: มีของอื่นอ้างจุดยอด / link เดิม = ไม่ทำ (ไม่เกิดรายการ Undo เปล่า)
+    const test = JSON.parse(JSON.stringify(sp)), block = Spec.rebuildPolygon(test, test.polygons.find(x => x.id === g.id), v);
+    if (block.length){ n.value = g.n; return alert(`เปลี่ยนจำนวนด้านไม่ได้ — ${block.join(", ")} อ้างจุดยอด / link ของ ${g.id} อยู่\nลบหรือย้ายการอ้างอิงนั้นก่อน (แก้ R / θ ได้ตามปกติ)`); }
+    specEdit(s => { Spec.rebuildPolygon(s, g, v); state.sel = { type:"dshape", item: it.id, id: g.shape }; }, it, `เปลี่ยน ${g.id} เป็น ${v} ด้าน`);
+    renderProps(true);
+  };
+  row.appendChild(n);
+  const ex = (key, label, small, pname) => {
+    const inp = exprRow(gr, it, label, small, g[key], v => { g[key] = v; Spec.updatePolygon(sp, g); });
+    if (canEdit(it)){
+      const b = btn("+", () => {
+        const name = newParamFromValue(it, inp.value.trim() || g[key], pname);
+        if (name){ specEdit(() => { g[key] = name; Spec.updatePolygon(sp, g); }, it, `${g.id} ใช้ parameter ${name}`); renderProps(true); }
+      }, false, "สร้าง parameter ใหม่จากช่องนี้ (default = ค่าตอนนี้)");
+      b.classList.add("par-btn"); inp.parentElement.appendChild(b);
+    }
+  };
+  ex("radius", "R", g.mode === "circumscribed" ? "ศูนย์กลาง → กึ่งกลางด้าน" : "ศูนย์กลาง → มุม", "R");
+  ex("angle", "θ (องศา)", "0 = จุดแรกอยู่บนสุด · ฝั่ง Right", "Theta");
+  selectRow(gr, it, "โหมด", [["inscribed", "ถึงมุม (Inscribed)"], ["circumscribed", "ถึงกึ่งกลางด้าน (Circumscribed)"]], g.mode, v => { g.mode = v; Spec.updatePolygon(sp, g); });
+  div("hint", "Move / Copy ทั้งรูปได้ (เลือกชิ้นไหนก็ได้ทั้งรูป) · จุดศูนย์กลางเป็นจุด auxiliary (ไม่ลง Civil 3D)", gr);
 }
 function propsDrawnPoint(box, it, p, r){
   const sp = it.spec, d = p.def, q = r && r.pts[p.id], a = asmOfItem(it.id);
@@ -676,13 +744,15 @@ function propsDrawnPoint(box, it, p, r){
   codesRow(g, it, p);
   const others = sp.points.filter(o => o.id !== p.id && !Spec.dependsOn(sp, o.id, p.id));
   const ptOpts = others.map(o => [o.id, `${o.id}${o.codes.length ? " " + o.codes.join(",") : ""}`]);
-  selectRow(g, it, "ชนิด", Object.entries(Spec.POINT_TYPES), d.type, t => convertPoint(it, p, t, r));
+  // จุดสัมผัสเกิดจาก Fillet เท่านั้น (เปลี่ยนเป็นชนิดอื่นได้ แต่เปลี่ยนกลับไม่ได้)
+  selectRow(g, it, "ชนิด", Object.entries(Spec.POINT_TYPES).filter(([k]) => k !== "tangent" || d.type === "tangent"), d.type, t => convertPoint(it, p, t, r));
   const refRow = (key, label, small, allowOrigin) =>
     selectRow(g, it, label, (allowOrigin ? [["", "(origin)"]] : []).concat(ptOpts), d[key] || "", v => { if (v) d[key] = v; else delete d[key]; }, small);
   const ex = (key, label, small, opts) => exprRow(g, it, label, small, d[key], v => { d[key] = v; }, opts);
   const dirRow = () => selectRow(g, it, "ทิศ", [["1", "ออกด้านนอก (+)"], ["-1", "เข้าด้านใน (−)"]], String(d.dir === -1 ? -1 : 1), v => { d.dir = +v; }, "ฝั่ง Right = ไปทางขวา");
   switch (d.type){
     case "delta": refRow("from", "จาก", "", true); ex("dx", "dx", "ไปทางนอก +"); ex("dy", "dy", "ขึ้น +"); break;
+    case "polar": refRow("from", "จาก", "", true); ex("length", "ระยะ", ""); ex("angle", "มุม (องศา)", "ทวนเข็มจาก +x · ฝั่ง Right"); break;
     case "slopeLength": refRow("from", "จาก", "", true); ex("slope", "Slope", "dy/dx ลง = ลบ (หรือ -1:2)", { slope: true }); dirRow();
       ex("length", "ยาว", ""); selectRow(g, it, "วัดความยาว", Object.entries(Spec.MEASURES), d.measure || "along", v => { d.measure = v; }); break;
     case "slopeToSurface": refRow("from", "จาก", "", true); ex("slope", "Slope", "dy/dx ลง = ลบ (หรือ -1:2)", { slope: true }); dirRow();
@@ -690,6 +760,13 @@ function propsDrawnPoint(box, it, p, r){
     case "onSurface": refRow("from", "จาก", "", true); ex("dx", "dx", "ไปทางนอก +"); break;
     case "between": refRow("a", "จุด a"); refRow("b", "จุด b"); ex("t", "t", "0 = a, 1 = b, 0.5 = กึ่งกลาง"); break;
     case "intersect": refRow("a1", "เส้น A จาก"); refRow("a2", "เส้น A ถึง"); refRow("b1", "เส้น B จาก"); refRow("b2", "เส้น B ถึง"); break;
+    case "tangent": {
+      refRow("corner", "มุม"); refRow("toward", "บนเส้นไปทาง"); refRow("other", "อีกเส้นไปทาง");
+      // รัศมีของจุดสัมผัสคู่นี้กับ link Fillet ต้องเท่ากัน -> แก้ที่ไหนก็แก้ทั้งสาม
+      const fl = sp.links.find(l => l.type === "fillet" && l.corner === d.corner && (l.from === p.id || l.to === p.id));
+      exprRow(g, it, "รัศมี", fl ? `ใช้ร่วมกับ ${fl.id}` : "", d.radius, v => fl ? setFilletRadius(sp, fl, v) : (d.radius = v));
+      break;
+    }
     case "external": {
       const rr = asmRes[it.id], codes = rr && rr.result ? [...new Set(rr.result.points.flatMap(x => x.codes))] : [];
       if (d.code && !codes.includes(d.code)) codes.unshift(d.code);
@@ -697,6 +774,8 @@ function propsDrawnPoint(box, it, p, r){
       break;
     }
   }
+  // Auxiliary: คำนวณใน C# แต่ไม่ Points.Add · เป็นปลาย link จริงไม่ได้ (setAux ถามก่อน)
+  auxCheck(g, it, { type:"dpt", id: p.id }, p, "ไม่เพิ่มลง Civil 3D · อ้างอิง / snap ได้");
   if (q && q.err) div("expr-err", "⚠ " + esc(q.err), g);
   else if (q){
     const rows = [["Offset", f3(q.x) + "  (เทียบ origin)"], ["Elevation", f3(q.y) + "  (เทียบ origin)"],
@@ -716,12 +795,15 @@ function convertPoint(it, p, type, r){
   p.def = {
     origin: () => ({ type }),
     delta: () => ({ type, ...fr, dx: Expr.num(dx * F), dy: Expr.num(dy) }),
+    // มุมในกรอบ Side = Right (ฝั่ง Left ภาพกระจก: dx บนจอ × F)
+    polar: () => ({ type, ...fr, length: Expr.num(Math.hypot(dx, dy)), angle: Expr.num(Math.atan2(dy, dx * F) * 180 / Math.PI) }),
     slopeLength: () => ({ type, ...fr, slope: Expr.num(s), length: Expr.num(Math.hypot(dx, dy)), dir, measure: "along" }),
     slopeToSurface: () => ({ type, ...fr, slope: Expr.num(s || -0.5), dir, target: "TargetSurface", maxDistance: "50", layoutLength: Expr.num(run || 3) }),
     onSurface: () => ({ type, ...fr, dx: Expr.num(dx * F), target: "TargetSurface" }),
     between: () => ({ type, a: others[0] || "", b: others[1] || others[0] || "", t: "0.5" }),
     intersect: () => ({ type, a1: others[0] || "", a2: others[1] || "", b1: others[2] || "", b2: others[3] || "" }),
-    external: () => { const rr = asmRes[it.id], c = rr && rr.result ? rr.result.points.find(x => x.codes.length) : null; return { type, code: c ? c.codes[0] : "" }; }
+    external: () => { const rr = asmRes[it.id], c = rr && rr.result ? rr.result.points.find(x => x.codes.length) : null; return { type, code: c ? c.codes[0] : "" }; },
+    tangent: () => d
   }[type]();
   if (d.type === type) p.def = d;
 }
@@ -731,21 +813,65 @@ function propsDrawnLink(box, it, l, r){
   const sp = it.spec, q = r && r.links[l.id];
   const g = group(box, `Link ${l.id}`, canEdit(it) ? { label:"ลบ", title:"ลบ link นี้ (และ shape ที่ใช้มัน)", cmd: () => deleteDrawn(it, "link", l.id) } : null);
   codesRow(g, it, l);
-  const [a, b] = Spec.linkEnds(l);
-  selectRow(g, it, "ชนิด", [["straight", "เส้นตรง"], ["followSurface", "วิ่งตามผิวดิน"]], l.type === "followSurface" ? "followSurface" : "straight", v => {
-    if (v === "followSurface"){ delete l.points; Object.assign(l, { type: v, from: a, to: b, target: "TargetSurface" }); }
-    else { delete l.type; delete l.from; delete l.to; delete l.target; l.points = [a, b]; }
+  const [a, b] = Spec.linkEnds(l), cur = l.type || "straight";
+  // เปลี่ยนชนิด: เส้นตรง / ตามดิน / โค้งรัศมี สลับกันได้ · โค้ง 3 จุด / Fillet เปลี่ยนเป็นชนิดอื่นได้แต่สร้างจากตรงนี้ไม่ได้ (ใช้เครื่องมือ Arc / Fillet)
+  const types = Object.entries(Spec.LINK_TYPES).filter(([k]) => !["arc3", "fillet"].includes(k) || k === cur);
+  selectRow(g, it, "ชนิด", types, cur, v => {
+    const keep = { id: l.id, codes: l.codes, ...(l.seg && Spec.ARC_TYPES.includes(v) ? { seg: l.seg } : {}) };
+    for (const k of Object.keys(l)) delete l[k];
+    if (v === "straight") Object.assign(l, keep, { points: [a, b] });
+    else if (v === "followSurface") Object.assign(l, keep, { type: v, from: a, to: b, target: "TargetSurface" });
+    else if (v === "arcR"){
+      const A = r && r.pts[a], B = r && r.pts[b], c = A && B && !A.err && !B.err ? Math.hypot(B.x - A.x, B.y - A.y) : 1;
+      Object.assign(l, keep, { type: v, from: a, to: b, radius: Expr.num(c), sweep: "ccw", large: false });   // เริ่มที่รัศมี = ระยะเริ่ม-ปลาย
+    }
   });
-  const opts = sp.points.map(o => [o.id, o.id + (o.codes.length ? " " + o.codes.join(",") : "")]);
-  const setEnd = (i, v) => { if (l.type === "followSurface") l[i ? "to" : "from"] = v; else l.points[i] = v; };
-  selectRow(g, it, "จาก", opts, a, v => setEnd(0, v));
-  selectRow(g, it, "ถึง", opts, b, v => setEnd(1, v));
-  if (q && q.err) div("expr-err", "⚠ " + esc(q.err), g);
+  // link จริง: จุด auxiliary เป็นปลายไม่ได้ (ไม่อยู่ใน Civil 3D) · link auxiliary ต่อได้ทุกจุด
+  const laux = Spec.isAux(l);
+  const opts = sp.points.filter(o => laux || !Spec.isAux(o) || o.id === a || o.id === b).map(o => [o.id, o.id + (o.codes.length ? " " + o.codes.join(",") : "") + (Spec.isAux(o) ? " (aux)" : "")]);
+  const setEnd = (i, v) => { if (l.points) l.points[i] = v; else l[i ? "to" : "from"] = v; };
+  if (l.type !== "fillet"){
+    selectRow(g, it, "จาก", opts, a, v => setEnd(0, v));
+    selectRow(g, it, "ถึง", opts, b, v => setEnd(1, v));
+  } else kv(g, [["จุดสัมผัส", `${a} → ${b}`], ["มุม", l.corner]]);
+  if (l.type === "arc3"){
+    const vopts = sp.points.filter(o => o.id !== a && o.id !== b).map(o => [o.id, o.id + (Spec.isAux(o) ? " (aux)" : "")]);
+    selectRow(g, it, "ผ่านจุด", vopts, l.via, v => { l.via = v; }, "จุด auxiliary ได้");
+  }
+  if (l.type === "arcR"){
+    exprRow(g, it, "รัศมี", "น้อยกว่าครึ่งระยะเริ่ม-ปลาย = เส้นตรง + เตือน", l.radius, v => { l.radius = v; });
+    selectRow(g, it, "ทิศ", [["ccw", "ทวนเข็ม"], ["cw", "ตามเข็ม"]], l.sweep === "cw" ? "cw" : "ccw", v => { l.sweep = v; }, "กรอบ Side = Right");
+    selectRow(g, it, "ทาง", [["", "ทางสั้น (≤ 180°)"], ["1", "ทางยาว (> 180°)"]], l.large ? "1" : "", v => { l.large = !!v; });
+  }
+  if (l.type === "fillet") exprRow(g, it, "รัศมี", "ใหญ่เกินเส้น / ขนาน = มุมแหลมเดิม + เตือน", l.radius, v => setFilletRadius(sp, l, v));
+  if (Spec.isArc(l)){
+    // ความละเอียด: ท่อนยาวไม่เกิน (m) หรือจำนวนท่อน · จำกัด 2–180 ท่อน
+    const sg = l.seg || Spec.SEG_DEFAULT;
+    selectRow(g, it, "แบ่งโค้ง", [["chord", "ท่อนยาวไม่เกิน (m)"], ["count", "จำนวนท่อน"]], sg.by, v => { l.seg = { by: v, value: v === "count" ? "16" : Spec.SEG_DEFAULT.value }; },
+              `${Spec.SEG_MIN}–${Spec.SEG_MAX} ท่อน`);
+    exprRow(g, it, sg.by === "count" ? "จำนวนท่อน" : "ท่อนยาวไม่เกิน", "", sg.value, v => { l.seg = { by: sg.by, value: v }; });
+  }
+  auxCheck(g, it, { type:"dlink", id: l.id }, l, "ไม่ Links.Add ลง Civil 3D · อ้างอิง / snap ได้ · ใช้ใน shape ไม่ได้");
+  if (q && q.err){
+    div("expr-err", "⚠ " + esc(q.err), g);
+    // quick fix: link จริงที่ปลายเป็นจุด auxiliary (ไม่เปลี่ยนให้เองเงียบๆ)
+    if (q.auxEnd && canEdit(it)) div("btns", null, g).append(
+      btn(`ทำจุด ${q.auxEnd} เป็นจุดจริง`, () => setAux(it, [{ type:"dpt", id: q.auxEnd }], false)),
+      btn("ทำ link นี้เป็น Auxiliary", () => setAux(it, [{ type:"dlink", id: l.id }], true)));
+  }
   else if (q){
     let len = 0; for (let k = 0; k < q.path.length - 1; k++) len += Math.hypot(q.path[k + 1].x - q.path[k].x, q.path[k + 1].y - q.path[k].y);
     const A = q.path[0], B = q.path[q.path.length - 1];
-    kv(g, [["ความยาว", f3(len) + " m"], ["dx / dy", `${f3(B.x - A.x)} / ${f3(B.y - A.y)}`], ["Slope", slopeText(B.x - A.x, B.y - A.y)], ["จำนวนจุด", String(q.path.length)]]);
+    const rows = [["ความยาว", f3(len) + " m"], ["dx / dy", `${f3(B.x - A.x)} / ${f3(B.y - A.y)}`], ["Slope", slopeText(B.x - A.x, B.y - A.y)], ["จำนวนจุด", String(q.path.length)]];
+    if (q.arc) rows.push(["ใน Civil 3D", `${q.path.length - 1} link ตรง (+ ${q.path.length - 2} จุดระหว่างทาง)`], ["รัศมีจริง", f3(q.arc.r) + " m"],
+                         ["มุมกวาด", `${f3(Math.abs(q.arc.sw) * 180 / Math.PI)}° ${q.arc.sw > 0 ? "ทวนเข็ม" : "ตามเข็ม"} (บนจอ)`]);
+    kv(g, rows);
   }
+}
+// รัศมีของ Fillet ใช้ 3 ที่ (link + จุดสัมผัส 2 จุด) ให้เท่ากันเสมอ
+function setFilletRadius(sp, fl, v){
+  fl.radius = v;
+  for (const id of [fl.from, fl.to]){ const p = Spec.byId(sp.points, id); if (p && p.def.type === "tangent" && p.def.corner === fl.corner) p.def.radius = v; }
 }
 function propsDrawnShape(box, it, s, r){
   const q = r && r.shapes[s.id];
@@ -754,6 +880,66 @@ function propsDrawnShape(box, it, s, r){
   let area = null;
   if (q && q.poly){ area = 0; q.poly.forEach((a, j) => { const b = q.poly[(j + 1) % q.poly.length]; area += a.x * b.y - b.x * a.y; }); area = Math.abs(area) / 2; }
   kv(g, [["Links", s.links.join(", ")], ["พื้นที่", q && q.err ? "⚠ " + q.err : area == null ? "(link ต่อกันไม่เป็นรูปปิด)" : f3(area) + " m²"]]);
+  // quick fix: shape ที่มี link auxiliary
+  if (q && q.auxLink && canEdit(it)) div("btns", null, g).append(
+    btn(`ทำ ${q.auxLink} เป็นของจริง`, () => setAux(it, [{ type:"dlink", id: q.auxLink }], false)),
+    btn(`เอา ${q.auxLink} ออกจาก shape`, () => { specEdit(() => { s.links = s.links.filter(x => x !== q.auxLink); }, it, `เอา ${q.auxLink} ออกจาก ${s.id}`); renderProps(true); }));
+}
+
+// ---------------- Auxiliary (ช่วยสร้าง) ----------------
+// point / link ที่สั่ง: คลิกขวาบนชิ้นที่อยู่ในชุดที่เลือก = ทั้งชุด · ไม่งั้น = ชิ้นนั้น (shape ไม่นับ)
+function auxTargets(it, extra){
+  const sel = pickedList().filter(o => o.item === it.id && (o.type === "dpt" || o.type === "dlink"));
+  return extra && !sel.some(o => o.type === extra.type && o.id === extra.id) ? [{ type: extra.type, item: it.id, id: extra.id }] : sel;
+}
+function auxMenuItem(it, extra, disabled){
+  const objs = auxTargets(it, extra), on = !objs.every(o => Spec.isAux(specObj(it, o)));
+  return { label: (on ? "ทำเป็น Auxiliary" : "ทำเป็นของจริง") + (objs.length > 1 ? ` (${objs.length} ชิ้น)` : ""),
+           cmd: () => setAux(it, objs, on), disabled: disabled || !objs.length, note: "X" };
+}
+// X นอกคำสั่ง: สลับ Auxiliary ของชุดที่เลือก (มีของจริงปน = ทำเป็น aux ทั้งหมด · aux ทั้งหมด = ทำเป็นของจริง)
+function toggleAuxSel(){
+  const it = editItem(); if (!it || !it.spec) return;
+  const objs = auxTargets(it, null);
+  if (!objs.length) return flashBanner(pickedList().length ? "Auxiliary ใช้กับ point / link (shape เป็น Auxiliary ไม่ได้)" : "เลือก point / link ก่อนแล้วกด X — หรือกด X ระหว่างวาดเพื่อวาดแบบ Auxiliary");
+  const on = !objs.every(o => Spec.isAux(specObj(it, o)));
+  if (setAux(it, objs, on)) flashBanner(`${on ? "ทำเป็น Auxiliary" : "ทำเป็นของจริง"}: ${objs.map(o => o.id).join(", ")} (Ctrl+Z ย้อนได้)`);
+}
+function auxCheck(g, it, ref, obj, note){
+  const cl = document.createElement("label"); cl.className = "check";
+  cl.innerHTML = `<input type="checkbox"${Spec.isAux(obj) ? " checked" : ""}> Auxiliary (ช่วยสร้าง) <small>(${esc(note)})</small>`;
+  const cb = cl.querySelector("input");
+  cb.disabled = !canEdit(it);
+  cb.onchange = () => { if (!setAux(it, [ref], cb.checked)) cb.checked = !cb.checked; };
+  g.appendChild(cl);
+}
+// สลับ Auxiliary ของ point / link หลายชิ้นพร้อมกัน (Undo ก้อนเดียว) — คืน false ถ้าผู้ใช้ยกเลิก
+//   ทำจุดเป็น aux แต่มี link จริงใช้อยู่ = ถาม "ทำ link พวกนี้เป็น Auxiliary ด้วย" / ยกเลิก
+//   ทำ link เป็น aux แต่อยู่ใน shape = ถาม "เอา link ออกจาก shape" (shape อาจไม่ปิด = เตือน) / ยกเลิก
+//   ทำเป็นของจริง = ทำได้เลย (link จริงที่ปลายเป็นจุด aux จะขึ้นเตือน + quick fix)
+function setAux(it, objs, on){
+  const sp = it.spec;
+  // ทำ link เป็นของจริงแต่ปลายยังเป็นจุด aux = ถามว่าจะทำจุดปลายเป็นจุดจริงด้วยไหม (Cancel = เฉพาะ link → ขึ้นเตือน + quick fix)
+  if (!on){
+    const P = new Set(objs.filter(o => o.type === "dpt").map(o => o.id));
+    const ends = [...new Set(objs.filter(o => o.type === "dlink").flatMap(o => Spec.linkEnds(Spec.byId(sp.links, o.id))))]
+      .filter(id => !P.has(id) && Spec.isAuxPoint(sp, id));
+    if (ends.length && confirm(`ปลายของ link เป็นจุด auxiliary: ${ends.join(", ")}\n\nOK = ทำจุดพวกนี้เป็นจุดจริงด้วย\nCancel = ทำเฉพาะ link (link จะขึ้นเตือนจนกว่าจะแก้)`))
+      objs = objs.concat(ends.map(id => ({ type: "dpt", item: it.id, id })));
+  }
+  const pl = Spec.auxPlan(sp, objs, on);
+  if (pl.hitLinks.length){
+    const hit = pl.hitLinks.map(id => Spec.byId(sp.links, id)), pts = pl.points.filter(id => hit.some(l => Spec.linkEnds(l).includes(id)));
+    if (!confirm(`${pts.join(", ")} เป็นปลายของ link จริง ${pl.hitLinks.join(", ")} — Civil 3D จะไม่มีจุดนี้\n\nOK = ทำ link พวกนี้เป็น Auxiliary ด้วย\nCancel = ยกเลิก`)) return false;
+  }
+  if (pl.shapes.length){
+    const ls = pl.links.filter(id => sp.shapes.some(s => pl.shapes.includes(s.id) && s.links.includes(id)));
+    if (!confirm(`${ls.join(", ")} อยู่ใน shape ${pl.shapes.join(", ")} — shape ใช้ link auxiliary ไม่ได้\n\nOK = เอา link ออกจาก shape (shape อาจไม่ปิด = เตือน)\nCancel = ยกเลิก`)) return false;
+  }
+  const n = pl.points.length + pl.links.length, what = n === 1 ? pl.points.concat(pl.links)[0] : `${n} objects`;
+  specEdit(s => Spec.applyAux(s, pl, on), it, on ? `ทำ ${what} เป็น Auxiliary` : `ทำ ${what} เป็นของจริง`);
+  renderProps(true);
+  return true;
 }
 
 // ---------------- ตาราง Parameter แบบ SAC ----------------
@@ -801,7 +987,9 @@ function propsParamTable(box, it){
 }
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
-const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId abstract as base bool break byte case catch char checked class const continue " +
+const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
+  "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
+  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation abstract as base bool break byte case catch char checked class const continue " +
   "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
   "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +
   "static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while var").split(" "));
@@ -810,12 +998,22 @@ function addSpecParam(it){
   let i = 1; while (names.includes("Param" + i)) i++;
   specEdit(s => { s.params.push({ name: "Param" + i, kind: "double", default: 1, displayName: "Param" + i, min: null, max: null }); }, it);
 }
+// สร้าง parameter ใหม่จากค่าในช่องพิมพ์ (แบบ SAC): default = ค่าของช่องนั้นตอนนี้ · คืนชื่อ (ให้ช่องใช้ชื่อแทน) · ค่าผิด = null
+function newParamFromValue(it, value, base){
+  const r = drawRes[it.id], env = r && r.env ? r.env : {};
+  let v;
+  try{ v = Expr.value(String(value).trim() || "0", env); }catch(e){ flashBanner("สร้าง parameter ไม่ได้: " + e.message); return null; }
+  const names = specNames(it);
+  let name = base, i = 2; while (names.includes(name) || RESERVED.has(name)) name = base + i++;
+  specEdit(s => { s.params.push({ name, kind: "double", default: +Expr.num(v), displayName: name, min: null, max: null }); }, it, `เพิ่ม parameter ${name}`);
+  return name;
+}
 // object ที่ใช้ parameter นี้ในนิพจน์
 function usesParam(sp, name){
   const out = [];
-  for (const p of sp.points) for (const k of Spec.EXPR_FIELDS[p.def.type] || []){
-    const r = Expr.check(p.def[k], []);
-    if (r.ast && Expr.vars(r.ast).has(name)){ out.push(p.id); break; }
+  for (const s of Spec.exprSlots(sp)){
+    const r = Expr.check(String(s.obj[s.key]).replace(/^(-?)1:/, "$11/"), []);
+    if (r.ast && Expr.vars(r.ast).has(name) && !out.includes(s.id)) out.push(s.id);
   }
   return out;
 }
@@ -828,7 +1026,7 @@ function renameSpecParam(it, p, v){
   specEdit(sp => {
     p.name = v; if (p.displayName === old) p.displayName = v;
     if (sp.side && sp.side.param === old) sp.side.param = v;
-    for (const q of sp.points) for (const k of Object.keys(q.def)) if (typeof q.def[k] === "string" && Spec.EXPR_FIELDS[q.def.type] && Spec.EXPR_FIELDS[q.def.type].includes(k)) q.def[k] = q.def[k].replace(re, v);
+    for (const s of Spec.exprSlots(sp)) if (typeof s.obj[s.key] === "string") s.obj[s.key] = s.obj[s.key].replace(re, v);
     if (it.params && old in it.params){ it.params[v] = it.params[old]; delete it.params[old]; }
   }, it);
   return true;
@@ -927,7 +1125,7 @@ function renderProblem(){
 // ---------------- 5 · แถบล่าง ----------------
 function renderXY(px, py){
   const a = curAsm();
-  $("bar-xy").textContent = `Offset ${f3(offOf(wx(px), a)).padStart(8)}  Elev ${f3(elevOf(wy(py))).padStart(8)}`;
+  $("bar-xy").textContent = `Offset ${fz(offOf(wx(px), a)).padStart(8)}  Elev ${fz(elevOf(wy(py))).padStart(8)}`;
 }
 function renderBar(){
   const b = state.bar;
@@ -935,11 +1133,12 @@ function renderBar(){
     const k = t.dataset.tg;
     t.classList.toggle("on", k === "codes" ? state.showCodes : !!b[k]);
   }
-  for (const t of document.querySelectorAll("#bar [data-os]")){
-    t.classList.toggle("on", !!b.osnap[t.dataset.os]);
-    t.classList.toggle("muted", !b.osOn);
-    t.title = `OSNAP ${t.textContent}: ${OSNAP_HELP[t.dataset.os]} — ใช้ตอนวาด${b.osOn ? "" : " (ตอนนี้ปิด OSNAP ทั้งหมดอยู่ กด F3)"}`;
-  }
+  // tooltip ของปุ่ม OSNAP บอกชนิดที่เปิดอยู่ (แบบ AutoCAD)
+  const onKinds = OSNAP_ITEMS.filter(([k]) => b.osnap[k]).map(([, n]) => n);
+  $("b-osnap").title = `Object snap เปิด/ปิดทั้งหมด (F3) — ตอนนี้${b.osOn ? "เปิด" : "ปิด"}\nชนิดที่เลือก: ${onKinds.join(", ") || "(ไม่มี)"}`
+    + `${b.track ? "\n+ Object snap tracking (F11)" : ""}\n▾ หรือคลิกขวา = เลือกชนิด`;
+  $("b-osmenu").classList.toggle("on", b.osOn);
+  if (!$("osmenu").hidden) renderOsMenu();
   const gs = $("b-gsnap");
   gs.textContent = `Grid snap ${+b.gridStep} (F9)`;
   gs.title = `ปัดค่าเป็นทุก ${+b.gridStep} m (F9) — ตอนวาดจุดอิสระ (dx / dy / ระยะตามลาด) และตอนลาก surface / แกน / subassembly ที่ลอยอยู่\nไม่ใช่ object snap (ดูปุ่ม OSNAP) · ดับเบิลคลิก = ตั้งระยะ`;
@@ -958,29 +1157,79 @@ function renderBar(){
   $("ve").value = state.view.ve;
 }
 $("bar").addEventListener("click", e => {
-  const t = e.target.closest("[data-tg],[data-os]"); if (!t) return;
-  if (t.dataset.os){ state.bar.osnap[t.dataset.os] = !state.bar.osnap[t.dataset.os]; }
-  else {
-    const k = t.dataset.tg;
-    if (k === "codes"){ state.showCodes = !state.showCodes; render(); }
-    else { state.bar[k] = !state.bar[k]; if (k === "grid") render(); }
-  }
+  if (e.target.closest("#b-osmenu")) return toggleOsMenu();
+  const t = e.target.closest("[data-tg]"); if (!t) return;
+  const k = t.dataset.tg;
+  if (k === "codes"){ state.showCodes = !state.showCodes; render(); }
+  else { state.bar[k] = !state.bar[k]; if (k === "grid") render(); }
   persist(); renderBar(); refreshSnap();
 });
-const OSNAP_HELP = { end: "จุดที่วาด / จุดของโค้ดเดิม / origin", mid: "กึ่งกลาง link", int: "จุดตัดของ 2 link",
-  surf: "จุดบนผิวดินที่ใกล้เมาส์ (ล็อก slope อยู่ = จุดที่ลาดชนดิน)", perp: "ตั้งฉากจากจุดก่อนหน้าไปยัง link", near: "จุดบน link ที่ใกล้เมาส์" };
+const OSNAP_HELP = { end: "จุดที่วาด / จุดของโค้ดเดิม / origin", mid: "กึ่งกลาง link", cen: "ศูนย์กลางของโค้ง / polygon ด้านเท่า",
+  int: "จุดตัดของ 2 link", perp: "ตั้งฉากจากจุดก่อนหน้าไปยัง link", near: "จุดบน link ที่ใกล้เมาส์",
+  surf: "จุดบนผิวดินที่ใกล้เมาส์ (ล็อก slope อยู่ = จุดที่ลาดชนดิน)" };
+const OSNAP_ITEMS = [["end", "Endpoint"], ["mid", "Midpoint"], ["cen", "Center"], ["int", "Intersection"],
+                     ["perp", "Perpendicular"], ["near", "Nearest"], ["surf", "Surface"]];
+
+// ---------------- เมนู OSNAP (▾ / คลิกขวาที่ปุ่ม OSNAP) ----------------
+// แบบ status bar ของ AutoCAD: ติ๊กหลายชนิดต่อกันได้ เมนูไม่ปิด · คลิกข้างนอก / Esc = ปิด · เปลี่ยนแล้ว snap ที่เมาส์เดิมเปลี่ยนทันที
+const osIcon = kind => `<svg viewBox="-11 -11 22 22" class="osic ${kind}" aria-hidden="true"><path d="${osnapMarker(kind, 0, 0)}"/></svg>`;
+function renderOsMenu(){
+  const m = $("osmenu"), b = state.bar;
+  const row = (attr, on, icon, name, help) =>
+    `<label class="osrow" title="${esc(help)}"><input type="checkbox" ${attr}${on ? " checked" : ""}>${icon}<span>${esc(name)}</span></label>`;
+  m.innerHTML = (b.osOn ? "" : `<div class="osnote">OSNAP ปิดอยู่ (F3) — ติ๊กไว้ได้ จะมีผลเมื่อเปิด</div>`)
+    + OSNAP_ITEMS.map(([k, n]) => row(`data-os="${k}"`, b.osnap[k], osIcon(k), n, OSNAP_HELP[k])).join("")
+    + `<hr>` + row(`data-trk="1"`, b.track, osIcon("trk"), "Object snap tracking (F11)",
+                   "ชี้ค้างบนจุด snap เพื่อจับเป็นจุดอ้างอิง (+) แล้วลากตามแนวราบ/ดิ่งของจุดนั้น หรือพิมพ์ dx dy จากจุดนั้น · ชี้ค้างซ้ำ = ปล่อย · Esc = ล้าง")
+    + `<label class="trkms">ชี้ค้าง <input type="number" data-trkms="1" min="0.1" max="3" step="0.1" value="${(b.trackMs || 500) / 1000}"> วินาที</label>`
+    + `<hr><div class="osbtns"><button data-all="1">เลือกทั้งหมด</button><button data-all="0">ล้างทั้งหมด</button></div>`;
+}
+function openOsMenu(){
+  const m = $("osmenu"), r = $("b-osnap").getBoundingClientRect();
+  renderOsMenu();
+  m.hidden = false; $("b-osmenu").setAttribute("aria-expanded", "true");
+  // แถบล่างอยู่ล่างสุด: เมนูเปิดขึ้นด้านบน
+  m.style.left = Math.max(4, Math.min(r.left, innerWidth - m.offsetWidth - 4)) + "px";
+  m.style.bottom = (innerHeight - r.top + 4) + "px";
+}
+function closeOsMenu(){ $("osmenu").hidden = true; $("b-osmenu").setAttribute("aria-expanded", "false"); }
+function toggleOsMenu(){ $("osmenu").hidden ? openOsMenu() : closeOsMenu(); }
+$("b-osnap").addEventListener("contextmenu", e => { e.preventDefault(); openOsMenu(); });
+$("osmenu").addEventListener("change", e => {
+  const t = e.target, b = state.bar;
+  if (t.dataset.os) b.osnap[t.dataset.os] = t.checked;
+  else if (t.dataset.trk){ b.track = t.checked; if (!b.track) trackClear(); }
+  else if (t.dataset.trkms){ const s = +t.value; if (s > 0) b.trackMs = Math.round(Math.min(3, Math.max(0.1, s)) * 1000); }
+  persist(); renderBar(); refreshSnap();
+});
+$("osmenu").addEventListener("click", e => {
+  const t = e.target.closest("[data-all]"); if (!t) return;
+  for (const [k] of OSNAP_ITEMS) state.bar.osnap[k] = t.dataset.all === "1";
+  persist(); renderBar(); refreshSnap();
+});
 $("b-gsnap").ondblclick = () => {
   const v = prompt("ระยะ Grid snap (m)", state.bar.gridStep);
   if (v == null) return;
   const n = +v;
-  if (!(n > 0)) return alert("ใส่ตัวเลขมากกว่า 0 เช่น 0.05");
+  if (!(n >= 0.001)) return alert("ใส่ตัวเลขตั้งแต่ 0.001 ขึ้นไป เช่น 0.05 หรือ 0.005");
   state.bar.gridStep = n; persist(); renderBar(); refreshSnap();
 };
 // F3 / F8 / F9 (เรียกจาก main.js)
-function toggleBar(k){ state.bar[k] = !state.bar[k]; persist(); renderBar(); refreshSnap(); showBanner(barBanner(k)); }
+function toggleBar(k){
+  state.bar[k] = !state.bar[k];
+  if (k === "track" && !state.bar.track) trackClear();
+  // ซ่อน Auxiliary: เอาออกจากชุดที่เลือกด้วย (มองไม่เห็น = ไม่ควรถูกแก้โดยไม่รู้ตัว)
+  if ((k === "aux" || k === "c3d") && !auxShown() && state.editing){
+    const it = editItem(), sp = it && it.spec;
+    if (sp) setSelList(selList().filter(o => !(o.item === it.id && (o.type === "dpt" || o.type === "dlink") && Spec.isAux(specObj(it, o)))));
+  }
+  persist(); renderBar(); refreshSnap(); render(); showBanner(barBanner(k));
+}
 function barBanner(k){
   const on = state.bar[k] ? "เปิด" : "ปิด";
-  const t = { osOn: `OSNAP ${on}`, snap: `Grid snap ${on} (${+state.bar.gridStep} m)`, ortho: `Ortho ${on}` }[k];
+  const t = { osOn: `OSNAP ${on}`, snap: `Grid snap ${on} (${+state.bar.gridStep} m)`, ortho: `Ortho ${on}`, track: `Object snap tracking ${on}`,
+              aux: state.bar.aux ? "แสดง Auxiliary" : "ซ่อน Auxiliary (snap / คลุมเลือกไม่ได้จนกว่าจะแสดง)",
+              c3d: state.bar.c3d ? "ดูแบบ Civil 3D: เห็นเฉพาะที่จะส่งออกไปจริง (ซ่อน Auxiliary)" : "เลิกดูแบบ Civil 3D" }[k];
   setTimeout(() => { if ($("banner").textContent === t) showBanner(draw.tool ? drawBanner() : ""); }, 1200);
   return t;
 }
@@ -1086,6 +1335,7 @@ function loadProjContent(c, name){
   WS().assemblies = c.assemblies
     ? c.assemblies.map((a, i) => ({ id: a.id || newId("a"), name: a.name || "Assembly " + (i + 1), baseline: a.baseline || { x:0, y:0 }, items: fix(a.items) }))
     : [{ id: newId("a"), name: c.name || "Assembly 1", baseline: c.baseline || { x:0, y:0 }, items: fix(c.items) }];
+  allItems().forEach(normItem);   // spec รุ่นก่อน (construction) -> auxiliary
   WS().name = name; state.editing = null; asmRes = {};
   renderBar(); setSel({ type:"ws" }); run();
   setTimeout(fit, 500);

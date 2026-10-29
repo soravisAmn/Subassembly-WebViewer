@@ -16,6 +16,7 @@ public class DrawingSpec
     public List<SpecPoint> Points { get; set; } = new();
     public List<SpecLink> Links { get; set; } = new();
     public List<SpecShape> Shapes { get; set; } = new();
+    public List<SpecRotation> Rotations { get; set; } = new();
     public SpecSide? Side { get; set; }
     public bool Imported { get; set; }
 
@@ -52,6 +53,9 @@ public class SpecPoint
     public string Id { get; set; } = "";
     public List<string> Codes { get; set; } = new();
     public PointDef Def { get; set; } = new();
+    public bool Auxiliary { get; set; }               // Auxiliary (ช่วยสร้าง): คำนวณพิกัดแต่ไม่ Points.Add
+    // spec รุ่นก่อน: construction = auxiliary (อ่านอย่างเดียว)
+    public bool Construction { get => false; set { if (value) Auxiliary = true; } }
 }
 
 public class PointDef
@@ -62,6 +66,7 @@ public class PointDef
     public string? Dy { get; set; }
     public string? Slope { get; set; }
     public string? Length { get; set; }
+    public string? Angle { get; set; }
     public double? Dir { get; set; }
     public string? Measure { get; set; }
     public string? Target { get; set; }
@@ -75,22 +80,41 @@ public class PointDef
     public string? B1 { get; set; }
     public string? B2 { get; set; }
     public string? Code { get; set; }
+    public string? Corner { get; set; }               // tangent: จุดมุม / จุดที่เส้นวิ่งไปหา / อีกเส้น / รัศมี
+    public string? Toward { get; set; }
+    public string? Other { get; set; }
+    public string? Radius { get; set; }
 
-    public IEnumerable<string> Refs() => new[] { From, A, B, A1, A2, B1, B2 }.Where(r => !string.IsNullOrEmpty(r))!;
+    public IEnumerable<string> Refs() => new[] { From, A, B, A1, A2, B1, B2, Corner, Toward, Other }.Where(r => !string.IsNullOrEmpty(r))!;
 }
 
 public class SpecLink
 {
     public string Id { get; set; } = "";
     public List<string>? Points { get; set; }
-    public string? Type { get; set; }                 // null = เส้นตรง | followSurface
+    public string? Type { get; set; }                 // null = เส้นตรง | followSurface | arc3 | arcR | fillet
     public string? From { get; set; }
     public string? To { get; set; }
     public string? Target { get; set; }
+    public string? Via { get; set; }                  // arc3: จุดที่โค้งผ่าน
+    public string? Corner { get; set; }               // fillet: จุดมุมเดิม
+    public string? Radius { get; set; }               // arcR / fillet
+    public string? Sweep { get; set; }                // arcR: ccw | cw (กรอบ Side = Right)
+    public bool Large { get; set; }                   // arcR: ทางยาว (> 180°)
+    public SpecSeg? Seg { get; set; }                 // ความละเอียดของโค้ง (ไม่มี = ท่อนยาวไม่เกิน 0.05 m)
+    public bool Auxiliary { get; set; }               // Auxiliary (ช่วยสร้าง): ใช้อ้างอิงอย่างเดียว ไม่ Links.Add
+    public bool Construction { get => false; set { if (value) Auxiliary = true; } }
     public List<string> Codes { get; set; } = new();
 
     public bool Follow => Type == "followSurface";
-    public (string A, string B) Ends => Follow ? (From ?? "", To ?? "") : (Points is { Count: >= 2 } ? (Points[0], Points[^1]) : ("", ""));
+    public bool IsArc => Type is "arc3" or "arcR" or "fillet";
+    public (string A, string B) Ends => Points is { Count: >= 2 } ? (Points[0], Points[^1]) : (From ?? "", To ?? "");
+}
+
+public class SpecSeg
+{
+    public string By { get; set; } = "chord";         // chord = ท่อนยาวไม่เกิน value (m) | count = value ท่อน
+    public string? Value { get; set; } = "0.05";
 }
 
 public class SpecShape
@@ -98,6 +122,15 @@ public class SpecShape
     public string Id { get; set; } = "";
     public List<string> Links { get; set; } = new();
     public List<string> Codes { get; set; } = new();
+}
+
+// กลุ่มหมุน: สมาชิกคำนวณตาม def แล้วหมุนรอบ pivot ด้วย F × angle (องศา ทวนเข็ม + ในกรอบ Side = Right)
+public class SpecRotation
+{
+    public string Id { get; set; } = "";
+    public string Pivot { get; set; } = "";
+    public string? Angle { get; set; }
+    public List<string> Points { get; set; } = new();
 }
 
 public class SpecSide

@@ -65,10 +65,7 @@ function mapSelected(){
 }
 
 // ---------------- วาด ----------------
-function niceStep(pxPerUnit){
-  for (const s of [0.05,0.1,0.2,0.5,1,2,5,10,20,50,100]) if (s * pxPerUnit >= 34) return s;
-  return 200;
-}
+const niceStep = View.niceStep, gridLabel = View.gridLabel;   // view.js
 const ptsPath = (P, idx) => idx.map((k, j) => (j ? "L" : "M") + sx(P[k].x) + " " + sy(P[k].y)).join(" ");
 
 function render(){
@@ -86,12 +83,12 @@ function render(){
   for (let k = Math.floor((wx(0) - bx) / stepX); bx + k * stepX <= wx(W); k++){
     const x = bx + k * stepX, major = Math.abs(k % 5) === 0;
     if (state.bar.grid) el("line", {x1:sx(x), x2:sx(x), y1:0, y2:H, class: major ? "g-major" : "g-minor"}, g);
-    if (major) el("text", {x:sx(x)+3, y:H-6, class:"g-lbl"}, g).textContent = +(k * stepX).toFixed(2);
+    if (major) el("text", {x:sx(x)+3, y:H-6, class:"g-lbl"}, g).textContent = gridLabel(k * stepX, stepX);
   }
   for (let k = Math.floor(elevOf(wy(H)) / stepY); k * stepY - state.originElevation <= wy(0); k++){
     const y = k * stepY - state.originElevation, major = Math.abs(k % 5) === 0;
     if (state.bar.grid) el("line", {x1:0, x2:W, y1:sy(y), y2:sy(y), class: major ? "g-major" : "g-minor"}, g);
-    if (major) el("text", {x:4, y:sy(y)-3, class:"g-lbl"}, g).textContent = +(k * stepY).toFixed(2);
+    if (major) el("text", {x:4, y:sy(y)-3, class:"g-lbl"}, g).textContent = gridLabel(k * stepY, stepY);
   }
 
   const pts = state.surface;
@@ -206,19 +203,36 @@ function renderSpec(it, r, grp, isSel){
     if (q && q.poly) el("polygon", {points: q.poly.map(p => X(p) + "," + Y(p)).join(" "), class:"shape item-hit dshape", "data-kind":"dshape", "data-id":it.id, "data-sid":sh.id}, grp);
   }
   for (const l of spec.links){
-    const q = r.links[l.id];
-    if (!q || q.err) continue;
+    let q = r.links[l.id];
+    if (!q) continue;
+    // ซ่อน Auxiliary / ดูแบบ Civil 3D (ไม่วาด link aux · ดูแบบ Civil 3D ไม่วาด link ที่ถูกข้ามด้วย)
+    if (Spec.isAux(l) && !auxShown() || q.err && state.bar.c3d) continue;
+    // link จริงที่ปลายเป็นจุด auxiliary: วาดเส้นประแดงไว้ให้คลิกไปแก้ (quick fix ใน Properties)
+    if (q.err){
+      const [ea, eb] = Spec.linkEnds(l).map(id => r.pts[id]);
+      if (!q.auxEnd || !ea || !eb || ea.err || eb.err) continue;
+      q = { path: [ea, eb], bad: true };
+    }
+    const aux = Spec.isAux(l);
     const d = q.path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" ");
-    el("path", {d, class:"link dlink" + (l.type === "followSurface" ? " follow" : ""), stroke: colorFor(primaryCode(l.codes))}, grp);
+    el("path", {d, class:"link dlink" + (l.type === "followSurface" ? " follow" : "") + (aux ? " aux" : "") + (q.bad ? " bad" : ""), stroke: colorFor(primaryCode(l.codes))}, grp);
     el("path", {d, class:"link-hit", "data-kind":"dlink", "data-id":it.id, "data-sid":l.id}, grp);
-    if (editingThis){ const a = q.path[0], b = q.path[q.path.length - 1]; el("text", {x:(X(a)+X(b))/2 + 4, y:(Y(a)+Y(b))/2 - 4, class:"d-lbl"}, grp).textContent = l.id; }
+    // ป้าย: กึ่งกลางเส้นตรง / จุดกลางของโค้ง
+    if (editingThis){
+      const a = q.path[0], b = q.path[q.path.length - 1], m = q.arc ? q.path[q.path.length >> 1] : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      el("text", {x: X(m) + 4, y: Y(m) - 4, class:"d-lbl" + (aux ? " cons" : "")}, grp).textContent = l.id;
+    }
   }
   for (const p of spec.points){
     const q = r.pts[p.id];
-    if (!q || q.err) continue;
-    el("rect", {x:X(q)-4, y:Y(q)-4, width:8, height:8, class:"dpt", "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
+    if (!q || q.err || Spec.isAux(p) && !auxShown()) continue;
+    // จุด auxiliary = กากบาทเทาเล็กๆ (ไม่อยู่ใน Civil 3D) · พื้นที่คลิกยังเท่าจุดปกติ
+    if (Spec.isAux(p)){
+      el("path", {d:`M${X(q)-4} ${Y(q)-4}L${X(q)+4} ${Y(q)+4}M${X(q)+4} ${Y(q)-4}L${X(q)-4} ${Y(q)+4}`, class:"dcons"}, grp);
+      el("rect", {x:X(q)-5, y:Y(q)-5, width:10, height:10, class:"dcons-hit", "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
+    } else el("rect", {x:X(q)-4, y:Y(q)-4, width:8, height:8, class:"dpt", "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
     const lbl = [editingThis ? p.id : "", state.showCodes && (isSel || editingThis) ? p.codes.join(", ") : ""].filter(Boolean).join(" ");
-    if (lbl) el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl"}, grp).textContent = lbl;
+    if (lbl) el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl" + (Spec.isAux(p) ? " cons" : "")}, grp).textContent = lbl;
   }
   if (!isSel) return;
   for (const o of selList()){
@@ -235,8 +249,9 @@ function pickables(){
   const out = [];
   const drawnGeoms = (it, r) => {
     const X = p => ({ x: sx(r.ox + p.x), y: sy(r.oy + p.y) }), sp = it.spec, g = [];
-    for (const p of sp.points){ const q = r.pts[p.id]; if (q && !q.err) g.push({ sel:{ type:"dpt", item: it.id, id: p.id }, geoms:[{ pts:[X(q)] }] }); }
-    for (const l of sp.links){ const q = r.links[l.id]; if (q && !q.err && q.path) g.push({ sel:{ type:"dlink", item: it.id, id: l.id }, geoms:[{ pts: q.path.map(X) }] }); }
+    const vis = o => auxShown() || !Spec.isAux(o);          // ซ่อน Auxiliary = คลุมเลือกไม่ได้
+    for (const p of sp.points){ const q = r.pts[p.id]; if (q && !q.err && vis(p)) g.push({ sel:{ type:"dpt", item: it.id, id: p.id }, geoms:[{ pts:[X(q)] }] }); }
+    for (const l of sp.links){ const q = r.links[l.id]; if (q && !q.err && q.path && vis(l)) g.push({ sel:{ type:"dlink", item: it.id, id: l.id }, geoms:[{ pts: q.path.map(X) }] }); }
     for (const s of sp.shapes){ const q = r.shapes[s.id]; if (q && q.poly) g.push({ sel:{ type:"dshape", item: it.id, id: s.id }, geoms:[{ pts: q.poly.map(X), closed: true }] }); }
     return g;
   };
@@ -587,7 +602,7 @@ svg.addEventListener("wheel", e => {
   e.preventDefault();
   const { px, py } = evtPos(e);
   const bx = wx(px), by = wy(py);
-  state.view.scale = Math.min(800, Math.max(4, state.view.scale * Math.exp(-e.deltaY * 0.0015)));
+  state.view.scale = clampScale(state.view.scale * View.wheelFactor(e));   // Shift ค้าง = ซูมทีละน้อย
   state.view.cx = bx - (px - W/2) / state.view.scale;
   state.view.cy = by + (py - H/2) / (state.view.scale * state.view.ve);
   render(); persist();
@@ -635,9 +650,23 @@ function fit(){
   for (const id in asmRes){ const x = asmRes[id].result; if (x) x.points.forEach(p => { xs.push(p.x); ys.push(p.y); }); }
   for (const id in drawRes){ const d = drawRes[id]; for (const k in d.pts) if (!d.pts[k].err){ xs.push(d.ox + d.pts[k].x); ys.push(d.oy + d.pts[k].y); } }
   state.surface.forEach(p => { xs.push(p.x); ys.push(p.y); });
+  zoomBox(xs, ys, 1);
+}
+// ซูมให้เห็นจุด xs / ys (พิกัดโลก) ทั้งหมด · minSize = ขนาดเล็กสุดของกรอบ (m) กันซูมเข้าไม่สิ้นสุดเมื่อมีจุดเดียว
+function zoomBox(xs, ys, minSize){
+  if (!xs.length) return;
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  state.view.scale = Math.max(4, Math.min((W - 120) / Math.max(maxX - minX, 1), (H - 120) / (Math.max(maxY - minY, 1) * state.view.ve)));
+  state.view.scale = clampScale(Math.min((W - 120) / Math.max(maxX - minX, minSize), (H - 120) / (Math.max(maxY - minY, minSize) * state.view.ve)));
   state.view.cx = (minX + maxX) / 2;
   state.view.cy = (minY + maxY) / 2;
-  render(); persist();
+  render(); persist(); refreshSnap();
+}
+// Z: ซูมไปที่ของที่เลือก (ไม่มีที่เลือก = Fit) — ขอบเขตจากรูปเดียวกับที่ใช้คลุมเลือก
+function zoomSel(){
+  const keys = new Set(pickedList().map(Select.key));
+  const xs = [], ys = [];
+  for (const o of pickables()) if (keys.has(Select.key(o.sel)))
+    for (const g of o.geoms) for (const p of g.pts){ xs.push(wx(p.x)); ys.push(wy(p.y)); }
+  if (!xs.length) return fit();
+  zoomBox(xs, ys, 0.02);
 }

@@ -1,0 +1,1145 @@
+﻿{
+  "version": 1,
+  "baseline": {
+    "x": 12.356577534621888,
+    "y": 7.085999439285537
+  },
+  "name": "Assembly 1",
+  "originElevation": 100,
+  "surface": [
+    {
+      "x": -6.240757524209523,
+      "y": 2.043399452605649
+    },
+    {
+      "x": 2.9511381654747053,
+      "y": 5.25
+    },
+    {
+      "x": 8.511270872871108,
+      "y": 4
+    },
+    {
+      "x": 20.41702034425301,
+      "y": 1.75
+    },
+    {
+      "x": 29.2,
+      "y": -1.5
+    },
+    {
+      "x": 43.25,
+      "y": -5.55
+    }
+  ],
+  "surfaceOn": true,
+  "layout": false,
+  "extendEnds": true,
+  "bar": {
+    "grid": true,
+    "snap": true,
+    "gridStep": 0.05,
+    "ortho": false,
+    "slopes": [
+      "1:1.5",
+      "1:2",
+      "1:3"
+    ],
+    "slope": -1,
+    "osOn": true,
+    "osnap": {
+      "end": true,
+      "mid": true,
+      "int": true,
+      "surf": true,
+      "perp": true,
+      "near": false
+    }
+  },
+  "items": [
+    {
+      "id": "sqb4bzm",
+      "file": "body_rock-pitching.cs",
+      "className": null,
+      "params": {},
+      "attach": {
+        "type": "baseline",
+        "x": 12.356577534621888,
+        "y": 7.085999439285537
+      }
+    },
+    {
+      "id": "shy6sve",
+      "file": "base_rock-pitching.cs",
+      "className": null,
+      "params": {},
+      "attach": {
+        "type": "point",
+        "parent": "sqb4bzm",
+        "code": "RockTopOutside",
+        "index": 1,
+        "x": 24.856577534621888,
+        "y": 2.085999439285537
+      }
+    },
+    {
+      "id": "srvh6tb",
+      "file": "pavement-assembly.cs",
+      "className": null,
+      "params": {},
+      "attach": {
+        "type": "baseline",
+        "x": 12.356577534621888,
+        "y": 7.085999439285537
+      },
+      "spec": {
+        "version": 1,
+        "className": "PavementAssembly",
+        "namespace": "TestSubassembly",
+        "params": [
+          {
+            "name": "Side",
+            "kind": "long",
+            "default": 0,
+            "displayName": "Side",
+            "min": null,
+            "max": null
+          }
+        ],
+        "targets": [
+          {
+            "name": "TargetSurface",
+            "type": "Surface",
+            "displayName": "Target Surface"
+          }
+        ],
+        "points": [
+          {
+            "id": "P1",
+            "codes": [],
+            "def": {
+              "type": "origin"
+            }
+          },
+          {
+            "id": "P2",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "dx": "0",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P3",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P2",
+              "dx": "-0.25",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P4",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "dx": "0",
+              "dy": "-0.5",
+              "from": "P3"
+            }
+          },
+          {
+            "id": "P5",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P4",
+              "dx": "0.25",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P6",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P3",
+              "dx": "-0.3",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P7",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P6",
+              "dx": "0",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P8",
+            "codes": [],
+            "def": {
+              "type": "between",
+              "a": "P3",
+              "b": "P4",
+              "t": "0.2"
+            }
+          },
+          {
+            "id": "P9",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P6",
+              "dx": "-0.3",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P10",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P9",
+              "dx": "0",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P11",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P9",
+              "dx": "-0.3",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P12",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P11",
+              "dx": "0",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P13",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P11",
+              "dx": "-0.3",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P14",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P13",
+              "dx": "0",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P15",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P13",
+              "dx": "-0.3",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P16",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P15",
+              "dx": "0",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P17",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P15",
+              "dx": "-0.3",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P18",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P17",
+              "dx": "0",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P19",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P17",
+              "dx": "-0.3",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P20",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P19",
+              "dx": "0",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P21",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "dx": "-2.65",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P22",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "dx": "-2.65",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P23",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "dx": "-2.95",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P24",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "dx": "-2.95",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P25",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "dx": "-2.65",
+              "dy": "-0.1"
+            }
+          },
+          {
+            "id": "P26",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "-0.05",
+              "dy": "-0.000"
+            }
+          },
+          {
+            "id": "P27",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P26",
+              "dx": "0",
+              "dy": "0.100"
+            }
+          },
+          {
+            "id": "P28",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P27",
+              "dx": "-0.15",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P29",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "dx": "0",
+              "dy": "-0.1",
+              "from": "P28"
+            }
+          },
+          {
+            "id": "P30",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "dx": "-0.0375",
+              "dy": "0",
+              "from": "P27"
+            }
+          },
+          {
+            "id": "P31",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P30",
+              "dx": "0",
+              "dy": "0.96"
+            }
+          },
+          {
+            "id": "P32",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P31",
+              "dx": "-0.075",
+              "dy": "-0.0014"
+            }
+          },
+          {
+            "id": "P33",
+            "codes": [],
+            "def": {
+              "type": "between",
+              "a": "P27",
+              "b": "P28",
+              "t": "0.75"
+            }
+          },
+          {
+            "id": "P34",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P23",
+              "dx": "0",
+              "dy": "-0.4"
+            }
+          },
+          {
+            "id": "P35",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P34",
+              "dx": "-0.5",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P36",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P35",
+              "dx": "0",
+              "dy": "0.24"
+            }
+          },
+          {
+            "id": "P37",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P23",
+              "dx": "-0.15",
+              "dy": "0.0019"
+            }
+          },
+          {
+            "id": "P38",
+            "codes": [],
+            "def": {
+              "type": "slopeLength",
+              "from": "P36",
+              "slope": "-1/8.33",
+              "length": "0.3022",
+              "dir": 1,
+              "measure": "along"
+            }
+          },
+          {
+            "id": "P39",
+            "codes": [],
+            "def": {
+              "type": "slopeLength",
+              "from": "P38",
+              "slope": "1/0.12",
+              "length": "0.1686",
+              "dir": 1,
+              "measure": "along"
+            }
+          },
+          {
+            "id": "P41",
+            "codes": [],
+            "def": {
+              "type": "slopeToSurface",
+              "from": "P35",
+              "slope": "-1/1.5",
+              "dir": -1,
+              "target": "TargetSurface",
+              "maxDistance": "50",
+              "layoutLength": "3"
+            }
+          },
+          {
+            "id": "P42",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P36",
+              "dx": "-0.5",
+              "dy": "0.0051"
+            }
+          },
+          {
+            "id": "P43",
+            "codes": [],
+            "def": {
+              "type": "slopeToSurface",
+              "from": "P42",
+              "slope": "-1/2",
+              "dir": -1,
+              "target": "TargetSurface",
+              "maxDistance": "50",
+              "layoutLength": "3"
+            }
+          },
+          {
+            "id": "P44",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P5",
+              "dx": "-0.045",
+              "dy": "-0.00"
+            }
+          },
+          {
+            "id": "P45",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P44",
+              "dx": "0",
+              "dy": "0.05"
+            }
+          },
+          {
+            "id": "P46",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P45",
+              "dx": "-0.16",
+              "dy": "-0.0"
+            }
+          },
+          {
+            "id": "P47",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P46",
+              "dx": "0",
+              "dy": "-2.5"
+            }
+          },
+          {
+            "id": "P48",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P47",
+              "dx": "0.16",
+              "dy": "0.0034"
+            }
+          },
+          {
+            "id": "P49",
+            "codes": [],
+            "def": {
+              "type": "onSurface",
+              "from": "P5",
+              "dx": "-0.0",
+              "target": "TargetSurface"
+            }
+          }
+        ],
+        "links": [
+          {
+            "id": "L1",
+            "points": [
+              "P2",
+              "P3"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L2",
+            "points": [
+              "P4",
+              "P5"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L3",
+            "points": [
+              "P5",
+              "P1"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L4",
+            "points": [
+              "P3",
+              "P4"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L5",
+            "points": [
+              "P3",
+              "P6"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L6",
+            "points": [
+              "P6",
+              "P7"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L7",
+            "points": [
+              "P7",
+              "P8"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L8",
+            "points": [
+              "P8",
+              "P3"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L9",
+            "points": [
+              "P6",
+              "P9"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L10",
+            "points": [
+              "P9",
+              "P10"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L11",
+            "points": [
+              "P10",
+              "P7"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L12",
+            "points": [
+              "P9",
+              "P11"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L13",
+            "points": [
+              "P11",
+              "P12"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L14",
+            "points": [
+              "P12",
+              "P10"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L15",
+            "points": [
+              "P11",
+              "P13"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L16",
+            "points": [
+              "P13",
+              "P14"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L17",
+            "points": [
+              "P14",
+              "P12"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L18",
+            "points": [
+              "P13",
+              "P15"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L19",
+            "points": [
+              "P15",
+              "P16"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L20",
+            "points": [
+              "P16",
+              "P14"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L21",
+            "points": [
+              "P15",
+              "P17"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L22",
+            "points": [
+              "P17",
+              "P18"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L23",
+            "points": [
+              "P18",
+              "P16"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L24",
+            "points": [
+              "P17",
+              "P19"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L25",
+            "points": [
+              "P19",
+              "P20"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L26",
+            "points": [
+              "P20",
+              "P18"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L27",
+            "points": [
+              "P19",
+              "P21"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L28",
+            "points": [
+              "P21",
+              "P22"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L29",
+            "points": [
+              "P22",
+              "P20"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L30",
+            "points": [
+              "P21",
+              "P23"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L31",
+            "points": [
+              "P23",
+              "P24"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L32",
+            "points": [
+              "P24",
+              "P25"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L33",
+            "points": [
+              "P3",
+              "P1"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L34",
+            "points": [
+              "P1",
+              "P26"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L35",
+            "points": [
+              "P26",
+              "P27"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L36",
+            "points": [
+              "P27",
+              "P28"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L37",
+            "points": [
+              "P28",
+              "P29"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L38",
+            "points": [
+              "P30",
+              "P31"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L39",
+            "points": [
+              "P31",
+              "P32"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L40",
+            "points": [
+              "P32",
+              "P33"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L41",
+            "points": [
+              "P23",
+              "P34"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L42",
+            "points": [
+              "P34",
+              "P35"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L43",
+            "points": [
+              "P35",
+              "P36"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L44",
+            "points": [
+              "P23",
+              "P37"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L45",
+            "points": [
+              "P36",
+              "P38"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L46",
+            "points": [
+              "P38",
+              "P39"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L47",
+            "points": [
+              "P39",
+              "P37"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L49",
+            "points": [
+              "P35",
+              "P41"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L50",
+            "points": [
+              "P36",
+              "P42"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L51",
+            "points": [
+              "P42",
+              "P43"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L52",
+            "type": "followSurface",
+            "from": "P43",
+            "to": "P41",
+            "target": "TargetSurface",
+            "codes": [
+              "Datum"
+            ]
+          },
+          {
+            "id": "L54",
+            "points": [
+              "P44",
+              "P45"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L55",
+            "points": [
+              "P45",
+              "P46"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L56",
+            "points": [
+              "P46",
+              "P47"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L57",
+            "points": [
+              "P47",
+              "P48"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L58",
+            "points": [
+              "P48",
+              "P44"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L59",
+            "points": [
+              "P5",
+              "P49"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L60",
+            "type": "followSurface",
+            "from": "P49",
+            "to": "P41",
+            "target": "TargetSurface",
+            "codes": [
+              "Datum"
+            ]
+          },
+          {
+            "id": "L61",
+            "points": [
+              "P34",
+              "P24"
+            ],
+            "codes": [
+              "compact soil"
+            ]
+          },
+          {
+            "id": "L62",
+            "points": [
+              "P24",
+              "P8"
+            ],
+            "codes": []
+          },
+          {
+            "id": "L63",
+            "points": [
+              "P8",
+              "P4"
+            ],
+            "codes": []
+          }
+        ],
+        "shapes": [
+          {
+            "id": "S1",
+            "links": [
+              "L33",
+              "L3",
+              "L2",
+              "L4"
+            ],
+            "codes": []
+          },
+          {
+            "id": "S2",
+            "links": [
+              "L50",
+              "L43",
+              "L49",
+              "L52",
+              "L51"
+            ],
+            "codes": [
+              "compact soil"
+            ]
+          },
+          {
+            "id": "S3",
+            "links": [
+              "L49",
+              "L42",
+              "L61",
+              "L62",
+              "L63",
+              "L2",
+              "L59",
+              "L60"
+            ],
+            "codes": [
+              "sand"
+            ]
+          }
+        ],
+        "side": {
+          "param": "Side",
+          "mirror": true
+        }
+      },
+      "savedSpec": "{\u0022version\u0022:1,\u0022className\u0022:\u0022PavementAssembly\u0022,\u0022namespace\u0022:\u0022TestSubassembly\u0022,\u0022params\u0022:[{\u0022name\u0022:\u0022Side\u0022,\u0022kind\u0022:\u0022long\u0022,\u0022default\u0022:0,\u0022displayName\u0022:\u0022Side\u0022,\u0022min\u0022:null,\u0022max\u0022:null}],\u0022targets\u0022:[{\u0022name\u0022:\u0022TargetSurface\u0022,\u0022type\u0022:\u0022Surface\u0022,\u0022displayName\u0022:\u0022Target Surface\u0022}],\u0022points\u0022:[{\u0022id\u0022:\u0022P1\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022origin\u0022}},{\u0022id\u0022:\u0022P2\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P3\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P2\u0022,\u0022dx\u0022:\u0022-0.25\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P4\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.5\u0022,\u0022from\u0022:\u0022P3\u0022}},{\u0022id\u0022:\u0022P5\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P4\u0022,\u0022dx\u0022:\u00220.25\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P6\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P3\u0022,\u0022dx\u0022:\u0022-0.3\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P7\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P6\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P8\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022between\u0022,\u0022a\u0022:\u0022P3\u0022,\u0022b\u0022:\u0022P4\u0022,\u0022t\u0022:\u00220.2\u0022}},{\u0022id\u0022:\u0022P9\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P6\u0022,\u0022dx\u0022:\u0022-0.3\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P10\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P9\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P11\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P9\u0022,\u0022dx\u0022:\u0022-0.3\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P12\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P11\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P13\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P11\u0022,\u0022dx\u0022:\u0022-0.3\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P14\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P13\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P15\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P13\u0022,\u0022dx\u0022:\u0022-0.3\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P16\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P15\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P17\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P15\u0022,\u0022dx\u0022:\u0022-0.3\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P18\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P17\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P19\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P17\u0022,\u0022dx\u0022:\u0022-0.3\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P20\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P19\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P21\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022dx\u0022:\u0022-2.65\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P22\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022dx\u0022:\u0022-2.65\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P23\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022dx\u0022:\u0022-2.95\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P24\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022dx\u0022:\u0022-2.95\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P25\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022dx\u0022:\u0022-2.65\u0022,\u0022dy\u0022:\u0022-0.1\u0022}},{\u0022id\u0022:\u0022P26\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P1\u0022,\u0022dx\u0022:\u0022-0.05\u0022,\u0022dy\u0022:\u0022-0.000\u0022}},{\u0022id\u0022:\u0022P27\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P26\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u00220.100\u0022}},{\u0022id\u0022:\u0022P28\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P27\u0022,\u0022dx\u0022:\u0022-0.15\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P29\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.1\u0022,\u0022from\u0022:\u0022P28\u0022}},{\u0022id\u0022:\u0022P30\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022dx\u0022:\u0022-0.0375\u0022,\u0022dy\u0022:\u00220\u0022,\u0022from\u0022:\u0022P27\u0022}},{\u0022id\u0022:\u0022P31\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P30\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u00220.96\u0022}},{\u0022id\u0022:\u0022P32\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P31\u0022,\u0022dx\u0022:\u0022-0.075\u0022,\u0022dy\u0022:\u0022-0.0014\u0022}},{\u0022id\u0022:\u0022P33\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022between\u0022,\u0022a\u0022:\u0022P27\u0022,\u0022b\u0022:\u0022P28\u0022,\u0022t\u0022:\u00220.75\u0022}},{\u0022id\u0022:\u0022P34\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P23\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-0.4\u0022}},{\u0022id\u0022:\u0022P35\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P34\u0022,\u0022dx\u0022:\u0022-0.5\u0022,\u0022dy\u0022:\u00220\u0022}},{\u0022id\u0022:\u0022P36\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P35\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u00220.24\u0022}},{\u0022id\u0022:\u0022P37\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P23\u0022,\u0022dx\u0022:\u0022-0.15\u0022,\u0022dy\u0022:\u00220.0019\u0022}},{\u0022id\u0022:\u0022P38\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022slopeLength\u0022,\u0022from\u0022:\u0022P36\u0022,\u0022slope\u0022:\u0022-1/8.33\u0022,\u0022length\u0022:\u00220.3022\u0022,\u0022dir\u0022:1,\u0022measure\u0022:\u0022along\u0022}},{\u0022id\u0022:\u0022P39\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022slopeLength\u0022,\u0022from\u0022:\u0022P38\u0022,\u0022slope\u0022:\u00221/0.12\u0022,\u0022length\u0022:\u00220.1686\u0022,\u0022dir\u0022:1,\u0022measure\u0022:\u0022along\u0022}},{\u0022id\u0022:\u0022P41\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022slopeToSurface\u0022,\u0022from\u0022:\u0022P35\u0022,\u0022slope\u0022:\u0022-1/1.5\u0022,\u0022dir\u0022:-1,\u0022target\u0022:\u0022TargetSurface\u0022,\u0022maxDistance\u0022:\u002250\u0022,\u0022layoutLength\u0022:\u00223\u0022}},{\u0022id\u0022:\u0022P42\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P36\u0022,\u0022dx\u0022:\u0022-0.5\u0022,\u0022dy\u0022:\u00220.0051\u0022}},{\u0022id\u0022:\u0022P43\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022slopeToSurface\u0022,\u0022from\u0022:\u0022P42\u0022,\u0022slope\u0022:\u0022-1/2\u0022,\u0022dir\u0022:-1,\u0022target\u0022:\u0022TargetSurface\u0022,\u0022maxDistance\u0022:\u002250\u0022,\u0022layoutLength\u0022:\u00223\u0022}},{\u0022id\u0022:\u0022P44\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P5\u0022,\u0022dx\u0022:\u0022-0.045\u0022,\u0022dy\u0022:\u0022-0.00\u0022}},{\u0022id\u0022:\u0022P45\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P44\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u00220.05\u0022}},{\u0022id\u0022:\u0022P46\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P45\u0022,\u0022dx\u0022:\u0022-0.16\u0022,\u0022dy\u0022:\u0022-0.0\u0022}},{\u0022id\u0022:\u0022P47\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P46\u0022,\u0022dx\u0022:\u00220\u0022,\u0022dy\u0022:\u0022-2.5\u0022}},{\u0022id\u0022:\u0022P48\u0022,\u0022codes\u0022:[],\u0022def\u0022:{\u0022type\u0022:\u0022delta\u0022,\u0022from\u0022:\u0022P47\u0022,\u0022dx\u0022:\u00220.16\u0022,\u0022dy\u0022:\u00220.0034\u0022}}],\u0022links\u0022:[{\u0022id\u0022:\u0022L1\u0022,\u0022points\u0022:[\u0022P2\u0022,\u0022P3\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L2\u0022,\u0022points\u0022:[\u0022P4\u0022,\u0022P5\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L3\u0022,\u0022points\u0022:[\u0022P5\u0022,\u0022P1\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L4\u0022,\u0022points\u0022:[\u0022P3\u0022,\u0022P4\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L5\u0022,\u0022points\u0022:[\u0022P3\u0022,\u0022P6\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L6\u0022,\u0022points\u0022:[\u0022P6\u0022,\u0022P7\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L7\u0022,\u0022points\u0022:[\u0022P7\u0022,\u0022P8\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L8\u0022,\u0022points\u0022:[\u0022P8\u0022,\u0022P3\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L9\u0022,\u0022points\u0022:[\u0022P6\u0022,\u0022P9\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L10\u0022,\u0022points\u0022:[\u0022P9\u0022,\u0022P10\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L11\u0022,\u0022points\u0022:[\u0022P10\u0022,\u0022P7\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L12\u0022,\u0022points\u0022:[\u0022P9\u0022,\u0022P11\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L13\u0022,\u0022points\u0022:[\u0022P11\u0022,\u0022P12\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L14\u0022,\u0022points\u0022:[\u0022P12\u0022,\u0022P10\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L15\u0022,\u0022points\u0022:[\u0022P11\u0022,\u0022P13\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L16\u0022,\u0022points\u0022:[\u0022P13\u0022,\u0022P14\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L17\u0022,\u0022points\u0022:[\u0022P14\u0022,\u0022P12\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L18\u0022,\u0022points\u0022:[\u0022P13\u0022,\u0022P15\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L19\u0022,\u0022points\u0022:[\u0022P15\u0022,\u0022P16\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L20\u0022,\u0022points\u0022:[\u0022P16\u0022,\u0022P14\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L21\u0022,\u0022points\u0022:[\u0022P15\u0022,\u0022P17\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L22\u0022,\u0022points\u0022:[\u0022P17\u0022,\u0022P18\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L23\u0022,\u0022points\u0022:[\u0022P18\u0022,\u0022P16\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L24\u0022,\u0022points\u0022:[\u0022P17\u0022,\u0022P19\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L25\u0022,\u0022points\u0022:[\u0022P19\u0022,\u0022P20\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L26\u0022,\u0022points\u0022:[\u0022P20\u0022,\u0022P18\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L27\u0022,\u0022points\u0022:[\u0022P19\u0022,\u0022P21\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L28\u0022,\u0022points\u0022:[\u0022P21\u0022,\u0022P22\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L29\u0022,\u0022points\u0022:[\u0022P22\u0022,\u0022P20\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L30\u0022,\u0022points\u0022:[\u0022P21\u0022,\u0022P23\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L31\u0022,\u0022points\u0022:[\u0022P23\u0022,\u0022P24\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L32\u0022,\u0022points\u0022:[\u0022P24\u0022,\u0022P25\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L33\u0022,\u0022points\u0022:[\u0022P3\u0022,\u0022P1\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L34\u0022,\u0022points\u0022:[\u0022P1\u0022,\u0022P26\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L35\u0022,\u0022points\u0022:[\u0022P26\u0022,\u0022P27\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L36\u0022,\u0022points\u0022:[\u0022P27\u0022,\u0022P28\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L37\u0022,\u0022points\u0022:[\u0022P28\u0022,\u0022P29\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L38\u0022,\u0022points\u0022:[\u0022P30\u0022,\u0022P31\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L39\u0022,\u0022points\u0022:[\u0022P31\u0022,\u0022P32\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L40\u0022,\u0022points\u0022:[\u0022P32\u0022,\u0022P33\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L41\u0022,\u0022points\u0022:[\u0022P23\u0022,\u0022P34\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L42\u0022,\u0022points\u0022:[\u0022P34\u0022,\u0022P35\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L43\u0022,\u0022points\u0022:[\u0022P35\u0022,\u0022P36\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L44\u0022,\u0022points\u0022:[\u0022P23\u0022,\u0022P37\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L45\u0022,\u0022points\u0022:[\u0022P36\u0022,\u0022P38\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L46\u0022,\u0022points\u0022:[\u0022P38\u0022,\u0022P39\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L47\u0022,\u0022points\u0022:[\u0022P39\u0022,\u0022P37\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L49\u0022,\u0022points\u0022:[\u0022P35\u0022,\u0022P41\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L50\u0022,\u0022points\u0022:[\u0022P36\u0022,\u0022P42\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L51\u0022,\u0022points\u0022:[\u0022P42\u0022,\u0022P43\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L52\u0022,\u0022type\u0022:\u0022followSurface\u0022,\u0022from\u0022:\u0022P43\u0022,\u0022to\u0022:\u0022P41\u0022,\u0022target\u0022:\u0022TargetSurface\u0022,\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L54\u0022,\u0022points\u0022:[\u0022P44\u0022,\u0022P45\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L55\u0022,\u0022points\u0022:[\u0022P45\u0022,\u0022P46\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L56\u0022,\u0022points\u0022:[\u0022P46\u0022,\u0022P47\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L57\u0022,\u0022points\u0022:[\u0022P47\u0022,\u0022P48\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022L58\u0022,\u0022points\u0022:[\u0022P48\u0022,\u0022P44\u0022],\u0022codes\u0022:[]}],\u0022shapes\u0022:[{\u0022id\u0022:\u0022S1\u0022,\u0022links\u0022:[\u0022L33\u0022,\u0022L3\u0022,\u0022L2\u0022,\u0022L4\u0022],\u0022codes\u0022:[]},{\u0022id\u0022:\u0022S2\u0022,\u0022links\u0022:[\u0022L50\u0022,\u0022L43\u0022,\u0022L49\u0022,\u0022L52\u0022,\u0022L51\u0022],\u0022codes\u0022:[]}],\u0022side\u0022:{\u0022param\u0022:\u0022Side\u0022,\u0022mirror\u0022:true}}",
+      "generatedFile": true
+    }
+  ]
+}

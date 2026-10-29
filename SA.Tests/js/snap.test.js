@@ -19,7 +19,7 @@ const eq = (exp, act, what) => { if (exp !== act) throw new Error(`${what}: ค�
 const ok = (c, what) => { if (!c) throw new Error(what); };
 
 // 100 px ต่อเมตร · รัศมี 12 px · เปิดทุกชนิด
-const ALL = { on: true, end: true, mid: true, int: true, surf: true, perp: true, near: true };
+const ALL = { on: true, end: true, mid: true, cen: true, int: true, surf: true, perp: true, near: true };
 const P = (label, x, y) => ({ label, x, y });
 const S = (id, a, b) => ({ id, a, b });
 function run(over){
@@ -115,6 +115,23 @@ test("Tab วนตามลำดับ / รายการเดิมจำ�
   eq(0, cyc.i, "วนกลับตัวแรก");
   const other = run({ mouse: { x: 0.02, y: 0 }, points: [p1, p2], segs: [short] });
   eq(0, Snap.keep(other, { sig: "x", i: 2 }).i, "รายการใหม่");
+});
+
+console.log("Center (ศูนย์กลางโค้ง / polygon ด้านเท่า)");
+test("ศูนย์กลางในรัศมี = Center พร้อมข้อมูลไว้สร้างจุด", () => {
+  const c = { x: 1, y: 1, label: "ศูนย์กลาง G1" };
+  const r = run({ mouse: { x: 1.05, y: 1 }, centers: [c] });
+  eq("cen", r[0].kind, "ชนิด"); ok(r[0].center === c, "ต้องส่งตัว center กลับมา");
+});
+test("ปิด Center ในเมนู = ไม่จับ", () => {
+  eq(0, run({ mouse: { x: 1, y: 1 }, centers: [{ x: 1, y: 1 }], os: { ...ALL, cen: false } }).length, "จำนวน");
+});
+test("Endpoint กับ Center ที่ระยะเท่ากัน: Endpoint ชนะ · Center ชนะ Intersection", () => {
+  const e = P("P1", 0, 0.05), c = { x: 0, y: -0.05, label: "c" };
+  eq("end,cen", kinds(run({ points: [e], centers: [c] })), "ลำดับ end/cen");
+  const a = P("A", -1, -1), b = P("B", 1, 1), d = P("D", -1, 1), f = P("E", 1, -1);
+  const r = run({ mouse: { x: 0, y: 0.0001 }, centers: [{ x: 0, y: 0, label: "c" }], segs: [S("L1", a, b), S("L2", d, f)], os: { ...ALL, near: false, mid: false } });
+  eq("cen", r[0].kind, "Center ก่อน Intersection เมื่อตำแหน่งเท่ากัน");
 });
 
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);

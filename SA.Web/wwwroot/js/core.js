@@ -24,9 +24,13 @@ const store = {
 function newId(prefix){ return (prefix || "s") + Math.random().toString(36).slice(2, 8); }
 function defaultBar(){
   // snap = Grid snap (F9) ทีละ gridStep m · osOn = OSNAP ทั้งหมด (F3) · osnap = ชนิดที่เปิดอยู่
-  return { grid: true, snap: false, gridStep: 0.05, ortho: false, slopes: ["1:1.5", "1:2", "1:3"], slope: -1, osOn: true,
-           osnap: { end: true, mid: false, int: true, surf: true, perp: false, near: false } };
+  // track = Object snap tracking (F11), trackMs = เวลาชี้ค้างเพื่อจับจุด · cen = Center (ศูนย์กลางโค้ง / polygon ด้านเท่า)
+  // aux = แสดง Auxiliary (ซ่อน = snap ไม่ได้ด้วย) · c3d = ดูแบบ Civil 3D (ซ่อน aux + ของที่ไม่ถูกส่งออก)
+  return { grid: true, snap: false, gridStep: 0.05, ortho: false, slopes: ["1:1.5", "1:2", "1:3"], slope: -1, osOn: true, track: false, trackMs: 500, aux: true, c3d: false,
+           osnap: { end: true, mid: false, cen: true, int: true, surf: true, perp: false, near: false } };
 }
+// แสดง / snap / คลุมเลือก object auxiliary ได้ไหม (ปุ่ม Aux เปิด และไม่ได้อยู่ในโหมดดูแบบ Civil 3D)
+const auxShown = () => state.bar.aux !== false && !state.bar.c3d;
 function newAssembly(name, baseline){ return { id: newId("a"), name, baseline: baseline || { x: 0, y: 0 }, items: [] }; }
 function baseState(){
   return {
@@ -50,6 +54,7 @@ function loadState(){
     st.bar = Object.assign(defaultBar(), s.bar);
     st.bar.osnap = Object.assign(defaultBar().osnap, s.bar && s.bar.osnap);
     if (!st.ws.assemblies || !st.ws.assemblies.length) st.ws.assemblies = [newAssembly("Assembly 1")];
+    st.view.scale = View.clampScale(st.view.scale);            // ซูมที่จำไว้ต้องอยู่ในช่วงที่ใช้ได้
     return st;
   }
   // ครั้งแรกหลังอัปเดต: ย้ายค่าจาก viewer เดิม (โหมด Assembly หรือไฟล์เดียว) เข้า workspace
@@ -168,6 +173,9 @@ function colorFor(code){
 const primaryCode = codes => codes.find(c => c !== "Datum") || codes[0] || "";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const f3 = v => (Math.abs(v) < 5e-4 ? 0 : v).toFixed(3);
+// ซูม / ทศนิยมตามซูม (view.js)
+const clampScale = View.clampScale;
+const fz = v => View.fmt(v, state.view.scale);
 const snapV = v => { const g = state.bar.gridStep; return state.bar.snap && g > 0 ? +(Math.round(v / g) * g).toFixed(9) : v; };
 // slope dy/dx -> "1:x" (ดิ่ง:ราบ) และ %
 function slopeText(dx, dy){

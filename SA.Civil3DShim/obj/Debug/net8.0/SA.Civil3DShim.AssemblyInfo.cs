@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SA.Civil3DShim")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5a0f9fe341c6243c5923b6cdeb5574c6fecb5240")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9721df1a45ce9d956d2d60bccb02a675bb2e9094")]
 [assembly: System.Reflection.AssemblyProductAttribute("SA.Civil3DShim")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SA.Civil3DShim")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

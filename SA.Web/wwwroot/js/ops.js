@@ -195,6 +195,15 @@ const Ops = (() => {
       for (const k of REFS) if (np.def[k] && map[np.def[k]]) np.def[k] = map[np.def[k]];
       if (np.def.points) np.def.points = np.def.points.map(p => map[p] || p);   // firstOf
       for (const k of Spec.EXPR_FIELDS[np.def.type] || []) if (np.def[k] != null) np.def[k] = String(np.def[k]).replace(/\bP\d+\b/g, w => map[w] || w);   // P3.y / ground(P3) ในนิพจน์
+      // Max / Min: สำเนาไปด้วย (จุดอ้างอิงในชุด = ตัวใหม่) · วางในตัวอื่นแล้วอ้างจุดนอกชุด = ไม่เอามา
+      const sp0 = Spec.byId(src.points, old);
+      if (sp0.limit && (!opts.detach || Spec.limitRefs(sp0).every(r => P.has(r)))){
+        const L = JSON.parse(JSON.stringify(sp0.limit)), re = s => s == null ? s : String(s).replace(/\bP\d+\b/g, w => map[w] || w);
+        L.min = re(L.min); L.max = re(L.max);
+        if (L.ref && L.ref.type === "point") L.ref.id = map[L.ref.id] || L.ref.id;
+        if (L.ref && L.ref.expr != null) L.ref.expr = re(L.ref.expr);
+        np.limit = L;
+      }
     }
     const L = new Set(frag.links), S = new Set(frag.shapes), links = [], shapes = [];
     for (const l of src.links.filter(l => L.has(l.id))){

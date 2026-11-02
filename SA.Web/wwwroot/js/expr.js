@@ -4,6 +4,7 @@
 //     min(a, b, ...)  max(a, b, ...)  abs(x)  sqrt(x)  pow(x, y)  sin(องศา)  cos(องศา)  tan(องศา)  atan(x) -> องศา
 //   เงื่อนไข (รอบ 4): > < >= <= == != (== / != มี tolerance EPS) · and or not (&& || !) · true false · if(เงื่อนไข, a, b)
 //   ค่าจากเรขาคณิต: P3.x / P3.y (x ในกรอบ Side = Right) · ground(P3) / ground(P3, "Target") · exists(P3) · hasGround()
+//   Max / Min (รอบ 4b): limited(P3) = จริงเมื่อรอบนี้ P3 ไม่ผ่านขอบเขต (ถูกขยับ / เตือน)
 //
 // ลำดับจากต่ำไปสูง: or < and < not < เปรียบเทียบ (ต่อกันไม่ได้) < + - < * / < เครื่องหมายหน้า < .x/.y
 // ชนิดของค่า: "num" (ตัวเลข) / "bool" (จริง/เท็จ) — ตรวจตอน parse (typeOf) ไม่แปลงให้เอง
@@ -15,7 +16,8 @@ const Expr = (() => {
   const FUNCS = {
     min:  { min: 1, max: 99 }, max: { min: 1, max: 99 }, abs: { min: 1, max: 1 }, sqrt: { min: 1, max: 1 },
     pow:  { min: 2, max: 2 },  sin: { min: 1, max: 1 },  cos: { min: 1, max: 1 }, tan: { min: 1, max: 1 }, atan: { min: 1, max: 1 },
-    if: { min: 3, max: 3 }, ground: { min: 1, max: 2 }, exists: { min: 1, max: 1 }, hasground: { min: 0, max: 1 }
+    if: { min: 3, max: 3 }, ground: { min: 1, max: 2 }, exists: { min: 1, max: 1 }, hasground: { min: 0, max: 1 },
+    limited: { min: 1, max: 1 }
   };
   // คำสงวน (ตั้งเป็นชื่อ parameter / เงื่อนไขไม่ได้ — ไม่สนตัวพิมพ์)
   const KEYWORDS = new Set(["and", "or", "not", "true", "false"]);
@@ -123,8 +125,8 @@ const Expr = (() => {
           expect(")");
           if (args.length < def.min || args.length > def.max)
             fail(x.at, `${x.v}() ต้องมี ${def.min === def.max ? def.min : def.min + "–" + def.max} ค่า`);
-          // ground(P3) / exists(P3): ค่าแรกเป็นชื่อจุด
-          if ((low === "ground" || low === "exists")){
+          // ground(P3) / exists(P3) / limited(P3): ค่าแรกเป็นชื่อจุด
+          if (low === "ground" || low === "exists" || low === "limited"){
             if (args[0].t !== "var") fail(args[0].at, `${x.v}() ต้องใส่ชื่อจุด เช่น ${x.v}(P3)`);
             args[0] = { t: "ref", id: args[0].n, at: args[0].at };
           }
@@ -159,7 +161,7 @@ const Expr = (() => {
     if (n.args) n.args.forEach(x => walk(x, fn));
   }
 
-  // ชนิดของนิพจน์: "num" | "bool" — sc = { params, points, conds, targets } (Set หรือ null)
+  // ชนิดของนิพจน์: "num" | "bool" — sc = { params, points, conds, targets, limits } (Set หรือ null) · limits = จุดที่มี Max / Min
   //   points = null -> ช่องนี้อ้างจุดไม่ได้ · targets = null -> ไม่ตรวจชื่อ target
   function typeOf(n, sc){
     const need = (x, want, what) => {
@@ -206,8 +208,9 @@ const Expr = (() => {
           if (a !== b || a === "str") fail(n.at, `if() ค่าที่ 2 กับ 3 ต้องชนิดเดียวกัน แต่ได้${TYPE_TH[a]}กับ${TYPE_TH[b]}`);
           return a;
         }
-        if (n.f === "ground" || n.f === "exists"){
+        if (n.f === "ground" || n.f === "exists" || n.f === "limited"){
           typeOf(A[0], sc);
+          if (n.f === "limited" && sc.limits && !sc.limits.has(A[0].id)) fail(A[0].at, `${A[0].id} ไม่มี Max / Min`);
           if (A[1]) target(A[1]);
           return n.f === "ground" ? "num" : "bool";
         }
@@ -223,7 +226,7 @@ const Expr = (() => {
     }
   }
 
-  // คำนวณ — env = ค่า parameter · ctx (ไม่บังคับ) = { px(id), py(id), ground(id, target), exists(id), hasGround(target), cond(name) }
+  // คำนวณ — env = ค่า parameter · ctx (ไม่บังคับ) = { px(id), py(id), ground(id, target), exists(id), hasGround(target), cond(name), limited(id) }
   function evaluate(ast, env, ctx){
     const ev = n => evaluate(n, env, ctx);
     const need = f => { if (!ctx || !ctx[f]) throw new Error("ใช้ค่าจากจุด / ผิวดินในช่องนี้ไม่ได้"); return ctx[f]; };
@@ -265,6 +268,7 @@ const Expr = (() => {
           case "if": return ev(A[0]) ? ev(A[1]) : ev(A[2]);
           case "ground": return need("ground")(A[0].id, A[1] ? A[1].v : null);
           case "exists": return need("exists")(A[0].id);
+          case "limited": return need("limited")(A[0].id);
           case "hasground": return need("hasGround")(A[0] ? A[0].v : null);
         }
         const v = A.map(ev);
@@ -285,14 +289,15 @@ const Expr = (() => {
   }
 
   // ตรวจตอนพิมพ์: { ok, error, ast, type }
-  //   names = ชื่อ parameter · opts = { want: "num" | "bool", points: [id], conds: [ชื่อ], targets: [ชื่อ] }
+  //   names = ชื่อ parameter · opts = { want: "num" | "bool", points: [id], conds: [ชื่อ], targets: [ชื่อ], limits: [id ที่มี Max / Min] }
   //   ไม่ส่ง opts.points = ช่องนี้อ้างจุดไม่ได้ · ast คืนให้แม้ชื่อผิด (ใช้หา parameter ที่นิพจน์ใช้)
   function check(src, names, opts = {}){
     let ast;
     try{ ast = parse(src); }catch(e){ return { ok: false, error: e.message }; }
     try{
       const sc = { params: new Set(names || []), points: opts.points ? new Set(opts.points) : null,
-                   conds: opts.conds ? new Set(opts.conds) : null, targets: opts.targets ? new Set(opts.targets) : null };
+                   conds: opts.conds ? new Set(opts.conds) : null, targets: opts.targets ? new Set(opts.targets) : null,
+                   limits: opts.limits ? new Set(opts.limits) : null };
       const type = typeOf(ast, sc), want = opts.want || "num";
       if (type !== want) return { ok: false, error: `ช่องนี้ต้องเป็น${TYPE_TH[want]} แต่นิพจน์นี้ให้${TYPE_TH[type] || type}`, ast, type };
       return { ok: true, ast, type };

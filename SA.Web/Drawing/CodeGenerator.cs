@@ -41,6 +41,7 @@ public static class CodeGenerator
         "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Tangent", "Rotate",
         "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
         "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "FirstOf",
+        "Limit", "SolveLimit", "Normal", "AlongLen", "F2", "LimAlong", "LimAct", "_p",
         // คำในนิพจน์ (and or not true false — ไม่สนตัวพิมพ์ ตรวจใน IsReservedName)
         "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue","decimal","default",
         "delegate","do","double","else","enum","event","explicit","extern","false","finally","fixed","float","for","foreach","goto",
@@ -50,7 +51,7 @@ public static class CodeGenerator
         "virtual","void","volatile","while","var","Math","Point","Link","Shape","ObjectId"
     };
     public static bool IsReservedName(string n) => Reserved.Contains(n) || SpecExpr.Keywords.Contains(n)
-        || System.Text.RegularExpressions.Regex.IsMatch(n, @"^([PpLlSsBbDd]\d+|surface\d+)$");
+        || System.Text.RegularExpressions.Regex.IsMatch(n, @"^([PpLlSsBbDd]\d+|surface\d+|[Pp]\d+_lim)$");
 
     public static string HelperClass(DrawingSpec s) => "SaDrawing_" + s.ClassName;
 
@@ -205,7 +206,8 @@ public static class CodeGenerator
             {
                 Params = _names, Points = s.Points.Select(p => p.Id).ToHashSet(), AllowMissingPoints = true,
                 Conds = _logic.Conditions.Select(c => c.Name).ToHashSet(),
-                Targets = s.Imported ? null : s.Targets.Select(t => t.Name).ToHashSet(), Surface = SurfVar
+                Targets = s.Imported ? null : s.Targets.Select(t => t.Name).ToHashSet(), Surface = SurfVar,
+                Limits = s.Points.Where(p => p.Limit != null).Select(p => p.Id).ToHashSet()
             };
             foreach (var p in s.Params)
                 if (IsReservedName(p.Name)) throw new FormatException($"ตั้งชื่อ parameter ว่า {p.Name} ไม่ได้ (ชื่อนี้โค้ดใช้เอง)");
@@ -313,7 +315,9 @@ public static class CodeGenerator
                 .Concat(_s.Links.Where(l => l.Follow).Select(l => l.Target))
                 // ground() / hasGround() ในนิพจน์
                 .Concat(_s.Points.SelectMany(p => p.Def.Exprs()).Concat(_s.Links.SelectMany(LinkExprs)).Concat(_s.Rotations.Select(g => g.Angle))
-                    .SelectMany(SpecExpr.GroundTargets)).ToList();
+                    .Concat(_s.Points.Where(p => p.Limit != null).SelectMany(p => p.Limit!.Exprs()))
+                    .SelectMany(SpecExpr.GroundTargets))
+                .Concat(_s.Points.Where(p => p.Limit != null && LimitGround(p.Limit!)).Select(p => p.Limit!.Ref?.Target)).ToList();
             if (usesSurface.Count > 0)
             {
                 L("        // ---- target surface (Layout mode / ไม่ได้กำหนด = วาดแบบไม่มีดิน) ----");
@@ -342,6 +346,7 @@ public static class CodeGenerator
                 else
                 {
                     L($"        Pt? {key} = null;");
+                    if (LimitedUsed(key)) L($"        bool {key}_lim = false;");
                     L($"        Warn(cs, CorridorError.Failure, \"{key}: จุด {key} อ้างถึงตัวเองเป็นวง\");");
                 }
             }
@@ -456,6 +461,70 @@ public static class CodeGenerator
             // นิพจน์ที่อ้างจุด (P3.y, ground(P3) ...): จุดที่อ้างหาไม่ได้ = จุดนี้หาไม่ได้ + เตือน (แบบเดียวกับในเว็บ) ไม่ทำให้ Draw ล้มทั้งตัว
             if (UsesRuntime(d.Exprs())) rhs = $"Try(cs, {Q}, () => {rhs})";
             L($"        Pt? {id} = {InBranch(p.Branch, rhs)};   // {note}{BrTag(p.Branch)}");
+            if (p.Limit != null) LimitLine(p);
+        }
+
+        // ---------------- Max / Min (รอบ 4b) ----------------
+        private static readonly HashSet<string> LimitNo = new() { "origin", "external", "firstOf", "slopeToSurface", "tangent" };
+        private static readonly Dictionary<string, string> LimitStart = new() { ["delta"] = "from", ["slopeLength"] = "from", ["polar"] = "from", ["between"] = "a" };
+        private static bool LimitGround(SpecLimit l) => l.Measure == "normal" || (l.Measure is "depth" or null && (l.Ref?.Type ?? "ground") == "ground");
+        // มีนิพจน์ไหนใช้ limited(id) ไหม (ไม่มี = ไม่ต้องประกาศตัวแปร id_lim)
+        private bool LimitedUsed(string id)
+        {
+            var re = new System.Text.RegularExpressions.Regex($@"\blimited\s*\(\s*{id}\s*\)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            return _s.Points.SelectMany(p => p.Def.Exprs().Concat(p.Limit?.Exprs() ?? Array.Empty<string>()))
+                .Concat(_s.Links.SelectMany(LinkExprs)).Concat(_s.Rotations.Select(g => g.Angle))
+                .Concat(_logic.Conditions.Select(c => c.Expr)).Concat(_logic.Decisions.Select(d => d.Test))
+                .Any(e => e != null && re.IsMatch(e));
+        }
+        // คำที่ใช้ในคำเตือน (ตรงกับ limitWhat ใน spec.js)
+        private string LimitWhat(SpecPoint p)
+        {
+            var l = p.Limit!; var r = l.Ref ?? new SpecLimitRef();
+            return l.Measure switch
+            {
+                "normal" => $"{(l.Below ? "ต่ำกว่า" : "สูงกว่า")}ผิวดิน (ตั้งฉาก)",
+                "length" => $"ยาวจาก {(LimitStart.TryGetValue(p.Def.Type, out var k) ? (k == "a" ? p.Def.A : p.Def.From) : null) ?? "origin"}",
+                "offset" => $"ห่างแนวราบจาก{(r.Type == "point" ? " " + r.Id : "แกน")}",
+                _ => $"{(l.Below ? "ต่ำกว่า" : "สูงกว่า")}{(r.Type == "point" ? " " + r.Id : r.Type == "elev" ? " ระดับ " + r.Expr : "ผิวดิน")}"
+            };
+        }
+        private void LimitLine(SpecPoint p)
+        {
+            var l = p.Limit!; var d = p.Def; string id = p.Id, Q = Str(id);
+            string outVar = LimitedUsed(id) ? $"out bool {id}_lim" : "out _";
+            var rot = _s.Rotations.FirstOrDefault(g => g.Points.Contains(id));
+            if (LimitNo.Contains(d.Type) || rot != null)
+            {
+                string why = rot != null ? $"สมาชิกกลุ่มหมุน {rot.Id} ใช้ไม่ได้" : "ใช้กับจุดชนิดนี้ไม่ได้";
+                L($"        if ({id} != null) Warn(cs, CorridorError.Failure, \"{id} Max / Min: {why} — ข้าม\");");
+                if (LimitedUsed(id)) L($"        bool {id}_lim = false;");
+                return;
+            }
+            string P(string? x) => string.IsNullOrEmpty(x) ? "Pt.Origin" : Exists(x!) ? x! : "null";
+            string start = LimitStart.TryGetValue(d.Type, out var k) ? P(k == "a" ? d.A : d.From) : "null";
+            var r = l.Ref ?? new SpecLimitRef();
+            bool gnd = LimitGround(l);
+            string surf = gnd ? SurfVar(r.Target) : "";
+            string refWhy = gnd ? $"{surf}.IsNull ? \"ไม่ได้กำหนด Target Surface\" : null" : "null";
+            string measure = l.Measure switch
+            {
+                "normal" => l.Below ? $"_p => Normal(cs, {surf}, _p)" : $"_p => -Normal(cs, {surf}, _p)",
+                "length" => $"_p => AlongLen({start}, {id}, _p)",
+                "offset" => r.Type == "point" ? $"_p => F * (_p.X - PX({P(r.Id)}))" : "_p => F * _p.X",
+                _ when gnd => l.Below ? $"_p => Ground(cs, {surf}, _p) - _p.Y" : $"_p => _p.Y - Ground(cs, {surf}, _p)",
+                _ when r.Type == "point" => l.Below ? $"_p => PY({P(r.Id)}) - _p.Y" : $"_p => _p.Y - PY({P(r.Id)})",
+                _ => l.Below ? $"_p => ({X(r.Expr, "ระดับ", id)}) - cs.CurrentElevation - _p.Y" : $"_p => _p.Y - (({X(r.Expr, "ระดับ", id)}) - cs.CurrentElevation)"
+            };
+            string Bound(string? e, string what) => string.IsNullOrWhiteSpace(e) ? "null" : $"() => {X(e, what, id)}";
+            string along = l.Along switch { "slope" => "LimAlong.Slope", "horizontal" => "LimAlong.Horizontal", _ => "LimAlong.Vertical" };
+            string act = l.Action switch { "clamp" => "LimAct.Clamp", "warn" => "LimAct.Warn", _ => "LimAct.ClampWarn" };
+            string actTh = l.Action switch { "clamp" => "ขยับเงียบๆ", "warn" => "เตือนอย่างเดียว", _ => "ขยับ + เตือน" };
+            string alongTh = l.Along switch { "slope" => "ตามแนวเดิม", "horizontal" => "แนวราบ", _ => "แนวดิ่ง" };
+            string what = LimitWhat(p);
+            string bounds = string.Join(" ", new[] { string.IsNullOrWhiteSpace(l.Min) ? null : "อย่างน้อย " + l.Min, string.IsNullOrWhiteSpace(l.Max) ? null : "อย่างมาก " + l.Max }.Where(x => x != null));
+            L($"        // {id} Max / Min: {what} {bounds} (ไม่ผ่าน: {actTh}{(l.Action == "warn" ? "" : " " + alongTh)})");
+            L($"        {id} = Limit(cs, {Q}, {id}, {start}, {along}, {refWhy}, {measure}, {Bound(l.Min, "อย่างน้อย")}, {Bound(l.Max, "อย่างมาก")}, {act}, {Str(what)}, {outVar});");
         }
 
         // กลุ่มหมุน: สมาชิกคำนวณตาม def ก่อน (ค่าก่อนหมุน) แล้ว Rotate ทีละจุดรอบ pivot
@@ -552,6 +621,7 @@ public static class CodeGenerator
                 state[p.Id] = 1;
                 // อ้างสมาชิกกลุ่มหมุนแบบเห็นค่าที่หมุนแล้ว = ต้องอยู่หลังบรรทัดหมุนของกลุ่มนั้น (NeedPt) · อยู่ในกิ่ง = หลังบรรทัดกิ่ง
                 bool ok = p.Def.Refs().All(r => NeedPt(r, p.Id)) & VisitBranch(p.Branch) & p.Def.Exprs().SelectMany(CondDeps).All(VisitCond);
+                if (p.Limit != null && !(p.Limit.Refs().All(r => NeedPt(r, p.Id)) & p.Limit.Exprs().SelectMany(CondDeps).All(VisitCond))) ok = false;
                 state[p.Id] = 2;
                 if (ok) { done.Add(p.Id); order.Add(p); } else if (!cyc.Contains(p.Id)) cyc.Add(p.Id);
                 return ok;
@@ -778,6 +848,121 @@ public static class CodeGenerator
         {
             throw new InvalidOperationException("ground(): " + e.Message);
         }
+    }
+
+    // ---- Max / Min ของจุด (รอบ 4b) — ตรงกับ limitPt / solveLimit ใน wwwroot/js/spec.js ----
+
+    private enum LimAlong { Vertical, Horizontal, Slope }
+    private enum LimAct { ClampWarn, Clamp, Warn }
+
+    // ค่าที่คุม (measure) ของจุด q ต้องอยู่ระหว่าง min..max — นอกขอบ = ขยับตาม along จนถึงขอบ (Slope = ตามแนวจาก start)
+    //   refWhy != null = อ้างอิงหาไม่ได้ (ไม่ขยับ + เตือน ยกเว้น Layout mode) · min / max = null ไม่คุม · limited = รอบนี้ไม่ผ่านขอบ
+    //   อ้างจุดที่หาไม่ได้ / เงื่อนไขไม่รู้ค่า ในนิพจน์ = ไม่ขยับ + เตือน (จุดไม่หาย)
+    private static Pt? Limit(CorridorState cs, string id, Pt? q, Pt? start, LimAlong along, string refWhy,
+                             Func<Pt, double> measure, Func<double> min, Func<double> max, LimAct act, string what, out bool limited)
+    {
+        limited = false;
+        if (q == null) return null;
+        Pt p0 = q.Value;
+        string tag = id + " Max / Min";
+        if (refWhy != null)
+        {
+            if (cs.Mode != CorridorMode.Layout) Warn(cs, CorridorError.LogicalNameNotFound, tag + ": " + refWhy + " — ไม่ขยับ");
+            return q;
+        }
+        try
+        {
+            double? mn = min != null ? min() : (double?)null, mx = max != null ? max() : (double?)null;
+            if (mn == null && mx == null) return q;
+            if (mn != null && mx != null && mn.Value > mx.Value)
+            {
+                Warn(cs, CorridorError.ValueInABadPosition, tag + ": อย่างน้อย " + F2(mn.Value) + " > อย่างมาก " + F2(mx.Value) + " — ใช้อย่างน้อย");
+                mx = null;
+            }
+            double v0 = measure(p0);
+            double tgt;
+            CorridorError err;
+            if (mn != null && v0 < mn.Value - 1e-9) { tgt = mn.Value; err = CorridorError.ValueTooSmall; }
+            else if (mx != null && v0 > mx.Value + 1e-9) { tgt = mx.Value; err = CorridorError.ValueTooLarge; }
+            else return q;
+            limited = true;
+            string msg = id + " " + what + " " + F2(v0) + " m " + (v0 < tgt ? "<" : ">") + " " + F2(tgt) + " m ";
+            if (act == LimAct.Warn) { Warn(cs, err, msg + "(ไม่ขยับ)"); return q; }
+            double dx = 0.0, dy = 1.0;
+            if (along == LimAlong.Horizontal) { dx = 1.0; dy = 0.0; }
+            else if (along == LimAlong.Slope)
+            {
+                Pt s = start ?? Pt.Origin;
+                double ex = p0.X - s.X, ey = p0.Y - s.Y, n = Math.Sqrt(ex * ex + ey * ey);
+                if (n < 1e-9) { Warn(cs, CorridorError.Failure, tag + ": จุดอยู่ที่จุดต้นของแนว — ไม่ขยับ"); return q; }
+                dx = ex / n; dy = ey / n;
+            }
+            double? t = SolveLimit(u =>
+            {
+                try { return measure(new Pt(p0.X + u * dx, p0.Y + u * dy)) - tgt; }
+                catch (InvalidOperationException) { return double.NaN; }
+            });
+            if (t == null) { Warn(cs, CorridorError.Failure, tag + ": หาตำแหน่งที่ถึงขอบไม่ได้ภายใน 50 m — ไม่ขยับ"); return q; }
+            if (act == LimAct.ClampWarn) Warn(cs, err, msg + "ใช้ " + F2(tgt) + " m แทน");
+            return new Pt(p0.X + t.Value * dx, p0.Y + t.Value * dy);
+        }
+        catch (InvalidOperationException e)
+        {
+            Warn(cs, CorridorError.Failure, tag + ": " + e.Message + " — ไม่ขยับ");
+            return q;
+        }
+    }
+
+    // หา t ที่ f(t) = 0 ใกล้ 0 ที่สุด: ขยายช่วง 0.01, 0.02, ... ถึง 50 สลับ + / − แล้วแบ่งครึ่ง 60 รอบ · ไม่เจอ = null
+    private static double? SolveLimit(Func<double, double> f)
+    {
+        double f0 = f(0.0);
+        if (double.IsNaN(f0) || double.IsInfinity(f0)) return null;
+        if (Math.Abs(f0) < 1e-12) return 0.0;
+        double prevP = 0.0, prevN = 0.0;
+        for (double s = 0.01; ; s = Math.Min(s * 2.0, 50.0))
+        {
+            foreach (int sg in new[] { 1, -1 })
+            {
+                double t = sg * s, ft = f(t);
+                if (double.IsNaN(ft) || double.IsInfinity(ft)) continue;
+                if (ft * f0 <= 0.0)
+                {
+                    double a = sg > 0 ? prevP : prevN, b = t, fa = f(a);
+                    for (int k = 0; k < 60; k++)
+                    {
+                        double m = (a + b) / 2.0, fm = f(m);
+                        if (fm * fa > 0.0) { a = m; fa = fm; } else b = m;
+                    }
+                    return (a + b) / 2.0;
+                }
+                if (sg > 0) prevP = t; else prevN = t;
+            }
+            if (s >= 50.0) return null;
+        }
+    }
+
+    // ระยะตั้งฉากจากจุดถึงผิวดิน (บวก = อยู่ใต้ดิน) — ความชันของดินจากระดับ ±0.01 m
+    private static double Normal(CorridorState cs, ObjectId surface, Pt p)
+    {
+        const double h = 0.01;
+        double s = (Ground(cs, surface, new Pt(p.X + h, p.Y)) - Ground(cs, surface, new Pt(p.X - h, p.Y))) / (2.0 * h);
+        return (Ground(cs, surface, p) - p.Y) / Math.Sqrt(1.0 + s * s);
+    }
+
+    // ความยาวของ p จากจุดต้น s ตามแนว s -> q (มีเครื่องหมาย)
+    private static double AlongLen(Pt? s, Pt? q, Pt p)
+    {
+        Pt a = s ?? Pt.Origin;
+        if (q == null) throw new InvalidOperationException("ข้ามเพราะหาจุดไม่ได้");
+        double ex = q.Value.X - a.X, ey = q.Value.Y - a.Y, n = Math.Sqrt(ex * ex + ey * ey);
+        if (n < 1e-9) throw new InvalidOperationException("จุดอยู่ที่จุดต้นของแนว");
+        return ((p.X - a.X) * ex + (p.Y - a.Y) * ey) / n;
+    }
+
+    private static string F2(double v)
+    {
+        return (Math.Abs(v) < 0.005 ? 0.0 : v).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     // ---- เงื่อนไข / กิ่ง ----
@@ -1183,6 +1368,7 @@ public static class CodeGenerator
         new(@"^\s*bool\?? (\w+) = "),                         // เงื่อนไข (ชื่อ) / decision (D1) / กิ่ง (B1)
         new(@"^\s*double\? (\w+) = "),                        // switch
         new(@"^\s*\w+ = (?:Try\(cs, ""[^""]+"", \(\) => )?Rotate\(cs, ""([^""]+)"""),
+        new(@"^\s*\w+ = Limit\(cs, ""([^""]+)"""),                // Max / Min
         new(@"^\s*Link(?:\[\])? \w+ = null;\s+// ([^:]+):"),
         new(@"^\s*// (\w+): (?:ไม่มีจุด|ปลาย \w+ เป็นจุด auxiliary)"),
         new(@"^\s*// (\w+) auxiliary:"),

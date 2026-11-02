@@ -58,6 +58,33 @@ public class SpecPoint
     // spec รุ่นก่อน: construction = auxiliary (อ่านอย่างเดียว)
     public bool Construction { get => false; set { if (value) Auxiliary = true; } }
     public string? Branch { get; set; }               // เกิดเฉพาะเมื่อกิ่งนี้เกิด (null = เกิดเสมอ)
+    public SpecLimit? Limit { get; set; }             // Max / Min ของจุด (รอบ 4b — ดู prompt-4b-design.md)
+}
+
+// Max / Min: ค่าที่คุม (measure) ต้องอยู่ระหว่าง Min..Max — นอกขอบ = ขยับจุดตาม Along จนถึงขอบ (ตรงกับ limitPt ใน spec.js)
+//   measure: depth (ระยะดิ่งจากอ้างอิง) | normal (ตั้งฉากกับผิวดิน) | length (ความยาวจากจุดต้นตามแนวเดิม) | offset (ระยะราบจากอ้างอิง ออกนอก +)
+public class SpecLimit
+{
+    public string Measure { get; set; } = "depth";
+    public string? Side { get; set; }                 // below (ต่ำกว่า) | above (สูงกว่า) — depth / normal
+    public SpecLimitRef? Ref { get; set; }
+    public string? Min { get; set; }
+    public string? Max { get; set; }
+    public string Action { get; set; } = "clampWarn"; // clampWarn | clamp | warn
+    public string Along { get; set; } = "vertical";   // vertical | horizontal | slope
+    public bool Below => Side != "above";
+    public IEnumerable<string> Exprs() => new[] { Min, Max, Ref?.Expr }.Where(e => !string.IsNullOrWhiteSpace(e))!;
+    // จุดที่ต้องคำนวณก่อน: จุดอ้างอิง + จุดในนิพจน์
+    public IEnumerable<string> Refs() => (Ref is { Type: "point", Id: { Length: > 0 } id } ? new[] { id } : Array.Empty<string>())
+        .Concat(Exprs().SelectMany(SpecExpr.PointRefs)).Distinct();
+}
+
+public class SpecLimitRef
+{
+    public string Type { get; set; } = "ground";      // ground | point | elev | origin
+    public string? Target { get; set; }
+    public string? Id { get; set; }
+    public string? Expr { get; set; }                 // elev: ระดับจริง (นิพจน์)
 }
 
 public class PointDef

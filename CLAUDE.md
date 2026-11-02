@@ -51,7 +51,10 @@
   M5 เสร็จ (2026-11-02): ข้อ 6 (ไฟล์ที่แก้เองนอกช่วง + กิ่ง — test ใน DrawingTests), codelink ของเงื่อนไข / กิ่ง (แท็บ Logic → โค้ด, เคอร์เซอร์บรรทัดกิ่ง → object),
   `tests-civil3d/round4-demo.cs` + `round4-checklist.md` (+ drawing-cases 50–54) → **รอบ 4 จบ** รอทดสอบใน Civil 3D
   ข้อเสนอที่ยังไม่ทำ (prompt-4 ข้อ 6): แสดงในแท็บ Logic ว่าโค้ดที่เขียนเองเข้า if บรรทัดไหน — งานแยก ถ้าผู้ใช้ต้องการ
-  ถัดไป: prompt-5 (Logic ข — flowchart แบบ SAC ที่แก้ข้อมูลชุดเดียวกัน) ยังไม่มีไฟล์ prompt-5.md
+  รอบ 4b M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบใน `prompt-4b-design.md` (ปุ่มชื่อ "Max / Min" · เลือกได้ว่าคุม ระยะดิ่ง / ตั้งฉากผิวดิน / ความยาว / ระยะราบ · ตัวอย่าง = base_rock-pitching)
+  รอบ 4b M1 เสร็จ (2026-11-02): `p.limit` ใน evaluate (spec.js limitPt / setLimit / limitOptions) + C# `Limit()` + `limited()` + Properties ขั้นต่ำ
+    (test: `limit.test.js`, drawing-cases 55–60, DrawingTests เทียบ base_rock-pitching.cs, ExprTests "Max / Min -> C#")
+  ถัดไป: **`prompt-4b.md` M2** (ปุ่ม "Max / Min" + หน้าต่างถามเป็นประโยค + พรีวิวสด) ทำก่อน แล้วค่อย **`prompt-5.md`** (Logic ข — flowchart + Logic API สำหรับ MCP ต้องรวมฟังก์ชันของ 4b) — เขียนแล้วทั้งคู่ ยังไม่เริ่ม
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

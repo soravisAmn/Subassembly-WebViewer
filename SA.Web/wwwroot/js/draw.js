@@ -111,7 +111,7 @@ function specCtx(it, o){
     values: it.params || {}, codeParams: codeParamsOf(it),
     codePoints: r && r.result ? r.result.points.map(p => ({ x: p.x - r.originX, y: p.y - r.originY, codes: p.codes })) : [],
     surface: state.surfaceOn && state.surface.length >= 2 ? state.surface.map(p => ({ x: p.x - o.x, y: p.y - o.y })) : null,
-    extendEnds: state.extendEnds, layout: state.layout
+    extendEnds: state.extendEnds, layout: state.layout, originElevation: elevOf(o.y)   // ระดับจริงของ origin (Max / Min อ้าง "ระดับจริง")
   };
 }
 function evalItem(it){

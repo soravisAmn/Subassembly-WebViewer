@@ -61,6 +61,17 @@ static class ExprTests
                 if (!CodeGenerator.IsReservedName(n)) throw new Exception($"{n} ต้องเป็นคำสงวน");
         });
 
+        Console.WriteLine("\nMax / Min -> C#");
+        test("limited(P3) = P3_lim · จุดที่ไม่มี = false · จุดที่ไม่มี Max / Min ใช้ไม่ได้ · ชื่อสงวน", () =>
+        {
+            var ls = new ExprScope { Params = sc.Params, Points = new HashSet<string> { "P2", "P3" }, AllowMissingPoints = true, Limits = new HashSet<string> { "P3" }, Surface = sc.Surface };
+            Eq("P3_lim && Width > 1.0", SpecExpr.ToCs("limited(P3) and Width > 1", ls, 0, "bool"), "limited");
+            Eq("false", SpecExpr.ToCs("limited(P9)", ls, 0, "bool"), "จุดที่ไม่มี");
+            Throws(() => SpecExpr.ToCs("limited(P2)", ls, 0, "bool"), "P2 ไม่มี Max / Min", "ไม่มี Max / Min");
+            foreach (var n in new[] { "P3_lim", "p12_lim", "Limit", "SolveLimit", "Normal", "AlongLen" })
+                if (!CodeGenerator.IsReservedName(n)) throw new Exception($"{n} ต้องเป็นคำสงวน");
+        });
+
         Console.WriteLine("\nกิ่ง -> C#");
         test("เงื่อนไขในนิพจน์ = V(ชื่อ) · โค้ดกิ่ง / firstOf / ชื่อ B1 D1 สงวน", () =>
         {

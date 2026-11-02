@@ -676,7 +676,7 @@ function propsMulti(box, list){
 function propsDrawn(box, it, s){
   const sp = it.spec, r = drawRes[it.id];
   if (!canEdit(it)) div("hint", "เข้า Edit (คลิกขวาที่ subassembly) เพื่อแก้ค่า", box);
-  if (s.type === "dpt") propsDrawnPoint(box, it, Spec.byId(sp.points, s.id), r);
+  if (s.type === "dpt"){ propsDrawnPoint(box, it, Spec.byId(sp.points, s.id), r); limitGroup(box, it, Spec.byId(sp.points, s.id), r); }
   else if (s.type === "dlink") propsDrawnLink(box, it, Spec.byId(sp.links, s.id), r);
   else propsDrawnShape(box, it, Spec.byId(sp.shapes, s.id), r);
   const pg = Spec.polygonOf(sp, DRAWN_KIND[s.type], s.id, true);
@@ -684,6 +684,53 @@ function propsDrawn(box, it, s){
   for (const rg of rotationsFor(sp, s)) propsRotation(box, it, rg);
   propsCode(box, it, s);
 }
+// ---------------- Max / Min ของจุด (รอบ 4b) — Properties ขั้นต่ำ (หน้าต่างถามแบบประโยคมาใน M2) ----------------
+// แก้ทุกช่อง = Spec.setLimit ตรวจก่อน (ผิด = แจ้งแล้วไม่เปลี่ยน) · Undo ได้ทีละช่อง
+function limitGroup(box, it, p, r){
+  const sp = it.spec, o = Spec.limitOptions(sp, p.id), L = p.limit, ed_ = canEdit(it);
+  const g = group(box, "Max / Min", L && ed_ ? { label: "ลบ", title: "เอา Max / Min ของจุดนี้ออก", cmd: () => specEdit(s => Spec.removeLimit(s, p.id), it, `ลบ Max / Min ของ ${p.id}`) } : null);
+  if (!o.ok){ div("hint", L ? `⚠ ${esc(o.why)} — ตอนรันจะข้าม` : `ตั้งที่จุดนี้ไม่ได้: ${esc(o.why)}`, g); return; }
+  if (!L){
+    if (ed_) div("btns", null, g).append(btn("+ ตั้ง Max / Min", () => specEdit(s => limitSet(s, p.id, { measure: "depth", side: "below", ref: { type: "ground" }, min: "2", max: null, action: "clampWarn" }), it, `ตั้ง Max / Min ของ ${p.id}`),
+                                             false, "เริ่มที่ ต่ำกว่าผิวดินอย่างน้อย 2 m แล้วแก้ต่อในกลุ่มนี้"));
+    else div("hint", "ไม่มี", g);
+    return;
+  }
+  const set = patch => limitSet(sp, p.id, { ...JSON.parse(JSON.stringify(L)), ...patch });
+  selectRow(g, it, "คุม", o.measures.map(m => [m, Spec.LIMIT_MEASURES[m]]), L.measure, v => {
+    set({ measure: v, along: o.defaultAlong[v], ref: v === "offset" ? { type: "origin" } : v === "length" ? null : { type: "ground" } });
+  });
+  if (L.measure === "depth" || L.measure === "normal")
+    selectRow(g, it, "จุดต้อง", [["below", "ต่ำกว่า"], ["above", "สูงกว่า"]], L.side || "below", v => set({ side: v }));
+  const others = sp.points.filter(q => q.id !== p.id && !Spec.dependsOn(sp, q.id, p.id)).map(q => ["pt:" + q.id, q.id + (q.codes.length ? " " + q.codes.join(",") : "")]);
+  const r0 = L.ref || {};
+  if (L.measure === "depth" || L.measure === "offset"){
+    const opts = (L.measure === "depth" ? [["ground", "ผิวดิน (ที่ offset ของจุดนี้)"], ["elev", "ระดับจริง (เช่น ระดับน้ำ)"]] : [["origin", "แกน (origin)"]]).concat(others);
+    selectRow(g, it, "เทียบกับ", opts, r0.type === "point" ? "pt:" + r0.id : r0.type || "ground", v => {
+      set({ ref: v.startsWith("pt:") ? { type: "point", id: v.slice(3) } : v === "elev" ? { type: "elev", expr: r0.expr || "100" } : { type: v } });
+    });
+  }
+  if (r0.type === "ground" && sp.targets.length > 1)
+    selectRow(g, it, "Target", sp.targets.map(t => [t.name, t.displayName || t.name]), r0.target, v => set({ ref: { ...r0, target: v } }));
+  if (r0.type === "elev") exprRow(g, it, "ระดับจริง", "ไม่ใช่เทียบ origin เช่น DesignWL", r0.expr, v => { L.ref.expr = v; });
+  exprRow(g, it, "อย่างน้อย", "m · ว่าง = ไม่คุม", L.min, v => { L.min = v || null; }, { optional: true });
+  exprRow(g, it, "อย่างมาก", "m · ว่าง = ไม่คุม", L.max, v => { L.max = v || null; }, { optional: true });
+  selectRow(g, it, "ถ้าไม่ผ่าน", Object.entries(Spec.LIMIT_ACTIONS), L.action || "clampWarn", v => set({ action: v }));
+  if (L.action !== "warn") selectRow(g, it, "ขยับ", o.along[L.measure].map(a => [a, Spec.LIMIT_ALONG[a]]), L.along, v => set({ along: v }));
+  // ค่าตอนนี้
+  const info = r && r.limits && r.limits[p.id], what = Spec.limitWhat(p);
+  const now = !info ? "ยังไม่ได้คำนวณ (จุดไม่เกิด / หาไม่ได้)" : info.v0 == null ? "ไม่รู้ค่า — ดู Messages" :
+    !info.hit ? `ผ่าน: ${what} ${info.v0.toFixed(2)} m` :
+    `${what} ${info.v0.toFixed(2)} m → ${L.action === "warn" ? "ไม่ผ่าน (เตือนอย่างเดียว)" : `ขยับให้เป็น ${info.tgt.toFixed(2)} m`}`;
+  kv(g, [["ตอนนี้", now]]);
+  if (!L.min && !L.max) div("expr-err", "ใส่อย่างน้อย หรือ อย่างมาก อย่างใดอย่างหนึ่ง", g);
+}
+// ตั้ง Max / Min ผ่าน Spec.setLimit — ผิด = แจ้ง (ไม่เปลี่ยน spec)
+function limitSet(sp, id, lim){
+  try{ return Spec.setLimit(sp, id, lim); }
+  catch(e){ setTimeout(() => alert(e.message)); return null; }
+}
+
 // กลุ่มหมุนที่เกี่ยวกับ object ที่เลือก: จุด = กลุ่มของมันเอง / กลุ่มที่ใช้มันเป็นจุดหมุน · link / shape = กลุ่มของจุดปลาย
 function rotationsFor(sp, s){
   const ids = s.type === "dpt" ? [s.id] : s.type === "dlink" ? Spec.linkRefs(Spec.byId(sp.links, s.id))
@@ -941,7 +988,7 @@ function newCondition(sp, parent){
 // ชื่อเงื่อนไขใช้ได้ไหม (null = ได้) — ห้ามซ้ำ parameter / เงื่อนไข / จุด และห้ามชื่อที่โค้ดใช้เอง
 function condNameError(sp, name){
   const used = new Set(Spec.names(sp).concat(((sp.logic || {}).conditions || []).map(c => c.name), sp.points.map(p => p.id)));
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || used.has(name) || RESERVED.has(name) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(name)
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || used.has(name) || RESERVED.has(name) || /^([PpLlSsBbDd]\d+|surface\d+|[Pp]\d+_lim)$/.test(name)
       || Expr.KEYWORDS.has(name.toLowerCase()) || Expr.FUNCS[name.toLowerCase()]) return `ตั้งชื่อ ${name} ไม่ได้ (ซ้ำ / เป็นชื่อที่โค้ดใช้เอง)`;
   return null;
 }
@@ -1118,7 +1165,7 @@ const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
 const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
   "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
-  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf abstract as base bool break byte case catch char checked class const continue " +
+  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf Limit SolveLimit Normal AlongLen F2 LimAlong LimAct _p abstract as base bool break byte case catch char checked class const continue " +
   "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
   "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +
   "static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while var").split(" "));
@@ -1149,7 +1196,7 @@ function usesParam(sp, name){
 function renameSpecParam(it, p, v){
   if (v === p.name) return true;
   if (!IDENT.test(v)){ alert("ชื่อ parameter ต้องเป็นตัวอังกฤษ/ตัวเลข/_ และไม่ขึ้นต้นด้วยตัวเลข"); return false; }
-  if (RESERVED.has(v) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(v)){ alert(`ตั้งชื่อ ${v} ไม่ได้ — โค้ดที่สร้างใช้ชื่อนี้เอง (เช่น F, P1, cs, double)`); return false; }
+  if (RESERVED.has(v) || /^([PpLlSsBbDd]\d+|surface\d+|[Pp]\d+_lim)$/.test(v)){ alert(`ตั้งชื่อ ${v} ไม่ได้ — โค้ดที่สร้างใช้ชื่อนี้เอง (เช่น F, P1, cs, double)`); return false; }
   if (Expr.KEYWORDS.has(v.toLowerCase())){ alert(`ตั้งชื่อ ${v} ไม่ได้ — เป็นคำในนิพจน์ (and or not true false)`); return false; }
   if (specNames(it).includes(v) || Expr.FUNCS[v.toLowerCase()]){ alert(`มีชื่อ ${v} อยู่แล้ว (หรือเป็นชื่อฟังก์ชัน)`); return false; }
   const old = p.name, re = new RegExp(`\\b${old}\\b`, "g");

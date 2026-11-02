@@ -1471,5 +1471,56 @@
   { "name": "round4-demo: ผิวดินราบ -1 = ถมปกติ", "surface": [{ "x": -30, "y": -1 }, { "x": 30, "y": -1 }], "copySpecFrom": 50 },
   { "name": "round4-demo: ผิวดินราบ -3 = ถมสูง (ราวกันตก) · Curb = 0 (ไม่มีขอบทาง)", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "values": { "Curb": 0 }, "copySpecFrom": 50 },
   { "name": "round4-demo: Side = Left ผิวดินลาด (ซ้ายต่ำ = ถมสูง)", "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": 8 }], "values": { "Side": 1 }, "copySpecFrom": 50 },
-  { "name": "round4-demo: Layout mode (ไม่มีดิน = ถม ยาว 3 m)", "surface": [{ "x": -30, "y": 2 }, { "x": 30, "y": 2 }], "layout": true, "copySpecFrom": 50 }
+  { "name": "round4-demo: Layout mode (ไม่มีดิน = ถม ยาว 3 m)", "surface": [{ "x": -30, "y": 2 }, { "x": 30, "y": 2 }], "layout": true, "copySpecFrom": 50 },
+  {
+    "name": "Max / Min ทุกแบบ (รอบ 4b): ลึกจากดินตามแนวลาด, สูง/ต่ำกว่าจุด, ระดับจริง, ตั้งฉาก, ความยาว, ระยะราบ, เตือนอย่างเดียว, อ้างจุดที่ไม่มี, limited() — ดินราบ 0",
+    "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }],
+    "spec": { "className": "LimitMix", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }, { "name": "Depth", "kind": "double", "default": 1 }, { "name": "MinDepth", "kind": "double", "default": 2 },
+                 { "name": "WL", "kind": "double", "default": 100.8 }, { "name": "FB", "kind": "double", "default": 0.5 }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": ["Crown"], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["Shoulder"], "def": { "type": "delta", "from": "P1", "dx": "3", "dy": "0" } },
+        { "id": "P3", "codes": ["Base"], "def": { "type": "slopeLength", "from": "P2", "slope": "-2", "length": "Depth", "dir": 1, "measure": "dy" },
+          "limit": { "measure": "depth", "side": "below", "ref": { "type": "ground", "target": "TargetSurface" }, "min": "MinDepth", "max": null, "action": "clampWarn", "along": "slope" } },
+        { "id": "P4", "codes": ["BaseEnd"], "def": { "type": "delta", "from": "P3", "dx": "1", "dy": "0" } },
+        { "id": "P5", "codes": ["Crest"], "def": { "type": "delta", "from": "P1", "dx": "1", "dy": "0.2" },
+          "limit": { "measure": "depth", "side": "above", "ref": { "type": "point", "id": "P2" }, "min": "0.5", "max": null, "action": "clampWarn", "along": "vertical" } },
+        { "id": "P6", "codes": ["Ditch"], "def": { "type": "delta", "from": "P2", "dx": "2", "dy": "-2" },
+          "limit": { "measure": "depth", "side": "below", "ref": { "type": "point", "id": "P2" }, "min": "0.5", "max": "1.5", "action": "clamp", "along": "vertical" } },
+        { "id": "P7", "codes": ["WLMark"], "def": { "type": "delta", "from": "P1", "dx": "2", "dy": "0.3" },
+          "limit": { "measure": "depth", "side": "above", "ref": { "type": "elev", "expr": "WL" }, "min": "FB", "max": null, "action": "clampWarn", "along": "vertical" } },
+        { "id": "P8", "codes": ["Normal"], "def": { "type": "delta", "from": "P1", "dx": "-2", "dy": "-0.5" },
+          "limit": { "measure": "normal", "side": "below", "ref": { "type": "ground", "target": "TargetSurface" }, "min": "1", "max": null, "action": "clampWarn", "along": "vertical" } },
+        { "id": "P9", "codes": ["Len"], "def": { "type": "polar", "from": "P1", "length": "2", "angle": "-30" },
+          "limit": { "measure": "length", "min": "3", "max": null, "action": "clampWarn", "along": "slope" } },
+        { "id": "P10", "codes": ["Off"], "def": { "type": "delta", "from": "P1", "dx": "0.5", "dy": "-1" },
+          "limit": { "measure": "offset", "ref": { "type": "origin" }, "min": "1", "max": null, "action": "clampWarn", "along": "horizontal" } },
+        { "id": "P11", "codes": ["Flag"], "def": { "type": "delta", "from": "P1", "dx": "0", "dy": "if(limited(P3), 1, 0)" } },
+        { "id": "P12", "codes": ["WarnOnly"], "def": { "type": "delta", "from": "P2", "dx": "0.5", "dy": "-0.2" },
+          "limit": { "measure": "depth", "side": "below", "ref": { "type": "ground", "target": "TargetSurface" }, "min": "2", "max": null, "action": "warn", "along": "vertical" } },
+        { "id": "P13", "codes": ["Missing"], "def": { "type": "delta", "from": "P1", "dx": "4", "dy": "0" },
+          "limit": { "measure": "depth", "side": "below", "ref": { "type": "point", "id": "P99" }, "min": "1", "max": null, "action": "clampWarn", "along": "vertical" } },
+        { "id": "P14", "codes": ["Forced"], "branch": "B1", "def": { "type": "delta", "from": "P3", "dx": "0", "dy": "-0.3" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Top"] },
+        { "id": "L2", "points": ["P2", "P3"], "codes": ["Side"] },
+        { "id": "L3", "points": ["P3", "P4"], "codes": ["Base"] },
+        { "id": "L4", "points": ["P3", "P14"], "codes": ["Forced"], "branch": "B1" }
+      ],
+      "shapes": [],
+      "logic": {
+        "conditions": [{ "id": "C1", "name": "Forced", "expr": "limited(P3)" }],
+        "decisions": [{ "id": "D1", "kind": "if", "test": "Forced", "label": "ถูกบังคับลึก?" }],
+        "branches": [{ "id": "B1", "decision": "D1", "case": true, "label": "บังคับลึก" }, { "id": "B2", "decision": "D1", "case": false, "label": "ไม่บังคับ" }]
+      },
+      "side": { "param": "Side", "mirror": true } }
+  },
+  { "name": "Max / Min ทุกแบบ: ดินลาด y = -0.5x (แก้สมการบนแนวลาด)", "surface": [{ "x": -30, "y": 15 }, { "x": 30, "y": -15 }], "copySpecFrom": 55 },
+  { "name": "Max / Min ทุกแบบ: Side = Left", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "values": { "Side": 1 }, "copySpecFrom": 55 },
+  { "name": "Max / Min ทุกแบบ: Depth = 3 (ฐานผ่าน, limited เป็นเท็จ) · WL 101.5", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "values": { "Depth": 3, "WL": 101.5 }, "copySpecFrom": 55 },
+  { "name": "Max / Min ทุกแบบ: Layout mode (อ้างผิวดิน = ไม่ขยับ ไม่เตือน)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "layout": true, "copySpecFrom": 55 },
+  { "name": "Max / Min ทุกแบบ: ไม่ได้กำหนด Target Surface (อ้างผิวดิน = ไม่ขยับ + เตือน)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "surfaceAssigned": false, "copySpecFrom": 55 }
 ]

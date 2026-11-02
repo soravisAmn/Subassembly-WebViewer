@@ -119,7 +119,9 @@ function treeItem(node, h, a, it, depth, editing){
     if (isOpen(key)) kids();
   };
   // ส่วนที่วาด (P1, L1, S1 …) ก่อน ตามด้วยของที่โค้ดสร้าง (#0, L0 …)
-  const errMeta = o => o && o.err ? "⚠" : "";
+  const errMeta = o => o && o.err && !o.off ? "⚠" : "";
+  // ป้ายกิ่ง (สีเดียวกับในรูป) · จาง = ไม่เกิดตอนนี้
+  const brTag = o => o.branch ? `<span class="br-tag${dr && ((dr.pts[o.id] || dr.links[o.id] || dr.shapes[o.id]) || {}).off ? " off" : ""}" style="background:${branchColor(sp, o.branch)}" title="เกิดเมื่อ ${esc(branchPath(sp, o.branch))}">${esc(Spec.branchLabel(sp, o.branch))}</span>` : "";
   // code ซ้ำ (เช่น จาก Copy / Paste) — Civil 3D ยอมให้ซ้ำได้ แต่บอกไว้ในต้นไม้
   const dupOf = list => { const n = {}; for (const o of list) for (const c of new Set(o.codes)) n[c] = (n[c] || 0) + 1; return o => o.codes.some(c => n[c] > 1); };
   const dname = (o, dup) => esc(o.codes.length ? `${o.id} ${o.codes.join(", ")}` : o.id) + (dup && dup(o) ? ' <small class="dup" title="มี point / link / shape อื่นใช้ code นี้ด้วย">code ซ้ำ</small>' : "");
@@ -129,17 +131,17 @@ function treeItem(node, h, a, it, depth, editing){
   const dupP = dupOf(dp), dupL = dupOf(dl), dupS = dupOf(ds);
   grp(ik + ":pts", "Points", dp.length + cp.length, () => {
     dp.forEach(p => node({ depth: d2 + 1, cls:"leaf drawn" + (Spec.isAux(p) ? " aux" : ""), s:{type:"dpt", item:it.id, id:p.id}, sel: isSel("dpt", it.id, p.id),
-                           name: dname(p, dupP), meta: errMeta(dr && dr.pts[p.id]) || (Spec.isAux(p) ? "aux · " : "") + (Spec.rotationOf(sp, p.id) ? `หมุน ${Spec.rotationOf(sp, p.id).id} · ` : "") + Spec.POINT_TYPES[p.def.type], metaCls: dr && dr.pts[p.id] && dr.pts[p.id].err ? "warn" : "" }));
+                           name: brTag(p) + dname(p, dupP), meta: errMeta(dr && dr.pts[p.id]) || (Spec.isAux(p) ? "aux · " : "") + (Spec.rotationOf(sp, p.id) ? `หมุน ${Spec.rotationOf(sp, p.id).id} · ` : "") + Spec.POINT_TYPES[p.def.type], metaCls: dr && dr.pts[p.id] && dr.pts[p.id].err && !dr.pts[p.id].off ? "warn" : "" }));
     cp.forEach((p, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"pt", item:it.id, i}, sel: isSel("pt", it.id, i), name: `#${i} ${esc(p.codes.join(", ") || "—")}`, meta: "โค้ด" }));
   });
   grp(ik + ":links", "Links", dl.length + cl.length, () => {
     dl.forEach(l => node({ depth: d2 + 1, cls:"leaf drawn" + (Spec.isAux(l) ? " aux" : ""), s:{type:"dlink", item:it.id, id:l.id}, sel: isSel("dlink", it.id, l.id),
-                           name: dname(l, dupL), meta: errMeta(dr && dr.links[l.id]) || (Spec.isAux(l) ? "aux · " : "") + Spec.linkEnds(l).join("→") + (l.type === "followSurface" ? " ตามดิน" : Spec.isArc(l) ? " " + Spec.LINK_TYPES[l.type] : "") }));
+                           name: brTag(l) + dname(l, dupL), meta: errMeta(dr && dr.links[l.id]) || (Spec.isAux(l) ? "aux · " : "") + Spec.linkEnds(l).join("→") + (l.type === "followSurface" ? " ตามดิน" : Spec.isArc(l) ? " " + Spec.LINK_TYPES[l.type] : "") }));
     cl.forEach((l, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"link", item:it.id, i}, sel: isSel("link", it.id, i), name: `L${i} ${esc(l.codes.join(", ") || "—")}`, meta: "#" + l.pts.join("→#") }));
   });
   grp(ik + ":shapes", "Shapes", ds.length + cs.length, () => {
     ds.forEach(s => node({ depth: d2 + 1, cls:"leaf drawn", s:{type:"dshape", item:it.id, id:s.id}, sel: isSel("dshape", it.id, s.id),
-                           name: dname(s, dupS), meta: errMeta(dr && dr.shapes[s.id]) || s.links.join(",") }));
+                           name: brTag(s) + dname(s, dupS), meta: errMeta(dr && dr.shapes[s.id]) || s.links.join(",") }));
     cs.forEach((s, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"shape", item:it.id, i}, sel: isSel("shape", it.id, i), name: `S${i} ${esc(s.codes.join(", ") || "—")}`, meta: "โค้ด" }));
   });
   const np = (res ? res.params.length : 0) + (sp ? sp.params.length : 0);
@@ -280,7 +282,8 @@ function renderEditBar(){
   const it = itemById(state.editing);
   if (state.editing && !it) state.editing = null;
   $("edit-bar").hidden = !it;
-  if (it) $("edit-name").textContent = itemLabel(it) + (hasCode(it) ? "" : " (ยังไม่มีไฟล์ .cs)") + (drawingDirty(it) ? " ●" : "");
+  if (it) $("edit-name").textContent = itemLabel(it) + (hasCode(it) ? "" : " (ยังไม่มีไฟล์ .cs)") + (drawingDirty(it) ? " ●" : "")
+                                       + (drawBranch() ? ` · วาดลงกิ่ง ${branchPath(it.spec, draw.branch)} (B)` : "");
   const sv = $("edit-save");
   sv.disabled = !canSaveDrawing(it);
   sv.title = !it ? "" : !it.spec ? "ยังไม่ได้วาดอะไร"
@@ -655,6 +658,7 @@ function propsMulti(box, list){
     inp.value = same ? txt[0] : ""; inp.placeholder = same ? "" : "(ต่างกัน — พิมพ์เพื่อแทนทั้งหมด)";
     inp.onchange = () => specEdit(() => { const c = inp.value.split(",").map(x => x.trim()).filter(Boolean); for (const o of objs) o.codes = c.slice(); }, it);
     row.appendChild(inp);
+    branchRow(g, it, objs, drawRes[it.id]);
   }
   div("hint", "คลิก / คลุมเพิ่ม = เพิ่มเข้าชุด · Shift = เอาออก · Ctrl+คลิกในต้นไม้ = เพิ่ม/เอาออก · Esc = ยกเลิกการเลือก", g);
   const g2 = group(box, "รายการ");
@@ -777,13 +781,16 @@ function propsDrawnPoint(box, it, p, r){
   }
   // Auxiliary: คำนวณใน C# แต่ไม่ Points.Add · เป็นปลาย link จริงไม่ได้ (setAux ถามก่อน)
   auxCheck(g, it, { type:"dpt", id: p.id }, p, "ไม่เพิ่มลง Civil 3D · อ้างอิง / snap ได้");
-  branchRow(g, it, p, r);
-  if (q && q.err) div("expr-err", "⚠ " + esc(q.err), g);
-  else if (q){
-    const rows = [["Offset", f3(q.x) + "  (เทียบ origin)"], ["Elevation", f3(q.y) + "  (เทียบ origin)"],
-                  ["Offset แกน", f3(offOf(r.ox + q.x, a))], ["ระดับจริง", f3(elevOf(r.oy + q.y))]];
-    const f = d.from && r.pts[d.from];
-    if (f && !f.err) rows.push(["จาก " + d.from, slopeText(q.x - f.x, q.y - f.y)]);
+  branchRow(g, it, [p], r);
+  const gq = q && q.off ? ghostOf(it, r, "pts", p.id) : null;
+  if (q && q.off) div("hint", `ไม่เกิดตอนนี้ (กิ่ง ${esc(branchPath(sp, q.off))})` + (gq ? " — ค่าด้านล่าง = ตำแหน่งเมื่อกิ่งนี้เกิด" : ""), g);
+  else if (q && q.err) div("expr-err", "⚠ " + esc(q.err), g);
+  const qq = q && !q.err ? q : gq;
+  if (qq){
+    const rows = [["Offset", f3(qq.x) + "  (เทียบ origin)"], ["Elevation", f3(qq.y) + "  (เทียบ origin)"],
+                  ["Offset แกน", f3(offOf(r.ox + qq.x, a))], ["ระดับจริง", f3(elevOf(r.oy + qq.y))]];
+    const f = d.from && ptOf(it, r, d.from);
+    if (f) rows.push(["จาก " + d.from, slopeText(qq.x - f.x, qq.y - f.y)]);
     kv(g, rows);
   }
 }
@@ -855,8 +862,9 @@ function propsDrawnLink(box, it, l, r){
     exprRow(g, it, sg.by === "count" ? "จำนวนท่อน" : "ท่อนยาวไม่เกิน", "", sg.value, v => { l.seg = { by: sg.by, value: v }; });
   }
   auxCheck(g, it, { type:"dlink", id: l.id }, l, "ไม่ Links.Add ลง Civil 3D · อ้างอิง / snap ได้ · ใช้ใน shape ไม่ได้");
-  branchRow(g, it, l, r);
-  if (q && q.err){
+  branchRow(g, it, [l], r);
+  if (q && q.off) div("hint", `ไม่เกิดตอนนี้ (กิ่ง ${esc(branchPath(sp, q.off))})`, g);
+  else if (q && q.err){
     div("expr-err", "⚠ " + esc(q.err), g);
     // quick fix: link จริงที่ปลายเป็นจุด auxiliary (ไม่เปลี่ยนให้เองเงียบๆ)
     if (q.auxEnd && canEdit(it)) div("btns", null, g).append(
@@ -883,31 +891,36 @@ function propsDrawnShape(box, it, s, r){
   codesRow(g, it, s);
   let area = null;
   if (q && q.poly){ area = 0; q.poly.forEach((a, j) => { const b = q.poly[(j + 1) % q.poly.length]; area += a.x * b.y - b.x * a.y; }); area = Math.abs(area) / 2; }
-  kv(g, [["Links", s.links.join(", ")], ["พื้นที่", q && q.err ? "⚠ " + q.err : area == null ? "(link ต่อกันไม่เป็นรูปปิด)" : f3(area) + " m²"]]);
-  branchRow(g, it, s, r);
+  kv(g, [["Links", s.links.join(", ")], ["พื้นที่", q && q.off ? `ไม่เกิดตอนนี้ (กิ่ง ${branchPath(it.spec, q.off)})` : q && q.err ? "⚠ " + q.err : area == null ? "(link ต่อกันไม่เป็นรูปปิด)" : f3(area) + " m²"]]);
+  branchRow(g, it, [s], r);
   // quick fix: shape ที่มี link auxiliary
   if (q && q.auxLink && canEdit(it)) div("btns", null, g).append(
     btn(`ทำ ${q.auxLink} เป็นของจริง`, () => setAux(it, [{ type:"dlink", id: q.auxLink }], false)),
     btn(`เอา ${q.auxLink} ออกจาก shape`, () => { specEdit(() => { s.links = s.links.filter(x => x !== q.auxLink); }, it, `เอา ${q.auxLink} ออกจาก ${s.id}`); renderProps(true); }));
 }
 
-// ---------------- กิ่ง (รอบ 4 M2 — UI ขั้นต่ำ, หน้าตาเต็มอยู่ M3 / M4) ----------------
+// ---------------- กิ่ง (รอบ 4) ----------------
 // object เกิดเสมอ หรือเกิดเฉพาะกิ่งหนึ่ง · "+ เงื่อนไขใหม่" = สร้างเงื่อนไข + decision (ใต้กิ่งเดิมของ object ถ้ามี) + กิ่ง ใช่ / ไม่ใช่
-function branchRow(g, it, obj, r){
+// objs = ชิ้นที่เลือก (หลายชิ้น = ตั้งพร้อมกัน Undo ก้อนเดียว · รายละเอียดเงื่อนไขแสดงเมื่อเลือกชิ้นเดียว)
+function branchRow(g, it, objs, r){
   const sp = it.spec, lg = sp.logic || {}, brs = lg.branches || [];
-  const lab = id => Spec.branchChain(sp, id).reverse().map(b => Spec.branchLabel(sp, b)).join(" › ");
-  const opts = [["", "เกิดเสมอ"]].concat(brs.map(b => [b.id, `${b.id}: ${lab(b.id)}`]), [["+", "+ เงื่อนไขใหม่…"]]);
-  selectRow(g, it, "เกิดเมื่อ", opts, obj.branch || "", v => {
-    if (v === "+"){ const b = newCondition(sp, obj.branch); if (b) obj.branch = b; }
-    else if (v) obj.branch = v; else delete obj.branch;
-  }, "กิ่งของเงื่อนไข (ไม่เกิด = ไม่มีใน Civil 3D)");
+  if (!objs.length) return;
+  const cur = objs[0].branch || "", same = objs.every(o => (o.branch || "") === cur);
+  const opts = [["", "เกิดเสมอ"]].concat(same ? [] : [["~", "(ต่างกัน)"]], brs.map(b => [b.id, `${b.id}: ${branchPath(sp, b.id)}`]), [["+", "+ เงื่อนไขใหม่…"]]);
+  selectRow(g, it, "เกิดเมื่อ", opts, same ? cur : "~", v => {
+    if (v === "~") return;
+    if (v === "+"){ const b = newCondition(sp, same ? cur || null : null); if (b) for (const o of objs) o.branch = b; }
+    else for (const o of objs){ if (v) o.branch = v; else delete o.branch; }
+  }, objs.length > 1 ? `ทุกชิ้นที่เลือก (${objs.length})` : "กิ่งของเงื่อนไข (ไม่เกิด = ไม่มีใน Civil 3D)");
+  if (objs.length > 1) return;
+  const obj = objs[0];
   if (!obj.branch) return;
   const b = Spec.byId(brs, obj.branch), d = b && Spec.byId(lg.decisions || [], b.decision);
   if (!d){ div("expr-err", `⚠ ไม่มีกิ่ง ${esc(obj.branch)} แล้ว — object นี้จะไม่เกิด`, g); return; }
   const c = d.kind !== "switch" && (lg.conditions || []).find(x => x.name === d.test);
   const on = r && r.logic ? r.logic.branches[b.id] : undefined, v = r && r.logic ? r.logic.decisions[d.id] : undefined;
   if (c) exprRow(g, it, `เงื่อนไข ${c.name}`, "จริง / เท็จ เช่น ground(P1) > P1.y", c.expr, x => { c.expr = x; }, { want: "bool" });
-  kv(g, [["กิ่ง", `${lab(b.id)} (case ${b.case})`],
+  kv(g, [["กิ่ง", `<i class="brdot" style="background:${branchColor(sp, b.id)}"></i>${esc(branchPath(sp, b.id))} (case ${esc(String(b.case))})`, true],
          ["ตอนนี้", v == null ? "ไม่รู้ค่า → ไม่เข้ากิ่งไหน" : `${d.test} = ${v} → ${on ? "เกิด" : "ไม่เกิด"}`]]);
   const risk = Spec.branchRisks(sp).find(x => x.id === obj.id);
   if (risk) div("expr-err", `⚠ อ้าง ${esc(risk.ref)} ที่เกิดเฉพาะกิ่ง ${esc(Spec.branchLabel(sp, risk.branch))} — กรณีอื่นจะหาไม่ได้ (ใช้ firstOf หรือ exists() ถ้าตั้งใจ)`, g);
@@ -1203,7 +1216,150 @@ function renderDock(){
   $("n-log").textContent = result && result.log.length ? String(result.log.length) : "";
   const npt = (result && !(rr && rr.generated) ? result.points.length : 0) + (it && it.spec ? it.spec.points.length : 0);
   $("n-pts").textContent = npt ? String(npt) : "";
+  renderLogic();
 }
+// ---------------- แผง Logic (แท็บในแถบผลลัพธ์ — รอบ 4 M4) ----------------
+// เงื่อนไข (ค่าตอนนี้อัปเดตสดตอนลากผิวดิน / แก้ parameter), ต้นไม้ decision → กิ่ง (จำนวน object, คลิก = เลือก), scenario ที่ทดสอบแต่ละกิ่ง
+const logicItem = () => { const it = editItem() || selItem(); return it && it.spec ? it : null; };
+function lgChip(e, v, kind){
+  if (kind === "br"){ e.textContent = v ? "เกิด" : "ไม่เกิด"; e.className = "lg-val " + (v ? "t" : "f"); return; }
+  const t = v === null || v === undefined ? "ไม่รู้ค่า" : typeof v === "boolean" ? (v ? "จริง" : "เท็จ") : Expr.num(v);
+  e.textContent = t; e.className = "lg-val " + (v === null || v === undefined ? "u" : v === false ? "f" : "t");
+}
+// ค่าในแผง Logic ตามผลคำนวณล่าสุด (เรียกจาก render ทุกครั้ง — ไม่สร้าง DOM ใหม่ ช่องที่พิมพ์อยู่ไม่หลุด)
+function updateLogicLive(){
+  if (!state.dock.open || state.dock.tab !== "logic") return;
+  const box = $("logic-pane"), it = logicItem(), r = it && drawRes[it.id];
+  if (!box || !r || !r.logic) return;
+  for (const e of box.querySelectorAll("[data-cond]")) lgChip(e, r.logic.conds[e.dataset.cond]);
+  for (const e of box.querySelectorAll("[data-dec]")) lgChip(e, r.logic.decisions[e.dataset.dec]);
+  for (const e of box.querySelectorAll("[data-br]")){ const on = !!r.logic.branches[e.dataset.br]; lgChip(e, on, "br"); const row = e.closest(".lg-br"); if (row) row.classList.toggle("off", !on); }
+}
+// กิ่งที่เกิดใน scenario s (ใช้ spec ปัจจุบันของ it กับผิวดิน / parameter / Layout ของ scenario) — null = scenario ไม่มีตัวนี้
+function scenarioBranches(s, it){
+  const ws = s.ws || s.asm;
+  if (!ws) return null;
+  const items = ws.assemblies ? ws.assemblies.flatMap(a => a.items || []) : (ws.items || []);
+  const si = items.find(x => x.id === it.id);
+  if (!si) return null;
+  // origin: ตัวที่ไม่มีโค้ดเก็บตำแหน่งไว้ใน attach · ตัวที่มีโค้ดใช้ตำแหน่งตอนนี้ (ใกล้เคียง)
+  const o = !hasCode(it) && si.attach && si.attach.x != null ? { x: si.attach.x, y: si.attach.y } : itemOrigin(it);
+  const c = specCtx(it, o), sf = ws.surface || [];
+  c.values = si.params || {};
+  c.surface = ws.surfaceOn !== false && sf.length >= 2 ? sf.map(p => ({ x: p.x - o.x, y: p.y - o.y })) : null;
+  c.layout = !!ws.layout; c.extendEnds = ws.extendEnds !== false;
+  try{ const r = Spec.evaluate(it.spec, c); return new Set(Object.keys(r.logic.branches).filter(k => r.logic.branches[k])); }
+  catch{ return null; }
+}
+function logicCoverage(it){
+  const brs = ((it.spec.logic || {}).branches || []), by = {};
+  for (const b of brs) by[b.id] = [];
+  for (const s of scenarios){ const on = scenarioBranches(s, it); if (on) for (const id of on) if (by[id]) by[id].push(s.name); }
+  return { by, untested: brs.filter(b => !by[b.id].length).map(b => b.id) };
+}
+function renderLogic(){
+  const box = $("logic-pane"), it = logicItem();
+  const lg = it ? it.spec.logic || {} : {}, nC = (lg.conditions || []).length;
+  $("n-logic").textContent = nC ? String(nC) : "";
+  if (state.dock.tab !== "logic" || !state.dock.open) return;
+  // กำลังพิมพ์ในแผงอยู่: อัปเดตแค่ค่า (สร้างใหม่ตอนออกจากช่อง)
+  if (box.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return updateLogicLive();
+  box.innerHTML = "";
+  if (!it){ box.innerHTML = '<div class="empty">เลือก subassembly ที่มีส่วนที่วาด (หรือเข้า Edit) เพื่อดูเงื่อนไข / กิ่ง</div>'; return; }
+  const sp = it.spec, ed_ = canEdit(it), r = drawRes[it.id];
+  const conds = lg.conditions || [], decs = lg.decisions || [], brs = lg.branches || [];
+  const cov = logicCoverage(it);
+
+  // ---- เงื่อนไข ----
+  const s1 = div("lg-sec", "<h4>เงื่อนไข <small>ค่าตอนนี้อัปเดตตามผิวดิน / parameter</small></h4>", box);
+  if (ed_) s1.querySelector("h4").appendChild(btn("+ เงื่อนไขใหม่", () => specEdit(s => newCondition(s, null), it, "เพิ่มเงื่อนไข"), false, "เงื่อนไข + กิ่ง ใช่ / ไม่ใช่ (ยังไม่มี object) — ใส่ object เข้ากิ่งที่ Properties → เกิดเมื่อ หรือ B ตอนวาด"));
+  if (!conds.length) div("empty", "ยังไม่มีเงื่อนไข — ปุ่ม ถ้าตัด / ถม ใน Drawer หรือ Properties → เกิดเมื่อ → + เงื่อนไขใหม่", s1);
+  const names = specNames(it), xo = { ...Spec.exprOpts(sp), want: "bool" };
+  for (const c of conds){
+    const row = div("lg-row", `<span class="nm">${esc(c.name)}</span>`, s1);
+    const inp = document.createElement("input"); inp.type = "text"; inp.className = "expr"; inp.value = c.expr || ""; inp.disabled = !ed_;
+    inp.title = c.note || "";
+    const err = div("expr-err", "", null);
+    const check = () => { const x = Expr.check(inp.value.trim(), names, xo); inp.classList.toggle("bad", !x.ok); err.textContent = x.ok ? "" : x.error; return x.ok; };
+    inp.addEventListener("input", () => { if (check()) liveEdit(it, () => { c.expr = inp.value.trim(); }); });
+    inp.addEventListener("change", () => renderLogic());
+    const chip = document.createElement("span"); chip.dataset.cond = c.name; lgChip(chip, r && r.logic ? r.logic.conds[c.name] : undefined);
+    row.append(inp, chip);
+    if (ed_) row.append(btn("ชื่อ", () => renameCondition(it, c), false, "เปลี่ยนชื่อ (นิพจน์ที่ใช้ชื่อนี้เปลี่ยนตาม)"),
+                        btn("×", () => deleteCondition(it, c), false, "ลบเงื่อนไข (และ decision / กิ่งที่ใช้มัน)"));
+    s1.appendChild(err); check();
+  }
+
+  // ---- ต้นไม้ decision → กิ่ง ----
+  const s2 = div("lg-sec", "<h4>กิ่ง <small>คลิก = เลือก object ในกิ่ง · ตัวเลข = จำนวน object</small></h4>", box);
+  if (!decs.length) div("empty", "ยังไม่มีกิ่ง", s2);
+  if (cov.untested.length && scenarios.length)
+    div("lg-row lg-miss", `⚠ ยังไม่มี scenario ไหนเข้ากิ่ง: ${cov.untested.map(id => esc(branchPath(sp, id))).join(", ")}`, s2);
+  else if (decs.length && !scenarios.length) div("hint", "ยังไม่มี scenario — ตั้งผิวดิน / parameter ให้เข้าแต่ละกิ่ง แล้วกด + บันทึกกรณีนี้ (แผงซ้าย) เพื่อทดสอบให้ครบทุกกิ่ง", s2);
+  const walk = (parent, depth) => {
+    for (const d of decs.filter(x => (x.parent || null) === parent)){
+      const dr = div("lg-row", `<span style="padding-left:${depth * 16}px">◇ <b>${esc(d.label || d.id)}</b> <small>${esc(d.kind === "switch" ? "switch " : "")}${esc(d.test || "")}</small></span>`, s2);
+      const ch = document.createElement("span"); ch.dataset.dec = d.id; lgChip(ch, r && r.logic ? r.logic.decisions[d.id] : undefined); dr.appendChild(ch);
+      if (ed_) dr.appendChild(btn("×", () => deleteDecision(it, d), false, "ลบ decision นี้ (และกิ่ง / decision ที่ซ้อนอยู่ข้างใน)"));
+      for (const b of brs.filter(x => x.decision === d.id)){
+        const objs = Spec.branchObjects(sp, b.id), on = r && r.logic ? !!r.logic.branches[b.id] : false;
+        const tested = cov.by[b.id] || [];
+        const br = div("lg-row lg-br" + (on ? "" : " off"), `<span style="padding-left:${depth * 16 + 14}px"></span><i class="brdot" style="background:${branchColor(sp, b.id)}"></i>`
+          + `<span class="lbl">${esc(b.label || b.id)} <small>${esc(b.id)} · case ${esc(String(b.case))} · ${objs.length} object</small></span>`, s2);
+        const bc = document.createElement("span"); bc.dataset.br = b.id; lgChip(bc, on, "br"); br.appendChild(bc);
+        const t = document.createElement("small");
+        t.textContent = scenarios.length ? (tested.length ? "ทดสอบ: " + tested.join(", ") : "ยังไม่มี scenario") : "";
+        if (scenarios.length && !tested.length) t.className = "lg-miss";
+        br.appendChild(t);
+        if (ed_) br.appendChild(btn("ชื่อ", ev => { ev.stopPropagation(); renameBranch(it, b); }, false, "เปลี่ยนชื่อกิ่ง (ป้ายในรูป / ต้นไม้ / คอมเมนต์ในโค้ด)"));
+        br.title = objs.length ? "คลิก = เลือก " + objs.map(o => o.id).join(", ") : "ยังไม่มี object ในกิ่งนี้";
+        br.onclick = () => { if (objs.length) setSelList(objs.map(o => ({ type: o.kind, item: it.id, id: o.id }))); };
+        walk(b.id, depth + 1);
+      }
+    }
+  };
+  walk(null, 0);
+  if (!ed_ && (conds.length || decs.length)) div("hint", "เข้า Edit เพื่อแก้เงื่อนไข / กิ่ง", box);
+}
+function renameCondition(it, c){
+  const v = (prompt(`ชื่อใหม่ของเงื่อนไข ${c.name}`, c.name) || "").trim();
+  if (!v || v === c.name) return;
+  const bad = condNameError(it.spec, v);
+  if (bad) return alert(bad);
+  const old = c.name;
+  specEdit(sp => Spec.renameCond(sp, old, v), it, `เปลี่ยนชื่อเงื่อนไข ${old} เป็น ${v}`);
+}
+function renameBranch(it, b){
+  const v = (prompt(`ชื่อกิ่ง ${b.id}`, b.label || "") || "").trim();
+  if (!v || v === b.label) return;
+  specEdit(() => { b.label = v; }, it, `เปลี่ยนชื่อกิ่ง ${b.id}`);
+}
+// ลบเงื่อนไข: ใช้ในนิพจน์อื่นอยู่ = ห้าม · decision ที่ใช้มัน = ลบด้วย (ถามว่าจะเอา object ในกิ่งไปไว้ไหน)
+function deleteCondition(it, c){
+  const sp = it.spec, uses = Spec.condUses(sp, c.name);
+  if (uses.length) return alert(`${c.name} ใช้อยู่ใน ${uses.join(", ")} — แก้นิพจน์เหล่านั้นก่อนลบ`);
+  const decs = ((sp.logic || {}).decisions || []).filter(d => d.test === c.name);
+  if (!decs.length) return specEdit(s => { s.logic.conditions = s.logic.conditions.filter(x => x !== c); }, it, `ลบเงื่อนไข ${c.name}`);
+  removeDecisionsDialog(it, decs, `ลบเงื่อนไข ${c.name}`);
+}
+function deleteDecision(it, d){ removeDecisionsDialog(it, [d], `ลบ decision ${d.label || d.id}`); }
+// ถามว่า object ในกิ่งที่จะหายไปไว้ไหน: ย้ายไปกิ่งแม่ / เกิดเสมอ หรือ ลบทิ้ง
+function removeDecisionsDialog(it, decs, title){
+  const sp = it.spec;
+  const trees = decs.map(d => ({ d, t: Spec.decisionTree(sp, d.id) }));
+  const objs = trees.flatMap(x => x.t.branches.flatMap(b => Spec.branchObjects(sp, b)));
+  const lose = trees.flatMap(x => x.t.branches).map(b => branchPath(sp, b));
+  const go = how => { closeDialog(); specEdit(s => { for (const x of trees) Spec.removeDecision(s, x.d.id, how); }, it, title); };
+  if (!objs.length) return go("move");
+  openDialog(title, b => {
+    kv(b, [["กิ่งที่จะหาย", lose.join(", ")], ["object ในกิ่ง", objs.map(o => o.id).join(", ")]]);
+    const to = decs.length === 1 && decs[0].parent ? `กิ่ง ${branchPath(sp, decs[0].parent)}` : "เกิดเสมอ";
+    div("btns", null, b).append(btn(`ย้าย object ไป${to}`, () => go("move")), btn("ลบ object ในกิ่งด้วย", () => go("remove")), btn("ยกเลิก", closeDialog));
+    div("hint", "Ctrl+Z ย้อนได้ทั้งก้อน", b);
+  });
+}
+
+
 $("dock").querySelector(".dock-tabs").addEventListener("click", e => {
   const b = e.target.closest("[data-tab]");
   if (b){ state.dock.tab = b.dataset.tab; state.dock.open = true; persist(); renderDock(); }
@@ -1514,17 +1670,19 @@ function renderScenarios(){
   scenarios.forEach((s, i) => {
     const row = document.createElement("div");
     const name = document.createElement("span");
-    name.innerHTML = `${esc(s.name)}<small>${esc(s.file || "")}</small>`; name.title = "โหลดกรณีนี้ (แทนที่ workspace)";
+    const li = logicItem(), on = li && ((li.spec.logic || {}).branches || []).length ? scenarioBranches(s, li) : null;
+    const brTxt = on ? " · กิ่ง: " + ([...on].map(id => Spec.branchLabel(li.spec, id)).join(", ") || "—") : "";
+    name.innerHTML = `${esc(s.name)}<small>${esc((s.file || "") + brTxt)}</small>`; name.title = "โหลดกรณีนี้ (แทนที่ workspace)" + (on ? `\nกิ่งของ ${itemLabel(li)} ที่เกิดในกรณีนี้ (spec ตอนนี้)` : "");
     name.onclick = () => loadScenario(s);
     const del = document.createElement("button"); del.textContent = "×"; del.title = "ลบ";
-    del.onclick = () => { scenarios.splice(i, 1); saveScenarios(); renderScenarios(); };
+    del.onclick = () => { scenarios.splice(i, 1); saveScenarios(); renderScenarios(); renderLogic(); };
     row.append(name, del); box.appendChild(row);
   });
 }
 $("b-save").onclick = () => {
   const name = prompt("ตั้งชื่อกรณีนี้", "กรณี " + (scenarios.length + 1));
   if (!name) return;
-  scenarios.push(snapshot(name)); saveScenarios(); renderScenarios();
+  scenarios.push(snapshot(name)); saveScenarios(); renderScenarios(); renderLogic();
 };
 function exportScenarios(){
   const blob = new Blob([JSON.stringify(scenarios, null, 2)], { type:"application/json" });

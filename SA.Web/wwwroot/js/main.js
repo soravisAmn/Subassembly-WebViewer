@@ -91,6 +91,8 @@ document.addEventListener("keydown", e => {
   else if (k === "r") startCmd("rotate");                    // Rotate (ส่วนที่วาด ใน Edit mode)
   // X = Auxiliary: ระหว่างวาด = สลับโหมดของชิ้นที่กำลังจะสร้าง · มีของเลือกอยู่ = สลับชุดที่เลือก (Ctrl+X = ตัด อยู่ด้านบน)
   else if (k === "x" && editing && !cmd.name){ if (draw.tool) toggleDrawAux(); else toggleAuxSel(); }
+  // B = วาดลงกิ่ง… (object ที่วาดต่อจากนี้เข้ากิ่งที่เลือก)
+  else if (k === "b" && editing && !cmd.name) chooseDrawBranch();
   else if (k === "a") setAddMode(!addMode);
   else if (k === "f") fit();
   else if (k === "z") zoomSel();                             // Zoom to selection (ไม่มีที่เลือก = Fit)

@@ -176,7 +176,8 @@ const Spec = (() => {
 
   // ---------- คำนวณ ----------
   // ctx = { values: {ชื่อ: ค่า}, codeParams: [...], codePoints: [{x, y, codes}] (เทียบ origin),
-  //         surface: [{x, y}] เทียบ origin หรือ null (ไม่มี/ไม่ได้กำหนด), extendEnds, layout }
+  //         surface: [{x, y}] เทียบ origin หรือ null (ไม่มี/ไม่ได้กำหนด), extendEnds, layout,
+  //         allBranches: ทุกกิ่งเกิด (ใช้วาด "แสดงทุกกรณี" เท่านั้น — ลาดจนชนดินที่ไม่ชน = ยาว layoutLength ไม่ใช่ maxDistance) }
   function evaluate(spec, ctx){
     const issues = [];
     const warn = (obj, msg) => issues.push({ level: "w", obj, msg });
@@ -255,7 +256,7 @@ const Spec = (() => {
       brBusy.delete(id);
       return (brVal[id] = on);
     }
-    const offOf = o => o.branch && !branchOn(o.branch) ? { err: `ไม่เกิด (กิ่ง ${branchLabel(spec, o.branch)})`, off: o.branch } : null;
+    const offOf = o => o.branch && !ctx.allBranches && !branchOn(o.branch) ? { err: `ไม่เกิด (กิ่ง ${branchLabel(spec, o.branch)})`, off: o.branch } : null;
     const Xv = (src, what, viewer) => { try{ return Expr.value(src, env, exprCtx(viewer)); }catch(e){ throw new Error(`${what}: ${e.message}`); } };
     const X = (src, what) => Xv(src, what, null);
 
@@ -338,6 +339,7 @@ const Spec = (() => {
           let hit = null;
           try{ hit = ground.intersect(f.x, f.y, F * dir, s); }catch{ hit = null; }
           if (hit && Math.abs(hit.x - f.x) <= maxD + 1e-9) return hit;
+          if (ctx.allBranches){ const run = X(d.layoutLength ?? "3", "layoutLength"); return { x: f.x + F * dir * run, y: f.y + s * run }; }
           warn(p.id, `${p.id} ลาดจนชนดิน: ไม่ชนผิวดินภายใน ${Expr.num(maxD)} m — หยุดที่ ${Expr.num(maxD)} m`);
           return { x: f.x + F * dir * maxD, y: f.y + s * maxD };
         }
@@ -653,6 +655,66 @@ const Spec = (() => {
     const no = next(lg.branches, "B"); lg.branches.push({ id: no, decision, case: false, label: o.no || "ไม่ " + o.name });
     return { cond, decision, yes, no };
   }
+  // object ที่อยู่ในกิ่งนี้โดยตรง [{ kind: "dpt" | "dlink" | "dshape", id }]
+  function branchObjects(spec, id){
+    return [...spec.points.filter(o => o.branch === id).map(o => ({ kind: "dpt", id: o.id })),
+            ...spec.links.filter(o => o.branch === id).map(o => ({ kind: "dlink", id: o.id })),
+            ...spec.shapes.filter(o => o.branch === id).map(o => ({ kind: "dshape", id: o.id }))];
+  }
+  // ที่ที่ใช้ชื่อเงื่อนไขนี้ในนิพจน์ (ไม่นับ test ของ decision ที่เป็นชื่อเงื่อนไขตรงๆ) — คืน [id ของที่ใช้]
+  function condUses(spec, name){
+    const re = new RegExp(`\\b${name}\\b`), out = [];
+    for (const s of exprSlots(spec)){
+      if (s.obj.test === name && s.key === "test") continue;
+      if (typeof s.obj[s.key] === "string" && re.test(s.obj[s.key]) && !(s.key === "expr" && s.obj.name === name) && !out.includes(s.id)) out.push(s.id);
+    }
+    return out;
+  }
+  // เปลี่ยนชื่อเงื่อนไข: ทุกนิพจน์ + test ของ decision เปลี่ยนตาม
+  function renameCond(spec, oldName, name){
+    const c = ((spec.logic || {}).conditions || []).find(x => x.name === oldName);
+    if (!c) return;
+    const re = new RegExp(`\\b${oldName}\\b`, "g");
+    for (const s of exprSlots(spec)) if (typeof s.obj[s.key] === "string") s.obj[s.key] = s.obj[s.key].replace(re, name);
+    for (const d of spec.logic.decisions || []) if (d.label === oldName) d.label = name;
+    for (const b of spec.logic.branches || []){ if (b.label === oldName) b.label = name; else if (b.label === "ไม่ " + oldName) b.label = "ไม่ " + name; }
+    c.name = name;
+  }
+  // decision นี้ + decision ที่ซ้อนอยู่ในกิ่งของมัน (ทุกชั้น) -> { decisions: [id], branches: [id] }
+  function decisionTree(spec, did){
+    const lg = spec.logic || {}, decs = [], brs = [];
+    const walk = id => {
+      if (decs.includes(id)) return;
+      decs.push(id);
+      for (const b of (lg.branches || []).filter(x => x.decision === id)){ brs.push(b.id); for (const d of (lg.decisions || []).filter(x => x.parent === b.id)) walk(d.id); }
+    };
+    walk(did);
+    return { decisions: decs, branches: brs };
+  }
+  // ลบ decision (และที่ซ้อนอยู่ข้างใน) — object ในกิ่งที่ลบ: moveTo = กิ่งแม่ของ decision / null = เกิดเสมอ · remove = ลบ object ด้วย
+  //   ลบเงื่อนไขที่ไม่มีใครใช้แล้วด้วย · คืนรายการ id ของ object ที่ย้าย / ลบ
+  function removeDecision(spec, did, how){
+    const lg = spec.logic || {}, d = byId(lg.decisions || [], did);
+    if (!d) return [];
+    const t = decisionTree(spec, did), B = new Set(t.branches), touched = [];
+    const moveTo = d.parent || null;
+    if (how === "remove"){
+      for (const o of [...spec.shapes]) if (B.has(o.branch) && spec.shapes.includes(o)) touched.push(...removeCascade(spec, "shape", o.id));
+      for (const o of [...spec.links]) if (B.has(o.branch) && spec.links.includes(o)) touched.push(...removeCascade(spec, "link", o.id));
+      for (const o of [...spec.points]) if (B.has(o.branch) && spec.points.includes(o)) touched.push(...removeCascade(spec, "point", o.id));
+    } else {
+      for (const o of [...spec.points, ...spec.links, ...spec.shapes]) if (B.has(o.branch)){ if (moveTo) o.branch = moveTo; else delete o.branch; touched.push(o.id); }
+    }
+    const names = t.decisions.map(id => byId(lg.decisions, id).test);
+    lg.decisions = lg.decisions.filter(x => !t.decisions.includes(x.id));
+    lg.branches = lg.branches.filter(x => !B.has(x.id));
+    // เงื่อนไขที่ไม่มีใครใช้แล้ว (วนซ้ำ: เงื่อนไขหนึ่งอาจถูกใช้แค่ในอีกเงื่อนไขที่เพิ่งหาย)
+    for (let again = true; again; ){
+      again = false;
+      for (const n of names) if ((lg.conditions || []).some(c => c.name === n) && !lg.decisions.some(x => x.test === n) && !condUses(spec, n).length){ lg.conditions = lg.conditions.filter(c => c.name !== n); again = true; }
+    }
+    return touched;
+  }
   // ปุ่มสำเร็จรูป "ถ้าตัด / ถม" ที่จุดบานพับ hinge — ตัด = ผิวดินสูงกว่าบานพับ (ground(hinge) > hinge.y), ไม่มีผิวดิน = ถม
   //   o = { hinge, target, cut: 1.5, fill: 2 (ลาด 1:x), params: สร้าง CutSlope / FillSlope, dir: 1 | -1, cutCode, fillCode }
   //   ได้: เงื่อนไข IsCut + กิ่ง ตัด / ถม (ซ้อนใต้กิ่งของบานพับ ถ้ามี), จุดลาดจนชนดินกิ่งละจุด + link, จุด firstOf "Daylight" (auxiliary)
@@ -794,6 +856,10 @@ const Spec = (() => {
     }
     for (const g of spec.polygons || []) for (const k of ["radius", "angle"]) out.push({ obj: g, key: k, id: g.id });
     for (const g of spec.rotations || []) out.push({ obj: g, key: "angle", id: g.id });
+    // เงื่อนไข / decision (เปลี่ยนชื่อ parameter แล้วนิพจน์ในเงื่อนไขเปลี่ยนตาม)
+    const lg = spec.logic || {};
+    for (const c of lg.conditions || []) if (c.expr != null) out.push({ obj: c, key: "expr", id: c.name });
+    for (const d of lg.decisions || []) if (d.test != null) out.push({ obj: d, key: "test", id: d.label || d.id });
     return out;
   }
 
@@ -873,7 +939,7 @@ const Spec = (() => {
     return g;
   }
 
-  return { exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
+  return { exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
            isAux, isAuxPoint, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,

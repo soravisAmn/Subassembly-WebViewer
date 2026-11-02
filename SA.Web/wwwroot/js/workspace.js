@@ -192,54 +192,67 @@ function render(){
   renderSelBox();
   $("welcome").style.display = allItems().length ? "none" : "flex";
   renderLegend();
+  updateLogicLive();           // แผง Logic: ค่าจริง / เท็จ สดตอนลากผิวดิน
 }
 
 // ส่วนที่วาด (DrawingSpec) ของ item: เส้นทึบหนากว่าของโค้ด จุดเป็นสี่เหลี่ยม ป้าย P1/L1 แสดงตอนแก้อยู่
+// แสดงทุกกรณี (ตัวที่แก้อยู่ ไม่ได้ดูแบบ Civil 3D): object ที่ไม่เกิดตอนนี้ = เส้นประจางสีของกิ่ง + ป้ายชื่อกิ่ง (คลิก / คลุมเลือกได้)
 function renderSpec(it, r, grp, isSel){
   const spec = it.spec, X = p => sx(r.ox + p.x), Y = p => sy(r.oy + p.y), s = state.sel;
   const editingThis = state.editing === it.id;
+  const geo = (kind, id) => { const q = r[kind][id]; return q && !q.err ? q : ghostOf(it, r, kind, id); };
+  const offBr = (kind, id) => { const q = r[kind][id]; return q && q.err && q.off ? q.off : null; };
   for (const sh of spec.shapes){
-    const q = r.shapes[sh.id];
-    if (q && q.poly) el("polygon", {points: q.poly.map(p => X(p) + "," + Y(p)).join(" "), class:"shape item-hit dshape", "data-kind":"dshape", "data-id":it.id, "data-sid":sh.id}, grp);
+    const q = geo("shapes", sh.id), ob = offBr("shapes", sh.id);
+    if (q && q.poly) el("polygon", {points: q.poly.map(p => X(p) + "," + Y(p)).join(" "), class:"shape item-hit dshape" + (ob ? " ghost" : ""),
+                                    ...(ob ? { style: `--br:${branchColor(spec, ob)}` } : {}), "data-kind":"dshape", "data-id":it.id, "data-sid":sh.id}, grp);
   }
   for (const l of spec.links){
     let q = r.links[l.id];
     if (!q) continue;
     // ซ่อน Auxiliary / ดูแบบ Civil 3D (ไม่วาด link aux · ดูแบบ Civil 3D ไม่วาด link ที่ถูกข้ามด้วย)
     if (Spec.isAux(l) && !auxShown() || q.err && state.bar.c3d) continue;
+    const ob = offBr("links", l.id), gq = ob ? ghostOf(it, r, "links", l.id) : null;
+    if (gq) q = { path: gq.path, arc: gq.arc, ghost: ob };
     // link จริงที่ปลายเป็นจุด auxiliary: วาดเส้นประแดงไว้ให้คลิกไปแก้ (quick fix ใน Properties)
-    if (q.err){
+    else if (q.err){
       const [ea, eb] = Spec.linkEnds(l).map(id => r.pts[id]);
       if (!q.auxEnd || !ea || !eb || ea.err || eb.err) continue;
       q = { path: [ea, eb], bad: true };
     }
     const aux = Spec.isAux(l);
     const d = q.path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" ");
-    el("path", {d, class:"link dlink" + (l.type === "followSurface" ? " follow" : "") + (aux ? " aux" : "") + (q.bad ? " bad" : ""), stroke: colorFor(primaryCode(l.codes))}, grp);
+    el("path", {d, class:"link dlink" + (l.type === "followSurface" ? " follow" : "") + (aux ? " aux" : "") + (q.bad ? " bad" : "") + (q.ghost ? " ghost" : ""),
+                stroke: q.ghost ? branchColor(spec, q.ghost) : colorFor(primaryCode(l.codes))}, grp);
     el("path", {d, class:"link-hit", "data-kind":"dlink", "data-id":it.id, "data-sid":l.id}, grp);
-    // ป้าย: กึ่งกลางเส้นตรง / จุดกลางของโค้ง
+    // ป้าย: กึ่งกลางเส้นตรง / จุดกลางของโค้ง · ไม่เกิดตอนนี้ = ต่อท้ายด้วยชื่อกิ่ง
     if (editingThis){
       const a = q.path[0], b = q.path[q.path.length - 1], m = q.arc ? q.path[q.path.length >> 1] : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      el("text", {x: X(m) + 4, y: Y(m) - 4, class:"d-lbl" + (aux ? " cons" : "")}, grp).textContent = l.id;
+      const t = el("text", {x: X(m) + 4, y: Y(m) - 4, class:"d-lbl" + (aux ? " cons" : "") + (q.ghost ? " ghost-lbl" : "")}, grp);
+      t.textContent = l.id + (q.ghost ? ` ‹${Spec.branchLabel(spec, q.ghost)}›` : "");
+      if (q.ghost) t.setAttribute("fill", branchColor(spec, q.ghost));
     }
   }
   for (const p of spec.points){
-    const q = r.pts[p.id];
-    if (!q || q.err || Spec.isAux(p) && !auxShown()) continue;
+    const ob = offBr("pts", p.id), q = geo("pts", p.id);
+    if (!q || Spec.isAux(p) && !auxShown()) continue;
+    const gs = ob ? { style: `--br:${branchColor(spec, ob)}` } : {};
     // จุด auxiliary = กากบาทเทาเล็กๆ (ไม่อยู่ใน Civil 3D) · พื้นที่คลิกยังเท่าจุดปกติ
     if (Spec.isAux(p)){
-      el("path", {d:`M${X(q)-4} ${Y(q)-4}L${X(q)+4} ${Y(q)+4}M${X(q)+4} ${Y(q)-4}L${X(q)-4} ${Y(q)+4}`, class:"dcons"}, grp);
+      el("path", {d:`M${X(q)-4} ${Y(q)-4}L${X(q)+4} ${Y(q)+4}M${X(q)+4} ${Y(q)-4}L${X(q)-4} ${Y(q)+4}`, class:"dcons" + (ob ? " ghost" : ""), ...gs}, grp);
       el("rect", {x:X(q)-5, y:Y(q)-5, width:10, height:10, class:"dcons-hit", "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
-    } else el("rect", {x:X(q)-4, y:Y(q)-4, width:8, height:8, class:"dpt", "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
+    } else el("rect", {x:X(q)-4, y:Y(q)-4, width:8, height:8, class:"dpt" + (ob ? " ghost" : ""), ...gs, "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
     const lbl = [editingThis ? p.id : "", state.showCodes && (isSel || editingThis) ? p.codes.join(", ") : ""].filter(Boolean).join(" ");
-    if (lbl) el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl" + (Spec.isAux(p) ? " cons" : "")}, grp).textContent = lbl;
+    if (lbl) el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl" + (Spec.isAux(p) ? " cons" : "") + (ob ? " ghost-lbl" : "")}, grp).textContent = lbl;
   }
   if (!isSel) return;
   for (const o of selList()){
     if (o.item !== it.id) continue;
-    if (o.type === "dshape" && r.shapes[o.id] && r.shapes[o.id].poly) el("polygon", {points: r.shapes[o.id].poly.map(p => X(p) + "," + Y(p)).join(" "), class:"sel-shape"}, svg);
-    else if (o.type === "dlink" && r.links[o.id] && r.links[o.id].path) el("path", {d: r.links[o.id].path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" "), class:"sel-link"}, svg);
-    else if (o.type === "dpt" && r.pts[o.id] && !r.pts[o.id].err) el("circle", {cx:X(r.pts[o.id]), cy:Y(r.pts[o.id]), r:9, class:"sel-pt"}, svg);
+    const kind = { dshape: "shapes", dlink: "links", dpt: "pts" }[o.type], q = kind && geo(kind, o.id);
+    if (!q) continue;
+    if (o.type === "dshape" && q.poly) el("polygon", {points: q.poly.map(p => X(p) + "," + Y(p)).join(" "), class:"sel-shape"}, svg);
+    else if (o.type === "dlink" && q.path) el("path", {d: q.path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" "), class:"sel-link"}, svg);
+    else if (o.type === "dpt") el("circle", {cx:X(q), cy:Y(q), r:9, class:"sel-pt"}, svg);
   }
 }
 
@@ -250,9 +263,11 @@ function pickables(){
   const drawnGeoms = (it, r) => {
     const X = p => ({ x: sx(r.ox + p.x), y: sy(r.oy + p.y) }), sp = it.spec, g = [];
     const vis = o => auxShown() || !Spec.isAux(o);          // ซ่อน Auxiliary = คลุมเลือกไม่ได้
-    for (const p of sp.points){ const q = r.pts[p.id]; if (q && !q.err && vis(p)) g.push({ sel:{ type:"dpt", item: it.id, id: p.id }, geoms:[{ pts:[X(q)] }] }); }
-    for (const l of sp.links){ const q = r.links[l.id]; if (q && !q.err && q.path && vis(l)) g.push({ sel:{ type:"dlink", item: it.id, id: l.id }, geoms:[{ pts: q.path.map(X) }] }); }
-    for (const s of sp.shapes){ const q = r.shapes[s.id]; if (q && q.poly) g.push({ sel:{ type:"dshape", item: it.id, id: s.id }, geoms:[{ pts: q.poly.map(X), closed: true }] }); }
+    // แสดงทุกกรณี: ของที่ไม่เกิดตอนนี้คลุมเลือกได้ด้วย (ตำแหน่งเมื่อกิ่งของมันเกิด)
+    const geo = (kind, id) => { const q = r[kind][id]; return q && !q.err ? q : ghostOf(it, r, kind, id); };
+    for (const p of sp.points){ const q = geo("pts", p.id); if (q && vis(p)) g.push({ sel:{ type:"dpt", item: it.id, id: p.id }, geoms:[{ pts:[X(q)] }] }); }
+    for (const l of sp.links){ const q = geo("links", l.id); if (q && q.path && vis(l)) g.push({ sel:{ type:"dlink", item: it.id, id: l.id }, geoms:[{ pts: q.path.map(X) }] }); }
+    for (const s of sp.shapes){ const q = geo("shapes", s.id); if (q && q.poly) g.push({ sel:{ type:"dshape", item: it.id, id: s.id }, geoms:[{ pts: q.poly.map(X), closed: true }] }); }
     return g;
   };
   if (state.editing){

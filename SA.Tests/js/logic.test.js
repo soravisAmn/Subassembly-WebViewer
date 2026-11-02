@@ -224,5 +224,53 @@ test("กดซ้ำที่จุดอื่น: ชื่อไม่ชน
   eq(0, Spec.branchRisks(s).length, "ไม่มีความเสี่ยงอ้างข้ามกิ่ง: " + JSON.stringify(Spec.branchRisks(s)));
 });
 
+console.log("แสดงทุกกรณี / แผง Logic (M4)");
+test("allBranches: object ในกิ่งที่ไม่เกิดมีตำแหน่ง (ลาดที่ไม่ชนดิน = ยาว layoutLength) · ไม่กระทบผลจริง", () => {
+  const s = hingeSpec(); Spec.addCutFill(s, cfOpts);
+  const surf5 = [{ x: -30, y: 5 }, { x: 30, y: 5 }];
+  const real = run(s, { surface: surf5 }), all = Spec.evaluate(s, { values: {}, codeParams: [], codePoints: [], surface: surf5, extendEnds: true, allBranches: true });
+  off(real, "P4"); ok(!all.pts.P4.err, "P4 มีตำแหน่งตอนทุกกิ่งเกิด");
+  near(6, all.pts.P4.x, "ลาดถมลงไม่ชนดินที่สูงกว่า = ยาว 3 m (layoutLength)"); near(-1.5, all.pts.P4.y, "P4.y");
+  near(real.pts.P3.x, all.pts.P3.x, "P3 เหมือนเดิม"); ok(!all.links.L3.err, "L3 มีเส้น");
+  eq(0, all.issues.filter(i => i.msg.includes("ลาดจนชนดิน")).length, "ไม่เตือนลาดที่ไม่ชน");
+});
+test("กิ่งที่ไม่มี object ก็รู้ค่า (scenario coverage) · decision ซ้อนคำนวณเมื่อกิ่งแม่เกิด", () => {
+  const s = sw(); s.points = s.points.filter(p => p.branch !== "B2");
+  const r = run(s);
+  eq(true, r.logic.branches.B2, "B2 ไม่มี object แต่เกิด (Lanes = 2)"); eq(false, r.logic.branches.B1, "B1");
+});
+test("branchObjects / condUses / renameCond (นิพจน์ + test + ป้าย ไม่ IsCut เปลี่ยนตาม)", () => {
+  const s = cutFill();
+  eq("dpt:P3,dlink:L2", Spec.branchObjects(s, "B1").map(o => o.kind + ":" + o.id).join(","), "object ในกิ่ง ตัด");
+  eq("P8,HighFill", Spec.condUses(s, "IsCut").join(","), "ที่ใช้ IsCut (ไม่นับ test ของ D1)");
+  s.logic.branches[1].label = "ไม่ IsCut";
+  Spec.renameCond(s, "IsCut", "Cut");
+  eq("Cut", s.logic.conditions[0].name, "ชื่อ"); eq("Cut", s.logic.decisions[0].test, "test");
+  eq("if(Cut, 1, 0)", Spec.byId(s.points, "P8").def.dy, "นิพจน์ของจุด"); eq("P2.y - ground(P2) > 1 and not Cut", s.logic.conditions[1].expr, "เงื่อนไขอื่น");
+  eq("ไม่ Cut", s.logic.branches[1].label, "ป้ายกิ่ง ไม่ ...");
+  near(5.1724, P(run(s), "P3").x, "ยังคำนวณได้เหมือนเดิม");
+});
+test("เปลี่ยนชื่อ parameter แล้วเงื่อนไขเปลี่ยนตาม (exprSlots รวม logic)", () => {
+  const s = cutFill(); s.logic.conditions[0].expr = "ground(P2) > P2.y + Width - 3";
+  ok(Spec.exprSlots(s).some(x => x.obj === s.logic.conditions[0]), "slot ของเงื่อนไข");
+  ok(Spec.exprSlots(s).some(x => x.obj === s.logic.decisions[0] && x.key === "test"), "slot ของ decision");
+});
+test("removeDecision: ย้าย object ไปกิ่งแม่ / เกิดเสมอ · ลบ object · เงื่อนไขที่ไม่มีใครใช้หายด้วย", () => {
+  const a = cutFill(); a.points = a.points.filter(p => p.id !== "P8");
+  Spec.removeDecision(a, "D2", "move");
+  eq("B2", Spec.byId(a.points, "P7").branch, "P7 ไปกิ่งแม่ (ถม)"); eq("B2", Spec.byId(a.links, "L4").branch, "L4 ไปกิ่งแม่");
+  eq("IsCut", a.logic.conditions.map(c => c.name).join(","), "HighFill หาย (ไม่มีใครใช้)"); eq("B1,B2", a.logic.branches.map(b => b.id).join(","), "กิ่งที่เหลือ");
+  const b = cutFill(); b.points = b.points.filter(p => p.id !== "P8");
+  Spec.removeDecision(b, "D1", "move");
+  ok(b.points.every(p => !p.branch) && b.links.every(l => !l.branch), "ลบ D1 (และ D2 ข้างใน) = ทุกอย่างเกิดเสมอ");
+  eq(0, b.logic.decisions.length + b.logic.branches.length + b.logic.conditions.length, "logic ว่าง");
+  const c = cutFill(); c.points = c.points.filter(p => p.id !== "P8");
+  const gone = Spec.removeDecision(c, "D2", "remove");
+  ok(gone.includes("P7") && gone.includes("L4") && !Spec.byId(c.points, "P7"), "ลบ P7 / L4: " + gone.join(","));
+  const d = cutFill();
+  Spec.removeDecision(d, "D1", "move");
+  ok(d.logic.conditions.some(x => x.name === "IsCut"), "IsCut ยังอยู่ (P8 ใช้ในนิพจน์)");
+});
+
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
 if (typeof process !== "undefined") process.exitCode = failed ? 1 : 0;

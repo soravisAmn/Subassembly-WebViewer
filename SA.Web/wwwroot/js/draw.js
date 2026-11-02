@@ -8,7 +8,8 @@
 
 // list = snap ทั้งหมดที่ตำแหน่งเมาส์ · cyc / lastCyc = ตัวที่ Tab วนไว้ · lastPx/lastPy = เมาส์ล่าสุดบนจอ (ไว้คำนวณใหม่เมื่อกดปุ่ม)
 // aux = โหมด Auxiliary ของชิ้นที่กำลังจะสร้าง (X สลับ — ใช้กับ AUX_TOOLS)
-const draw = { tool: null, chain: [], cand: null, mouse: null, typing: false, list: [], cyc: null, lastCyc: null, lastPx: null, lastPy: null, aux: false };
+// branch = "วาดลงกิ่ง" (B): object ที่สร้างด้วยเครื่องมือวาดเข้ากิ่งนี้ (null = เกิดเสมอ)
+const draw = { tool: null, chain: [], cand: null, mouse: null, typing: false, list: [], cyc: null, lastCyc: null, lastPx: null, lastPy: null, aux: false, branch: null };
 const AUX_TOOLS = ["point", "link", "polygon", "ngon", "arc", "fillet"];
 const auxDrawing = () => draw.aux && AUX_TOOLS.includes(draw.tool);
 // X ระหว่างวาด: สลับโหมด Auxiliary ของชิ้นที่กำลังจะสร้าง (จุด / link ที่สร้างใหม่ = aux · จุดเดิมที่ snap ไม่เปลี่ยน)
@@ -22,7 +23,50 @@ function markNewAux(spec, before){
   for (const o of spec.points) if (!before.P.has(o.id)) o.auxiliary = true;
   for (const o of spec.links) if (!before.L.has(o.id)) o.auxiliary = true;
 }
-const snapshotIds = spec => ({ P: new Set(spec.points.map(p => p.id)), L: new Set(spec.links.map(l => l.id)) });
+const snapshotIds = spec => ({ P: new Set(spec.points.map(p => p.id)), L: new Set(spec.links.map(l => l.id)), S: new Set(spec.shapes.map(s => s.id)) });
+
+// ---------------- กิ่ง (รอบ 4) ----------------
+// สีของกิ่ง (ตามลำดับใน logic.branches) ใช้ทั้งในรูป ต้นไม้ และแผง Logic
+const BR_COLORS = ["#e0892b", "#3b8fd9", "#3fa34d", "#a65ad9", "#d9506e", "#1fa3a3", "#b39b1f", "#6f6fe0"];
+const branchColor = (spec, id) => { const i = ((spec.logic || {}).branches || []).findIndex(b => b.id === id); return i < 0 ? "#8a8f98" : BR_COLORS[i % BR_COLORS.length]; };
+// "แสดงทุกกรณี": ตัวที่แก้อยู่ และไม่ได้กด "ดูแบบ Civil 3D" -> object ที่ไม่เกิดตอนนี้วาดจางเป็นเส้นประจากผลแบบทุกกิ่งเกิด (r.ghost)
+const showAllCases = it => !!it && state.editing === it.id && !state.bar.c3d;
+function ghostOf(it, r, kind, id){
+  const q = r && r[kind][id];
+  if (!q || !q.off || !r.ghost || !showAllCases(it)) return null;
+  const g = r.ghost[kind][id];
+  return g && !g.err ? g : null;
+}
+// ตำแหน่งจุด: ที่เกิดจริง หรือ (แสดงทุกกรณี) ตำแหน่งเมื่อกิ่งของมันเกิด
+function ptOf(it, r, id){
+  const q = r && r.pts[id];
+  return q && !q.err ? q : ghostOf(it, r, "pts", id);
+}
+// กิ่งที่ "วาดลงกิ่ง" ใช้ได้ไหม (กิ่งถูกลบไปแล้ว = กลับเป็นเกิดเสมอ)
+function drawBranch(){
+  const it = editItem();
+  if (!draw.branch || !it || !it.spec || !Spec.byId(((it.spec.logic || {}).branches || []), draw.branch)) draw.branch = null;
+  return draw.branch;
+}
+// B: เลือกกิ่งที่จะวาดลง (หน้าต่างรายการกิ่ง) — ใช้กับทุกเครื่องมือวาด ยกเว้น ถ้าตัด / ถม (กิ่งของมันเอง)
+function chooseDrawBranch(){
+  const it = editItem(); if (!it || !it.spec) return;
+  const sp = it.spec, brs = (sp.logic || {}).branches || [];
+  if (!brs.length) return flashBanner("ยังไม่มีกิ่ง — สร้างเงื่อนไขก่อน (Properties → เกิดเมื่อ → + เงื่อนไขใหม่ / ปุ่ม ถ้าตัด / ถม)");
+  openDialog("วาดลงกิ่ง (B)", b => {
+    div("hint", "object ที่สร้างด้วยเครื่องมือวาดหลังจากนี้จะเข้ากิ่งที่เลือก (Copy / Paste คงกิ่งเดิมของต้นฉบับ)", b);
+    const list = div("flist", null, b);
+    const pick = id => { draw.branch = id; closeDialog(); showBanner(drawBanner()); renderEditBar(); flashBanner(id ? `วาดลงกิ่ง: ${branchPath(sp, id)}` : "วาดแบบเกิดเสมอ"); };
+    const x0 = btn("", () => pick(null)); x0.innerHTML = `เกิดเสมอ<small>${draw.branch ? "" : "ใช้อยู่"}</small>`; list.appendChild(x0);
+    for (const br of brs){
+      const x = btn("", () => pick(br.id));
+      x.innerHTML = `<i class="brdot" style="background:${branchColor(sp, br.id)}"></i>${esc(br.id)}: ${esc(branchPath(sp, br.id))}<small>${draw.branch === br.id ? "ใช้อยู่" : ""}</small>`;
+      list.appendChild(x);
+    }
+  });
+}
+// ชื่อกิ่งเต็ม (กิ่งแม่ › กิ่งนี้)
+const branchPath = (sp, id) => Spec.branchChain(sp, id).reverse().map(b => Spec.branchLabel(sp, b)).join(" › ");
 let drawRes = {};                  // item id -> ผล Spec.evaluate (เทียบ origin) จาก render ล่าสุด
 const TOOL_NAMES = { point: "Point", link: "Link", shape: "Shape", daylight: "ลาดจนชนดิน", follow: "วิ่งตามผิวดิน", polygon: "Polygon", ngon: "Polygon ด้านเท่า",
                      arc: "Arc", fillet: "Fillet", cutfill: "ถ้าตัด / ถม" };
@@ -67,8 +111,10 @@ function specCtx(it, o){
 }
 function evalItem(it){
   if (!it.spec) return null;
-  const o = itemOrigin(it);
-  const r = Spec.evaluate(it.spec, specCtx(it, o));
+  const o = itemOrigin(it), c = specCtx(it, o);
+  const r = Spec.evaluate(it.spec, c);
+  // มีกิ่ง: คำนวณแบบทุกกิ่งเกิดอีกรอบ ไว้วาด object ที่ไม่เกิดตอนนี้ ("แสดงทุกกรณี")
+  if (((it.spec.logic || {}).branches || []).length) r.ghost = Spec.evaluate(it.spec, { ...c, allBranches: true });
   r.ox = o.x; r.oy = o.y;
   return r;
 }
@@ -113,7 +159,14 @@ function specEdit(fn, it, label){
   it = it || editItem();
   if (!it || !it.spec) return;
   History.act(label || "แก้ส่วนที่วาด");
+  // วาดลงกิ่ง: ของที่เครื่องมือวาดเพิ่งสร้างเข้ากิ่งที่เลือก (ถ้าตัด / ถม ตั้งกิ่งเอง)
+  const br = draw.tool && draw.tool !== "cutfill" && it.id === state.editing ? drawBranch() : null, s0 = br ? snapshotIds(it.spec) : null;
   const r = fn(it.spec);
+  if (br){
+    for (const o of it.spec.points) if (!s0.P.has(o.id)) o.branch = br;
+    for (const o of it.spec.links) if (!s0.L.has(o.id)) o.branch = br;
+    for (const o of it.spec.shapes) if (!s0.S.has(o.id)) o.branch = br;
+  }
   persist(); renderAll();
   return r;
 }
@@ -166,7 +219,8 @@ function drawBanner(){
   }[draw.tool];
   document.body.classList.toggle("aux-mode", auxDrawing());
   // โหมด Auxiliary: ป้ายชัดๆ หน้าข้อความ (X = สลับ)
-  return (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (draw.tool === "cutfill" ? "" : " · Tab = พิมพ์ค่า")
+  const br = draw.tool !== "cutfill" && drawBranch() ? `▶ กิ่ง ${branchPath(editItem().spec, draw.branch)} · ` : "";
+  return br + (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (draw.tool === "cutfill" ? "" : " · Tab = พิมพ์ค่า")
        + (AUX_TOOLS.includes(draw.tool) ? ` · X = ${draw.aux ? "กลับเป็นของจริง" : "Auxiliary"}` : "") + " · Esc = ยกเลิก";
 }
 function arcBanner(){
@@ -207,8 +261,8 @@ function prevPoint(){
   // Point: อ้างจากจุดที่เลือก (เลือกหลายชิ้น = จุดที่เลือกล่าสุด)
   const picked = draw.tool === "point" ? selList().filter(s => s.type === "dpt" && s.item === it.id) : [];
   if (!id && picked.length) id = picked[picked.length - 1].id;
-  const p = id && r && r.pts[id];
-  return p && !p.err ? { id, x: p.x, y: p.y } : null;
+  const p = id && ptOf(it, r, id);          // แสดงทุกกรณี: ต่อจากจุดที่ไม่เกิดตอนนี้ได้ (ตำแหน่งเมื่อกิ่งของมันเกิด)
+  return p ? { id, x: p.x, y: p.y } : null;
 }
 
 // ผู้สมัคร snap ที่ตำแหน่งเมาส์ m -> { x, y, kind, label, make() -> id ของจุด }
@@ -293,7 +347,11 @@ function editSnapList(m, A, withRay){
   const points = [];
   // Auxiliary ที่ซ่อนอยู่ (ปุ่ม Aux / ดูแบบ Civil 3D) = snap ไม่ได้
   const vis = o => auxShown() || !Spec.isAux(o);
-  for (const p of spec.points){ const q = r.pts[p.id]; if (q && !q.err && vis(p)) points.push({ x: q.x, y: q.y, label: p.id + (p.codes.length ? " " + p.codes.join(",") : "") + (Spec.isAux(p) ? " (aux)" : ""), make: () => p.id, ref: { type:"pt", id: p.id } }); }
+  for (const p of spec.points){
+    const q = ptOf(it, r, p.id), off = q && r.pts[p.id].err;
+    if (q && vis(p)) points.push({ x: q.x, y: q.y, label: p.id + (p.codes.length ? " " + p.codes.join(",") : "") + (Spec.isAux(p) ? " (aux)" : "") + (off ? ` (ไม่เกิดตอนนี้ · กิ่ง ${Spec.branchLabel(spec, r.pts[p.id].off)})` : ""),
+                                   make: () => p.id, ref: { type:"pt", id: p.id } });
+  }
   const rr = asmRes[it.id];
   if (rr && rr.result && !rr.generated) rr.result.points.forEach((p, i) => {
     const x = p.x - rr.originX, y = p.y - rr.originY, code = p.codes[0];

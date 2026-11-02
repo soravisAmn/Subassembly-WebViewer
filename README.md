@@ -17,6 +17,11 @@
 | object → โค้ด | เลือก object แล้วเห็นบรรทัดในไฟล์ + ปุ่มไปที่โค้ด, เคอร์เซอร์ในโค้ด → เน้น object | **object → บรรทัดโค้ด** |
 | Shortcut | กด `?` / `F1` บนหน้าเว็บ | **Shortcut** |
 
+**รอบ 4 (`prompt-4.md`)** — ทำครบแล้ว (M0–M5): Logic แบบ ก — เงื่อนไข / กิ่ง ติดที่ object (หัวข้อ **กิ่ง (ตัด / ถม ฯลฯ)**)
+- นิพจน์เงื่อนไข (`and or not`, `if()`, `P3.x / P3.y`, `ground()`, `exists()`), กิ่ง if / switch / ซ้อน, ชนิดจุด **จุดแรกที่เกิด**, ปุ่ม **ถ้าตัด / ถม**,
+  แท็บ **Logic** (ค่าสด + scenario ครอบคลุมกิ่ง), **แสดงทุกกรณี**, `B` = วาดลงกิ่ง — JS กับโค้ด C# ที่สร้างให้ผลตรงกัน (เทียบทุกกิ่ง ทั้ง Right / Left / Layout)
+- **ชุดทดสอบใน Civil 3D**: `tests-civil3d/round4-demo.cs` (+ `.assembly.json`) ตัด / ถม / ถมสูง / switch ขอบทาง · ทำตาม `tests-civil3d/round4-checklist.md` (**ยังไม่ได้ทดสอบใน Civil 3D จริง**)
+
 **รอบ 3 (`prompt-3.md`)** — ทำครบแล้ว: Milestone 1–6 + Auxiliary 3b-1, 3b-2 (`prompt-3b.md`)
 - **ชุดทดสอบใน Civil 3D**: `tests-civil3d/round3-demo.cs` (+ `.assembly.json`) มีครบทุกอย่างของรอบ 3 + auxiliary · ทำตาม `tests-civil3d/round3-checklist.md` (หัวข้อ **ทดสอบใน Civil 3D**)
 - **Auxiliary (ช่วยสร้าง)** point / link แบบ SAC: คำนวณ / อ้างอิง / snap ได้ แต่ไม่ส่งออกไป Civil 3D (หัวข้อ **Auxiliary**)
@@ -247,6 +252,10 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
       อยากได้นิยามอื่น (เช่น ตัดเมื่อดินสูงกว่า 0.3 m) แก้นิพจน์ได้ที่ Properties ของจุดลาด แถว "เงื่อนไข IsCut"
     - กดซ้ำที่จุดอื่นได้: ชื่อไม่ชน (`IsCut2`, `CutSlope2`, กิ่ง "ตัด P6") · บานพับที่อยู่ในกิ่ง = ตัด / ถม ชุดใหม่ซ้อนใต้กิ่งนั้น
     - link ต่อจากปลายลาด (เช่น คูระบายน้ำ) ให้ต่อจากจุดลาดของแต่ละกิ่ง หรือวาดจุดถัดไปจาก Daylight แล้วลาก link จากจุดลาดกิ่งละเส้น
+  - **ไฟล์ที่สร้างจากเว็บแล้วแก้โค้ดเองนอกช่วง SA-DRAWING** (Import กลับมาวาดต่อ): ส่วนที่วาดในช่วงนั้นใช้เงื่อนไข / กิ่งได้เหมือนไฟล์ใหม่ (Save แทนที่เฉพาะช่วง โค้ดของคุณไม่หาย)
+    · logic ใน if / else ที่เขียนเองนอกช่วง ยังไม่แปลงเป็นกิ่ง (ไว้รอบหน้า) · ไฟล์เขียนเองที่ยังไม่มีช่วง SA-DRAWING ยัง Save ส่วนที่วาดลงไม่ได้ (เหมือนเดิม)
+  - **object → บรรทัดโค้ด**: แท็บ Logic มีปุ่ม **โค้ด** ที่เงื่อนไข / decision / กิ่ง → ไปบรรทัดที่คำนวณค่า · เคอร์เซอร์บนบรรทัด `bool B3 = …` = เน้น object ในกิ่งนั้นบนรูป
+    (ของที่ไม่เกิดตอนนี้เน้นที่ตำแหน่งแบบแสดงทุกกรณี)
   - โค้ด C#: `bool? IsCut = Cond(cs, "IsCut", () => …);` → `bool B1 = IsCut == true;` → `Pt? P3 = B1 ? … : null;` / `Point p3 = B1 ? AddPoint(…) : null;` /
     `if (B1) AddShape(…)` · switch: `double? D1 = Val(…)` แล้วกิ่งเทียบด้วย `Eq` (กิ่ง `else` = ไม่ตรงกิ่งอื่น) · ชื่อ `B1`, `D1`, `Cond`, `Val`, `V`, `FirstOf` สงวนไว้
 - **ตาราง Parameter แบบ SAC** (Properties ของ subassembly หรือโหนด Parameters): ชื่อ, ชนิด, default, display name, min / max
@@ -437,6 +446,13 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 - build แบบเดียวกับ .cs อื่นของคุณ แล้วทำตาม `tests-civil3d/round3-checklist.md` (ภาษาไทย 7 ข้อ + ตารางพิกัดที่ควรได้)
 - ไฟล์เดียวกันนี้ผ่านการเทียบ JS กับ C# (ทั้ง Right / Left) ใน `dotnet run --project SA.Tests` แล้ว — ที่ยังต้องเช็คใน Civil 3D จริงคือหน้าตา, ความหนักของ corridor, Code Set Style
 - เปิดดูในเว็บ: คัดลอก `round3-demo.assembly.json` ไปไว้โฟลเดอร์เดียวกับ `run-viewer.bat` → ไฟล์ ▾ → Open project (เว็บเปิดไฟล์ได้เฉพาะในโฟลเดอร์นั้น)
+
+### ทดสอบใน Civil 3D (รอบ 4)
+
+`tests-civil3d/round4-demo.cs` = subassembly `TestSubassembly.Round4Demo`: ไหล่ทาง + ลาดตัด / ลาดถมที่เลือกเองตามผิวดิน (`IsCut`),
+ราวกันตกเมื่อถมสูงเกิน `HighFillH` (กิ่งซ้อน), ขอบทางตาม `Curb` (switch), คูต่อจากปลายลาดทั้งสองกรณี (จุดแรกที่เกิด + เงื่อนไขในนิพจน์)
+- ต้องมี target surface ที่ corridor ผ่านทั้งช่วงตัดและถม แล้วทำตาม `tests-civil3d/round4-checklist.md` (10 ข้อ + ตารางพิกัดเมื่อดินราบ)
+- spec เดียวกันอยู่ใน `drawing-cases.json` (เทียบ JS กับ C# 5 กรณี: ตัด, ถมปกติ, ถมสูง + ไม่มีขอบทาง, Left, Layout)
 
 ### ทดสอบ
 

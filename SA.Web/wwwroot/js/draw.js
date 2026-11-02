@@ -37,6 +37,11 @@ function ghostOf(it, r, kind, id){
   const g = r.ghost[kind][id];
   return g && !g.err ? g : null;
 }
+// point / link / shape: ผลที่เกิดจริง หรือ (แสดงทุกกรณี) ผลเมื่อกิ่งของมันเกิด
+function geoOf(it, r, kind, id){
+  const q = r && r[kind][id];
+  return q && !q.err ? q : ghostOf(it, r, kind, id);
+}
 // ตำแหน่งจุด: ที่เกิดจริง หรือ (แสดงทุกกรณี) ตำแหน่งเมื่อกิ่งของมันเกิด
 function ptOf(it, r, id){
   const q = r && r.pts[id];

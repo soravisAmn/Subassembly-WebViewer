@@ -1285,6 +1285,7 @@ function renderLogic(){
     inp.addEventListener("change", () => renderLogic());
     const chip = document.createElement("span"); chip.dataset.cond = c.name; lgChip(chip, r && r.logic ? r.logic.conds[c.name] : undefined);
     row.append(inp, chip);
+    const cb = logicCodeBtn(it, c.name); if (cb) row.append(cb);
     if (ed_) row.append(btn("ชื่อ", () => renameCondition(it, c), false, "เปลี่ยนชื่อ (นิพจน์ที่ใช้ชื่อนี้เปลี่ยนตาม)"),
                         btn("×", () => deleteCondition(it, c), false, "ลบเงื่อนไข (และ decision / กิ่งที่ใช้มัน)"));
     s1.appendChild(err); check();
@@ -1300,6 +1301,7 @@ function renderLogic(){
     for (const d of decs.filter(x => (x.parent || null) === parent)){
       const dr = div("lg-row", `<span style="padding-left:${depth * 16}px">◇ <b>${esc(d.label || d.id)}</b> <small>${esc(d.kind === "switch" ? "switch " : "")}${esc(d.test || "")}</small></span>`, s2);
       const ch = document.createElement("span"); ch.dataset.dec = d.id; lgChip(ch, r && r.logic ? r.logic.decisions[d.id] : undefined); dr.appendChild(ch);
+      const dcb = logicCodeBtn(it, d.id); if (dcb) dr.appendChild(dcb);
       if (ed_) dr.appendChild(btn("×", () => deleteDecision(it, d), false, "ลบ decision นี้ (และกิ่ง / decision ที่ซ้อนอยู่ข้างใน)"));
       for (const b of brs.filter(x => x.decision === d.id)){
         const objs = Spec.branchObjects(sp, b.id), on = r && r.logic ? !!r.logic.branches[b.id] : false;
@@ -1311,6 +1313,7 @@ function renderLogic(){
         t.textContent = scenarios.length ? (tested.length ? "ทดสอบ: " + tested.join(", ") : "ยังไม่มี scenario") : "";
         if (scenarios.length && !tested.length) t.className = "lg-miss";
         br.appendChild(t);
+        const bcb = logicCodeBtn(it, b.id); if (bcb) br.appendChild(bcb);
         if (ed_) br.appendChild(btn("ชื่อ", ev => { ev.stopPropagation(); renameBranch(it, b); }, false, "เปลี่ยนชื่อกิ่ง (ป้ายในรูป / ต้นไม้ / คอมเมนต์ในโค้ด)"));
         br.title = objs.length ? "คลิก = เลือก " + objs.map(o => o.id).join(", ") : "ยังไม่มี object ในกิ่งนี้";
         br.onclick = () => { if (objs.length) setSelList(objs.map(o => ({ type: o.kind, item: it.id, id: o.id }))); };

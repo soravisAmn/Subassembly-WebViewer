@@ -80,8 +80,13 @@ function codeCursor(line){
   const it = selItem(), rr = it && asmRes[it.id];
   let list = [];
   if (rr && rr.ok && codeViewMatches(it, { linesFor: rr.linesFor })){
-    if (rr.drawnLines && it.spec) for (const [id, L] of Object.entries(rr.drawnLines)) if (L.includes(line))
-      list.push({ type: Spec.byId(it.spec.points, id) ? "dpt" : Spec.byId(it.spec.links, id) ? "dlink" : "dshape", id });
+    if (rr.drawnLines && it.spec) for (const [id, L] of Object.entries(rr.drawnLines)) if (L.includes(line)){
+      const sp = it.spec;
+      if (Spec.byId(sp.points, id)) list.push({ type: "dpt", id });
+      else if (Spec.byId(sp.links, id)) list.push({ type: "dlink", id });
+      else if (Spec.byId(sp.shapes, id)) list.push({ type: "dshape", id });
+      else for (const b of logicBranchesOf(sp, id)) for (const o of Spec.branchObjects(sp, b)) list.push({ type: o.kind, id: o.id });   // บรรทัดเงื่อนไข / decision / กิ่ง
+    }
     const res = rr.result;
     if (res && !rr.generated){
       const hit = o => o.sites && o.sites.some(x => x.line === line);
@@ -92,6 +97,21 @@ function codeCursor(line){
   }
   codeHot = list.length ? { item: it.id, list } : null;
   render();
+}
+
+// id ในโค้ด (ชื่อเงื่อนไข / D1 / B1) -> กิ่งที่บรรทัดนั้นตัดสิน
+function logicBranchesOf(sp, id){
+  const lg = sp.logic || {}, brs = lg.branches || [], decs = lg.decisions || [];
+  if (Spec.byId(brs, id)) return [id];
+  const ds = Spec.byId(decs, id) ? [id] : decs.filter(d => d.test === id).map(d => d.id);
+  return brs.filter(b => ds.includes(b.decision)).map(b => b.id);
+}
+// ปุ่มไปที่บรรทัดของเงื่อนไข / decision / กิ่ง ในโค้ดที่สร้าง (แท็บ Logic) — ยังไม่รู้บรรทัด = ไม่มีปุ่ม
+function logicCodeBtn(it, id){
+  const rr = asmRes[it.id], L = rr && rr.ok && rr.drawnLines && rr.drawnLines[id];
+  if (!L || !L.length) return null;
+  const b = btn("โค้ด", ev => { ev.stopPropagation(); gotoCode(it, L, rr.linesFor); }, false, `ไปบรรทัด ${L.join(", ")} ของโค้ด`);
+  return b;
 }
 
 // วาดเน้น object ของ codeHot (เรียกจาก render)
@@ -106,8 +126,8 @@ function renderCodeHot(){
     if (o.type === "pt" && P[o.i]) el("circle", { cx: sx(P[o.i].x), cy: sy(P[o.i].y), r: 9, class: "code-hot" }, svg);
     else if (o.type === "link" && rr.result.links[o.i]) el("path", { d: path(rr.result.links[o.i].pts.map(k => P[k])), class: "code-hot" }, svg);
     else if (o.type === "shape" && rr.result.shapes[o.i] && rr.result.shapes[o.i].polygon) el("path", { d: path(rr.result.shapes[o.i].polygon.map(k => P[k])) + "Z", class: "code-hot area" }, svg);
-    else if (d && o.type === "dpt" && d.pts[o.id] && !d.pts[o.id].err){ const q = local(d.pts[o.id]); el("circle", { cx: sx(q.x), cy: sy(q.y), r: 9, class: "code-hot" }, svg); }
-    else if (d && o.type === "dlink" && d.links[o.id] && d.links[o.id].path) el("path", { d: path(d.links[o.id].path.map(local)), class: "code-hot" }, svg);
-    else if (d && o.type === "dshape" && d.shapes[o.id] && d.shapes[o.id].poly) el("path", { d: path(d.shapes[o.id].poly.map(local)) + "Z", class: "code-hot area" }, svg);
+    else if (d && o.type === "dpt" && ptOf(it, d, o.id)){ const q = local(ptOf(it, d, o.id)); el("circle", { cx: sx(q.x), cy: sy(q.y), r: 9, class: "code-hot" }, svg); }
+    else if (d && o.type === "dlink"){ const q = geoOf(it, d, "links", o.id); if (q && q.path) el("path", { d: path(q.path.map(local)), class: "code-hot" }, svg); }
+    else if (d && o.type === "dshape"){ const q = geoOf(it, d, "shapes", o.id); if (q && q.poly) el("path", { d: path(q.poly.map(local)) + "Z", class: "code-hot area" }, svg); }
   }
 }

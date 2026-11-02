@@ -1171,6 +1171,7 @@ public static class CodeGenerator
     // source map: id ของ point / link / shape ที่วาด -> เลขบรรทัด (1-based) ในข้อความทั้งไฟล์
     //   point = บรรทัดคำนวณพิกัด (Pt? P3 = ...) + บรรทัดเพิ่มลง CorridorState (AddPoint(cs, P3 ...))
     //   link = บรรทัด AddLink / FollowSurface · shape = บรรทัด AddShape
+    //   เงื่อนไข (ชื่อ) / decision (D1, switch / if ที่เป็นนิพจน์) / กิ่ง (B1) = บรรทัดที่คำนวณค่า (แท็บ Logic → ปุ่ม โค้ด)
     // อ่านจากช่วง SA-DRAWING ของข้อความจริง จึงตรงกับไฟล์เสมอ ทั้งไฟล์ที่สร้างใหม่และไฟล์ที่ช่วงนี้อยู่กลางไฟล์
     // (นับรวมบรรทัด CALL / PARAM / TARGET ที่อยู่ก่อนหน้าแล้ว)
     private static readonly System.Text.RegularExpressions.Regex[] MapPatterns =

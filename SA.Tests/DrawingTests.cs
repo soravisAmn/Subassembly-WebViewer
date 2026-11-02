@@ -98,6 +98,32 @@ static class DrawingTests
             var r = CodeGenerator.ReplaceBlock(lf, b, CodeGenerator.GenerateBlock(DrawingSpec.Parse(json), json, b.Indent));
             if (r.Contains('\r')) throw new Exception("มี CR หลุดเข้ามา");
         });
+        test("ไฟล์ที่แก้เองนอกช่วง SA-DRAWING + กิ่ง (รอบ 4 ข้อ 6): รันได้ สลับตัด / ถม, Save ซ้ำโค้ดผู้ใช้ไม่หาย, sa-spec อ่าน logic กลับได้ครบ", () =>
+        {
+            var c = cases.First(x => x!["spec"] is JsonNode s && (string?)s["className"] == "CutFillButton")!;
+            var json = c["spec"]!.ToJsonString();
+            var spec = DrawingSpec.Parse(json);
+            var h = CodeGenerator.HelperClass(spec);
+            // ผู้ใช้เขียนโค้ดเองใน Draw ก่อนเรียกส่วนที่วาด (นอกช่วงป้าย)
+            var file = CodeGenerator.GenerateFile(spec, json, "CutFillButton.cs")
+                .Replace($"{h}.Draw(corridorState); {CodeGenerator.CallTag}",
+                         $"corridorState.Points.Add(0, 1, \"UserMark\");   // ผู้ใช้เขียนเอง\r\n                {h}.Draw(corridorState); {CodeGenerator.CallTag}");
+            if (!file.Contains("UserMark")) throw new Exception("แทรกโค้ดผู้ใช้ไม่ได้");
+            var b = CodeGenerator.FindBlock(file) ?? throw new Exception("หาช่วงป้ายไม่เจอ");
+            var back = DrawingSpec.Parse(b.SpecJson!);
+            if (back.Logic == null || back.Logic.Conditions.Count != 1 || back.Logic.Branches.Count != 2 || back.Points.Count(p => p.Branch != null) != 2)
+                throw new Exception("sa-spec อ่าน logic / กิ่งกลับมาไม่ครบ");
+            // Save ซ้ำ (แทนที่ช่วง) แล้วโค้ดผู้ใช้อยู่ครบ
+            var saved = CodeGenerator.ReplaceBlock(file, b, CodeGenerator.GenerateBlock(spec, json, b.Indent));
+            if (saved != file) throw new Exception("Save ซ้ำแล้วไฟล์เปลี่ยน");
+            var compiled = compiler.Compile(saved, "CutFillButton.cs");
+            if (!compiled.Success) throw new Exception("คอมไพล์ไม่ผ่าน: " + string.Join(" | ", compiled.Diagnostics.Where(d => d.Severity == "Error").Select(d => d.Message)));
+            string Codes(double ground) => string.Join(",", runner.Run(compiled.Classes[0], null, new WorldInput
+                { Surface = new() { new(-30, ground), new(30, ground) }, OriginElevation = 100 }).Points.SelectMany(p => p.Codes));
+            var cut = Codes(5); var fill = Codes(-4);
+            if (!cut.Contains("UserMark") || !cut.Contains("Daylight_Cut") || cut.Contains("Daylight_Fill")) throw new Exception("ผิวดินสูง ต้องเป็นตัด: " + cut);
+            if (!fill.Contains("UserMark") || !fill.Contains("Daylight_Fill") || fill.Contains("Daylight_Cut")) throw new Exception("ผิวดินต่ำ ต้องเป็นถม: " + fill);
+        });
         test("object → บรรทัดโค้ด ครบทุกชนิด (polar, polygon, โค้ง, Fillet, กลุ่มหมุน, auxiliary) ในทุกกรณีทดสอบ", () =>
         {
             foreach (var c in cases)

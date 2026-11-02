@@ -40,15 +40,18 @@
 
 ## สถานะล่าสุด (อัปเดตทุกครั้งที่จบ milestone)
 - รอบ 1 (`prompt.md`), รอบ 2 (`prompt-2.md`), รอบ 3 + 3b (`prompt-3.md`, `prompt-3b.md`) — **เสร็จแล้ว** (commit `ha`)
-- ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs` ใน Civil 3D จริง
-- **กำลังทำ: `prompt-4.md`** — M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบผู้ใช้อยู่ใน `prompt-4-design.md` (ตอบ "ตามที่เสนอ" ทุกข้อ), จัดระเบียบ repo แล้ว (เลิก track bin/obj · ยังเหลือของที่ควรลบ ดูไฟล์นั้น)
+- ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs` และ `tests-civil3d/round4-demo.cs` ใน Civil 3D จริง (เครื่องนี้ไม่มี Civil 3D)
+- **รอบ 4 `prompt-4.md` เสร็จแล้ว** — M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบผู้ใช้อยู่ใน `prompt-4-design.md` (ตอบ "ตามที่เสนอ" ทุกข้อ), จัดระเบียบ repo แล้ว (เลิก track bin/obj · ยังเหลือของที่ควรลบ ดูไฟล์นั้น)
   M1 เสร็จ (2026-11-02): นิพจน์เงื่อนไข + P3.x/y, ground(), exists(), hasGround() ใน JS / C# (test: `cond.test.js`, `ExprTests.cs`, drawing-cases 31–35)
   M2 เสร็จ (2026-11-02): กิ่ง if / switch / ซ้อน + `firstOf` ใน JS / C# + UI ขั้นต่ำ "เกิดเมื่อ" ใน Properties (test: `logic.test.js`, ExprTests "กิ่ง -> C#", drawing-cases 36–44)
   - ตกลงระหว่างทำ: firstOf เป็น auxiliary → link จริงหลังกิ่งต้องต่อจากจุดในแต่ละกิ่งเอง (ยังไม่มี "จุดแทน" ที่ AddLink ได้)
   - object ที่ไม่เกิดถูกซ่อน (เลือกบนรูปไม่ได้จนกว่าจะเกิด) — "แสดงทุกกรณี" อยู่ M4
   M3 เสร็จ (2026-11-02): ปุ่ม "ถ้าตัด / ถม" ใน drawer (`Spec.addCutFill` + หน้าต่างใน ui.js; test: `logic.test.js`, drawing-cases 45–49)
   M4 เสร็จ (2026-11-02): แท็บ Logic (ค่าสด, ต้นไม้กิ่ง, เปลี่ยนชื่อ / ลบ), แสดงทุกกรณี (`evaluate` + `allBranches`), ป้ายกิ่งในต้นไม้, scenario ครอบคลุมกิ่ง, B = วาดลงกิ่ง, เกิดเมื่อหลายชิ้น
-  ถัดไป: M5 รวมงาน — ข้อ 6 (ส่วนที่วาดในไฟล์ import ใช้ logic), codelink / undo ครบ, `tests-civil3d/round4-demo.cs` + checklist, README (prompt-4.md ข้อ 8)
+  M5 เสร็จ (2026-11-02): ข้อ 6 (ไฟล์ที่แก้เองนอกช่วง + กิ่ง — test ใน DrawingTests), codelink ของเงื่อนไข / กิ่ง (แท็บ Logic → โค้ด, เคอร์เซอร์บรรทัดกิ่ง → object),
+  `tests-civil3d/round4-demo.cs` + `round4-checklist.md` (+ drawing-cases 50–54) → **รอบ 4 จบ** รอทดสอบใน Civil 3D
+  ข้อเสนอที่ยังไม่ทำ (prompt-4 ข้อ 6): แสดงในแท็บ Logic ว่าโค้ดที่เขียนเองเข้า if บรรทัดไหน — งานแยก ถ้าผู้ใช้ต้องการ
+  ถัดไป: prompt-5 (Logic ข — flowchart แบบ SAC ที่แก้ข้อมูลชุดเดียวกัน) ยังไม่มีไฟล์ prompt-5.md
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

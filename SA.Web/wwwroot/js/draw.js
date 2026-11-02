@@ -772,10 +772,11 @@ function commitRadiusTyping(){
 const typingRef = () => draw.tool !== "daylight" && trackOn() && trk.list.length ? Track.main(trk.list) : null;
 function checkTyped(field, v, names){
   if (!v) return { ok: true };
-  if (field === "slope") return Expr.check(slopeMag(v), names);
+  const it = editItem(), o = it && it.spec ? Spec.exprOpts(it.spec) : {};   // อ้างจุดได้ เช่น dy = ground(P2) - P2.y
+  if (field === "slope") return Expr.check(slopeMag(v), names, o);
   const pol = field === "dx" ? Track.polarText(v) : null;
-  if (pol){ const a = Expr.check(pol.length, names); return a.ok ? Expr.check(pol.angle, names) : a; }
-  return Expr.check(v, names);
+  if (pol){ const a = Expr.check(pol.length, names, o); return a.ok ? Expr.check(pol.angle, names, o) : a; }
+  return Expr.check(v, names, o);
 }
 function openTyping(first){
   if (draw.tool === "ngon" && draw.mouse) return openNgonTyping(first);

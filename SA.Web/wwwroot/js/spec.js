@@ -37,7 +37,8 @@
 //   ยกเว้นจุดที่ pivot อ้างถึง (ทางอ้อมด้วย) เห็นค่า raw — ตรงกับลำดับในโค้ด C# (คำนวณก่อนบรรทัด Rotate)
 //   1 จุดอยู่ได้กลุ่มเดียว · pivot ไม่อยู่ในกลุ่มตัวเอง
 //
-// ระยะสอง: point/link จะมี "cond" (เงื่อนไขการเกิด) ได้ — evaluator ตอนนี้ไม่สนใจ key ที่ไม่รู้จัก
+// นิพจน์ (ดู expr.js) อ้างจุดได้: P3.x (กรอบ Side = Right) / P3.y / ground(P3) / exists(P3) — จุดที่อ้างนับเป็นการพึ่งพา (refs)
+// Logic (เงื่อนไข / กิ่ง) ของรอบ 4: โครงข้อมูลดู prompt-4-design.md
 // ไฟล์นี้ไม่ใช้ DOM เพื่อให้ node โหลดไปทดสอบได้ (SA.Tests/js)
 "use strict";
 const Spec = (() => {
@@ -71,7 +72,12 @@ const Spec = (() => {
   }
 
   // ---------- โครงสร้าง ----------
-  const refs = def => ["from", "a", "b", "a1", "a2", "b1", "b2", "corner", "toward", "other"].map(k => def[k]).filter(Boolean);
+  // จุดที่ def อ้างถึง: ช่องอ้างจุด (from, a, b, ...) + จุดในนิพจน์ (P3.x, ground(P3), exists(P3)) — ต้องคำนวณก่อน / ลบแล้วจุดนี้หาย
+  const refs = def => {
+    const r = ["from", "a", "b", "a1", "a2", "b1", "b2", "corner", "toward", "other"].map(k => def[k]).filter(Boolean);
+    for (const k of EXPR_FIELDS[def.type] || []) for (const id of Expr.pointRefsOf(def[k])) if (!r.includes(id)) r.push(id);
+    return r;
+  };
   const linkEnds = l => l.points ? l.points : [l.from, l.to];
   // จุดทั้งหมดที่ link ใช้ (ปลาย + จุดผ่านของ arc3 + มุมของ fillet) — ลบจุดเหล่านี้ = link หาย · Move ย้ายไปด้วย
   const linkRefs = l => linkEnds(l).concat([l.via, l.corner].filter(Boolean));
@@ -96,6 +102,11 @@ const Spec = (() => {
     const s = new Set(spec.params.map(p => p.name));
     for (const p of codeParams || []) if (p.kind === "double" || p.kind === "long") s.add(p.name);
     return [...s];
+  }
+  // ตัวเลือกของ Expr.check สำหรับช่องนิพจน์ของ spec นี้: จุดที่อ้างได้ + target (ไฟล์ import ใช้ target ของโค้ดเดิม = ไม่ตรวจชื่อ)
+  //   self = id ของ object ที่ช่องนี้เป็นของ (อ้างตัวเองไม่ได้)
+  function exprOpts(spec, self){
+    return { points: spec.points.map(p => p.id).filter(id => id !== self), targets: spec.imported ? null : spec.targets.map(t => t.name) };
   }
   // ช่องนิพจน์ของ def แต่ละชนิด
   const EXPR_FIELDS = { delta: ["dx", "dy"], polar: ["length", "angle"], slopeLength: ["slope", "length"], slopeToSurface: ["slope", "maxDistance", "layoutLength"],
@@ -128,7 +139,22 @@ const Spec = (() => {
     const F = spec.side && spec.side.mirror && env[spec.side.param] === 1 ? -1 : 1;
     const ground = ctx.surface && ctx.surface.length >= 2 && !ctx.layout ? makeGround(ctx.surface, ctx.extendEnds) : null;
     const noTargetMsg = "ไม่ได้กำหนด Target Surface";
-    const X = (src, what) => { try{ return Expr.value(src, env); }catch(e){ throw new Error(`${what}: ${e.message}`); } };
+    // นิพจน์ที่อ้างจุด / ผิวดิน: viewer = จุดที่กำลังคำนวณ (กลุ่มหมุน: เห็นค่า raw / ค่าที่หมุนตาม needFrom) · null = link
+    //   P3.x = ค่าในกรอบ Side = Right (F × x) · ground(P3) ไม่มีผิวดิน = ระดับของ P3 เอง + เตือน (แบบลาดจนชนดิน) · ตรงกับ CodeGenerator
+    const exprCtx = viewer => ({
+      px: id => F * needFrom(viewer, id).x,
+      py: id => needFrom(viewer, id).y,
+      ground: id => {
+        const q = needFrom(viewer, id);
+        if (ground) return ground.elev(q.x);
+        if (!ctx.layout) warn(viewer || id, `${viewer ? viewer + " " : ""}ground(${id}): ${noTargetMsg} — ใช้ระดับของ ${id}`);
+        return q.y;
+      },
+      exists: id => { try{ needFrom(viewer, id); return true; }catch{ return false; } },
+      hasGround: () => !!ground
+    });
+    const Xv = (src, what, viewer) => { try{ return Expr.value(src, env, exprCtx(viewer)); }catch(e){ throw new Error(`${what}: ${e.message}`); } };
+    const X = (src, what) => Xv(src, what, null);
 
     // กลุ่มหมุน: จุด -> กลุ่ม · pre[กลุ่ม] = จุดนอกกลุ่มที่ pivot อ้างถึง (ทางอ้อมด้วย) — เห็นสมาชิกเป็นค่า raw
     const groupOf = {}, pre = {};
@@ -180,7 +206,7 @@ const Spec = (() => {
     }
     const need = id => needFrom(null, id);          // link: เห็นค่าที่หมุนแล้ว
     function calcPoint(p){
-      const d = p.def, need = id => needFrom(p.id, id);
+      const d = p.def, need = id => needFrom(p.id, id), X = (src, what) => Xv(src, what, p.id);
       switch (d.type){
         case "origin": return { x: 0, y: 0 };
         case "delta": { const f = need(d.from); return { x: f.x + F * X(d.dx, "dx"), y: f.y + X(d.dy, "dy") }; }
@@ -669,7 +695,7 @@ const Spec = (() => {
     return g;
   }
 
-  return { POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
+  return { exprOpts, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
            isAux, isAuxPoint, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,

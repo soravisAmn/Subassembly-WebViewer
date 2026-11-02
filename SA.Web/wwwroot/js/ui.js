@@ -605,10 +605,10 @@ function exprRow(parent, it, label, small, value, onValid, opts = {}){
   const inp = document.createElement("input"); inp.type = "text"; inp.value = value ?? ""; inp.disabled = !canEdit(it);
   inp.className = "expr";
   const err = div("expr-err", "", parent);
-  const names = specNames(it);
+  const names = specNames(it), xo = it.spec ? Spec.exprOpts(it.spec) : {};   // อ้างจุดได้ (P3.y, ground(P3), ...)
   const check = () => {
     const v = inp.value.trim();
-    const r = opts.optional && !v ? { ok: true } : Expr.check(opts.slope ? v.replace(/^(-?)1:/, "$11/") : v, names);
+    const r = opts.optional && !v ? { ok: true } : Expr.check(opts.slope ? v.replace(/^(-?)1:/, "$11/") : v, names, xo);
     inp.classList.toggle("bad", !r.ok); err.textContent = r.ok ? "" : r.error;
     return r.ok;
   };
@@ -989,7 +989,7 @@ const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
 const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
   "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
-  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation abstract as base bool break byte case catch char checked class const continue " +
+  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try abstract as base bool break byte case catch char checked class const continue " +
   "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
   "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +
   "static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while var").split(" "));
@@ -1021,6 +1021,7 @@ function renameSpecParam(it, p, v){
   if (v === p.name) return true;
   if (!IDENT.test(v)){ alert("ชื่อ parameter ต้องเป็นตัวอังกฤษ/ตัวเลข/_ และไม่ขึ้นต้นด้วยตัวเลข"); return false; }
   if (RESERVED.has(v) || /^([PpLlSs]\d+|surface\d+)$/.test(v)){ alert(`ตั้งชื่อ ${v} ไม่ได้ — โค้ดที่สร้างใช้ชื่อนี้เอง (เช่น F, P1, cs, double)`); return false; }
+  if (Expr.KEYWORDS.has(v.toLowerCase())){ alert(`ตั้งชื่อ ${v} ไม่ได้ — เป็นคำในนิพจน์ (and or not true false)`); return false; }
   if (specNames(it).includes(v) || Expr.FUNCS[v.toLowerCase()]){ alert(`มีชื่อ ${v} อยู่แล้ว (หรือเป็นชื่อฟังก์ชัน)`); return false; }
   const old = p.name, re = new RegExp(`\\b${old}\\b`, "g");
   specEdit(sp => {

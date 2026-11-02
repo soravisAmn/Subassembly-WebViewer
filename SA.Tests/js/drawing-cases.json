@@ -1216,5 +1216,65 @@
       "BlockAng": -25
     },
     "copySpecFrom": 29
+  },
+  {
+    "name": "นิพจน์อ้างเรขาคณิต: P3.x/y, ground(), exists(), hasGround(), if/and/or/not, == (Right: ตัด)",
+    "surface": [{ "x": -30, "y": -5 }, { "x": 0, "y": -1 }, { "x": 30, "y": 30 }],
+    "spec": { "className": "ExprGeo", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }, { "name": "Width", "kind": "double", "default": 3 }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": ["Crown"], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["Hinge"], "def": { "type": "delta", "from": "P1", "dx": "Width", "dy": "0" } },
+        { "id": "P3", "codes": ["OnGround"], "def": { "type": "delta", "from": "P2", "dx": "1", "dy": "ground(P2) - P2.y" } },
+        { "id": "P4", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "if(ground(P2) > P2.y, 2, 4)", "dy": "if(P2.x > 2 and not (Width == 4), -1, -2)" } },
+        { "id": "P5", "codes": [], "def": { "type": "polar", "from": "P1", "length": "1", "angle": "if(hasGround() && exists(P3), 30, 60)" } },
+        { "id": "P6", "codes": [], "def": { "type": "slopeLength", "from": "P4", "slope": "if(ground(P4) >= P4.y || exists(P9), -0.5, 0.5)", "length": "max(1, abs(P3.y))", "dir": 1, "measure": "dx" } },
+        { "id": "P7", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "if(exists(P9), 9, 0.5)", "dy": "-3" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Top"] },
+        { "id": "L2", "points": ["P2", "P3"], "codes": [] },
+        { "id": "L3", "points": ["P1", "P4"], "codes": [] },
+        { "id": "L4", "points": ["P4", "P6"], "codes": [] },
+        { "id": "L5", "points": ["P4", "P7"], "codes": [] },
+        { "id": "L6", "type": "arcR", "from": "P7", "to": "P1", "radius": "max(3, P2.x)", "sweep": "ccw", "seg": { "by": "count", "value": "4" }, "codes": [] }
+      ],
+      "shapes": [], "side": { "param": "Side", "mirror": true } }
+  },
+  {
+    "name": "นิพจน์อ้างเรขาคณิต Side = Left (x ในกรอบ Right, ผิวดินฝั่งซ้ายต่ำ = ถม)",
+    "surface": [{ "x": -30, "y": -5 }, { "x": 0, "y": -1 }, { "x": 30, "y": 30 }],
+    "values": { "Side": 1 },
+    "copySpecFrom": 31
+  },
+  {
+    "name": "นิพจน์อ้างเรขาคณิต Layout mode: ground() = ระดับของจุดเอง, hasGround() = เท็จ (ไม่เตือน)",
+    "surface": [{ "x": -30, "y": -5 }, { "x": 0, "y": -1 }, { "x": 30, "y": 30 }],
+    "layout": true, "values": { "Width": 4 },
+    "copySpecFrom": 31
+  },
+  {
+    "name": "นิพจน์อ้างเรขาคณิต ไม่ได้กำหนด Target Surface: ground() = ระดับของจุดเอง + เตือน",
+    "surface": [{ "x": -30, "y": -5 }, { "x": 0, "y": -1 }, { "x": 30, "y": 30 }],
+    "surfaceAssigned": false,
+    "copySpecFrom": 31
+  },
+  {
+    "name": "นิพจน์อ้างจุดที่ไม่มี / ground() นอกขอบเขต surface -> จุดนั้นหาไม่ได้ + เตือน (exists เป็นเท็จ)",
+    "surface": [{ "x": -10, "y": -2 }, { "x": 10, "y": -2 }],
+    "extendEnds": false,
+    "spec": { "className": "ExprMissing", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "40", "dy": "0" } },
+        { "id": "P3", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "1", "dy": "ground(P2)" } },
+        { "id": "P4", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "P9.x", "dy": "0" } },
+        { "id": "P5", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "2", "dy": "if(exists(P4), 1, -1)" } }
+      ],
+      "links": [{ "id": "L1", "points": ["P1", "P5"], "codes": [] }, { "id": "L2", "points": ["P1", "P3"], "codes": [] }],
+      "shapes": [], "side": { "param": "Side", "mirror": true } }
   }
 ]

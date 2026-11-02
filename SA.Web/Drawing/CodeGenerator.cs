@@ -40,7 +40,8 @@ public static class CodeGenerator
         // ชื่อตัวช่วยในโค้ดที่สร้าง (ตัวแปรชื่อเดียวกันจะบังเมธอด / ชนิด)
         "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Tangent", "Rotate",
         "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
-        "GetLong", "GetDouble", "Elevation",
+        "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try",
+        // คำในนิพจน์ (and or not true false — ไม่สนตัวพิมพ์ ตรวจใน IsReservedName)
         "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue","decimal","default",
         "delegate","do","double","else","enum","event","explicit","extern","false","finally","fixed","float","for","foreach","goto",
         "if","implicit","in","int","interface","internal","is","lock","long","namespace","new","null","object","operator","out",
@@ -48,7 +49,8 @@ public static class CodeGenerator
         "static","string","struct","switch","this","throw","true","try","typeof","uint","ulong","unchecked","unsafe","ushort","using",
         "virtual","void","volatile","while","var","Math","Point","Link","Shape","ObjectId"
     };
-    public static bool IsReservedName(string n) => Reserved.Contains(n) || System.Text.RegularExpressions.Regex.IsMatch(n, @"^([PpLlSs]\d+|surface\d+)$");
+    public static bool IsReservedName(string n) => Reserved.Contains(n) || SpecExpr.Keywords.Contains(n)
+        || System.Text.RegularExpressions.Regex.IsMatch(n, @"^([PpLlSs]\d+|surface\d+)$");
 
     public static string HelperClass(DrawingSpec s) => "SaDrawing_" + s.ClassName;
 
@@ -189,11 +191,18 @@ public static class CodeGenerator
         private readonly StringBuilder _o = new();
         private readonly HashSet<string> _names;
         private readonly Dictionary<string, string> _surf = new();   // ชื่อ target -> ตัวแปร ObjectId
+        private readonly ExprScope _scope;
 
         public Gen(DrawingSpec s)
         {
             _s = s;
             _names = s.Params.Select(p => p.Name).ToHashSet();
+            // นิพจน์อ้างจุดได้ (จุดที่ไม่มี = หาไม่ได้ตอนรัน แบบเดียวกับในเว็บ) · ไฟล์ import ใช้ target ของโค้ดเดิม = ไม่ตรวจชื่อ
+            _scope = new ExprScope
+            {
+                Params = _names, Points = s.Points.Select(p => p.Id).ToHashSet(), AllowMissingPoints = true,
+                Targets = s.Imported ? null : s.Targets.Select(t => t.Name).ToHashSet(), Surface = SurfVar
+            };
             foreach (var p in s.Params)
                 if (IsReservedName(p.Name)) throw new FormatException($"ตั้งชื่อ parameter ว่า {p.Name} ไม่ได้ (ชื่อนี้โค้ดใช้เอง)");
             if (!System.Text.RegularExpressions.Regex.IsMatch(s.ClassName, @"^[A-Za-z_][A-Za-z0-9_]*$"))
@@ -203,7 +212,7 @@ public static class CodeGenerator
         private void L(string line = "") => _o.AppendLine(line);
         private string X(string? src, string what, string id, int need = 0)
         {
-            try { return SpecExpr.ToCs(src, _names, need); }
+            try { return SpecExpr.ToCs(src, _scope, need); }
             catch (FormatException e) { throw new FormatException($"{id} {what}: {e.Message}"); }
         }
 
@@ -282,7 +291,10 @@ public static class CodeGenerator
 
             // surface ที่ต้องใช้
             var usesSurface = _s.Points.Where(p => p.Def.Type is "slopeToSurface" or "onSurface").Select(p => p.Def.Target)
-                .Concat(_s.Links.Where(l => l.Follow).Select(l => l.Target)).ToList();
+                .Concat(_s.Links.Where(l => l.Follow).Select(l => l.Target))
+                // ground() / hasGround() ในนิพจน์
+                .Concat(_s.Points.SelectMany(p => p.Def.Exprs()).Concat(_s.Links.SelectMany(LinkExprs)).Concat(_s.Rotations.Select(g => g.Angle))
+                    .SelectMany(SpecExpr.GroundTargets)).ToList();
             if (usesSurface.Count > 0)
             {
                 L("        // ---- target surface (Layout mode / ไม่ได้กำหนด = วาดแบบไม่มีดิน) ----");
@@ -336,12 +348,15 @@ public static class CodeGenerator
                     var sg = l.Seg ?? new SpecSeg();
                     string seg = $"{(sg.By == "count" ? "Seg.Count" : "Seg.Chord")}, {X(sg.Value ?? "0.05", "ท่อนโค้ง", l.Id)}";
                     string cc = Codes(l.Codes);
+                    // รัศมี / ความละเอียดอ้างจุด: หาจุดไม่ได้ = link นี้หาไม่ได้ + เตือน (แบบเดียวกับในเว็บ)
+                    bool wrap = UsesPoints(LinkExprs(l));
+                    string W(string call) => wrap ? $"Try(cs, \"{l.Id}\", () => {call})" : call;
                     if (l.Type == "arc3")
-                        L($"        Link[] {Lc(l.Id)} = Arc3(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Via}, {b}, {Lc(b)}, {seg}{cc});   // {l.Id} โค้งผ่าน {a} {l.Via} {b}");
+                        L($"        Link[] {Lc(l.Id)} = {W($"Arc3(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Via}, {b}, {Lc(b)}, {seg}{cc})")};   // {l.Id} โค้งผ่าน {a} {l.Via} {b}");
                     else if (l.Type == "arcR")
-                        L($"        Link[] {Lc(l.Id)} = ArcR(cs, \"{l.Id}\", {a}, {Lc(a)}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {(l.Sweep == "cw" ? "false" : "true")}, {(l.Large ? "true" : "false")}, F, {seg}{cc});   // {l.Id} โค้งรัศมี {(l.Sweep == "cw" ? "ตามเข็ม" : "ทวนเข็ม")}{(l.Large ? " ทางยาว" : "")} (กรอบ Side = Right)");
+                        L($"        Link[] {Lc(l.Id)} = {W($"ArcR(cs, \"{l.Id}\", {a}, {Lc(a)}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {(l.Sweep == "cw" ? "false" : "true")}, {(l.Large ? "true" : "false")}, F, {seg}{cc})")};   // {l.Id} โค้งรัศมี {(l.Sweep == "cw" ? "ตามเข็ม" : "ทวนเข็ม")}{(l.Large ? " ทางยาว" : "")} (กรอบ Side = Right)");
                     else
-                        L($"        Link[] {Lc(l.Id)} = Fillet(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Corner}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {seg}{cc});   // {l.Id} Fillet ที่มุม {l.Corner}");
+                        L($"        Link[] {Lc(l.Id)} = {W($"Fillet(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Corner}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {seg}{cc})")};   // {l.Id} Fillet ที่มุม {l.Corner}");
                     continue;
                 }
                 if (l.Follow)
@@ -372,6 +387,7 @@ public static class CodeGenerator
         }
 
         private bool Exists(string id) => _s.Points.Any(p => p.Id == id);
+        private static IEnumerable<string?> LinkExprs(SpecLink l) => new[] { l.Radius, l.Seg?.Value };
 
         private void PointLine(SpecPoint p)
         {
@@ -381,50 +397,37 @@ public static class CodeGenerator
             string From(string? f) => string.IsNullOrEmpty(f) ? "Pt.Origin" : Exists(f!) ? f! : "null";
             string Dir() => d.Dir == -1 ? "-F" : "F";
             string Ex(string? e, string what, int need = 0) => X(e, what, id, need);
-            switch (d.Type)
+            var (rhs, note) = d.Type switch
             {
-                case "origin":
-                    L($"        Pt? {id} = Pt.Origin;   // {id} origin");
-                    break;
-                case "delta":
-                    L($"        Pt? {id} = Delta(cs, {Q}, {From(d.From)}, F * {Ex(d.Dx, "dx", 1)}, {Ex(d.Dy, "dy")});   // {id} ห่างจาก {d.From ?? "origin"}");
-                    break;
-                case "polar":
-                    L($"        Pt? {id} = Polar(cs, {Q}, {From(d.From)}, {Ex(d.Length, "length")}, {Ex(d.Angle, "angle")}, F);   // {id} ระยะ + มุม จาก {d.From ?? "origin"}");
-                    break;
-                case "slopeLength":
-                    var m = d.Measure switch { "dx" => "Measure.Dx", "dy" => "Measure.Dy", _ => "Measure.Along" };
-                    L($"        Pt? {id} = SlopeLength(cs, {Q}, {From(d.From)}, {Ex(d.Slope, "slope")}, {Ex(d.Length, "length")}, {Dir()}, {m});   // {id} ลาด + ความยาว จาก {d.From ?? "origin"}");
-                    break;
-                case "slopeToSurface":
-                    L($"        Pt? {id} = SlopeToSurface(cs, {Q}, {SurfVar(d.Target)}, {From(d.From)}, {Ex(d.Slope, "slope")}, {Dir()}, {Ex(d.MaxDistance ?? "50", "maxDistance")}, {Ex(d.LayoutLength ?? "3", "layoutLength")});   // {id} ลาดจนชนดิน");
-                    break;
-                case "onSurface":
-                    L($"        Pt? {id} = OnSurface(cs, {Q}, {SurfVar(d.Target)}, {From(d.From)}, F * {Ex(d.Dx, "dx", 1)});   // {id} บนผิวดิน");
-                    break;
-                case "between":
-                    L($"        Pt? {id} = Between(cs, {Q}, {From(d.A)}, {From(d.B)}, {Ex(d.T, "t")});   // {id} บนเส้น {d.A}-{d.B}");
-                    break;
-                case "intersect":
-                    L($"        Pt? {id} = Intersect(cs, {Q}, {From(d.A1)}, {From(d.A2)}, {From(d.B1)}, {From(d.B2)});   // {id} จุดตัด {d.A1}-{d.A2} กับ {d.B1}-{d.B2}");
-                    break;
-                case "tangent":
-                    L($"        Pt? {id} = Tangent(cs, {Q}, {From(d.Corner)}, {From(d.Toward)}, {From(d.Other)}, {Ex(d.Radius, "radius")});   // {id} จุดสัมผัสของ Fillet ที่มุม {d.Corner}");
-                    break;
-                case "external":
-                    throw new FormatException($"{id}: จุดจากโค้ดเดิม (external) ใช้ได้กับไฟล์ที่เขียนเองเท่านั้น — รองรับใน Milestone 4");
-                default:
-                    throw new FormatException($"{id}: ไม่รู้จักชนิดจุด {d.Type}");
-            }
+                "origin" => ("Pt.Origin", $"{id} origin"),
+                "delta" => ($"Delta(cs, {Q}, {From(d.From)}, F * {Ex(d.Dx, "dx", 1)}, {Ex(d.Dy, "dy")})", $"{id} ห่างจาก {d.From ?? "origin"}"),
+                "polar" => ($"Polar(cs, {Q}, {From(d.From)}, {Ex(d.Length, "length")}, {Ex(d.Angle, "angle")}, F)", $"{id} ระยะ + มุม จาก {d.From ?? "origin"}"),
+                "slopeLength" => ($"SlopeLength(cs, {Q}, {From(d.From)}, {Ex(d.Slope, "slope")}, {Ex(d.Length, "length")}, {Dir()}, {d.Measure switch { "dx" => "Measure.Dx", "dy" => "Measure.Dy", _ => "Measure.Along" }})",
+                                  $"{id} ลาด + ความยาว จาก {d.From ?? "origin"}"),
+                "slopeToSurface" => ($"SlopeToSurface(cs, {Q}, {SurfVar(d.Target)}, {From(d.From)}, {Ex(d.Slope, "slope")}, {Dir()}, {Ex(d.MaxDistance ?? "50", "maxDistance")}, {Ex(d.LayoutLength ?? "3", "layoutLength")})",
+                                     $"{id} ลาดจนชนดิน"),
+                "onSurface" => ($"OnSurface(cs, {Q}, {SurfVar(d.Target)}, {From(d.From)}, F * {Ex(d.Dx, "dx", 1)})", $"{id} บนผิวดิน"),
+                "between" => ($"Between(cs, {Q}, {From(d.A)}, {From(d.B)}, {Ex(d.T, "t")})", $"{id} บนเส้น {d.A}-{d.B}"),
+                "intersect" => ($"Intersect(cs, {Q}, {From(d.A1)}, {From(d.A2)}, {From(d.B1)}, {From(d.B2)})", $"{id} จุดตัด {d.A1}-{d.A2} กับ {d.B1}-{d.B2}"),
+                "tangent" => ($"Tangent(cs, {Q}, {From(d.Corner)}, {From(d.Toward)}, {From(d.Other)}, {Ex(d.Radius, "radius")})", $"{id} จุดสัมผัสของ Fillet ที่มุม {d.Corner}"),
+                "external" => throw new FormatException($"{id}: จุดจากโค้ดเดิม (external) ใช้ได้กับไฟล์ที่เขียนเองเท่านั้น — รองรับใน Milestone 4"),
+                _ => throw new FormatException($"{id}: ไม่รู้จักชนิดจุด {d.Type}")
+            };
+            // นิพจน์ที่อ้างจุด (P3.y, ground(P3) ...): จุดที่อ้างหาไม่ได้ = จุดนี้หาไม่ได้ + เตือน (แบบเดียวกับในเว็บ) ไม่ทำให้ Draw ล้มทั้งตัว
+            if (UsesPoints(d.Exprs())) rhs = $"Try(cs, {Q}, () => {rhs})";
+            L($"        Pt? {id} = {rhs};   // {note}");
         }
+        private static bool UsesPoints(IEnumerable<string?> exprs) => exprs.Any(e => SpecExpr.PointRefs(e).Count > 0);
 
         // กลุ่มหมุน: สมาชิกคำนวณตาม def ก่อน (ค่าก่อนหมุน) แล้ว Rotate ทีละจุดรอบ pivot
         private void RotationLines(SpecRotation g)
         {
             string pv = Exists(g.Pivot) ? g.Pivot : "null", a = X(g.Angle, "มุมหมุน", g.Id, 1);
             L($"        // กลุ่มหมุน {g.Id}: หมุนรอบ {g.Pivot} มุม {g.Angle}° (ทวนเข็ม + ในกรอบ Side = Right)");
+            bool wrap = UsesPoints(new[] { g.Angle });     // มุมอ้างจุด: หาจุดไม่ได้ = สมาชิกหาไม่ได้ + เตือน
             foreach (var m in g.Points.Where(Exists))
-                L($"        {m} = Rotate(cs, \"{m}\", {m}, {pv}, F * {a});");
+                L(wrap ? $"        {m} = Try(cs, \"{m}\", () => Rotate(cs, \"{m}\", {m}, {pv}, F * {a}));"
+                       : $"        {m} = Rotate(cs, \"{m}\", {m}, {pv}, F * {a});");
         }
 
         // ลำดับคำนวณ: จุด (SpecPoint) + บรรทัดหมุนของกลุ่ม (SpecRotation) — จุดที่ต้องคำนวณก่อน (from / a / b ...) มาก่อน;
@@ -458,7 +461,7 @@ public static class CodeGenerator
                 if (state.GetValueOrDefault(key) == 1) return false;
                 state[key] = 1;
                 bool ok = true;
-                foreach (var id in g.Points.Append(g.Pivot))
+                foreach (var id in g.Points.Append(g.Pivot).Concat(SpecExpr.PointRefs(g.Angle)))
                 {
                     var q = _s.Points.FirstOrDefault(x => x.Id == id);
                     if (q != null && !Visit(q)) ok = false;
@@ -608,6 +611,65 @@ public static class CodeGenerator
         if (pivot == null) { Warn(cs, CorridorError.Failure, id + ": ข้ามเพราะหาจุดหมุนไม่ได้"); return null; }
         double r = angle * Deg, c = Math.Cos(r), s = Math.Sin(r), dx = p.Value.X - pivot.Value.X, dy = p.Value.Y - pivot.Value.Y;
         return Check(cs, id, new Pt(pivot.Value.X + dx * c - dy * s, pivot.Value.Y + dx * s + dy * c));
+    }
+
+    // ---- ค่าจากเรขาคณิตในนิพจน์ (P3.x / P3.y / ground / exists) ----
+    // จุดที่อ้างหาไม่ได้ = โยน InvalidOperationException -> Try ข้างล่างเตือน แล้วให้ object นี้หาไม่ได้ (ตรงกับตัวคำนวณในเว็บ)
+
+    private static double PX(Pt? p)
+    {
+        if (p == null) throw new InvalidOperationException("ข้ามเพราะหาจุดที่นิพจน์อ้างไม่ได้");
+        return p.Value.X;
+    }
+
+    private static double PY(Pt? p)
+    {
+        if (p == null) throw new InvalidOperationException("ข้ามเพราะหาจุดที่นิพจน์อ้างไม่ได้");
+        return p.Value.Y;
+    }
+
+    private static bool Exists(Pt? p)
+    {
+        return p != null;
+    }
+
+    // == / != ของตัวเลขเทียบด้วย tolerance เดียวกับเว็บ
+    private static bool Eq(double a, double b)
+    {
+        return Math.Abs(a - b) <= 1e-6;
+    }
+
+    // ระดับผิวดินที่ offset ของจุด (เทียบ origin) · ไม่มีผิวดิน (Layout mode / ไม่ได้กำหนด target) = ระดับของจุดเอง + เตือน
+    private static double Ground(CorridorState cs, ObjectId surface, Pt? p)
+    {
+        double y = PY(p);
+        if (surface.IsNull)
+        {
+            if (cs.Mode != CorridorMode.Layout)
+                Warn(cs, CorridorError.LogicalNameNotFound, "ground(): ไม่ได้กำหนด Target Surface — ใช้ระดับของจุดเอง");
+            return y;
+        }
+        try
+        {
+            return Elevation(cs, surface, cs.CurrentOffset + p.Value.X) - cs.CurrentElevation;
+        }
+        catch (Exception e)
+        {
+            throw new InvalidOperationException("ground(): " + e.Message);
+        }
+    }
+
+    private static T Try<T>(CorridorState cs, string id, Func<T> calc)
+    {
+        try
+        {
+            return calc();
+        }
+        catch (InvalidOperationException e)
+        {
+            Warn(cs, CorridorError.Failure, id + ": " + e.Message);
+            return default(T);
+        }
     }
 
     private static Pt? Check(CorridorState cs, string id, Pt p)
@@ -948,8 +1010,8 @@ public static class CodeGenerator
         new(@"^\s*Pt\? (\w+) = (?!null;)"),
         new(@"^\s*Point \w+ = AddPoint\(cs, (\w+)"),
         new(@"^\s*Link \w+ = (?:AddLink|FollowSurface)\(cs, ""([^""]+)"""),
-        new(@"^\s*Link\[\] \w+ = (?:Arc3|ArcR|Fillet)\(cs, ""([^""]+)"""),
-        new(@"^\s*\w+ = Rotate\(cs, ""([^""]+)"""),
+        new(@"^\s*Link\[\] \w+ = (?:Try\(cs, ""[^""]+"", \(\) => )?(?:Arc3|ArcR|Fillet)\(cs, ""([^""]+)"""),
+        new(@"^\s*\w+ = (?:Try\(cs, ""[^""]+"", \(\) => )?Rotate\(cs, ""([^""]+)"""),
         new(@"^\s*Link(?:\[\])? \w+ = null;\s+// ([^:]+):"),
         new(@"^\s*// (\w+): (?:ไม่มีจุด|ปลาย \w+ เป็นจุด auxiliary)"),
         new(@"^\s*// (\w+) auxiliary:"),

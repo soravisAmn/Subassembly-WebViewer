@@ -85,7 +85,12 @@ public class PointDef
     public string? Other { get; set; }
     public string? Radius { get; set; }
 
-    public IEnumerable<string> Refs() => new[] { From, A, B, A1, A2, B1, B2, Corner, Toward, Other }.Where(r => !string.IsNullOrEmpty(r))!;
+    // จุดที่ต้องคำนวณก่อน: ช่องอ้างจุด + จุดในนิพจน์ (P3.x, ground(P3), exists(P3)) — ตรงกับ refs ใน spec.js
+    public IEnumerable<string> Refs() => new[] { From, A, B, A1, A2, B1, B2, Corner, Toward, Other }.Where(r => !string.IsNullOrEmpty(r))
+        .Concat(Exprs().SelectMany(SpecExpr.PointRefs)).Distinct()!;
+
+    // ช่องนิพจน์ทั้งหมดของ def (ที่ไม่ว่าง)
+    public IEnumerable<string> Exprs() => new[] { Dx, Dy, Slope, Length, Angle, MaxDistance, LayoutLength, T, Radius }.Where(e => !string.IsNullOrWhiteSpace(e))!;
 }
 
 public class SpecLink

@@ -110,6 +110,7 @@ Test("TopWidth <= 0 → error และใช้ค่า default", () =>
 
 DrawingTests.Run(Test);
 SiteTests.Run(Test);
+ExprTests.Run(Test);
 
 Console.WriteLine($"\n{passed} ผ่าน, {failed} ไม่ผ่าน");
 return failed == 0 ? 0 : 1;

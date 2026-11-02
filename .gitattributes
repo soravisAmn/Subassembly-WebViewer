@@ -1,0 +1,14 @@
+# ไฟล์ข้อความ: ในที่เก็บเป็น LF, checkout ออกมาเป็น CRLF เสมอ (กติกาโปรเจกต์) ไม่ขึ้นกับ core.autocrlf ของแต่ละเครื่อง
+* text=auto eol=crlf
+
+# ไฟล์ binary
+*.dll binary
+*.exe binary
+*.pdb binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
+
+# git มองว่าเป็น binary อยู่แล้ว — คงไว้ตามเดิม ไม่แปลงบรรทัด
+link-API-Reference.txt -text

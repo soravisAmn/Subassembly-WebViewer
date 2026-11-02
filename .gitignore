@@ -1,0 +1,10 @@
+# ไฟล์ build ของ .NET (สร้างใหม่ได้เสมอ)
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# ตั้งค่าเฉพาะเครื่อง
+.claude/launch.json
+.claude/settings.local.json

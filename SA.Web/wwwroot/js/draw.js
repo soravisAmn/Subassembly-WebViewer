@@ -191,7 +191,10 @@ function deleteDrawnSet(it, list){
   const extra = [...gone].filter(g => !picked.has(g));
   const what = objs.length === 1 ? objs[0].id : `${objs.length} objects ที่เลือก`;
   const list_ = extra.length > 15 ? extra.slice(0, 15).join(", ") + ` … และอีก ${extra.length - 15} ชิ้น` : extra.join(", ");
-  if (extra.length && !confirm(`ลบ ${what} จะลบ ${list_} ที่พึ่งอยู่ไปด้วย (รวม ${extra.length} ชิ้น) ตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
+  // Max / Min ที่อ้างจุดที่ลบ (จุดยังอยู่ แต่ขอบเขตหาย)
+  const lostLim = it.spec.points.filter(p => p.limit && !gone.has(p.id) && !Spec.byId(trial.points, p.id).limit).map(p => p.id);
+  const limTxt = lostLim.length ? `\n\nMax / Min ของ ${lostLim.join(", ")} อ้างจุดที่ลบ — จะถูกลบด้วย (จุดยังอยู่)` : "";
+  if ((extra.length || lostLim.length) && !confirm(`ลบ ${what}${extra.length ? ` จะลบ ${list_} ที่พึ่งอยู่ไปด้วย (รวม ${extra.length} ชิ้น)` : ""}${limTxt}\n\nตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
   const n = picked.size + extra.length;
   specEdit(s => { for (const o of objs) Spec.removeCascade(s, DRAWN_KIND[o.type], o.id); }, it, n === 1 ? `ลบ ${objs[0].id}` : `ลบ ${n} objects`);
   setSel({ type:"item", item: it.id });

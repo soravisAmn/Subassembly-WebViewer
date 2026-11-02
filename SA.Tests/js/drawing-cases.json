@@ -1522,5 +1522,60 @@
   { "name": "Max / Min ทุกแบบ: Side = Left", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "values": { "Side": 1 }, "copySpecFrom": 55 },
   { "name": "Max / Min ทุกแบบ: Depth = 3 (ฐานผ่าน, limited เป็นเท็จ) · WL 101.5", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "values": { "Depth": 3, "WL": 101.5 }, "copySpecFrom": 55 },
   { "name": "Max / Min ทุกแบบ: Layout mode (อ้างผิวดิน = ไม่ขยับ ไม่เตือน)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "layout": true, "copySpecFrom": 55 },
-  { "name": "Max / Min ทุกแบบ: ไม่ได้กำหนด Target Surface (อ้างผิวดิน = ไม่ขยับ + เตือน)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "surfaceAssigned": false, "copySpecFrom": 55 }
+  { "name": "Max / Min ทุกแบบ: ไม่ได้กำหนด Target Surface (อ้างผิวดิน = ไม่ขยับ + เตือน)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "surfaceAssigned": false, "copySpecFrom": 55 },
+  {
+    "name": "round4b-demo (tests-civil3d): ดินราบ 0 — กำแพงยกถึง Freeboard, ฐานลึกตามแนวลาด, คูลึกอย่างน้อย 0.5, รองพื้น (limited)",
+    "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }],
+    "spec":
+{
+      "version": 1, "className": "Round4bDemo", "namespace": "TestSubassembly",
+      "params": [
+        { "name": "Side", "kind": "long", "default": 0, "displayName": "Side", "min": null, "max": null },
+        { "name": "TopWidth", "kind": "double", "default": 2, "displayName": "Top Width", "min": null, "max": null },
+        { "name": "SideSlope", "kind": "double", "default": 1.5, "displayName": "Side Slope (1:x)", "min": null, "max": null },
+        { "name": "Depth", "kind": "double", "default": 1, "displayName": "Depth (ตามแบบ)", "min": null, "max": null },
+        { "name": "MinDepth", "kind": "double", "default": 1.5, "displayName": "Min Depth below ground", "min": null, "max": null },
+        { "name": "WallH", "kind": "double", "default": 0.5, "displayName": "Wall Height", "min": null, "max": null },
+        { "name": "DesignWL", "kind": "double", "default": 101, "displayName": "Design WL (ระดับจริง)", "min": null, "max": null },
+        { "name": "Freeboard", "kind": "double", "default": 0.5, "displayName": "Freeboard", "min": null, "max": null },
+        { "name": "DitchOffset", "kind": "double", "default": 3, "displayName": "Ditch Offset", "min": null, "max": null },
+        { "name": "DitchMin", "kind": "double", "default": 0.5, "displayName": "Ditch depth min", "min": null, "max": null },
+        { "name": "DitchMax", "kind": "double", "default": 1.5, "displayName": "Ditch depth max", "min": null, "max": null }
+      ],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": ["TrapTopInside"], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["TrapTopOutside"], "def": { "type": "delta", "from": "P1", "dx": "TopWidth", "dy": "0" } },
+        { "id": "P3", "codes": ["WallTop"], "def": { "type": "delta", "from": "P2", "dx": "0", "dy": "WallH" },
+          "limit": { "measure": "depth", "side": "above", "ref": { "type": "elev", "expr": "DesignWL" }, "min": "Freeboard", "max": null, "action": "clampWarn", "along": "vertical" } },
+        { "id": "P4", "codes": ["TrapBaseOutside"], "def": { "type": "slopeLength", "from": "P2", "slope": "-1/SideSlope", "length": "Depth", "dir": 1, "measure": "dy" },
+          "limit": { "measure": "depth", "side": "below", "ref": { "type": "ground", "target": "TargetSurface" }, "min": "MinDepth", "max": null, "action": "clampWarn", "along": "slope" } },
+        { "id": "P5", "codes": ["TrapBaseInside"], "def": { "type": "delta", "from": "P1", "dx": "-0.5", "dy": "P4.y" } },
+        { "id": "P6", "codes": ["DitchBottom"], "def": { "type": "onSurface", "from": "P2", "dx": "DitchOffset", "target": "TargetSurface" },
+          "limit": { "measure": "depth", "side": "below", "ref": { "type": "point", "id": "P2" }, "min": "DitchMin", "max": "DitchMax", "action": "clampWarn", "along": "vertical" } },
+        { "id": "P7", "codes": ["Underlay"], "branch": "B1", "def": { "type": "delta", "from": "P4", "dx": "0", "dy": "-0.3" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Top"] },
+        { "id": "L2", "points": ["P2", "P3"], "codes": ["Wall"] },
+        { "id": "L3", "points": ["P2", "P4"], "codes": ["TrapSide"] },
+        { "id": "L4", "points": ["P4", "P5"], "codes": ["TrapBase"] },
+        { "id": "L5", "points": ["P5", "P1"], "codes": ["TrapSide"] },
+        { "id": "L6", "points": ["P2", "P6"], "codes": ["Ditch"] },
+        { "id": "L7", "points": ["P4", "P7"], "codes": ["Underlay"], "branch": "B1" }
+      ],
+      "shapes": [{ "id": "S1", "links": ["L1", "L3", "L4", "L5"], "codes": ["Body"] }],
+      "logic": {
+        "conditions": [{ "id": "C1", "name": "Deep", "expr": "limited(P4)", "note": "ฐานถูกบังคับให้ลึกกว่าแบบ = รองพื้นเพิ่ม" }],
+        "decisions": [{ "id": "D1", "parent": null, "kind": "if", "test": "Deep", "label": "ฐานถูกบังคับลึก?" }],
+        "branches": [{ "id": "B1", "decision": "D1", "case": true, "label": "บังคับลึก" }, { "id": "B2", "decision": "D1", "case": false, "label": "ลึกตามแบบ" }]
+      },
+      "side": { "param": "Side", "mirror": true }
+    }
+  },
+  { "name": "round4b-demo: ดินราบ -2 (ฐานต้องลึก 3.5 · คูไม่เกิน 1.5)", "surface": [{ "x": -30, "y": -2 }, { "x": 30, "y": -2 }], "copySpecFrom": 61 },
+  { "name": "round4b-demo: ดินลาด y = 0.3x - 0.5", "surface": [{ "x": -30, "y": -9.5 }, { "x": 30, "y": 8.5 }], "copySpecFrom": 61 },
+  { "name": "round4b-demo: Side = Left ดินราบ -1", "surface": [{ "x": -30, "y": -1 }, { "x": 30, "y": -1 }], "values": { "Side": 1 }, "copySpecFrom": 61 },
+  { "name": "round4b-demo: Depth = 3, DesignWL = 99.5 (ฐาน / กำแพงผ่าน · คูยังถูกขยับ)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "values": { "Depth": 3, "DesignWL": 99.5 }, "copySpecFrom": 61 },
+  { "name": "round4b-demo: Layout mode (ผิวดิน = ไม่ขยับ, จุด / ระดับยังคุม)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "layout": true, "copySpecFrom": 61 }
 ]

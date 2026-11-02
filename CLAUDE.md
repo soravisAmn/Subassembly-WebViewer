@@ -40,7 +40,7 @@
 
 ## สถานะล่าสุด (อัปเดตทุกครั้งที่จบ milestone)
 - รอบ 1 (`prompt.md`), รอบ 2 (`prompt-2.md`), รอบ 3 + 3b (`prompt-3.md`, `prompt-3b.md`) — **เสร็จแล้ว** (commit `ha`)
-- ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs` และ `tests-civil3d/round4-demo.cs` ใน Civil 3D จริง (เครื่องนี้ไม่มี Civil 3D)
+- ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4b-demo.cs` ใน Civil 3D จริง (เครื่องนี้ไม่มี Civil 3D)
 - **รอบ 4 `prompt-4.md` เสร็จแล้ว** — M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบผู้ใช้อยู่ใน `prompt-4-design.md` (ตอบ "ตามที่เสนอ" ทุกข้อ), จัดระเบียบ repo แล้ว (เลิก track bin/obj · ยังเหลือของที่ควรลบ ดูไฟล์นั้น)
   M1 เสร็จ (2026-11-02): นิพจน์เงื่อนไข + P3.x/y, ground(), exists(), hasGround() ใน JS / C# (test: `cond.test.js`, `ExprTests.cs`, drawing-cases 31–35)
   M2 เสร็จ (2026-11-02): กิ่ง if / switch / ซ้อน + `firstOf` ใน JS / C# + UI ขั้นต่ำ "เกิดเมื่อ" ใน Properties (test: `logic.test.js`, ExprTests "กิ่ง -> C#", drawing-cases 36–44)
@@ -55,7 +55,9 @@
   รอบ 4b M1 เสร็จ (2026-11-02): `p.limit` ใน evaluate (spec.js limitPt / setLimit / limitOptions) + C# `Limit()` + `limited()` + Properties ขั้นต่ำ
     (test: `limit.test.js`, drawing-cases 55–60, DrawingTests เทียบ base_rock-pitching.cs, ExprTests "Max / Min -> C#")
   รอบ 4b M2 เสร็จ (2026-11-02): ปุ่ม "Max / Min" ใน drawer + หน้าต่างถามเป็นประโยค (ชิดขวา) + พรีวิวสด (ข้อความ + เส้นประขอบ / ลูกศรบนรูป) — `js/limit.js`
-  ถัดไป: **`prompt-4b.md` M3** (ข้อ 4 + 5: ไอคอน / แถบช่วงบนรูปตอนเลือกจุด, แท็บ Logic, scenario, Delete ถาม, README ตาราง "ใช้อันไหนเมื่อไร", `tests-civil3d/round4b-demo.cs`) ทำก่อน แล้วค่อย **`prompt-5.md`** (Logic ข — flowchart + Logic API สำหรับ MCP ต้องรวมฟังก์ชันของ 4b) — เขียนแล้วทั้งคู่ ยังไม่เริ่ม
+  รอบ 4b M3 เสร็จ (2026-11-02): ไอคอน ↕ + เส้นขอบตอนเลือกจุด, Properties ประโยคสรุป, แท็บ Logic → Max / Min (สถานะสด + scenario), Delete ถาม, Rotate ไม่ให้หมุนจุดที่มี Max / Min,
+    branchRisks นับจุดที่ Max / Min อ้าง, README ตาราง "ใช้อันไหนเมื่อไร", `tests-civil3d/round4b-demo.cs` + `round4b-checklist.md` (drawing-cases 61–66) → **รอบ 4b จบ** รอทดสอบใน Civil 3D
+  ถัดไป: **`prompt-5.md`** (Logic ข — flowchart + Logic API ที่ต้องรวม setLimit / removeLimit / limitOptions ของ 4b) — ยังไม่เริ่ม แล้วค่อย **`prompt-5.md`** (Logic ข — flowchart + Logic API สำหรับ MCP ต้องรวมฟังก์ชันของ 4b) — เขียนแล้วทั้งคู่ ยังไม่เริ่ม
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

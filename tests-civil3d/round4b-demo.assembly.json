@@ -1,0 +1,396 @@
+{
+  "version": 1,
+  "name": "Round4b demo",
+  "baseline": {
+    "x": 0,
+    "y": 0
+  },
+  "originElevation": 100,
+  "surface": [
+    {
+      "x": -20,
+      "y": -1.5
+    },
+    {
+      "x": -5,
+      "y": -0.8
+    },
+    {
+      "x": 0,
+      "y": -0.5
+    },
+    {
+      "x": 5,
+      "y": -0.9
+    },
+    {
+      "x": 20,
+      "y": -2.5
+    }
+  ],
+  "surfaceOn": true,
+  "layout": false,
+  "extendEnds": true,
+  "items": [
+    {
+      "id": "round4bdemo",
+      "name": "Round4bDemo",
+      "className": null,
+      "params": {},
+      "attach": {
+        "type": "baseline",
+        "x": 0,
+        "y": 0
+      },
+      "fileName": "round4b-demo.cs",
+      "spec": {
+        "version": 1,
+        "className": "Round4bDemo",
+        "namespace": "TestSubassembly",
+        "params": [
+          {
+            "name": "Side",
+            "kind": "long",
+            "default": 0,
+            "displayName": "Side",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "TopWidth",
+            "kind": "double",
+            "default": 2,
+            "displayName": "Top Width",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "SideSlope",
+            "kind": "double",
+            "default": 1.5,
+            "displayName": "Side Slope (1:x)",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "Depth",
+            "kind": "double",
+            "default": 1,
+            "displayName": "Depth (\u0E15\u0E32\u0E21\u0E41\u0E1A\u0E1A)",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "MinDepth",
+            "kind": "double",
+            "default": 1.5,
+            "displayName": "Min Depth below ground",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "WallH",
+            "kind": "double",
+            "default": 0.5,
+            "displayName": "Wall Height",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "DesignWL",
+            "kind": "double",
+            "default": 101,
+            "displayName": "Design WL (\u0E23\u0E30\u0E14\u0E31\u0E1A\u0E08\u0E23\u0E34\u0E07)",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "Freeboard",
+            "kind": "double",
+            "default": 0.5,
+            "displayName": "Freeboard",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "DitchOffset",
+            "kind": "double",
+            "default": 3,
+            "displayName": "Ditch Offset",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "DitchMin",
+            "kind": "double",
+            "default": 0.5,
+            "displayName": "Ditch depth min",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "DitchMax",
+            "kind": "double",
+            "default": 1.5,
+            "displayName": "Ditch depth max",
+            "min": null,
+            "max": null
+          }
+        ],
+        "targets": [
+          {
+            "name": "TargetSurface",
+            "type": "Surface",
+            "displayName": "Target Surface"
+          }
+        ],
+        "points": [
+          {
+            "id": "P1",
+            "codes": [
+              "TrapTopInside"
+            ],
+            "def": {
+              "type": "origin"
+            }
+          },
+          {
+            "id": "P2",
+            "codes": [
+              "TrapTopOutside"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "TopWidth",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P3",
+            "codes": [
+              "WallTop"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P2",
+              "dx": "0",
+              "dy": "WallH"
+            },
+            "limit": {
+              "measure": "depth",
+              "side": "above",
+              "ref": {
+                "type": "elev",
+                "expr": "DesignWL"
+              },
+              "min": "Freeboard",
+              "max": null,
+              "action": "clampWarn",
+              "along": "vertical"
+            }
+          },
+          {
+            "id": "P4",
+            "codes": [
+              "TrapBaseOutside"
+            ],
+            "def": {
+              "type": "slopeLength",
+              "from": "P2",
+              "slope": "-1/SideSlope",
+              "length": "Depth",
+              "dir": 1,
+              "measure": "dy"
+            },
+            "limit": {
+              "measure": "depth",
+              "side": "below",
+              "ref": {
+                "type": "ground",
+                "target": "TargetSurface"
+              },
+              "min": "MinDepth",
+              "max": null,
+              "action": "clampWarn",
+              "along": "slope"
+            }
+          },
+          {
+            "id": "P5",
+            "codes": [
+              "TrapBaseInside"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "-0.5",
+              "dy": "P4.y"
+            }
+          },
+          {
+            "id": "P6",
+            "codes": [
+              "DitchBottom"
+            ],
+            "def": {
+              "type": "onSurface",
+              "from": "P2",
+              "dx": "DitchOffset",
+              "target": "TargetSurface"
+            },
+            "limit": {
+              "measure": "depth",
+              "side": "below",
+              "ref": {
+                "type": "point",
+                "id": "P2"
+              },
+              "min": "DitchMin",
+              "max": "DitchMax",
+              "action": "clampWarn",
+              "along": "vertical"
+            }
+          },
+          {
+            "id": "P7",
+            "codes": [
+              "Underlay"
+            ],
+            "branch": "B1",
+            "def": {
+              "type": "delta",
+              "from": "P4",
+              "dx": "0",
+              "dy": "-0.3"
+            }
+          }
+        ],
+        "links": [
+          {
+            "id": "L1",
+            "points": [
+              "P1",
+              "P2"
+            ],
+            "codes": [
+              "Top"
+            ]
+          },
+          {
+            "id": "L2",
+            "points": [
+              "P2",
+              "P3"
+            ],
+            "codes": [
+              "Wall"
+            ]
+          },
+          {
+            "id": "L3",
+            "points": [
+              "P2",
+              "P4"
+            ],
+            "codes": [
+              "TrapSide"
+            ]
+          },
+          {
+            "id": "L4",
+            "points": [
+              "P4",
+              "P5"
+            ],
+            "codes": [
+              "TrapBase"
+            ]
+          },
+          {
+            "id": "L5",
+            "points": [
+              "P5",
+              "P1"
+            ],
+            "codes": [
+              "TrapSide"
+            ]
+          },
+          {
+            "id": "L6",
+            "points": [
+              "P2",
+              "P6"
+            ],
+            "codes": [
+              "Ditch"
+            ]
+          },
+          {
+            "id": "L7",
+            "points": [
+              "P4",
+              "P7"
+            ],
+            "codes": [
+              "Underlay"
+            ],
+            "branch": "B1"
+          }
+        ],
+        "shapes": [
+          {
+            "id": "S1",
+            "links": [
+              "L1",
+              "L3",
+              "L4",
+              "L5"
+            ],
+            "codes": [
+              "Body"
+            ]
+          }
+        ],
+        "logic": {
+          "conditions": [
+            {
+              "id": "C1",
+              "name": "Deep",
+              "expr": "limited(P4)",
+              "note": "\u0E10\u0E32\u0E19\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A\u0E43\u0E2B\u0E49\u0E25\u0E36\u0E01\u0E01\u0E27\u0E48\u0E32\u0E41\u0E1A\u0E1A = \u0E23\u0E2D\u0E07\u0E1E\u0E37\u0E49\u0E19\u0E40\u0E1E\u0E34\u0E48\u0E21"
+            }
+          ],
+          "decisions": [
+            {
+              "id": "D1",
+              "parent": null,
+              "kind": "if",
+              "test": "Deep",
+              "label": "\u0E10\u0E32\u0E19\u0E16\u0E39\u0E01\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A\u0E25\u0E36\u0E01?"
+            }
+          ],
+          "branches": [
+            {
+              "id": "B1",
+              "decision": "D1",
+              "case": true,
+              "label": "\u0E1A\u0E31\u0E07\u0E04\u0E31\u0E1A\u0E25\u0E36\u0E01"
+            },
+            {
+              "id": "B2",
+              "decision": "D1",
+              "case": false,
+              "label": "\u0E25\u0E36\u0E01\u0E15\u0E32\u0E21\u0E41\u0E1A\u0E1A"
+            }
+          ]
+        },
+        "side": {
+          "param": "Side",
+          "mirror": true
+        }
+      }
+    }
+  ]
+}

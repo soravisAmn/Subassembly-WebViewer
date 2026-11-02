@@ -243,6 +243,13 @@ function renderSpec(it, r, grp, isSel){
       el("path", {d:`M${X(q)-4} ${Y(q)-4}L${X(q)+4} ${Y(q)+4}M${X(q)+4} ${Y(q)-4}L${X(q)-4} ${Y(q)+4}`, class:"dcons" + (ob ? " ghost" : ""), ...gs}, grp);
       el("rect", {x:X(q)-5, y:Y(q)-5, width:10, height:10, class:"dcons-hit", "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
     } else el("rect", {x:X(q)-4, y:Y(q)-4, width:8, height:8, class:"dpt" + (ob ? " ghost" : ""), ...gs, "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
+    // Max / Min: ไอคอน ↕ (ส้ม = รอบนี้ไม่ผ่าน / ถูกขยับ) — คลิก = เลือกจุด
+    if (p.limit && editingThis){
+      const inf = r.limits && r.limits[p.id];
+      const t = el("text", { x: X(q) - 13, y: Y(q) - 5, class: "lim-icon" + (inf && inf.hit ? " hit" : ""), "data-kind": "dpt", "data-id": it.id, "data-sid": p.id }, grp);
+      t.textContent = "↕";
+      el("title", {}, t).textContent = `Max / Min: ${Spec.limitWhat(p)}${inf && inf.hit ? " — ไม่ผ่าน" : ""}`;
+    }
     const lbl = [editingThis ? p.id : "", state.showCodes && (isSel || editingThis) ? p.codes.join(", ") : ""].filter(Boolean).join(" ");
     if (lbl) el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl" + (Spec.isAux(p) ? " cons" : "") + (ob ? " ghost-lbl" : "")}, grp).textContent = lbl;
   }
@@ -251,6 +258,8 @@ function renderSpec(it, r, grp, isSel){
     if (o.item !== it.id) continue;
     const kind = { dshape: "shapes", dlink: "links", dpt: "pts" }[o.type], q = kind && geo(kind, o.id);
     if (!q) continue;
+    // จุดที่มี Max / Min: ขอบที่ยอมได้ + ตำแหน่งก่อนขยับ (ไม่ซ้อนกับพรีวิวของหน้าต่าง)
+    if (o.type === "dpt" && editingThis && !limitPreview && (Spec.byId(spec.points, o.id) || {}).limit) limitBands(spec, r, o.id, true);
     if (o.type === "dshape" && q.poly) el("polygon", {points: q.poly.map(p => X(p) + "," + Y(p)).join(" "), class:"sel-shape"}, svg);
     else if (o.type === "dlink" && q.path) el("path", {d: q.path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" "), class:"sel-link"}, svg);
     else if (o.type === "dpt") el("circle", {cx:X(q), cy:Y(q), r:9, class:"sel-pt"}, svg);

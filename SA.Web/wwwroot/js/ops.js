@@ -91,6 +91,9 @@ const Ops = (() => {
   function rotatePlan(spec, ids, pivot, ignore){
     const blocked = [], merge = [], compose = [];
     let set = new Set(ids.filter(id => id !== pivot && Spec.byId(spec.points, id)));
+    // สมาชิกกลุ่มหมุนตั้ง Max / Min ไม่ได้ (รอบ 4b) — ลบ Max / Min ก่อนหมุน
+    const LIM_WHY = "มี Max / Min — ลบ Max / Min ก่อนหมุน (สมาชิกกลุ่มหมุนตั้ง Max / Min ไม่ได้)";
+    for (const id of [...set]) if (Spec.byId(spec.points, id).limit){ blocked.push({ id, why: LIM_WHY }); set.delete(id); }
     for (const g of spec.rotations || []){
       const inSel = g.points.filter(p => set.has(p));
       if (!inSel.length) continue;
@@ -128,7 +131,7 @@ const Ops = (() => {
         for (const id of set) if (!M.has(id) && !out.some(b => b.id === id)) out.push({ id, why: "หมุนไม่ได้" });
         return { members, merge, compose, blocked: out };
       }
-      if (!set.has(bridge) && !grouped(bridge) && Spec.byId(spec.points, bridge)) set.add(bridge);
+      if (!set.has(bridge) && !grouped(bridge) && Spec.byId(spec.points, bridge) && !Spec.byId(spec.points, bridge).limit) set.add(bridge);
       else { blocked.push({ id: by, why: `อ้าง ${bridge} ซึ่งอ้างจุดในชุดที่หมุน แต่ ${bridge} หมุนไม่ได้` }); set.delete(by); }
     }
     return { members: [], merge, compose, blocked: blocked.concat([...set].map(id => ({ id, why: "หมุนไม่ได้ (โครงสร้างซับซ้อนเกิน)" }))) };

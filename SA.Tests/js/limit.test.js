@@ -176,5 +176,19 @@ test("Copy ในตัวเดิม: Max / Min ไปด้วย (อ้า�
   ok(Spec.exprSlots(s).some(x => x.obj === s.points[2].limit && x.key === "min"), "slot ของ limit");
 });
 
+test("Rotate: จุดที่มี Max / Min หมุนไม่ได้ (บอกเหตุผล) · branchRisks นับจุดที่ Max / Min อ้าง", () => {
+  const s = base(deep);
+  const pl = Ops.rotatePlan(s, ["P3"], "P2");
+  ok(pl.blocked.some(b => b.id === "P3" && b.why.includes("Max / Min")), JSON.stringify(pl.blocked));
+  ok(!pl.members.includes("P3"), "P3 ไม่อยู่ในกลุ่ม");
+  const b = base();
+  b.logic = { conditions: [{ id: "C1", name: "Up", expr: "true" }], decisions: [{ id: "D1", kind: "if", test: "Up" }],
+              branches: [{ id: "B1", decision: "D1", case: true }, { id: "B2", decision: "D1", case: false }] };
+  b.points.find(p => p.id === "P2").branch = "B1";
+  b.points.push(pt("P5", { type: "delta", from: "P1", dx: "1", dy: "0" }));
+  Spec.setLimit(b, "P5", { measure: "depth", side: "above", ref: { type: "point", id: "P2" }, min: "0.5" });
+  ok(Spec.branchRisks(b).some(x => x.id === "P5" && x.ref === "P2"), JSON.stringify(Spec.branchRisks(b)));
+});
+
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
 if (typeof process !== "undefined") process.exitCode = failed ? 1 : 0;

@@ -150,6 +150,27 @@ function openLimit(it, id, st){
     preview();
   }
 }
+// ประโยคสรุปของ Max / Min ที่ตั้งไว้ (Properties / แท็บ Logic) — ค่าในวงเล็บ = ค่าตอนนี้ของนิพจน์
+function limitSentence(sp, p, r){
+  const L = p.limit, info = r && r.limits && r.limits[p.id];
+  if (!L) return "";
+  const v = (e, n) => e == null || e === "" ? null : `<b>${esc(e)}</b>${n != null && !/^-?[\d.]+$/.test(String(e).trim()) ? ` <small>(= ${n.toFixed(2)})</small>` : ""}`;
+  const mn = v(L.min, info && info.mn), mx = v(L.max, info && info.mx);
+  const act = { clampWarn: "ขยับให้ถึงขอบ + เตือน", clamp: "ขยับเงียบๆ", warn: "เตือนอย่างเดียว" }[L.action || "clampWarn"];
+  return `จุด <b>${esc(p.id)}</b> ต้อง${esc(Spec.limitWhat(p))}${mn ? " อย่างน้อย " + mn : ""}${mx ? (mn ? " และไม่เกิน " : " ไม่เกิน ") + mx : ""} ม.`
+       + ` <small>· ถ้าไม่ผ่าน: ${act}${L.action === "warn" ? "" : " (" + Spec.LIMIT_ALONG[L.along || "vertical"] + ")"}</small>`;
+}
+// scenario ไหนทำให้ Max / Min ของจุดไม่ผ่าน (ถูกขยับ / เตือน) — คิดจาก spec ตอนนี้ + ผิวดิน / parameter ของ scenario
+function limitCoverage(it){
+  const ids = it.spec.points.filter(p => p.limit).map(p => p.id), by = {};
+  for (const id of ids) by[id] = { hit: [], pass: [] };
+  for (const s of scenarios){
+    const r = scenarioEval(s, it);
+    if (!r) continue;
+    for (const id of ids){ const inf = r.limits[id]; if (inf && inf.v0 != null) by[id][inf.hit ? "hit" : "pass"].push(s.name); }
+  }
+  return by;
+}
 // ข้อความ "ตอนนี้ ..." (หน้าต่าง / Properties / แท็บ Logic)
 function limitNowText(sp, r, id, future){
   const p = Spec.byId(sp.points, id), info = r && r.limits && r.limits[id];

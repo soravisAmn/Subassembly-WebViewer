@@ -360,6 +360,9 @@ input.expr{font-family:"IBM Plex Mono",monospace}
 .lim-from{fill:none;stroke:#e0892b;stroke-dasharray:2 2;opacity:.8;pointer-events:none}
 .lim-to{fill:none;stroke:#e0892b;stroke-width:2;pointer-events:none}
 .lim-arrow{stroke:#e0892b;stroke-width:1.4;stroke-dasharray:3 3;pointer-events:none}
+.lim-icon{fill:#8a8f98;font:bold 12px sans-serif;cursor:pointer;paint-order:stroke;stroke:var(--paper);stroke-width:3px}
+.lim-icon.hit{fill:#e0892b}
+.lim-sum{font-size:12px;margin:2px 0 4px;line-height:1.5}
 .trk-acq{stroke:#4fd2e0;stroke-width:2;fill:none;pointer-events:none}
 .trk-acq.main{stroke-width:3}
 .trk-line{stroke:#4fd2e0;stroke-width:1;stroke-dasharray:3 4;opacity:.8;pointer-events:none}

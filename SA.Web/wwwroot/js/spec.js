@@ -146,7 +146,7 @@ const Spec = (() => {
       const mine = new Set(o.branch ? branchChain(spec, o.branch) : []);
       for (const r of ids) for (const b of need(r)) if (!mine.has(b)){ out.push({ id: o.id, kind, ref: r, branch: b }); return; }
     };
-    for (const p of spec.points) if (p.def.type !== "firstOf") check(p, "point", strictRefs(p.def));
+    for (const p of spec.points) if (p.def.type !== "firstOf") check(p, "point", strictRefs(p.def).concat(limitRefs(p)));
     for (const l of spec.links) check(l, "link", linkRefs(l));
     for (const s of spec.shapes){
       const mine = new Set(s.branch ? branchChain(spec, s.branch) : []);

@@ -25,7 +25,7 @@ function markNewAux(spec, before){
 const snapshotIds = spec => ({ P: new Set(spec.points.map(p => p.id)), L: new Set(spec.links.map(l => l.id)) });
 let drawRes = {};                  // item id -> ผล Spec.evaluate (เทียบ origin) จาก render ล่าสุด
 const TOOL_NAMES = { point: "Point", link: "Link", shape: "Shape", daylight: "ลาดจนชนดิน", follow: "วิ่งตามผิวดิน", polygon: "Polygon", ngon: "Polygon ด้านเท่า",
-                     arc: "Arc", fillet: "Fillet" };
+                     arc: "Arc", fillet: "Fillet", cutfill: "ถ้าตัด / ถม" };
 // Polygon ด้านเท่า: จำนวนด้าน / โหมดที่ใช้ล่าสุด (inscribed = รัศมีถึงมุม · circumscribed = รัศมีถึงกึ่งกลางด้าน)
 const ngonOpt = () => (state.ngon ||= { n: 5, mode: "inscribed" });
 // Arc: โหมด 3p = ผ่าน 3 จุด · ser = เริ่ม-ปลาย-รัศมี (สลับระหว่างวาดด้วย T / E แบบตัวเลือกใน banner ของ AutoCAD)
@@ -161,11 +161,12 @@ function drawBanner(){
                             : `Polygon ${ngonOpt().n} ด้าน: คลิกจุดศูนย์กลาง (เกาะจุดเดิมได้) · Tab = ตั้ง N / โหมด`,
     arc: arcBanner(),
     fillet: `Fillet R = ${filletOpt().r}: ` + (draw.chain.length ? `คลิก link ที่ 2 (ต่อกับ ${draw.chain[0]} ที่มุม)` : "คลิก link ที่ 1") + " · Tab / พิมพ์ = เปลี่ยน R"
-            + (auxDrawing() ? " · Auxiliary = โค้งช่วยสร้างทับมุมเดิม (เส้นเดิมไม่เปลี่ยน)" : "")
+            + (auxDrawing() ? " · Auxiliary = โค้งช่วยสร้างทับมุมเดิม (เส้นเดิมไม่เปลี่ยน)" : ""),
+    cutfill: "ถ้าตัด / ถม: คลิกจุดบานพับ (ไหล่คันดิน / ขอบไหล่ทาง — จุดที่วาดแล้ว)"
   }[draw.tool];
   document.body.classList.toggle("aux-mode", auxDrawing());
   // โหมด Auxiliary: ป้ายชัดๆ หน้าข้อความ (X = สลับ)
-  return (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + " · Tab = พิมพ์ค่า"
+  return (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (draw.tool === "cutfill" ? "" : " · Tab = พิมพ์ค่า")
        + (AUX_TOOLS.includes(draw.tool) ? ` · X = ${draw.aux ? "กลับเป็นของจริง" : "Auxiliary"}` : "") + " · Esc = ยกเลิก";
 }
 function arcBanner(){
@@ -185,6 +186,8 @@ document.getElementById("drawer").addEventListener("click", e => {
   const b = e.target.closest("[data-tool]"); if (!b || b.disabled) return;
   const t = b.dataset.tool;
   if (t === "bounds"){ const it = editItem(); if (it){ state.open["i:" + it.id] = true; setSel({ type:"params", item: it.id }); } return; }
+  // ถ้าตัด / ถม: เลือกจุดไว้จุดเดียว = ใช้เป็นจุดบานพับเลย ไม่งั้นให้คลิกจุด
+  if (t === "cutfill"){ const it = editItem(), s = pickedList().filter(o => o.item === it.id); if (s.length === 1 && s[0].type === "dpt"){ setTool(null); return openCutFill(it, s[0].id); } }
   setTool(draw.tool === t ? null : t);
 });
 function renderDrawer(){
@@ -468,6 +471,10 @@ function drawClick(px, py){
   const viaStage = draw.tool === "arc" && arcOpt().mode === "3p" && draw.chain.length === 1;   // จุดที่โค้งผ่านเป็นจุด auxiliary ได้
   if (c.kind === "end" && c.point.ref && c.point.ref.type === "pt" && draw.tool !== "point" && draw.tool !== "ngon" && !viaStage && !auxDrawing() && Spec.isAuxPoint(it.spec, c.point.ref.id))
     return flashBanner(`${c.point.ref.id} เป็นจุด auxiliary ต่อ link จริงไม่ได้ — ปิด "Auxiliary (ช่วยสร้าง)" ใน Properties ของ ${c.point.ref.id} ก่อน`);
+  if (draw.tool === "cutfill"){
+    if (c.kind !== "end" || !c.point.ref || c.point.ref.type !== "pt") return flashBanner("ถ้าตัด / ถม: คลิกบนจุดที่วาดแล้ว (จุดบานพับ) — วาดจุดก่อนถ้ายังไม่มี");
+    return openCutFill(it, c.point.ref.id);
+  }
   commitPoint(c.make, c.kind);
 }
 // สร้าง/ใช้จุดจาก make() แล้วต่อ link / shape ตามเครื่องมือ (ทั้งหมดเป็น undo ก้อนเดียว)
@@ -781,7 +788,7 @@ function checkTyped(field, v, names){
 function openTyping(first){
   if (draw.tool === "ngon" && draw.mouse) return openNgonTyping(first);
   if (draw.tool === "fillet" || (arcSerStage() && draw.mouse)) return openRadiusTyping(first);
-  if (!draw.tool || draw.tool === "shape" || draw.tool === "follow" || !draw.mouse) return;
+  if (!draw.tool || draw.tool === "shape" || draw.tool === "follow" || draw.tool === "cutfill" || !draw.mouse) return;
   const it = editItem(), box = $("dyn");
   draw.typing = true;
   const A = prevPoint(), R = typingRef(), B = R || A;

@@ -177,5 +177,52 @@ test("clone ในตัวเดิม: คงกิ่ง, remap firstOf / จ
   ok(dst.points.every(p => !p.branch) && dst.links.every(l => !l.branch), "detach ไม่มีกิ่ง");
 });
 
+console.log("ปุ่มสำเร็จรูป ถ้าตัด / ถม (Spec.addCutFill)");
+function hingeSpec(){
+  const s = Spec.newSpec("CutFillButton");
+  s.points.push(pt("P2", { type: "delta", from: "P1", dx: "3", dy: "0" }, { codes: ["Shoulder"] }));
+  s.links.push({ id: "L1", points: ["P1", "P2"], codes: ["Top"] });
+  return s;
+}
+const cfOpts = { hinge: "P2", cut: 1.5, fill: 2, params: true, dir: 1, cutCode: "Daylight_Cut", fillCode: "Daylight_Fill" };
+test("ได้ชุดเดียวกับ drawing-cases (CutFillButton) ทุกตัว: parameter, เงื่อนไข, กิ่ง, จุดลาด, link, Daylight", () => {
+  const s = hingeSpec(), r = Spec.addCutFill(s, cfOpts);
+  eq("C1 D1 B1 B2 P3 P4 P5 L2 L3", [r.cond, r.decision, r.yes, r.no, r.cut.point, r.fill.point, r.daylight, r.cut.link, r.fill.link].join(" "), "id");
+  const fs = typeof require === "function" ? require("fs") : null, path = typeof require === "function" ? require("path") : null;
+  if (!fs) return;
+  const ref = JSON.parse(fs.readFileSync(path.join(__dirname, "drawing-cases.json"), "utf8")).find(c => c.spec && c.spec.className === "CutFillButton").spec;
+  const pick = o => JSON.stringify(o);
+  eq(pick(ref.params), pick(s.params), "params");
+  eq(pick(ref.logic), pick(s.logic), "logic");
+  eq(pick(ref.points.slice(0, 5)), pick(s.points), "points");
+  eq(pick(ref.links.slice(0, 3)), pick(s.links), "links");
+});
+test("ตัด / ถม สลับตามผิวดิน (ลากผิวดินขึ้นลง) · Daylight ตามกิ่งที่เกิด · ไม่มีเตือน", () => {
+  const s = hingeSpec(); Spec.addCutFill(s, cfOpts);
+  const hi = run(s, { surface: [{ x: -30, y: 5 }, { x: 30, y: 5 }] }), lo = run(s, { surface: [{ x: -30, y: -4 }, { x: 30, y: -4 }] });
+  near(10.5, P(hi, "P3").x, "ตัด 1:1.5 ขึ้น 5 m"); off(hi, "P4"); near(10.5, P(hi, "P5").x, "Daylight = P3");
+  near(11, P(lo, "P4").x, "ถม 1:2 ลง 4 m"); off(lo, "P3"); near(11, P(lo, "P5").x, "Daylight = P4");
+  eq(0, hi.issues.length + lo.issues.length, "ไม่มีเตือน");
+  const L = run(s, { values: { Side: 1 }, surface: [{ x: -30, y: -8 }, { x: 30, y: 8 }] });
+  eq(false, L.logic.conds.IsCut, "Left ผิวดินต่ำ = ถม"); ok(P(L, "P4").x < -3, "ถมไปทางซ้าย");
+  near(9, P(run(s, { values: { CutSlope: 1.2 }, surface: [{ x: -30, y: 5 }, { x: 30, y: 5 }] }), "P3").x, "CutSlope = 1.2 -> 3 + 6");
+});
+test("ไม่สร้าง parameter = ลาดเป็นตัวเลข · target ที่สอง = ground(P2, \"ชื่อ\") · ทิศเข้าด้านใน", () => {
+  const s = hingeSpec(); s.targets.push({ name: "Rock", type: "Surface", displayName: "Rock" });
+  Spec.addCutFill(s, { ...cfOpts, params: false, target: "Rock", dir: -1 });
+  eq(1, s.params.length, "ไม่มี parameter เพิ่ม");
+  eq("1/1.5", Spec.byId(s.points, "P3").def.slope, "ลาดตัด"); eq("-1/2", Spec.byId(s.points, "P4").def.slope, "ลาดถม");
+  eq('ground(P2, "Rock") > P2.y', s.logic.conditions[0].expr, "target"); eq(-1, Spec.byId(s.points, "P4").def.dir, "ทิศ");
+  ok(Expr.check(s.logic.conditions[0].expr, Spec.names(s), { ...Spec.exprOpts(s), want: "bool" }).ok, "นิพจน์ผ่านการตรวจ");
+});
+test("กดซ้ำที่จุดอื่น: ชื่อไม่ชน (IsCut2, CutSlope2, ป้าย ตัด P6) · บานพับในกิ่ง = กิ่งใหม่ซ้อนใต้กิ่งนั้น", () => {
+  const s = hingeSpec(); const a = Spec.addCutFill(s, cfOpts);
+  const r = Spec.addCutFill(s, { ...cfOpts, hinge: a.cut.point });
+  eq("IsCut2", Spec.byId(s.logic.conditions, r.cond).name, "ชื่อเงื่อนไข"); ok(s.params.some(p => p.name === "CutSlope2"), "CutSlope2");
+  eq(`ตัด ${a.cut.point}`, Spec.branchLabel(s, r.yes), "ป้ายกิ่ง"); eq(a.yes, Spec.byId(s.logic.decisions, r.decision).parent, "ซ้อนใต้กิ่ง ตัด");
+  eq(a.yes, Spec.byId(s.points, r.daylight).branch, "Daylight อยู่กิ่งเดียวกับบานพับ");
+  eq(0, Spec.branchRisks(s).length, "ไม่มีความเสี่ยงอ้างข้ามกิ่ง: " + JSON.stringify(Spec.branchRisks(s)));
+});
+
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
 if (typeof process !== "undefined") process.exitCode = failed ? 1 : 0;

@@ -633,6 +633,57 @@ const Spec = (() => {
     spec.shapes.push({ id, links: linkIds, codes: [] });
     return id;
   }
+  // ---------- Logic: สร้างเงื่อนไข / กิ่ง ----------
+  // ชื่อที่ยังไม่มีใน parameter / เงื่อนไข / จุด: base, base2, base3, ...
+  function freeName(spec, base){
+    const used = new Set(spec.params.map(p => p.name).concat(((spec.logic || {}).conditions || []).map(c => c.name), spec.points.map(p => p.id)));
+    let n = base, i = 2; while (used.has(n)) n = base + i++;
+    return n;
+  }
+  // เงื่อนไข + decision if (ใต้กิ่ง parent) + กิ่ง ใช่ / ไม่ใช่ — คืน { cond, decision, yes, no } (id)
+  function addIf(spec, o){
+    const lg = spec.logic = spec.logic || {};
+    for (const k of ["conditions", "decisions", "branches"]) lg[k] = lg[k] || [];
+    const next = (list, pre) => { let k = 0; for (const x of list){ const m = new RegExp(`^${pre}(\\d+)$`).exec(x.id); if (m) k = Math.max(k, +m[1]); } return pre + (k + 1); };
+    const cond = next(lg.conditions, "C");
+    lg.conditions.push(o.note ? { id: cond, name: o.name, expr: o.expr, note: o.note } : { id: cond, name: o.name, expr: o.expr });
+    const decision = next(lg.decisions, "D");
+    lg.decisions.push({ id: decision, parent: o.parent || null, kind: "if", test: o.name, label: o.label || o.name });
+    const yes = next(lg.branches, "B"); lg.branches.push({ id: yes, decision, case: true, label: o.yes || o.name });
+    const no = next(lg.branches, "B"); lg.branches.push({ id: no, decision, case: false, label: o.no || "ไม่ " + o.name });
+    return { cond, decision, yes, no };
+  }
+  // ปุ่มสำเร็จรูป "ถ้าตัด / ถม" ที่จุดบานพับ hinge — ตัด = ผิวดินสูงกว่าบานพับ (ground(hinge) > hinge.y), ไม่มีผิวดิน = ถม
+  //   o = { hinge, target, cut: 1.5, fill: 2 (ลาด 1:x), params: สร้าง CutSlope / FillSlope, dir: 1 | -1, cutCode, fillCode }
+  //   ได้: เงื่อนไข IsCut + กิ่ง ตัด / ถม (ซ้อนใต้กิ่งของบานพับ ถ้ามี), จุดลาดจนชนดินกิ่งละจุด + link, จุด firstOf "Daylight" (auxiliary)
+  function addCutFill(spec, o){
+    const h = byId(spec.points, o.hinge);
+    if (!h) throw new Error(`ไม่มีจุด ${o.hinge}`);
+    const target = o.target || (spec.targets[0] || {}).name || "TargetSurface";
+    let cutS = `1/${Expr.num(o.cut)}`, fillS = `-1/${Expr.num(o.fill)}`;
+    if (o.params){
+      const cn = freeName(spec, "CutSlope"); spec.params.push({ name: cn, kind: "double", default: o.cut, displayName: "Cut Slope (1:x)", min: null, max: null });
+      const fn = freeName(spec, "FillSlope"); spec.params.push({ name: fn, kind: "double", default: o.fill, displayName: "Fill Slope (1:x)", min: null, max: null });
+      cutS = `1/${cn}`; fillS = `-1/${fn}`;
+    }
+    const first = !spec.targets.length || spec.targets[0].name === target;
+    const g = first ? `ground(${h.id})` : `ground(${h.id}, "${target}")`;
+    const lab = (spec.logic && (spec.logic.branches || []).some(b => b.label === "ตัด")) ? ` ${h.id}` : "";
+    const br = addIf(spec, { name: freeName(spec, "IsCut"), expr: `${g} > ${h.id}.y`, note: "ผิวดินสูงกว่าบานพับ = ตัด", parent: h.branch,
+                             label: "ตัดหรือถม?" + lab, yes: "ตัด" + lab, no: "ถม" + lab });
+    const dir = o.dir === -1 ? -1 : 1;
+    const day = (slope, branch, code) => {
+      const id = addPoint(spec, { type: "slopeToSurface", from: h.id, slope, dir, target, maxDistance: "50", layoutLength: "3" }, code ? [code] : []);
+      byId(spec.points, id).branch = branch;
+      const l = byId(spec.links, addLink(spec, h.id, id, { points: [h.id, id] }));
+      l.codes = code ? [code] : []; l.branch = branch;
+      return { point: id, link: l.id };
+    };
+    const cut = day(cutS, br.yes, o.cutCode), fill = day(fillS, br.no, o.fillCode);
+    const daylight = addPoint(spec, { type: "firstOf", points: [cut.point, fill.point] }, ["Daylight"], true);
+    if (h.branch) byId(spec.points, daylight).branch = h.branch;
+    return { ...br, cut, fill, daylight };
+  }
   // ลบ object และทุกอย่างที่พึ่งมัน คืนรายการ id ที่ลบ
   function removeCascade(spec, kind, id){
     const gone = { points: new Set(), links: new Set(), shapes: new Set() };
@@ -822,7 +873,7 @@ const Spec = (() => {
     return g;
   }
 
-  return { exprOpts, caseMatch, branchLabel, branchChain, branchRisks, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
+  return { exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
            isAux, isAuxPoint, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,

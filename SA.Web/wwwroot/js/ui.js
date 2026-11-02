@@ -914,27 +914,80 @@ function branchRow(g, it, obj, r){
 }
 // สร้างเงื่อนไข + decision + กิ่ง ใช่ / ไม่ใช่ — คืน id ของกิ่ง "ใช่" (ยกเลิก = null)
 function newCondition(sp, parent){
-  const lg = sp.logic = sp.logic || {};
-  for (const k of ["conditions", "decisions", "branches"]) lg[k] = lg[k] || [];
-  const used = new Set(Spec.names(sp).concat(lg.conditions.map(c => c.name), sp.points.map(p => p.id)));
-  let n = 1; while (used.has("Test" + n)) n++;
-  const name = (prompt("ชื่อเงื่อนไข (ใช้เป็นชื่อตัวแปรในโค้ด)", "Test" + n) || "").trim();
+  const name = (prompt("ชื่อเงื่อนไข (ใช้เป็นชื่อตัวแปรในโค้ด)", Spec.freeName(sp, "Test1")) || "").trim();
   if (!name) return null;
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || used.has(name) || RESERVED.has(name) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(name)
-      || Expr.KEYWORDS.has(name.toLowerCase()) || Expr.FUNCS[name.toLowerCase()]){
-    alert(`ตั้งชื่อ ${name} ไม่ได้ (ซ้ำ / เป็นชื่อที่โค้ดใช้เอง)`); return null;
-  }
+  const bad = condNameError(sp, name);
+  if (bad){ alert(bad); return null; }
   const p0 = sp.points.find(p => p.def.type !== "origin");
   const ex = (prompt("นิพจน์ จริง / เท็จ (เช่น ground(P1) > P1.y = ดินสูงกว่าจุด = ตัด)", p0 ? `ground(${p0.id}) > ${p0.id}.y` : "true") || "").trim();
   if (!ex) return null;
   const chk = Expr.check(ex, Spec.names(sp), { ...Spec.exprOpts(sp), want: "bool" });
   if (!chk.ok){ alert("นิพจน์ใช้ไม่ได้: " + chk.error); return null; }
-  const next = (list, pre) => { let k = 0; for (const x of list){ const m = new RegExp(`^${pre}(\\d+)$`).exec(x.id); if (m) k = Math.max(k, +m[1]); } return pre + (k + 1); };
-  lg.conditions.push({ id: next(lg.conditions, "C"), name, expr: ex });
-  const did = next(lg.decisions, "D"); lg.decisions.push({ id: did, parent: parent || null, kind: "if", test: name, label: name });
-  const yes = next(lg.branches, "B"); lg.branches.push({ id: yes, decision: did, case: true, label: name });
-  lg.branches.push({ id: next(lg.branches, "B"), decision: did, case: false, label: "ไม่ " + name });
-  return yes;
+  return Spec.addIf(sp, { name, expr: ex, parent }).yes;
+}
+// ชื่อเงื่อนไขใช้ได้ไหม (null = ได้) — ห้ามซ้ำ parameter / เงื่อนไข / จุด และห้ามชื่อที่โค้ดใช้เอง
+function condNameError(sp, name){
+  const used = new Set(Spec.names(sp).concat(((sp.logic || {}).conditions || []).map(c => c.name), sp.points.map(p => p.id)));
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || used.has(name) || RESERVED.has(name) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(name)
+      || Expr.KEYWORDS.has(name.toLowerCase()) || Expr.FUNCS[name.toLowerCase()]) return `ตั้งชื่อ ${name} ไม่ได้ (ซ้ำ / เป็นชื่อที่โค้ดใช้เอง)`;
+  return null;
+}
+
+// ---------------- ปุ่มสำเร็จรูป "ถ้าตัด / ถม" (รอบ 4 M3) ----------------
+// จุดบานพับ (จุดที่วาดแล้ว ไม่ใช่ auxiliary) -> หน้าต่างตั้งค่า -> Spec.addCutFill (undo ก้อนเดียว)
+const slopeH = t => { const m = /^\s*1\s*:\s*([0-9.]+)\s*$/.exec(t || ""); const v = m ? +m[1] : +t; return v > 0 && isFinite(v) ? v : null; };
+function openCutFill(it, hinge){
+  const sp = it.spec, h = Spec.byId(sp.points, hinge);
+  if (!h) return;
+  if (Spec.isAux(h)) return flashBanner(`${hinge} เป็นจุด auxiliary — จุดบานพับต้องเป็นจุดจริง (ปลายของ link ลาด)`);
+  const sl = state.bar.slopes || [];
+  const o = { cut: sl[0] || "1:1.5", fill: sl[1] || "1:2", params: true, dir: "1", cutCode: "Daylight_Cut", fillCode: "Daylight_Fill",
+              target: (sp.targets[0] || {}).name || "TargetSurface" };
+  openDialog(`ถ้าตัด / ถม ที่ ${hinge}`, b => {
+    const field = (label, small, key, type) => {
+      const row = div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, b);
+      const inp = document.createElement("input"); inp.type = type || "text"; inp.value = o[key]; inp.dataset.k = key;
+      inp.oninput = () => { o[key] = inp.value.trim(); };
+      row.appendChild(inp); return inp;
+    };
+    const select = (label, small, key, opts) => {
+      const row = div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, b);
+      const s = document.createElement("select"); s.dataset.k = key;
+      s.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(""); s.value = o[key];
+      s.onchange = () => { o[key] = s.value; };
+      row.appendChild(s); return s;
+    };
+    kv(b, [["จุดบานพับ", hinge + (h.codes.length ? " " + h.codes.join(",") : "") + (h.branch ? ` · อยู่ในกิ่ง ${Spec.branchLabel(sp, h.branch)} (กิ่งใหม่ซ้อนใต้กิ่งนี้)` : "")]]);
+    if (sp.targets.length > 1) select("Target surface", "", "target", sp.targets.map(t => [t.name, t.displayName || t.name]));
+    field("ลาดตัด", "1:x ขึ้นไปหาผิวดิน", "cut");
+    field("ลาดถม", "1:x ลงไปหาผิวดิน", "fill");
+    const pc = document.createElement("label"); pc.className = "check";
+    pc.innerHTML = `<input type="checkbox" checked data-k="params"> สร้าง parameter <b>CutSlope</b> / <b>FillSlope</b> <small>(แก้ใน Civil 3D ได้)</small>`;
+    pc.querySelector("input").onchange = e => { o.params = e.target.checked; };
+    b.appendChild(pc);
+    select("ทิศ", "ฝั่ง Right = ไปทางขวา", "dir", [["1", "ออกด้านนอก (+)"], ["-1", "เข้าด้านใน (−)"]]);
+    field("Code ลาดตัด", "จุด + link", "cutCode");
+    field("Code ลาดถม", "จุด + link", "fillCode");
+    const err = div("expr-err", "", b);
+    div("hint", `ตัด = ผิวดินสูงกว่าจุดบานพับ (ground(${hinge}) > ${hinge}.y) · ไม่มีผิวดิน / Layout = ถม · แก้นิพจน์ได้ใน Properties ของจุดลาด<br>`
+              + `ได้: เงื่อนไข IsCut, กิ่ง ตัด / ถม, จุดลาดจนชนดินกิ่งละจุด + link, จุด Daylight (จุดแรกที่เกิด ไว้ต่อเรขาคณิต)`, b);
+    div("btns", null, b).append(
+      btn("สร้าง", () => {
+        const cut = slopeH(o.cut), fill = slopeH(o.fill);
+        if (!cut || !fill){ err.textContent = "ลาดต้องเป็นแบบ 1:1.5 หรือตัวเลขมากกว่า 0"; return; }
+        closeDialog();
+        cutFillCommit(it, { hinge, target: o.target, cut, fill, params: o.params, dir: +o.dir, cutCode: o.cutCode, fillCode: o.fillCode });
+      }),
+      btn("ยกเลิก", closeDialog));
+  });
+}
+function cutFillCommit(it, opts){
+  const r = specEdit(sp => Spec.addCutFill(sp, opts), it, `ถ้าตัด / ถม ที่ ${opts.hinge}`);
+  if (!r) return;
+  if (draw.tool === "cutfill") setTool(null);
+  state.sel = { type:"dpt", item: it.id, id: r.cut.point }; renderAll();
+  const cn = Spec.byId(it.spec.logic.conditions, r.cond).name;
+  flashBanner(`ถ้าตัด / ถม: ${cn} · ตัด = ${r.cut.point} · ถม = ${r.fill.point} · Daylight = ${r.daylight} — ลากจุดผิวดินขึ้นลงดูรูปสลับ (Ctrl+Z ย้อนได้)`);
 }
 // firstOf: จุดแรกในรายการที่เกิด (ต่อเรขาคณิตหลังกิ่ง เช่น ปลายลาดตัด / ปลายลาดถม)
 function firstOfRow(g, it, p, others){

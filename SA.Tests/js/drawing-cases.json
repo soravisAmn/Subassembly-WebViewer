@@ -1375,5 +1375,40 @@
       "side": { "param": "Side", "mirror": true } }
   },
   { "name": "switch Lanes = 4 (else + กิ่งซ้อน), Side = Left", "surface": [{ "x": -30, "y": -2 }, { "x": 30, "y": -2 }], "values": { "Lanes": 4, "Side": 1 }, "copySpecFrom": 42 },
-  { "name": "switch Lanes = 1", "surface": [{ "x": -30, "y": -2 }, { "x": 30, "y": -2 }], "values": { "Lanes": 1 }, "copySpecFrom": 42 }
+  { "name": "switch Lanes = 1", "surface": [{ "x": -30, "y": -2 }, { "x": 30, "y": -2 }], "values": { "Lanes": 1 }, "copySpecFrom": 42 },
+  {
+    "name": "ปุ่ม ถ้าตัด / ถม (spec ที่ปุ่มสร้าง + ต่อคูจาก Daylight) Right: ผิวดินลาดขึ้นขวา = ตัด",
+    "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": 8 }],
+    "spec": { "className": "CutFillButton", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0, "displayName": "Side", "min": null, "max": null },
+                 { "name": "CutSlope", "kind": "double", "default": 1.5, "displayName": "Cut Slope (1:x)", "min": null, "max": null },
+                 { "name": "FillSlope", "kind": "double", "default": 2, "displayName": "Fill Slope (1:x)", "min": null, "max": null }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["Shoulder"], "def": { "type": "delta", "from": "P1", "dx": "3", "dy": "0" } },
+        { "id": "P3", "codes": ["Daylight_Cut"], "def": { "type": "slopeToSurface", "from": "P2", "slope": "1/CutSlope", "dir": 1, "target": "TargetSurface", "maxDistance": "50", "layoutLength": "3" }, "branch": "B1" },
+        { "id": "P4", "codes": ["Daylight_Fill"], "def": { "type": "slopeToSurface", "from": "P2", "slope": "-1/FillSlope", "dir": 1, "target": "TargetSurface", "maxDistance": "50", "layoutLength": "3" }, "branch": "B2" },
+        { "id": "P5", "codes": ["Daylight"], "def": { "type": "firstOf", "points": ["P3", "P4"] }, "auxiliary": true },
+        { "id": "P6", "codes": ["Ditch"], "def": { "type": "delta", "from": "P5", "dx": "1", "dy": "-0.5" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Top"] },
+        { "id": "L2", "points": ["P2", "P3"], "codes": ["Daylight_Cut"], "branch": "B1" },
+        { "id": "L3", "points": ["P2", "P4"], "codes": ["Daylight_Fill"], "branch": "B2" },
+        { "id": "L4", "points": ["P3", "P6"], "codes": ["Ditch"], "branch": "B1" },
+        { "id": "L5", "points": ["P4", "P6"], "codes": ["Ditch"], "branch": "B2" }
+      ],
+      "shapes": [],
+      "logic": {
+        "conditions": [{ "id": "C1", "name": "IsCut", "expr": "ground(P2) > P2.y", "note": "ผิวดินสูงกว่าบานพับ = ตัด" }],
+        "decisions": [{ "id": "D1", "parent": null, "kind": "if", "test": "IsCut", "label": "ตัดหรือถม?" }],
+        "branches": [{ "id": "B1", "decision": "D1", "case": true, "label": "ตัด" }, { "id": "B2", "decision": "D1", "case": false, "label": "ถม" }]
+      },
+      "side": { "param": "Side", "mirror": true } }
+  },
+  { "name": "ปุ่ม ถ้าตัด / ถม Side = Left (ผิวดินต่ำด้านซ้าย = ถม)", "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": 8 }], "values": { "Side": 1 }, "copySpecFrom": 45 },
+  { "name": "ปุ่ม ถ้าตัด / ถม Right ผิวดินราบต่ำ -4 = ถม", "surface": [{ "x": -30, "y": -4 }, { "x": 30, "y": -4 }], "copySpecFrom": 45 },
+  { "name": "ปุ่ม ถ้าตัด / ถม Right ผิวดินราบสูง 5 + CutSlope = 1, FillSlope = 3", "surface": [{ "x": -30, "y": 5 }, { "x": 30, "y": 5 }], "values": { "CutSlope": 1, "FillSlope": 3 }, "copySpecFrom": 45 },
+  { "name": "ปุ่ม ถ้าตัด / ถม Layout mode (ไม่มีผิวดิน = ถม ยาว 3 m)", "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": 8 }], "layout": true, "copySpecFrom": 45 }
 ]

@@ -188,6 +188,7 @@ function render(){
 
   renderCodeHot();
   renderDrawOverlay();
+  renderLimitPreview();         // หน้าต่าง Max / Min: ขอบที่ยอมได้ + ตำแหน่งหลังขยับ
   renderCmdOverlay();
   renderSelBox();
   $("welcome").style.display = allItems().length ? "none" : "flex";

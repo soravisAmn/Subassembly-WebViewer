@@ -74,7 +74,9 @@ function chooseDrawBranch(){
 const branchPath = (sp, id) => Spec.branchChain(sp, id).reverse().map(b => Spec.branchLabel(sp, b)).join(" › ");
 let drawRes = {};                  // item id -> ผล Spec.evaluate (เทียบ origin) จาก render ล่าสุด
 const TOOL_NAMES = { point: "Point", link: "Link", shape: "Shape", daylight: "ลาดจนชนดิน", follow: "วิ่งตามผิวดิน", polygon: "Polygon", ngon: "Polygon ด้านเท่า",
-                     arc: "Arc", fillet: "Fillet", cutfill: "ถ้าตัด / ถม" };
+                     arc: "Arc", fillet: "Fillet", cutfill: "ถ้าตัด / ถม", limit: "Max / Min", limitref: "Max / Min (จุดอ้างอิง)" };
+// เครื่องมือที่คลิกจุดเดิมอย่างเดียว (ไม่สร้างของใหม่ / ไม่มีพิมพ์ค่า)
+const PICK_TOOLS = ["cutfill", "limit", "limitref"];
 // Polygon ด้านเท่า: จำนวนด้าน / โหมดที่ใช้ล่าสุด (inscribed = รัศมีถึงมุม · circumscribed = รัศมีถึงกึ่งกลางด้าน)
 const ngonOpt = () => (state.ngon ||= { n: 5, mode: "inscribed" });
 // Arc: โหมด 3p = ผ่าน 3 จุด · ser = เริ่ม-ปลาย-รัศมี (สลับระหว่างวาดด้วย T / E แบบตัวเลือกใน banner ของ AutoCAD)
@@ -198,6 +200,7 @@ function deleteDrawnSet(it, list){
 // ---------------- เครื่องมือ ----------------
 function setTool(t){
   if (t && !state.editing) return;
+  if (draw.tool === "limitref" && t !== "limitref") limitToolLeave();   // กลับหน้าต่าง Max / Min
   if (t && cmd.name) endCmd();
   draw.tool = t; draw.chain = []; draw.cand = null; draw.hover = null; draw.list = []; draw.lastCyc = null; closeTyping(); tip.style.display = "none";
   if (!t) document.body.classList.remove("aux-mode");
@@ -220,13 +223,15 @@ function drawBanner(){
     arc: arcBanner(),
     fillet: `Fillet R = ${filletOpt().r}: ` + (draw.chain.length ? `คลิก link ที่ 2 (ต่อกับ ${draw.chain[0]} ที่มุม)` : "คลิก link ที่ 1") + " · Tab / พิมพ์ = เปลี่ยน R"
             + (auxDrawing() ? " · Auxiliary = โค้งช่วยสร้างทับมุมเดิม (เส้นเดิมไม่เปลี่ยน)" : ""),
-    cutfill: "ถ้าตัด / ถม: คลิกจุดบานพับ (ไหล่คันดิน / ขอบไหล่ทาง — จุดที่วาดแล้ว)"
+    cutfill: "ถ้าตัด / ถม: คลิกจุดบานพับ (ไหล่คันดิน / ขอบไหล่ทาง — จุดที่วาดแล้ว)",
+    limit: "Max / Min: คลิกจุดที่จะคุม (จุดที่วาดแล้ว)",
+    limitref: "Max / Min: คลิกจุดอ้างอิงบนรูป · Esc = กลับหน้าต่างโดยไม่เปลี่ยน"
   }[draw.tool];
   document.body.classList.toggle("aux-mode", auxDrawing());
   // โหมด Auxiliary: ป้ายชัดๆ หน้าข้อความ (X = สลับ)
-  const br = draw.tool !== "cutfill" && drawBranch() ? `▶ กิ่ง ${branchPath(editItem().spec, draw.branch)} · ` : "";
-  return br + (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (draw.tool === "cutfill" ? "" : " · Tab = พิมพ์ค่า")
-       + (AUX_TOOLS.includes(draw.tool) ? ` · X = ${draw.aux ? "กลับเป็นของจริง" : "Auxiliary"}` : "") + " · Esc = ยกเลิก";
+  const br = !PICK_TOOLS.includes(draw.tool) && drawBranch() ? `▶ กิ่ง ${branchPath(editItem().spec, draw.branch)} · ` : "";
+  return br + (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (PICK_TOOLS.includes(draw.tool) ? "" : " · Tab = พิมพ์ค่า")
+       + (AUX_TOOLS.includes(draw.tool) ? ` · X = ${draw.aux ? "กลับเป็นของจริง" : "Auxiliary"}` : "") + (draw.tool === "limitref" ? "" : " · Esc = ยกเลิก");
 }
 function arcBanner(){
   const o = arcOpt(), n = draw.chain.length;
@@ -247,6 +252,8 @@ document.getElementById("drawer").addEventListener("click", e => {
   if (t === "bounds"){ const it = editItem(); if (it){ state.open["i:" + it.id] = true; setSel({ type:"params", item: it.id }); } return; }
   // ถ้าตัด / ถม: เลือกจุดไว้จุดเดียว = ใช้เป็นจุดบานพับเลย ไม่งั้นให้คลิกจุด
   if (t === "cutfill"){ const it = editItem(), s = pickedList().filter(o => o.item === it.id); if (s.length === 1 && s[0].type === "dpt"){ setTool(null); return openCutFill(it, s[0].id); } }
+  // Max / Min: เลือกจุดไว้จุดเดียว = เปิดหน้าต่างของจุดนั้นเลย
+  if (t === "limit"){ const it = editItem(), s = pickedList().filter(o => o.item === it.id); if (s.length === 1 && s[0].type === "dpt"){ setTool(null); return openLimit(it, s[0].id); } }
   setTool(draw.tool === t ? null : t);
 });
 function renderDrawer(){
@@ -513,6 +520,7 @@ function drawClick(px, py){
   if (draw.tool === "fillet") return filletClick();
   const c = snapAt(draw.mouse);
   if (!c) return;
+  if (draw.tool === "limit" || draw.tool === "limitref") return limitToolClick(it, c);   // จุด auxiliary ตั้ง / อ้างอิงได้
   // Arc เริ่ม-ปลาย-รัศมี คลิกที่สาม = รัศมี / ทิศจากตำแหน่งเมาส์ (โค้งผ่านจุดนั้น)
   if (arcSerStage()){
     const g = arcFromMouse(c);
@@ -851,7 +859,7 @@ function checkTyped(field, v, names){
 function openTyping(first){
   if (draw.tool === "ngon" && draw.mouse) return openNgonTyping(first);
   if (draw.tool === "fillet" || (arcSerStage() && draw.mouse)) return openRadiusTyping(first);
-  if (!draw.tool || draw.tool === "shape" || draw.tool === "follow" || draw.tool === "cutfill" || !draw.mouse) return;
+  if (!draw.tool || draw.tool === "shape" || draw.tool === "follow" || PICK_TOOLS.includes(draw.tool) || !draw.mouse) return;
   const it = editItem(), box = $("dyn");
   draw.typing = true;
   const A = prevPoint(), R = typingRef(), B = R || A;

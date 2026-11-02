@@ -336,7 +336,8 @@ const Spec = (() => {
         let mx = val(L.max, "อย่างมาก");
         if (mn == null && mx == null) return q;
         if (mn != null && mx != null && mn > mx){ warn(p.id, `${tag}: อย่างน้อย ${f2(mn)} > อย่างมาก ${f2(mx)} — ใช้อย่างน้อย`); mx = null; }
-        const sk = LIMIT_START[p.def.type], S = sk ? need(p.def[sk]) : { x: 0, y: 0 };
+        info.mn = mn; info.mx = mx;                       // ไว้วาดขอบที่ยอมได้ (limit.js)
+        const sk = LIMIT_START[p.def.type], S = info.S = sk ? need(p.def[sk]) : { x: 0, y: 0 };
         let Q;
         if (m === "normal") Q = pt => {
           const h = 0.01, s = (ground.elev(pt.x + h) - ground.elev(pt.x - h)) / (2 * h), v = (ground.elev(pt.x) - pt.y) / Math.sqrt(1 + s * s);
@@ -346,11 +347,12 @@ const Spec = (() => {
           const ex = q.x - S.x, ey = q.y - S.y, n = Math.hypot(ex, ey);
           if (n < 1e-9){ warn(p.id, `${tag}: จุดอยู่ที่จุดต้นของแนว — ไม่ขยับ`); return q; }
           Q = pt => (pt.x - S.x) * ex / n + (pt.y - S.y) * ey / n;
+          info.u = { x: ex / n, y: ey / n };
         }
-        else if (m === "offset"){ const rx = r.type === "point" ? need(r.id).x : 0; Q = pt => F * (pt.x - rx); }
+        else if (m === "offset"){ const rx = info.rx = r.type === "point" ? need(r.id).x : 0; Q = pt => F * (pt.x - rx); }
         else if (groundRef) Q = pt => below ? ground.elev(pt.x) - pt.y : pt.y - ground.elev(pt.x);
         else {
-          const ry = r.type === "point" ? need(r.id).y : X(r.expr, "ระดับ") - (ctx.originElevation || 0);
+          const ry = info.ry = r.type === "point" ? need(r.id).y : X(r.expr, "ระดับ") - (ctx.originElevation || 0);
           Q = pt => below ? ry - pt.y : pt.y - ry;
         }
         const v0 = info.v0 = Q(q);
@@ -507,7 +509,7 @@ const Spec = (() => {
       shapes[s.id] = { poly };
     }
     for (const b of BRS) branchOn(b.id);
-    return { pts, links, shapes, issues, flip: F, env, raw: raws, logic: { conds: condVal, decisions: decVal, branches: brVal }, limits: limInfo };
+    return { pts, links, shapes, issues, flip: F, env, raw: raws, logic: { conds: condVal, decisions: decVal, branches: brVal }, limits: limInfo, ground };
   }
   // หมุนจุด q รอบ c ด้วยมุม a องศา (ทวนเข็ม +) — ตรงกับ Rotate ใน CodeGenerator.cs
   function rotatePt(q, c, a){

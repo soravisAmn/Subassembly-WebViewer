@@ -54,7 +54,8 @@
   รอบ 4b M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบใน `prompt-4b-design.md` (ปุ่มชื่อ "Max / Min" · เลือกได้ว่าคุม ระยะดิ่ง / ตั้งฉากผิวดิน / ความยาว / ระยะราบ · ตัวอย่าง = base_rock-pitching)
   รอบ 4b M1 เสร็จ (2026-11-02): `p.limit` ใน evaluate (spec.js limitPt / setLimit / limitOptions) + C# `Limit()` + `limited()` + Properties ขั้นต่ำ
     (test: `limit.test.js`, drawing-cases 55–60, DrawingTests เทียบ base_rock-pitching.cs, ExprTests "Max / Min -> C#")
-  ถัดไป: **`prompt-4b.md` M2** (ปุ่ม "Max / Min" + หน้าต่างถามเป็นประโยค + พรีวิวสด) ทำก่อน แล้วค่อย **`prompt-5.md`** (Logic ข — flowchart + Logic API สำหรับ MCP ต้องรวมฟังก์ชันของ 4b) — เขียนแล้วทั้งคู่ ยังไม่เริ่ม
+  รอบ 4b M2 เสร็จ (2026-11-02): ปุ่ม "Max / Min" ใน drawer + หน้าต่างถามเป็นประโยค (ชิดขวา) + พรีวิวสด (ข้อความ + เส้นประขอบ / ลูกศรบนรูป) — `js/limit.js`
+  ถัดไป: **`prompt-4b.md` M3** (ข้อ 4 + 5: ไอคอน / แถบช่วงบนรูปตอนเลือกจุด, แท็บ Logic, scenario, Delete ถาม, README ตาราง "ใช้อันไหนเมื่อไร", `tests-civil3d/round4b-demo.cs`) ทำก่อน แล้วค่อย **`prompt-5.md`** (Logic ข — flowchart + Logic API สำหรับ MCP ต้องรวมฟังก์ชันของ 4b) — เขียนแล้วทั้งคู่ ยังไม่เริ่ม
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

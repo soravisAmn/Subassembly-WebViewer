@@ -1578,7 +1578,10 @@ function openDialog(title, build){
   build(b);
   $("modal").hidden = false;
 }
-function closeDialog(){ $("modal").hidden = true; }
+function closeDialog(){
+  $("modal").hidden = true; $("modal").classList.remove("side");
+  limitPreviewClear();                              // พรีวิวของหน้าต่าง Max / Min
+}
 $("dlg-x").onclick = closeDialog;
 $("modal").addEventListener("pointerdown", e => { if (e.target === $("modal")) closeDialog(); });
 

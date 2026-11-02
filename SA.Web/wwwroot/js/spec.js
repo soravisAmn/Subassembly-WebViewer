@@ -45,7 +45,7 @@ const Spec = (() => {
   const POINT_TYPES = {
     origin: "Origin", delta: "ห่างจากจุด (dx, dy)", polar: "ระยะ + มุม (polar)", slopeLength: "ลาด + ความยาว", slopeToSurface: "ลาดจนชนดิน",
     onSurface: "บนผิวดิน", between: "บนเส้นระหว่าง 2 จุด", intersect: "จุดตัดของ 2 เส้น", external: "จุดจากโค้ดเดิม (point code)",
-    tangent: "จุดสัมผัส (Fillet)"
+    tangent: "จุดสัมผัส (Fillet)", firstOf: "จุดแรกที่เกิด (หลังกิ่ง)"
   };
   const LINK_TYPES = { straight: "เส้นตรง", followSurface: "วิ่งตามผิวดิน", arc3: "โค้งผ่าน 3 จุด", arcR: "โค้ง เริ่ม-ปลาย-รัศมี", fillet: "โค้ง Fillet" };
   const ARC_TYPES = ["arc3", "arcR", "fillet"];
@@ -75,6 +75,7 @@ const Spec = (() => {
   // จุดที่ def อ้างถึง: ช่องอ้างจุด (from, a, b, ...) + จุดในนิพจน์ (P3.x, ground(P3), exists(P3)) — ต้องคำนวณก่อน / ลบแล้วจุดนี้หาย
   const refs = def => {
     const r = ["from", "a", "b", "a1", "a2", "b1", "b2", "corner", "toward", "other"].map(k => def[k]).filter(Boolean);
+    if (def.type === "firstOf") for (const id of def.points || []) if (id && !r.includes(id)) r.push(id);
     for (const k of EXPR_FIELDS[def.type] || []) for (const id of Expr.pointRefsOf(def[k])) if (!r.includes(id)) r.push(id);
     return r;
   };
@@ -103,10 +104,69 @@ const Spec = (() => {
     for (const p of codeParams || []) if (p.kind === "double" || p.kind === "long") s.add(p.name);
     return [...s];
   }
+  // ---------- Logic: กิ่ง ----------
+  // ค่าของ decision ตรงกับทางออก (กิ่ง) นี้ไหม — if: case true / false · switch: ค่าเท่ากับ case (tolerance เดียวกับ ==), "else" = ไม่ตรงกิ่งอื่นเลย
+  function caseMatch(lg, d, b, v){
+    if (v === null || v === undefined) return false;
+    if (d.kind === "switch"){
+      const eq = c => Math.abs(v - Number(c)) <= Expr.EPS;
+      if (b.case === "else") return !(lg.branches || []).some(o => o.decision === d.id && o.case !== "else" && eq(o.case));
+      return eq(b.case);
+    }
+    return v === (b.case === true || b.case === "true");
+  }
+  const branchLabel = (spec, id) => { const b = byId((spec.logic || {}).branches || [], id); return b ? b.label || b.id : id; };
+  // กิ่งนี้ + กิ่งแม่ทุกชั้น (กิ่งเกิด = กิ่งเหล่านี้เกิดทั้งหมด)
+  function branchChain(spec, id){
+    const lg = spec.logic || {}, out = [];
+    for (let cur = id; cur && !out.includes(cur); ){
+      out.push(cur);
+      const b = byId(lg.branches || [], cur), d = b && byId(lg.decisions || [], b.decision);
+      cur = d ? d.parent : null;
+    }
+    return out;
+  }
+  // object ที่ "อาจหาจุดไม่ได้ในบางกรณี": อ้างจุด (ทางตรง / ทางอ้อม) ที่เกิดเฉพาะกิ่งที่ object นี้ไม่ได้อยู่
+  //   exists(P) และรายการของ firstOf ไม่นับ · คืน [{ id, kind, ref, branch }]
+  function branchRisks(spec){
+    const req = {}, busy = new Set();
+    // กิ่งที่จุดต้องเกิดถึงจะหาได้
+    function need(id){
+      if (req[id]) return req[id];
+      const p = byId(spec.points, id);
+      if (!p || busy.has(id)) return new Set();
+      busy.add(id);
+      const s = new Set(p.branch ? branchChain(spec, p.branch) : []);
+      if (p.def.type !== "firstOf") for (const r of strictRefs(p.def)) for (const b of need(r)) s.add(b);
+      busy.delete(id);
+      return (req[id] = s);
+    }
+    const out = [];
+    const check = (o, kind, ids) => {
+      const mine = new Set(o.branch ? branchChain(spec, o.branch) : []);
+      for (const r of ids) for (const b of need(r)) if (!mine.has(b)){ out.push({ id: o.id, kind, ref: r, branch: b }); return; }
+    };
+    for (const p of spec.points) if (p.def.type !== "firstOf") check(p, "point", strictRefs(p.def));
+    for (const l of spec.links) check(l, "link", linkRefs(l));
+    for (const s of spec.shapes){
+      const mine = new Set(s.branch ? branchChain(spec, s.branch) : []);
+      const l = s.links.map(id => byId(spec.links, id)).find(l => l && l.branch && !mine.has(l.branch));
+      if (l) out.push({ id: s.id, kind: "shape", ref: l.id, branch: l.branch });
+    }
+    return out;
+  }
+  // จุดที่ต้องมีจริง (ไม่นับ exists(P) ที่แค่ถามว่าเกิดไหม)
+  function strictRefs(def){
+    const r = ["from", "a", "b", "a1", "a2", "b1", "b2", "corner", "toward", "other"].map(k => def[k]).filter(Boolean);
+    for (const k of EXPR_FIELDS[def.type] || []) for (const id of Expr.pointRefsOf(def[k], true)) if (!r.includes(id)) r.push(id);
+    return r;
+  }
+
   // ตัวเลือกของ Expr.check สำหรับช่องนิพจน์ของ spec นี้: จุดที่อ้างได้ + target (ไฟล์ import ใช้ target ของโค้ดเดิม = ไม่ตรวจชื่อ)
   //   self = id ของ object ที่ช่องนี้เป็นของ (อ้างตัวเองไม่ได้)
   function exprOpts(spec, self){
-    return { points: spec.points.map(p => p.id).filter(id => id !== self), targets: spec.imported ? null : spec.targets.map(t => t.name) };
+    return { points: spec.points.map(p => p.id).filter(id => id !== self), targets: spec.imported ? null : spec.targets.map(t => t.name),
+             conds: ((spec.logic && spec.logic.conditions) || []).map(c => c.name) };
   }
   // ช่องนิพจน์ของ def แต่ละชนิด
   const EXPR_FIELDS = { delta: ["dx", "dy"], polar: ["length", "angle"], slopeLength: ["slope", "length"], slopeToSurface: ["slope", "maxDistance", "layoutLength"],
@@ -151,8 +211,51 @@ const Spec = (() => {
         return q.y;
       },
       exists: id => { try{ needFrom(viewer, id); return true; }catch{ return false; } },
-      hasGround: () => !!ground
+      hasGround: () => !!ground,
+      isCond: name => name in condByName,
+      cond: name => { const v = cond(name); if (v === null) throw new Error(`เงื่อนไข ${name} ไม่รู้ค่า`); return v; }
     });
+
+    // ---------- Logic (รอบ 4): เงื่อนไข / decision / กิ่ง — ดู prompt-4-design.md ----------
+    //   เงื่อนไข = คำนวณทุกตัวเสมอ (ไม่รู้ค่า = null + เตือน) · decision คำนวณเมื่อกิ่งแม่เกิด · กิ่งเกิด = กิ่งแม่เกิด และค่าตรง case
+    //   object ในกิ่งที่ไม่เกิด = { err, off: กิ่ง } (ไม่เตือน) · object ที่อ้างจุดที่ไม่เกิดผ่าน from / a / b ... = ไม่เกิดตาม (ไม่เตือน)
+    //   ตรงกับโค้ด C# ที่สร้าง (ฟังก์ชันช่วยคืน null เงียบๆ เมื่อจุดตั้งต้นเป็น null)
+    const LG = spec.logic || {}, CONDS = LG.conditions || [], DECS = LG.decisions || [], BRS = LG.branches || [];
+    const condByName = {};
+    for (const c of CONDS) condByName[c.name] = c;
+    const condVal = {}, condBusy = new Set(), decVal = {}, brVal = {}, brBusy = new Set();
+    function cond(name){
+      if (name in condVal) return condVal[name];
+      const c = condByName[name];
+      if (condBusy.has(name)) throw new Error(`เงื่อนไข ${name} อ้างถึงตัวเองเป็นวง`);
+      condBusy.add(name);
+      let v = null;
+      try{ v = Expr.test(c.expr, env, exprCtx(null)); }
+      catch(e){ warn(c.id, `เงื่อนไข ${name}: ${e.message}`); }
+      condBusy.delete(name);
+      return (condVal[name] = v);
+    }
+    // ค่าของ decision: if = จริง/เท็จ, switch = ตัวเลข, null = ไม่รู้
+    function decision(d){
+      if (d.id in decVal) return decVal[d.id];
+      const t = String(d.test ?? "").trim();
+      let v = null;
+      if (d.kind !== "switch" && condByName[t]) v = cond(t);
+      else try{ v = d.kind === "switch" ? Expr.value(t, env, exprCtx(null)) : Expr.test(t, env, exprCtx(null)); }
+      catch(e){ warn(d.id, `${d.label || d.id}: ${e.message}`); }
+      return (decVal[d.id] = v);
+    }
+    function branchOn(id){
+      if (id in brVal) return brVal[id];
+      const b = byId(BRS, id), d = b && byId(DECS, b.decision);
+      if (!d || brBusy.has(id)) return (brVal[id] = false);           // กิ่ง / decision ที่ไม่มี = ไม่เกิด
+      brBusy.add(id);
+      let on = !d.parent || branchOn(d.parent);
+      if (on) on = caseMatch(LG, d, b, decision(d));
+      brBusy.delete(id);
+      return (brVal[id] = on);
+    }
+    const offOf = o => o.branch && !branchOn(o.branch) ? { err: `ไม่เกิด (กิ่ง ${branchLabel(spec, o.branch)})`, off: o.branch } : null;
     const Xv = (src, what, viewer) => { try{ return Expr.value(src, env, exprCtx(viewer)); }catch(e){ throw new Error(`${what}: ${e.message}`); } };
     const X = (src, what) => Xv(src, what, null);
 
@@ -176,7 +279,7 @@ const Spec = (() => {
       visiting.add(key);
       let r;
       try{ r = fn(); }
-      catch(e){ r = { err: e.message }; }
+      catch(e){ r = e.off ? { err: e.message, off: e.off } : { err: e.message }; }
       visiting.delete(key);
       return (store[id] = r);
     };
@@ -184,6 +287,7 @@ const Spec = (() => {
     function pt(id){
       const p = byId(spec.points, id);
       if (!p) return (pts[id] = { err: `ไม่มีจุด ${id}` });
+      if (!(id in pts)){ const o = offOf(p); if (o) return (pts[id] = o); }
       const g = groupOf[id];
       if (!g) return memo(pts, "f:" + id, id, () => calcPoint(p));
       return memo(pts, "f:" + id, id, () => {
@@ -195,12 +299,17 @@ const Spec = (() => {
       });
     }
     // ค่าก่อนหมุนของสมาชิกกลุ่มหมุน
-    function rawPt(id){ return memo(raws, "r:" + id, id, () => calcPoint(byId(spec.points, id))); }
+    function rawPt(id){
+      const p = byId(spec.points, id), o = p && !(id in raws) ? offOf(p) : null;
+      if (o) return (raws[id] = o);
+      return memo(raws, "r:" + id, id, () => calcPoint(p));
+    }
     // จุด viewer อ้างจุด id: สมาชิกกลุ่มเดียวกัน / จุดที่ pivot ของกลุ่มนั้นอ้าง = ค่า raw · อื่นๆ = ค่าที่หมุนแล้ว
     function needFrom(viewer, id){
       if (!id) return { x: 0, y: 0 };               // ไม่มี from = origin
       const g = groupOf[id];
       const q = g && (groupOf[viewer] === g || pre[g.id].has(viewer)) ? rawPt(id) : pt(id);
+      if (q.off) throw Object.assign(new Error(`ไม่เกิดเพราะ ${id} ไม่เกิด`), { skip: true, off: q.off });
       if (q.err) throw Object.assign(new Error(`ข้ามเพราะหาจุด ${id} ไม่ได้`), { skip: true });
       return q;
     }
@@ -258,6 +367,11 @@ const Spec = (() => {
           if (r.warn) warn(p.id, `${p.id} จุดสัมผัส: ${r.warn} — ใช้มุมแหลมเดิม`);
           return { x: r.x, y: r.y };
         }
+        case "firstOf": {
+          // จุดแรกในรายการที่เกิด (ไว้ต่อเรขาคณิตหลังกิ่ง) · ไม่มีสักจุด = หาไม่ได้ + เตือน
+          for (const id of d.points || []){ try{ return need(id); }catch{} }
+          throw new Error(`ไม่มีจุดใดใน ${(d.points || []).join(", ") || "(ว่าง)"} เกิด`);
+        }
         case "external": {
           const q = (ctx.codePoints || []).find(c => c.codes.includes(d.code));
           if (!q) throw Object.assign(new Error(`ไม่พบจุด code '${d.code}' จากโค้ดเดิม`), { skip: true });
@@ -266,15 +380,24 @@ const Spec = (() => {
       }
       throw new Error(`ไม่รู้จักชนิดจุด ${d.type}`);
     }
+    for (const c of CONDS) cond(c.name);               // เงื่อนไขคำนวณทุกตัว (แบบโค้ด C#) แม้ไม่มีใครใช้
     for (const p of spec.points){
       const r = pt(p.id);
-      if (r.err) warn(p.id, `${p.id}: ${r.err}`);
+      if (r.err && !r.off) warn(p.id, `${p.id}: ${r.err}`);
     }
 
     const links = {};
     for (const l of spec.links){
+      const lo = offOf(l);
+      if (lo){ links[l.id] = lo; continue; }
       const [a, b] = linkEnds(l), A = pts[a], B = pts[b];
-      if (!A || !B || A.err || B.err){ links[l.id] = { err: `ข้ามเพราะหาจุด ${!A || A.err ? a : b} ไม่ได้` }; warn(l.id, `${l.id}: ${links[l.id].err}`); continue; }
+      if (!A || !B || A.err || B.err){
+        // ปลายไม่เกิดเพราะกิ่ง = link ไม่เกิดตาม (ไม่เตือน) · หาไม่ได้ = เตือน
+        const off = [A, B].every(q => q && (!q.err || q.off)) ? (A.off || B.off) : null;
+        links[l.id] = off ? { err: `ไม่เกิดเพราะปลายไม่เกิด`, off } : { err: `ข้ามเพราะหาจุด ${!A || A.err ? a : b} ไม่ได้` };
+        if (!off) warn(l.id, `${l.id}: ${links[l.id].err}`);
+        continue;
+      }
       // link จริงที่ปลายเป็นจุด auxiliary: จุดนั้นไม่อยู่ใน Civil 3D (โค้ด C# ข้าม link นี้ + เตือนแบบเดียวกัน) · link auxiliary ต่อได้ทุกจุด
       const aux = isAux(l), auxEnd = aux ? null : [a, b].find(id => isAuxPoint(spec, id));
       if (auxEnd){ links[l.id] = { err: `ปลาย ${auxEnd} เป็นจุด auxiliary (ไม่อยู่ใน Civil 3D)`, auxEnd }; warn(l.id, `${l.id}: ${links[l.id].err}`); continue; }
@@ -307,6 +430,9 @@ const Spec = (() => {
 
     const shapes = {};
     for (const s of spec.shapes){
+      const so = offOf(s);
+      if (so){ shapes[s.id] = so; continue; }
+      // link ที่ไม่เกิด (กิ่งอื่น) ใน shape ที่เกิด = ข้าม + เตือน (โค้ด C# AddShape เตือนแบบเดียวกัน)
       const bad = s.links.find(id => !links[id] || links[id].err);
       if (bad){ shapes[s.id] = { err: `ข้ามเพราะ link ${bad} วาดไม่ได้` }; warn(s.id, `${s.id}: ${shapes[s.id].err}`); continue; }
       // shape ใน Civil 3D ประกอบจาก link จริงเท่านั้น
@@ -316,7 +442,8 @@ const Spec = (() => {
       if (!poly) warn(s.id, `${s.id}: link ต่อกันไม่เป็นรูปปิด`);
       shapes[s.id] = { poly };
     }
-    return { pts, links, shapes, issues, flip: F, env, raw: raws };
+    for (const b of BRS) branchOn(b.id);
+    return { pts, links, shapes, issues, flip: F, env, raw: raws, logic: { conds: condVal, decisions: decVal, branches: brVal } };
   }
   // หมุนจุด q รอบ c ด้วยมุม a องศา (ทวนเข็ม +) — ตรงกับ Rotate ใน CodeGenerator.cs
   function rotatePt(q, c, a){
@@ -695,7 +822,7 @@ const Spec = (() => {
     return g;
   }
 
-  return { exprOpts, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
+  return { exprOpts, caseMatch, branchLabel, branchChain, branchRisks, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
            isAux, isAuxPoint, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,

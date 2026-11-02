@@ -17,6 +17,7 @@ public class DrawingSpec
     public List<SpecLink> Links { get; set; } = new();
     public List<SpecShape> Shapes { get; set; } = new();
     public List<SpecRotation> Rotations { get; set; } = new();
+    public SpecLogic? Logic { get; set; }                 // เงื่อนไข / decision / กิ่ง (รอบ 4 — ดู prompt-4-design.md)
     public SpecSide? Side { get; set; }
     public bool Imported { get; set; }
 
@@ -56,6 +57,7 @@ public class SpecPoint
     public bool Auxiliary { get; set; }               // Auxiliary (ช่วยสร้าง): คำนวณพิกัดแต่ไม่ Points.Add
     // spec รุ่นก่อน: construction = auxiliary (อ่านอย่างเดียว)
     public bool Construction { get => false; set { if (value) Auxiliary = true; } }
+    public string? Branch { get; set; }               // เกิดเฉพาะเมื่อกิ่งนี้เกิด (null = เกิดเสมอ)
 }
 
 public class PointDef
@@ -84,9 +86,11 @@ public class PointDef
     public string? Toward { get; set; }
     public string? Other { get; set; }
     public string? Radius { get; set; }
+    public List<string>? Points { get; set; }         // firstOf: จุดแรกในรายการที่เกิด
 
-    // จุดที่ต้องคำนวณก่อน: ช่องอ้างจุด + จุดในนิพจน์ (P3.x, ground(P3), exists(P3)) — ตรงกับ refs ใน spec.js
+    // จุดที่ต้องคำนวณก่อน: ช่องอ้างจุด + รายการของ firstOf + จุดในนิพจน์ (P3.x, ground(P3), exists(P3)) — ตรงกับ refs ใน spec.js
     public IEnumerable<string> Refs() => new[] { From, A, B, A1, A2, B1, B2, Corner, Toward, Other }.Where(r => !string.IsNullOrEmpty(r))
+        .Concat(Type == "firstOf" ? Points ?? new() : new())
         .Concat(Exprs().SelectMany(SpecExpr.PointRefs)).Distinct()!;
 
     // ช่องนิพจน์ทั้งหมดของ def (ที่ไม่ว่าง)
@@ -110,6 +114,7 @@ public class SpecLink
     public bool Auxiliary { get; set; }               // Auxiliary (ช่วยสร้าง): ใช้อ้างอิงอย่างเดียว ไม่ Links.Add
     public bool Construction { get => false; set { if (value) Auxiliary = true; } }
     public List<string> Codes { get; set; } = new();
+    public string? Branch { get; set; }
 
     public bool Follow => Type == "followSurface";
     public bool IsArc => Type is "arc3" or "arcR" or "fillet";
@@ -127,6 +132,47 @@ public class SpecShape
     public string Id { get; set; } = "";
     public List<string> Links { get; set; } = new();
     public List<string> Codes { get; set; } = new();
+    public string? Branch { get; set; }
+}
+
+// ---------------- Logic (รอบ 4) ----------------
+// conditions = เงื่อนไขที่ตั้งชื่อ (ใช้ซ้ำได้) · decisions = โหนดของ flowchart (if / switch) · branches = ทางออกของ decision
+// กิ่งเกิด = กิ่งแม่ของ decision เกิด (หรืออยู่ชั้นบนสุด) และค่าของ test ตรงกับ case
+public class SpecLogic
+{
+    public List<SpecCondition> Conditions { get; set; } = new();
+    public List<SpecDecision> Decisions { get; set; } = new();
+    public List<SpecBranch> Branches { get; set; } = new();
+}
+
+public class SpecCondition
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";           // ชื่อตัวแปรในโค้ด C# (bool?) และในนิพจน์อื่น
+    public string? Expr { get; set; }
+    public string? Note { get; set; }
+}
+
+public class SpecDecision
+{
+    public string Id { get; set; } = "";
+    public string? Parent { get; set; }               // กิ่งแม่ (null = ชั้นบนสุด)
+    public string Kind { get; set; } = "if";          // if | switch
+    public string? Test { get; set; }                 // ชื่อเงื่อนไข หรือนิพจน์ (if = จริง/เท็จ, switch = ตัวเลข)
+    public string? Label { get; set; }
+}
+
+public class SpecBranch
+{
+    public string Id { get; set; } = "";
+    public string Decision { get; set; } = "";
+    public JsonElement Case { get; set; }             // if: true / false · switch: ตัวเลข หรือ "else"
+    public string? Label { get; set; }
+
+    public bool IsElse => Case.ValueKind == JsonValueKind.String && Case.GetString() == "else";
+    public bool AsBool => Case.ValueKind == JsonValueKind.True || (Case.ValueKind == JsonValueKind.String && Case.GetString() == "true");
+    public double AsNumber => Case.ValueKind == JsonValueKind.Number ? Case.GetDouble()
+        : double.TryParse(Case.ValueKind == JsonValueKind.String ? Case.GetString() : "", System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : double.NaN;
 }
 
 // กลุ่มหมุน: สมาชิกคำนวณตาม def แล้วหมุนรอบ pivot ด้วย F × angle (องศา ทวนเข็ม + ในกรอบ Side = Right)

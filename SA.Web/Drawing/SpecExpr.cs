@@ -63,6 +63,14 @@ public static class SpecExpr
 
     public static ISet<string> VarsOf(string? src) => Walk(Parse(src)).OfType<Var>().Select(v => v.Name).ToHashSet();
 
+    // ชื่อที่ใช้ (parameter / เงื่อนไข) — parse ไม่ได้ = ไม่มี
+    public static ISet<string> NamesOf(string? src)
+    {
+        if (string.IsNullOrWhiteSpace(src)) return new HashSet<string>();
+        try { return VarsOf(src); }
+        catch (FormatException) { return new HashSet<string>(); }
+    }
+
     // จุดที่นิพจน์อ้าง (parse ไม่ได้ = ไม่มี) — ใช้เรียงลำดับการคำนวณ (TopoOrder)
     public static ISet<string> PointRefs(string? src)
     {
@@ -313,7 +321,7 @@ public static class SpecExpr
         {
             case Num x: return Lit(x.V);
             case Bool b: return b.V ? "true" : "false";
-            case Var v: return v.Name;
+            case Var v: return sc.Conds != null && sc.Conds.Contains(v.Name) ? $"V({v.Name})" : v.Name;   // เงื่อนไขไม่รู้ค่า = โยน (Try / Cond จัดการ)
             case PtRef r: return r.Axis == "x" ? Wrap($"F * PX({Pt(r.Id)})", 1, need) : $"PY({Pt(r.Id)})";
             case Neg g:
             {

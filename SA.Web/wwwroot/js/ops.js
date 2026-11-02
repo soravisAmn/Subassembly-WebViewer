@@ -183,6 +183,7 @@ const Ops = (() => {
     for (const p of src.points.filter(p => P.has(p.id))){
       const id = Spec.addPoint(dst, JSON.parse(JSON.stringify(p.def)), p.codes.slice(), Spec.isAux(p));
       map[p.id] = id; pts.push([p.id, id]);
+      if (p.branch && src === dst) Spec.byId(dst.points, id).branch = p.branch;   // กิ่ง: ในตัวเดิมเท่านั้น (ตัวอื่นไม่มีกิ่งนี้)
     }
     for (const [old, id] of pts){
       const np = Spec.byId(dst.points, id);
@@ -192,6 +193,8 @@ const Ops = (() => {
         continue;
       }
       for (const k of REFS) if (np.def[k] && map[np.def[k]]) np.def[k] = map[np.def[k]];
+      if (np.def.points) np.def.points = np.def.points.map(p => map[p] || p);   // firstOf
+      for (const k of Spec.EXPR_FIELDS[np.def.type] || []) if (np.def[k] != null) np.def[k] = String(np.def[k]).replace(/\bP\d+\b/g, w => map[w] || w);   // P3.y / ground(P3) ในนิพจน์
     }
     const L = new Set(frag.links), S = new Set(frag.shapes), links = [], shapes = [];
     for (const l of src.links.filter(l => L.has(l.id))){
@@ -201,6 +204,7 @@ const Ops = (() => {
       if (c.to) c.to = map[c.to] || c.to;
       if (c.via) c.via = map[c.via] || c.via;
       if (c.corner) c.corner = map[c.corner] || c.corner;
+      if (src !== dst) delete c.branch;
       c.id = Spec.nextId(dst, "L");
       dst.links.push(c); lmap[l.id] = c.id; links.push(c.id);
     }
@@ -208,6 +212,7 @@ const Ops = (() => {
     for (const s of src.shapes.filter(s => S.has(s.id))){
       const id = Spec.addShape(dst, s.links.map(l => lmap[l] || l));
       Spec.byId(dst.shapes, id).codes = s.codes.slice();
+      if (s.branch && src === dst) Spec.byId(dst.shapes, id).branch = s.branch;
       shapes.push(id); smap[s.id] = id;
     }
     // polygon ด้านเท่าที่สำเนามาทั้งรูป: สำเนาข้อมูล polygon ด้วย (แก้ N / R / θ ของสำเนาได้)

@@ -1,0 +1,181 @@
+// ทดสอบกิ่งของรอบ 4 M2 (logic.conditions / decisions / branches + firstOf ใน spec.js, clone กิ่งใน ops.js)
+// รัน: node SA.Tests/js/logic.test.js
+// (ไม่มี node: รันใน console ของหน้าเว็บได้ด้วย globalThis.SA_LIB = { Expr, Spec, Ops } แล้ว eval ไฟล์นี้ในฟังก์ชัน)
+"use strict";
+const { Expr, Spec, Ops } = typeof require === "function" ? (() => {
+  const fs = require("fs"), path = require("path"), vm = require("vm");
+  const js = f => fs.readFileSync(path.join(__dirname, "../../SA.Web/wwwroot/js", f), "utf8");
+  const ctx = vm.createContext({ console });
+  vm.runInContext(js("expr.js") + "\n" + js("spec.js") + "\n" + js("ops.js") + "\nthis.Expr = Expr; this.Spec = Spec; this.Ops = Ops;", ctx);
+  return ctx;
+})() : globalThis.SA_LIB;
+
+let passed = 0, failed = 0;
+function test(name, body){
+  try{ body(); passed++; console.log("  PASS  " + name); }
+  catch(e){ failed++; console.log("  FAIL  " + name + "\n        " + e.message); }
+}
+const near = (exp, act, what, tol = 1e-3) => { if (!(Math.abs(exp - act) <= tol)) throw new Error(`${what}: คาด ${exp} ได้ ${act}`); };
+const eq = (exp, act, what) => { if (exp !== act) throw new Error(`${what}: คาด ${exp} ได้ ${act}`); };
+const ok = (c, what) => { if (!c) throw new Error(what); };
+
+// ผิวดิน: ขวาสูง (ที่ x = 3 สูง 2.1 = ตัด) ซ้ายต่ำ (ที่ x = -3 สูง -1.4 = ถมสูง 1.4)
+const surf = [{ x: -30, y: -5 }, { x: 0, y: -1 }, { x: 30, y: 30 }];
+const run = (s, o = {}) => Spec.evaluate(s, { values: o.values || {}, codeParams: [], codePoints: [], surface: o.surface === undefined ? surf : o.surface,
+                                             extendEnds: true, layout: !!o.layout });
+const P = (r, id) => { const p = r.pts[id]; if (!p || p.err) throw new Error(`จุด ${id}: ${p ? p.err : "ไม่มี"}`); return p; };
+const off = (r, id, what) => ok(r.pts[id] && r.pts[id].off, `${what || id}: ต้องไม่เกิด (ได้ ${JSON.stringify(r.pts[id])})`);
+const pt = (id, def, extra) => ({ id, codes: [], def, ...extra });
+
+// ตัด / ถม ที่ hinge: ตัด = ลาด 2:1 ขึ้นชนดิน · ถม = ลาด 1:2 ลงชนดิน · ถมสูง (> 1 m) มีชั้นพัก
+function cutFill(){
+  const s = Spec.newSpec("T");
+  s.params.push({ name: "Width", kind: "double", default: 3, min: null, max: null });
+  s.points = [
+    pt("P1", { type: "origin" }),
+    pt("P2", { type: "delta", from: "P1", dx: "Width", dy: "0" }),
+    pt("P3", { type: "slopeToSurface", from: "P2", slope: "2", dir: 1, target: "TargetSurface", maxDistance: "50", layoutLength: "2" }, { branch: "B1" }),
+    pt("P4", { type: "slopeToSurface", from: "P2", slope: "-0.5", dir: 1, target: "TargetSurface", maxDistance: "50", layoutLength: "3" }, { branch: "B2" }),
+    pt("P5", { type: "firstOf", points: ["P3", "P4"] }, { auxiliary: true }),
+    pt("P6", { type: "delta", from: "P5", dx: "1", dy: "0" }),
+    pt("P7", { type: "delta", from: "P4", dx: "2", dy: "0" }, { branch: "B3" }),
+    pt("P8", { type: "delta", from: "P3", dx: "1", dy: "if(IsCut, 1, 0)" })           // ไม่อยู่ในกิ่ง แต่อ้าง P3 -> ไม่เกิดตาม (ไม่เตือน)
+  ];
+  s.links = [
+    { id: "L1", points: ["P1", "P2"], codes: [] },
+    { id: "L2", points: ["P2", "P3"], codes: [], branch: "B1" },
+    { id: "L3", points: ["P2", "P4"], codes: [], branch: "B2" },
+    { id: "L4", points: ["P4", "P7"], codes: [], branch: "B3" },
+    { id: "L5", points: ["P2", "P6"], codes: [] }
+  ];
+  s.logic = {
+    conditions: [{ id: "C1", name: "IsCut", expr: "ground(P2) > P2.y" },
+                 { id: "C2", name: "HighFill", expr: "P2.y - ground(P2) > 1 and not IsCut" }],
+    decisions: [{ id: "D1", kind: "if", test: "IsCut", label: "ตัดไหม" },
+                { id: "D2", parent: "B2", kind: "if", test: "HighFill", label: "ถมสูงไหม" }],
+    branches: [{ id: "B1", decision: "D1", case: true, label: "ตัด" }, { id: "B2", decision: "D1", case: false, label: "ถม" },
+               { id: "B3", decision: "D2", case: true, label: "ถมสูง" }, { id: "B4", decision: "D2", case: false, label: "ถมต่ำ" }]
+  };
+  return s;
+}
+
+console.log("กิ่ง if / กิ่งซ้อน / firstOf");
+test("Right (ตัด): P3 เกิด, P4 / P7 ไม่เกิด, firstOf = P3, ต่อเรขาคณิตหลังกิ่ง", () => {
+  const r = run(cutFill());
+  eq(true, r.logic.conds.IsCut, "IsCut"); eq(false, r.logic.conds.HighFill, "HighFill");
+  eq(true, r.logic.branches.B1, "B1"); eq(false, r.logic.branches.B2, "B2"); eq(false, r.logic.branches.B3, "B3 (กิ่งแม่ไม่เกิด)");
+  near(5.1724, P(r, "P3").x, "P3.x"); near(4.3448, P(r, "P3").y, "P3.y");
+  off(r, "P4"); off(r, "P7");
+  near(P(r, "P3").x, P(r, "P5").x, "firstOf = P3"); near(P(r, "P3").x + 1, P(r, "P6").x, "P6 ต่อจาก firstOf");
+  near(P(r, "P3").y + 1, P(r, "P8").y, "IsCut ในนิพจน์ = จริง");
+  ok(!r.links.L2.err && r.links.L3.off && r.links.L4.off, "link ตามกิ่ง");
+  eq(0, r.issues.length, "ไม่มีเตือน: " + r.issues.map(i => i.msg).join(" | "));
+});
+test("Left (ถมสูง): กิ่งซ้อนเกิด, P3 / P8 ไม่เกิด (P8 ไม่เกิดตาม P3 ไม่เตือน)", () => {
+  const r = run(cutFill(), { values: { Side: 1 } });
+  eq(false, r.logic.conds.IsCut, "IsCut"); eq(true, r.logic.conds.HighFill, "HighFill");
+  eq(true, r.logic.branches.B2, "B2"); eq(true, r.logic.branches.B3, "B3");
+  off(r, "P3"); off(r, "P8", "P8 (อ้าง P3)");
+  near(-6.8182, P(r, "P4").x, "P4.x"); near(-1.9091, P(r, "P4").y, "P4.y");
+  near(-8.8182, P(r, "P7").x, "P7 ชั้นพัก (บนจอ ไปทางซ้าย)");
+  near(P(r, "P4").x - 1, P(r, "P6").x, "firstOf = P4 (P6 ไปทางนอก = ซ้าย)");
+  eq(0, r.issues.length, "ไม่มีเตือน: " + r.issues.map(i => i.msg).join(" | "));
+});
+test("ถมต่ำ: ดินราบที่ -0.5 -> ถม 0.5 m = กิ่ง ถมต่ำ", () => {
+  const r = run(cutFill(), { values: { Side: 1 }, surface: [{ x: -30, y: -0.5 }, { x: 30, y: -0.5 }] });
+  eq(false, r.logic.conds.IsCut, "ถม"); eq(false, r.logic.conds.HighFill, "ถมไม่ถึง 1 m");
+  eq(true, r.logic.branches.B4, "B4"); off(r, "P7");
+});
+test("ไม่มีผิวดิน: ground() = ระดับของจุดเอง -> ไม่ใช่ตัด -> ถม (ยาว layoutLength) · Layout ไม่เตือน", () => {
+  const r = run(cutFill(), { surface: null, layout: true });
+  eq(false, r.logic.conds.IsCut, "IsCut"); off(r, "P3");
+  near(6, P(r, "P4").x, "P4 = layoutLength 3"); near(7, P(r, "P6").x, "firstOf = P4");
+  eq(0, r.issues.length, "Layout ไม่เตือน");
+});
+test("เงื่อนไขไม่รู้ค่า (อ้างจุดที่ไม่มี) = null + เตือน -> ไม่เข้ากิ่งไหน -> firstOf ไม่มีจุด = หาไม่ได้ + เตือน", () => {
+  const s = cutFill(); s.logic.conditions[0].expr = "P9.y > 0";
+  const r = run(s);
+  eq(null, r.logic.conds.IsCut, "IsCut ไม่รู้ค่า"); eq(false, r.logic.conds.HighFill, "HighFill: ส่วนแรกเท็จ -> ลัดวงจร ไม่ต้องรู้ IsCut");
+  eq(false, r.logic.branches.B1, "B1"); eq(false, r.logic.branches.B2, "B2");
+  off(r, "P3"); off(r, "P4");
+  ok(r.pts.P5.err && !r.pts.P5.off, "P5 หาไม่ได้ (error ไม่ใช่ไม่เกิด)");
+  ok(r.issues.some(i => i.msg.includes("เงื่อนไข IsCut")), "เตือนเงื่อนไข");
+  ok(r.issues.some(i => i.msg.includes("P5")), "เตือน firstOf");
+});
+test("อ้างจุดที่ไม่เกิดในนิพจน์ (ไม่ใช่ exists) = error + เตือน · exists(จุดที่ไม่เกิด) = เท็จ", () => {
+  const s = cutFill();
+  s.points.push(pt("P9", { type: "delta", from: "P1", dx: "P4.x", dy: "0" }), pt("P10", { type: "delta", from: "P1", dx: "if(exists(P4), 1, 2)", dy: "0" }));
+  const r = run(s);
+  ok(r.pts.P9.err && !r.pts.P9.off, "P9 error"); ok(r.issues.some(i => i.msg.includes("P9")), "เตือน P9");
+  near(2, P(r, "P10").x, "exists(P4) เท็จ");
+});
+test("shape ที่ link อยู่ในกิ่งที่ไม่เกิด = ไม่เกิด (ไม่เตือน) · shape อยู่ในกิ่งเดียวกัน", () => {
+  const s = cutFill();
+  s.links.push({ id: "L6", points: ["P3", "P1"], codes: [], branch: "B1" });
+  s.shapes = [{ id: "S1", links: ["L1", "L2", "L6"], codes: ["Cut"], branch: "B1" }];
+  const a = run(s), b = run(s, { values: { Side: 1 } });
+  ok(!a.shapes.S1.err, "ตัด: S1 เกิด"); ok(b.shapes.S1.off, "ถม: S1 ไม่เกิด"); eq(0, b.issues.length, "ไม่เตือน");
+});
+
+console.log("switch / else");
+function sw(){
+  const s = Spec.newSpec("T");
+  s.params.push({ name: "Lanes", kind: "long", default: 2, min: null, max: null });
+  s.points = [pt("P1", { type: "origin" }),
+              pt("P2", { type: "delta", from: "P1", dx: "3", dy: "0" }, { branch: "B1" }),
+              pt("P3", { type: "delta", from: "P1", dx: "6", dy: "0" }, { branch: "B2" }),
+              pt("P4", { type: "delta", from: "P1", dx: "1", dy: "-1" }, { branch: "B3" }),
+              pt("P5", { type: "firstOf", points: ["P2", "P3", "P4"] })];
+  s.logic = { conditions: [],
+              decisions: [{ id: "D1", kind: "switch", test: "Lanes", label: "จำนวนช่อง" }],
+              branches: [{ id: "B1", decision: "D1", case: 1, label: "1 ช่อง" }, { id: "B2", decision: "D1", case: 2, label: "2 ช่อง" },
+                         { id: "B3", decision: "D1", case: "else", label: "อื่นๆ" }] };
+  return s;
+}
+test("switch ตัวเลข: case ตรง / else = ไม่ตรงกิ่งอื่นเลย", () => {
+  near(6, P(run(sw()), "P5").x, "Lanes 2"); near(3, P(run(sw(), { values: { Lanes: 1 } }), "P5").x, "Lanes 1");
+  const r = run(sw(), { values: { Lanes: 5 } });
+  eq(5, r.logic.decisions.D1, "ค่า switch"); off(r, "P2"); off(r, "P3"); near(1, P(r, "P5").x, "else");
+});
+test("caseMatch: if รับ true / \"true\" · switch ใช้ tolerance ของ ==", () => {
+  const lg = sw().logic, d = lg.decisions[0];
+  eq(true, Spec.caseMatch(lg, d, lg.branches[1], 2.0000001), "tolerance"); eq(false, Spec.caseMatch(lg, d, lg.branches[2], 2), "else ไม่ตรงเมื่อมี case 2");
+  eq(true, Spec.caseMatch(lg, { kind: "if" }, { case: "true" }, true), "\"true\""); eq(false, Spec.caseMatch(lg, d, lg.branches[0], null), "null = ไม่ตรง");
+});
+
+console.log("ตรวจตอนออกแบบ / clone");
+test("branchChain / branchLabel / branchRisks", () => {
+  const s = cutFill();
+  eq("B3,B2", Spec.branchChain(s, "B3").join(","), "chain"); eq("ถมสูง", Spec.branchLabel(s, "B3"), "label");
+  const risks = Spec.branchRisks(s);
+  ok(risks.some(x => x.id === "P8" && x.ref === "P3" && x.branch === "B1"), "P8 อ้าง P3 (กิ่ง ตัด): " + JSON.stringify(risks));
+  ok(!risks.some(x => ["P5", "P6", "P7", "L4"].includes(x.id)), "firstOf / ของในกิ่งเดียวกัน / กิ่งลูก ไม่นับ: " + JSON.stringify(risks));
+  ok(!risks.some(x => x.id === "P10"), "ไม่มี P10");
+});
+test("refs นับรายการของ firstOf · ลบ P3 = P5 ที่ใช้ P3 หายด้วย", () => {
+  const s = cutFill();
+  eq("P3,P4", Spec.refs(s.points[4].def).join(","), "refs firstOf");
+  ok(Spec.removeCascade(s, "point", "P3").includes("P5"), "ลบตาม");
+});
+test("exprOpts มีชื่อเงื่อนไข · เงื่อนไขในนิพจน์ตัวเลขใช้ใน if() ได้", () => {
+  const s = cutFill(), o = Spec.exprOpts(s);
+  eq("IsCut,HighFill", o.conds.join(","), "conds");
+  ok(Expr.check("if(IsCut, 1, 2)", Spec.names(s), o).ok, "if(IsCut, ...)");
+  ok(!Expr.check("IsCut + 1", Spec.names(s), o).ok, "IsCut + 1 ใช้ไม่ได้");
+});
+test("clone ในตัวเดิม: คงกิ่ง, remap firstOf / จุดในนิพจน์ · วางในตัวอื่น (detach): ไม่มีกิ่ง", () => {
+  const s = cutFill();
+  const c = Ops.clone(s, Ops.expand(s, { points: ["P3", "P4", "P5"] }), s);
+  const [n3, n4, n5] = ["P3", "P4", "P5"].map(id => Spec.byId(s.points, c.map[id]));
+  eq("B1", n3.branch, "กิ่ง P3"); eq("B2", n4.branch, "กิ่ง P4");
+  eq(`${n3.id},${n4.id}`, n5.def.points.join(","), "firstOf remap");
+  const s2 = cutFill(); s2.points.push(pt("P9", { type: "delta", from: "P2", dx: "P2.x", dy: "ground(P2) - P2.y" }));
+  const c2 = Ops.clone(s2, Ops.expand(s2, { points: ["P2", "P9"] }), s2), n9 = Spec.byId(s2.points, c2.map.P9);
+  eq(`${c2.map.P2}.x`, n9.def.dx, "P2.x remap"); eq(`ground(${c2.map.P2}) - ${c2.map.P2}.y`, n9.def.dy, "ground remap");
+  const dst = Spec.newSpec("U"), pos = {}; for (const id of ["P1", "P2", "P3"]) pos[id] = { x: 1, y: 1 };
+  const c3 = Ops.clone(s, Ops.expand(s, { links: ["L2"] }), dst, { detach: true, pos, F: 1, names: Spec.names(dst) });
+  ok(dst.points.every(p => !p.branch) && dst.links.every(l => !l.branch), "detach ไม่มีกิ่ง");
+});
+
+console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
+if (typeof process !== "undefined") process.exitCode = failed ? 1 : 0;

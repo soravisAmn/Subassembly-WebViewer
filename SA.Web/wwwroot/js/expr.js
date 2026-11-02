@@ -144,9 +144,12 @@ const Expr = (() => {
     walk(ast, n => { if (n.t === "var") out.add(n.n); });
     return out;
   }
-  // จุดที่อ้าง (P3.x, ground(P3), exists(P3))
-  function pointRefs(ast, out = new Set()){
-    walk(ast, n => { if (n.t === "pt" || n.t === "ref") out.add(n.id); });
+  // จุดที่อ้าง (P3.x, ground(P3), exists(P3)) · strict = ไม่นับ exists(P3) (แค่ถามว่าเกิดไหม ไม่ต้องมีจริง)
+  function pointRefs(ast, out = new Set(), strict){
+    walk(ast, n => {
+      if (n.t === "pt" || (n.t === "ref" && !strict)) out.add(n.id);
+      if (strict && n.t === "call" && n.f === "ground") out.add(n.args[0].id);
+    });
     return out;
   }
   function walk(n, fn){
@@ -317,9 +320,9 @@ const Expr = (() => {
     return v;
   }
   // จุดที่ข้อความนิพจน์อ้าง (parse ไม่ได้ = ไม่มี)
-  function pointRefsOf(src){
+  function pointRefsOf(src, strict){
     if (src == null || src === "") return [];
-    try{ return [...pointRefs(astOf(String(src)))]; }catch{ return []; }
+    try{ return [...pointRefs(astOf(String(src)), new Set(), strict)]; }catch{ return []; }
   }
 
   // ตัวเลขเป็นข้อความสั้นๆ สำหรับเก็บใน spec (ปัดทศนิยม 4 ตำแหน่ง)

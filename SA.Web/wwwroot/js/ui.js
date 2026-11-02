@@ -605,7 +605,7 @@ function exprRow(parent, it, label, small, value, onValid, opts = {}){
   const inp = document.createElement("input"); inp.type = "text"; inp.value = value ?? ""; inp.disabled = !canEdit(it);
   inp.className = "expr";
   const err = div("expr-err", "", parent);
-  const names = specNames(it), xo = it.spec ? Spec.exprOpts(it.spec) : {};   // อ้างจุดได้ (P3.y, ground(P3), ...)
+  const names = specNames(it), xo = { ...(it.spec ? Spec.exprOpts(it.spec) : {}), ...(opts.want ? { want: opts.want } : {}) };   // อ้างจุดได้ (P3.y, ground(P3), ...) · want: "bool" = ช่องเงื่อนไข
   const check = () => {
     const v = inp.value.trim();
     const r = opts.optional && !v ? { ok: true } : Expr.check(opts.slope ? v.replace(/^(-?)1:/, "$11/") : v, names, xo);
@@ -759,6 +759,7 @@ function propsDrawnPoint(box, it, p, r){
       ex("maxDistance", "ไม่ชนดินใน", "ระยะราบสูงสุด (m) แล้วหยุด + เตือน"); ex("layoutLength", "Layout / ไม่มีดิน", "ระยะราบที่วาดแทน (m)"); break;
     case "onSurface": refRow("from", "จาก", "", true); ex("dx", "dx", "ไปทางนอก +"); break;
     case "between": refRow("a", "จุด a"); refRow("b", "จุด b"); ex("t", "t", "0 = a, 1 = b, 0.5 = กึ่งกลาง"); break;
+    case "firstOf": firstOfRow(g, it, p, others); break;
     case "intersect": refRow("a1", "เส้น A จาก"); refRow("a2", "เส้น A ถึง"); refRow("b1", "เส้น B จาก"); refRow("b2", "เส้น B ถึง"); break;
     case "tangent": {
       refRow("corner", "มุม"); refRow("toward", "บนเส้นไปทาง"); refRow("other", "อีกเส้นไปทาง");
@@ -776,6 +777,7 @@ function propsDrawnPoint(box, it, p, r){
   }
   // Auxiliary: คำนวณใน C# แต่ไม่ Points.Add · เป็นปลาย link จริงไม่ได้ (setAux ถามก่อน)
   auxCheck(g, it, { type:"dpt", id: p.id }, p, "ไม่เพิ่มลง Civil 3D · อ้างอิง / snap ได้");
+  branchRow(g, it, p, r);
   if (q && q.err) div("expr-err", "⚠ " + esc(q.err), g);
   else if (q){
     const rows = [["Offset", f3(q.x) + "  (เทียบ origin)"], ["Elevation", f3(q.y) + "  (เทียบ origin)"],
@@ -803,6 +805,7 @@ function convertPoint(it, p, type, r){
     between: () => ({ type, a: others[0] || "", b: others[1] || others[0] || "", t: "0.5" }),
     intersect: () => ({ type, a1: others[0] || "", a2: others[1] || "", b1: others[2] || "", b2: others[3] || "" }),
     external: () => { const rr = asmRes[it.id], c = rr && rr.result ? rr.result.points.find(x => x.codes.length) : null; return { type, code: c ? c.codes[0] : "" }; },
+    firstOf: () => ({ type, points: others.slice(0, 2) }),
     tangent: () => d
   }[type]();
   if (d.type === type) p.def = d;
@@ -852,6 +855,7 @@ function propsDrawnLink(box, it, l, r){
     exprRow(g, it, sg.by === "count" ? "จำนวนท่อน" : "ท่อนยาวไม่เกิน", "", sg.value, v => { l.seg = { by: sg.by, value: v }; });
   }
   auxCheck(g, it, { type:"dlink", id: l.id }, l, "ไม่ Links.Add ลง Civil 3D · อ้างอิง / snap ได้ · ใช้ใน shape ไม่ได้");
+  branchRow(g, it, l, r);
   if (q && q.err){
     div("expr-err", "⚠ " + esc(q.err), g);
     // quick fix: link จริงที่ปลายเป็นจุด auxiliary (ไม่เปลี่ยนให้เองเงียบๆ)
@@ -880,10 +884,69 @@ function propsDrawnShape(box, it, s, r){
   let area = null;
   if (q && q.poly){ area = 0; q.poly.forEach((a, j) => { const b = q.poly[(j + 1) % q.poly.length]; area += a.x * b.y - b.x * a.y; }); area = Math.abs(area) / 2; }
   kv(g, [["Links", s.links.join(", ")], ["พื้นที่", q && q.err ? "⚠ " + q.err : area == null ? "(link ต่อกันไม่เป็นรูปปิด)" : f3(area) + " m²"]]);
+  branchRow(g, it, s, r);
   // quick fix: shape ที่มี link auxiliary
   if (q && q.auxLink && canEdit(it)) div("btns", null, g).append(
     btn(`ทำ ${q.auxLink} เป็นของจริง`, () => setAux(it, [{ type:"dlink", id: q.auxLink }], false)),
     btn(`เอา ${q.auxLink} ออกจาก shape`, () => { specEdit(() => { s.links = s.links.filter(x => x !== q.auxLink); }, it, `เอา ${q.auxLink} ออกจาก ${s.id}`); renderProps(true); }));
+}
+
+// ---------------- กิ่ง (รอบ 4 M2 — UI ขั้นต่ำ, หน้าตาเต็มอยู่ M3 / M4) ----------------
+// object เกิดเสมอ หรือเกิดเฉพาะกิ่งหนึ่ง · "+ เงื่อนไขใหม่" = สร้างเงื่อนไข + decision (ใต้กิ่งเดิมของ object ถ้ามี) + กิ่ง ใช่ / ไม่ใช่
+function branchRow(g, it, obj, r){
+  const sp = it.spec, lg = sp.logic || {}, brs = lg.branches || [];
+  const lab = id => Spec.branchChain(sp, id).reverse().map(b => Spec.branchLabel(sp, b)).join(" › ");
+  const opts = [["", "เกิดเสมอ"]].concat(brs.map(b => [b.id, `${b.id}: ${lab(b.id)}`]), [["+", "+ เงื่อนไขใหม่…"]]);
+  selectRow(g, it, "เกิดเมื่อ", opts, obj.branch || "", v => {
+    if (v === "+"){ const b = newCondition(sp, obj.branch); if (b) obj.branch = b; }
+    else if (v) obj.branch = v; else delete obj.branch;
+  }, "กิ่งของเงื่อนไข (ไม่เกิด = ไม่มีใน Civil 3D)");
+  if (!obj.branch) return;
+  const b = Spec.byId(brs, obj.branch), d = b && Spec.byId(lg.decisions || [], b.decision);
+  if (!d){ div("expr-err", `⚠ ไม่มีกิ่ง ${esc(obj.branch)} แล้ว — object นี้จะไม่เกิด`, g); return; }
+  const c = d.kind !== "switch" && (lg.conditions || []).find(x => x.name === d.test);
+  const on = r && r.logic ? r.logic.branches[b.id] : undefined, v = r && r.logic ? r.logic.decisions[d.id] : undefined;
+  if (c) exprRow(g, it, `เงื่อนไข ${c.name}`, "จริง / เท็จ เช่น ground(P1) > P1.y", c.expr, x => { c.expr = x; }, { want: "bool" });
+  kv(g, [["กิ่ง", `${lab(b.id)} (case ${b.case})`],
+         ["ตอนนี้", v == null ? "ไม่รู้ค่า → ไม่เข้ากิ่งไหน" : `${d.test} = ${v} → ${on ? "เกิด" : "ไม่เกิด"}`]]);
+  const risk = Spec.branchRisks(sp).find(x => x.id === obj.id);
+  if (risk) div("expr-err", `⚠ อ้าง ${esc(risk.ref)} ที่เกิดเฉพาะกิ่ง ${esc(Spec.branchLabel(sp, risk.branch))} — กรณีอื่นจะหาไม่ได้ (ใช้ firstOf หรือ exists() ถ้าตั้งใจ)`, g);
+}
+// สร้างเงื่อนไข + decision + กิ่ง ใช่ / ไม่ใช่ — คืน id ของกิ่ง "ใช่" (ยกเลิก = null)
+function newCondition(sp, parent){
+  const lg = sp.logic = sp.logic || {};
+  for (const k of ["conditions", "decisions", "branches"]) lg[k] = lg[k] || [];
+  const used = new Set(Spec.names(sp).concat(lg.conditions.map(c => c.name), sp.points.map(p => p.id)));
+  let n = 1; while (used.has("Test" + n)) n++;
+  const name = (prompt("ชื่อเงื่อนไข (ใช้เป็นชื่อตัวแปรในโค้ด)", "Test" + n) || "").trim();
+  if (!name) return null;
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || used.has(name) || RESERVED.has(name) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(name)
+      || Expr.KEYWORDS.has(name.toLowerCase()) || Expr.FUNCS[name.toLowerCase()]){
+    alert(`ตั้งชื่อ ${name} ไม่ได้ (ซ้ำ / เป็นชื่อที่โค้ดใช้เอง)`); return null;
+  }
+  const p0 = sp.points.find(p => p.def.type !== "origin");
+  const ex = (prompt("นิพจน์ จริง / เท็จ (เช่น ground(P1) > P1.y = ดินสูงกว่าจุด = ตัด)", p0 ? `ground(${p0.id}) > ${p0.id}.y` : "true") || "").trim();
+  if (!ex) return null;
+  const chk = Expr.check(ex, Spec.names(sp), { ...Spec.exprOpts(sp), want: "bool" });
+  if (!chk.ok){ alert("นิพจน์ใช้ไม่ได้: " + chk.error); return null; }
+  const next = (list, pre) => { let k = 0; for (const x of list){ const m = new RegExp(`^${pre}(\\d+)$`).exec(x.id); if (m) k = Math.max(k, +m[1]); } return pre + (k + 1); };
+  lg.conditions.push({ id: next(lg.conditions, "C"), name, expr: ex });
+  const did = next(lg.decisions, "D"); lg.decisions.push({ id: did, parent: parent || null, kind: "if", test: name, label: name });
+  const yes = next(lg.branches, "B"); lg.branches.push({ id: yes, decision: did, case: true, label: name });
+  lg.branches.push({ id: next(lg.branches, "B"), decision: did, case: false, label: "ไม่ " + name });
+  return yes;
+}
+// firstOf: จุดแรกในรายการที่เกิด (ต่อเรขาคณิตหลังกิ่ง เช่น ปลายลาดตัด / ปลายลาดถม)
+function firstOfRow(g, it, p, others){
+  const row = div("row", `<label>จุด (ตามลำดับ)<small>คั่นด้วย , · ใช้จุดแรกที่เกิด</small></label>`, g);
+  const inp = document.createElement("input"); inp.type = "text"; inp.value = (p.def.points || []).join(", "); inp.disabled = !canEdit(it);
+  const err = div("expr-err", "", g), ok = new Set(others.map(o => o.id));
+  inp.onchange = () => {
+    const ids = inp.value.split(",").map(x => x.trim()).filter(Boolean), bad = ids.filter(x => !ok.has(x));
+    err.textContent = bad.length ? `ไม่มีจุด / อ้างวน: ${bad.join(", ")}` : !ids.length ? "ใส่อย่างน้อย 1 จุด" : "";
+    if (!bad.length && ids.length){ specEdit(() => { p.def.points = ids; }, it, `แก้รายการของ ${p.id}`); renderProps(true); }
+  };
+  row.appendChild(inp);
 }
 
 // ---------------- Auxiliary (ช่วยสร้าง) ----------------
@@ -989,7 +1052,7 @@ const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
 const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
   "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
-  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try abstract as base bool break byte case catch char checked class const continue " +
+  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf abstract as base bool break byte case catch char checked class const continue " +
   "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
   "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +
   "static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while var").split(" "));
@@ -1020,7 +1083,7 @@ function usesParam(sp, name){
 function renameSpecParam(it, p, v){
   if (v === p.name) return true;
   if (!IDENT.test(v)){ alert("ชื่อ parameter ต้องเป็นตัวอังกฤษ/ตัวเลข/_ และไม่ขึ้นต้นด้วยตัวเลข"); return false; }
-  if (RESERVED.has(v) || /^([PpLlSs]\d+|surface\d+)$/.test(v)){ alert(`ตั้งชื่อ ${v} ไม่ได้ — โค้ดที่สร้างใช้ชื่อนี้เอง (เช่น F, P1, cs, double)`); return false; }
+  if (RESERVED.has(v) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(v)){ alert(`ตั้งชื่อ ${v} ไม่ได้ — โค้ดที่สร้างใช้ชื่อนี้เอง (เช่น F, P1, cs, double)`); return false; }
   if (Expr.KEYWORDS.has(v.toLowerCase())){ alert(`ตั้งชื่อ ${v} ไม่ได้ — เป็นคำในนิพจน์ (and or not true false)`); return false; }
   if (specNames(it).includes(v) || Expr.FUNCS[v.toLowerCase()]){ alert(`มีชื่อ ${v} อยู่แล้ว (หรือเป็นชื่อฟังก์ชัน)`); return false; }
   const old = p.name, re = new RegExp(`\\b${old}\\b`, "g");

@@ -43,7 +43,10 @@
 - ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs` ใน Civil 3D จริง
 - **กำลังทำ: `prompt-4.md`** — M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบผู้ใช้อยู่ใน `prompt-4-design.md` (ตอบ "ตามที่เสนอ" ทุกข้อ), จัดระเบียบ repo แล้ว (เลิก track bin/obj · ยังเหลือของที่ควรลบ ดูไฟล์นั้น)
   M1 เสร็จ (2026-11-02): นิพจน์เงื่อนไข + P3.x/y, ground(), exists(), hasGround() ใน JS / C# (test: `cond.test.js`, `ExprTests.cs`, drawing-cases 31–35)
-  ถัดไป: M2 กิ่ง (logic.conditions / decisions / branches) + `firstOf` ใน evaluator และโค้ดที่สร้าง
+  M2 เสร็จ (2026-11-02): กิ่ง if / switch / ซ้อน + `firstOf` ใน JS / C# + UI ขั้นต่ำ "เกิดเมื่อ" ใน Properties (test: `logic.test.js`, ExprTests "กิ่ง -> C#", drawing-cases 36–44)
+  - ตกลงระหว่างทำ: firstOf เป็น auxiliary → link จริงหลังกิ่งต้องต่อจากจุดในแต่ละกิ่งเอง (ยังไม่มี "จุดแทน" ที่ AddLink ได้)
+  - object ที่ไม่เกิดถูกซ่อน (เลือกบนรูปไม่ได้จนกว่าจะเกิด) — "แสดงทุกกรณี" อยู่ M4
+  ถัดไป: M3 ปุ่มสำเร็จรูป "ถ้าตัด / ถม" (prompt-4.md ข้อ 4)
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

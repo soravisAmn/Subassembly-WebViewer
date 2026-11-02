@@ -60,5 +60,35 @@ static class ExprTests
             foreach (var n in new[] { "and", "OR", "Not", "true", "False", "Ground", "Exists", "PX", "Try" })
                 if (!CodeGenerator.IsReservedName(n)) throw new Exception($"{n} ต้องเป็นคำสงวน");
         });
+
+        Console.WriteLine("\nกิ่ง -> C#");
+        test("เงื่อนไขในนิพจน์ = V(ชื่อ) · โค้ดกิ่ง / firstOf / ชื่อ B1 D1 สงวน", () =>
+        {
+            var cs = new ExprScope { Params = sc.Params, Points = sc.Points, Conds = new HashSet<string> { "IsCut" }, Surface = sc.Surface };
+            Eq("V(IsCut) && Width > 2.0", SpecExpr.ToCs("IsCut and Width > 2", cs, 0, "bool"), "cond ใน bool");
+            Eq("(V(IsCut) ? 1.0 : 0.0)", SpecExpr.ToCs("if(IsCut, 1, 0)", cs, 0, "num"), "cond ใน if");
+            foreach (var n in new[] { "B1", "d2", "Cond", "Val", "V", "FirstOf" })
+                if (!CodeGenerator.IsReservedName(n)) throw new Exception($"{n} ต้องเป็นคำสงวน");
+            var json = """
+            { "className": "Br", "params": [{ "name": "Side", "kind": "long", "default": 0 }],
+              "targets": [{ "name": "TargetSurface" }],
+              "points": [{ "id": "P1", "def": { "type": "origin" } },
+                         { "id": "P2", "branch": "B1", "def": { "type": "delta", "from": "P1", "dx": "1", "dy": "0" } },
+                         { "id": "P3", "branch": "B2", "def": { "type": "delta", "from": "P1", "dx": "2", "dy": "0" } },
+                         { "id": "P4", "def": { "type": "firstOf", "points": ["P2", "P3"] } }],
+              "links": [{ "id": "L1", "points": ["P1", "P4"] }, { "id": "L2", "points": ["P1", "P2"], "branch": "B1" }],
+              "shapes": [],
+              "logic": { "conditions": [{ "id": "C1", "name": "Up", "expr": "ground(P1) > P1.y" }],
+                         "decisions": [{ "id": "D1", "test": "Up" }],
+                         "branches": [{ "id": "B1", "decision": "D1", "case": true, "label": "ขึ้น" }, { "id": "B2", "decision": "D1", "case": false }] },
+              "side": { "param": "Side", "mirror": true } }
+            """;
+            var code = CodeGenerator.GenerateFile(DrawingSpec.Parse(json), json, "Br.cs");
+            foreach (var part in new[] { "bool? Up = Cond(cs, \"Up\", () => Ground(cs, surface, P1) > PY(P1));", "bool B1 = Up == true;", "bool B2 = Up == false;",
+                                         "FirstOf(cs, \"P4\", P2, P3)", "B1 ? AddPoint(cs, P2", "B1 ? AddLink(cs, \"L2\"" })
+                if (!code.Contains(part)) throw new Exception($"โค้ดต้องมี: {part}\n{code}");
+            var dup = json.Replace("\"name\": \"Up\"", "\"name\": \"Side\"").Replace("\"test\": \"Up\"", "\"test\": \"Side\"");
+            Throws(() => CodeGenerator.GenerateFile(DrawingSpec.Parse(dup), dup, "Br.cs"), "ซ้ำ", "ชื่อเงื่อนไขซ้ำกับ parameter");
+        });
     }
 }

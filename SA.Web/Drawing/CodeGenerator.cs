@@ -40,7 +40,7 @@ public static class CodeGenerator
         // ชื่อตัวช่วยในโค้ดที่สร้าง (ตัวแปรชื่อเดียวกันจะบังเมธอด / ชนิด)
         "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Tangent", "Rotate",
         "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
-        "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try",
+        "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "FirstOf",
         // คำในนิพจน์ (and or not true false — ไม่สนตัวพิมพ์ ตรวจใน IsReservedName)
         "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue","decimal","default",
         "delegate","do","double","else","enum","event","explicit","extern","false","finally","fixed","float","for","foreach","goto",
@@ -50,7 +50,7 @@ public static class CodeGenerator
         "virtual","void","volatile","while","var","Math","Point","Link","Shape","ObjectId"
     };
     public static bool IsReservedName(string n) => Reserved.Contains(n) || SpecExpr.Keywords.Contains(n)
-        || System.Text.RegularExpressions.Regex.IsMatch(n, @"^([PpLlSs]\d+|surface\d+)$");
+        || System.Text.RegularExpressions.Regex.IsMatch(n, @"^([PpLlSsBbDd]\d+|surface\d+)$");
 
     public static string HelperClass(DrawingSpec s) => "SaDrawing_" + s.ClassName;
 
@@ -192,15 +192,19 @@ public static class CodeGenerator
         private readonly HashSet<string> _names;
         private readonly Dictionary<string, string> _surf = new();   // ชื่อ target -> ตัวแปร ObjectId
         private readonly ExprScope _scope;
+        private readonly SpecLogic _logic;
 
         public Gen(DrawingSpec s)
         {
             _s = s;
             _names = s.Params.Select(p => p.Name).ToHashSet();
+            _logic = s.Logic ?? new SpecLogic();
+            CheckLogicNames();
             // นิพจน์อ้างจุดได้ (จุดที่ไม่มี = หาไม่ได้ตอนรัน แบบเดียวกับในเว็บ) · ไฟล์ import ใช้ target ของโค้ดเดิม = ไม่ตรวจชื่อ
             _scope = new ExprScope
             {
                 Params = _names, Points = s.Points.Select(p => p.Id).ToHashSet(), AllowMissingPoints = true,
+                Conds = _logic.Conditions.Select(c => c.Name).ToHashSet(),
                 Targets = s.Imported ? null : s.Targets.Select(t => t.Name).ToHashSet(), Surface = SurfVar
             };
             foreach (var p in s.Params)
@@ -209,10 +213,25 @@ public static class CodeGenerator
                 throw new FormatException($"ชื่อ class '{s.ClassName}' ใช้ใน C# ไม่ได้");
         }
 
-        private void L(string line = "") => _o.AppendLine(line);
-        private string X(string? src, string what, string id, int need = 0)
+        // ชื่อในโค้ด C#: เงื่อนไข (bool?) / decision (D1) / กิ่ง (B1) ต้องเป็นชื่อตัวแปรได้ และไม่ซ้ำกับ parameter / จุด / กันเอง
+        private void CheckLogicNames()
         {
-            try { return SpecExpr.ToCs(src, _scope, need); }
+            var used = new HashSet<string>(_names.Concat(_s.Points.Select(p => p.Id)));
+            void Name(string n, string what)
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(n ?? "", @"^[A-Za-z_][A-Za-z0-9_]*$")) throw new FormatException($"{what} '{n}' ใช้เป็นชื่อในโค้ดไม่ได้ (ตัวอังกฤษ / ตัวเลข / _)");
+                if (Reserved.Contains(n!) || SpecExpr.Keywords.Contains(n!)) throw new FormatException($"ตั้งชื่อ{what}ว่า {n} ไม่ได้ (ชื่อนี้โค้ดใช้เอง)");
+                if (!used.Add(n!)) throw new FormatException($"ชื่อ{what} {n} ซ้ำกับ parameter / จุด / ชื่ออื่น");
+            }
+            foreach (var c in _logic.Conditions) Name(c.Name, "เงื่อนไข");
+            foreach (var d in _logic.Decisions) Name(d.Id, " decision");
+            foreach (var b in _logic.Branches) Name(b.Id, "กิ่ง");
+        }
+
+        private void L(string line = "") => _o.AppendLine(line);
+        private string X(string? src, string what, string id, int need = 0, string want = "num")
+        {
+            try { return SpecExpr.ToCs(src, _scope, need, want); }
             catch (FormatException e) { throw new FormatException($"{id} {what}: {e.Message}"); }
         }
 
@@ -305,15 +324,32 @@ public static class CodeGenerator
 
             // พิกัดของจุด (ตามลำดับที่ต้องคำนวณก่อน-หลัง)
             L("        // ---- พิกัดของจุด (เทียบ origin; null = หาจุดนี้ไม่ได้ ส่วนที่พึ่งจุดนี้จะถูกข้าม) ----");
+            if (_logic.Conditions.Count > 0 || _logic.Decisions.Count > 0)
+                L("        // (เงื่อนไข / กิ่ง: bool? = null คือไม่รู้ค่า เพราะหาจุดที่อ้างไม่ได้ -> ไม่เข้ากิ่งไหน · object ในกิ่งที่ไม่เกิด = null ไม่เพิ่มลง Civil 3D)");
             var order = TopoOrder(out var cyclic);
-            foreach (var id in cyclic)
+            foreach (var key in cyclic)
             {
-                L($"        Pt? {id} = null;");
-                L($"        Warn(cs, CorridorError.Failure, \"{id}: จุด {id} อ้างถึงตัวเองเป็นวง\");");
+                if (key.StartsWith('?'))
+                {
+                    L($"        bool? {key[1..]} = null;");
+                    L($"        Warn(cs, CorridorError.Failure, \"เงื่อนไข {key[1..]} อ้างถึงตัวเองเป็นวง\");");
+                }
+                else if (key.StartsWith('!'))
+                {
+                    foreach (var b in _logic.Branches.Where(b => b.Decision == key[1..])) L($"        bool {b.Id} = false;");
+                    L($"        Warn(cs, CorridorError.Failure, \"{key[1..]}: อ้างถึงตัวเองเป็นวง\");");
+                }
+                else
+                {
+                    L($"        Pt? {key} = null;");
+                    L($"        Warn(cs, CorridorError.Failure, \"{key}: จุด {key} อ้างถึงตัวเองเป็นวง\");");
+                }
             }
             foreach (var o in order)
             {
                 if (o is SpecPoint p) PointLine(p);
+                else if (o is SpecCondition c) ConditionLine(c);
+                else if (o is SpecDecision d) DecisionLines(d);
                 else RotationLines((SpecRotation)o);
             }
             L();
@@ -322,7 +358,7 @@ public static class CodeGenerator
             foreach (var p in _s.Points)
                 // จุด auxiliary: ไม่ประกาศตัวแปร Point (ไม่มีใครใช้ — กันคำเตือน CS0219 ของ compiler)
                 L(p.Auxiliary ? $"        // {p.Id} auxiliary: ใช้คำนวณอย่างเดียว ไม่เพิ่มลง Civil 3D"
-                              : $"        Point {Lc(p.Id)} = AddPoint(cs, {p.Id}{Codes(p.Codes)});");
+                              : $"        Point {Lc(p.Id)} = {InBranch(p.Branch, $"AddPoint(cs, {p.Id}{Codes(p.Codes)})")};{BrNote(p.Branch)}");
             foreach (var l in _s.Links)
             {
                 var (a, b) = l.Ends;
@@ -337,10 +373,12 @@ public static class CodeGenerator
                 string skip = used ? $"        {lt} {Lc(l.Id)} = null;   // " : "        // ";
                 if (missing != null) { L($"{skip}{l.Id}: ไม่มีจุด {missing}"); continue; }
                 var aux = new[] { a, b }.FirstOrDefault(id => _s.Points.First(p => p.Id == id).Auxiliary);
+                // เตือนเฉพาะเมื่อกิ่งของ link นี้เกิด (แบบในเว็บ)
+                string whenOn = l.Branch != null ? $"if ({Br(l.Branch)}) " : "";
                 if (aux != null)
                 {
                     L($"{skip}{l.Id}: ปลาย {aux} เป็นจุด auxiliary");
-                    L($"        Warn(cs, CorridorError.Failure, \"{l.Id}: ปลาย {aux} เป็นจุด auxiliary (ไม่อยู่ใน Civil 3D)\");");
+                    L($"        {whenOn}Warn(cs, CorridorError.Failure, \"{l.Id}: ปลาย {aux} เป็นจุด auxiliary (ไม่อยู่ใน Civil 3D)\");");
                     continue;
                 }
                 if (l.IsArc)
@@ -349,37 +387,38 @@ public static class CodeGenerator
                     string seg = $"{(sg.By == "count" ? "Seg.Count" : "Seg.Chord")}, {X(sg.Value ?? "0.05", "ท่อนโค้ง", l.Id)}";
                     string cc = Codes(l.Codes);
                     // รัศมี / ความละเอียดอ้างจุด: หาจุดไม่ได้ = link นี้หาไม่ได้ + เตือน (แบบเดียวกับในเว็บ)
-                    bool wrap = UsesPoints(LinkExprs(l));
-                    string W(string call) => wrap ? $"Try(cs, \"{l.Id}\", () => {call})" : call;
+                    bool wrap = UsesRuntime(LinkExprs(l));
+                    string W(string call) => InBranch(l.Branch, wrap ? $"Try(cs, \"{l.Id}\", () => {call})" : call);
                     if (l.Type == "arc3")
-                        L($"        Link[] {Lc(l.Id)} = {W($"Arc3(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Via}, {b}, {Lc(b)}, {seg}{cc})")};   // {l.Id} โค้งผ่าน {a} {l.Via} {b}");
+                        L($"        Link[] {Lc(l.Id)} = {W($"Arc3(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Via}, {b}, {Lc(b)}, {seg}{cc})")};   // {l.Id} โค้งผ่าน {a} {l.Via} {b}{BrTag(l.Branch)}");
                     else if (l.Type == "arcR")
-                        L($"        Link[] {Lc(l.Id)} = {W($"ArcR(cs, \"{l.Id}\", {a}, {Lc(a)}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {(l.Sweep == "cw" ? "false" : "true")}, {(l.Large ? "true" : "false")}, F, {seg}{cc})")};   // {l.Id} โค้งรัศมี {(l.Sweep == "cw" ? "ตามเข็ม" : "ทวนเข็ม")}{(l.Large ? " ทางยาว" : "")} (กรอบ Side = Right)");
+                        L($"        Link[] {Lc(l.Id)} = {W($"ArcR(cs, \"{l.Id}\", {a}, {Lc(a)}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {(l.Sweep == "cw" ? "false" : "true")}, {(l.Large ? "true" : "false")}, F, {seg}{cc})")};   // {l.Id} โค้งรัศมี {(l.Sweep == "cw" ? "ตามเข็ม" : "ทวนเข็ม")}{(l.Large ? " ทางยาว" : "")} (กรอบ Side = Right){BrTag(l.Branch)}");
                     else
-                        L($"        Link[] {Lc(l.Id)} = {W($"Fillet(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Corner}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {seg}{cc})")};   // {l.Id} Fillet ที่มุม {l.Corner}");
+                        L($"        Link[] {Lc(l.Id)} = {W($"Fillet(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Corner}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {seg}{cc})")};   // {l.Id} Fillet ที่มุม {l.Corner}{BrTag(l.Branch)}");
                     continue;
                 }
                 if (l.Follow)
-                    L($"        Link {Lc(l.Id)} = FollowSurface(cs, \"{l.Id}\", {SurfVar(l.Target)}, {a}, {Lc(a)}, {b}, {Lc(b)}{Codes(l.Codes)});   // {l.Id} วิ่งตามผิวดิน");
+                    L($"        Link {Lc(l.Id)} = {InBranch(l.Branch, $"FollowSurface(cs, \"{l.Id}\", {SurfVar(l.Target)}, {a}, {Lc(a)}, {b}, {Lc(b)}{Codes(l.Codes)})")};   // {l.Id} วิ่งตามผิวดิน{BrTag(l.Branch)}");
                 else
-                    L($"        Link {Lc(l.Id)} = AddLink(cs, \"{l.Id}\", {Lc(a)}, {Lc(b)}{Codes(l.Codes)});");
+                    L($"        Link {Lc(l.Id)} = {InBranch(l.Branch, $"AddLink(cs, \"{l.Id}\", {Lc(a)}, {Lc(b)}{Codes(l.Codes)})")};{BrNote(l.Branch)}");
             }
             foreach (var sh in _s.Shapes)
             {
                 var ok = sh.Links.All(id => _s.Links.Any(l => l.Id == id));
                 // shape ใน Civil 3D ประกอบจาก link จริงเท่านั้น
                 var ax = ok ? sh.Links.FirstOrDefault(id => _s.Links.First(l => l.Id == id).Auxiliary) : null;
+                string shOn = sh.Branch != null ? $"if ({Br(sh.Branch)}) " : "";
                 if (ax != null)
                 {
                     L($"        // {sh.Id}: ใช้ link auxiliary {ax} — ข้าม");
-                    L($"        Warn(cs, CorridorError.Failure, \"{sh.Id}: ใช้ link auxiliary {ax} ไม่ได้ (ไม่อยู่ใน Civil 3D)\");");
+                    L($"        {shOn}Warn(cs, CorridorError.Failure, \"{sh.Id}: ใช้ link auxiliary {ax} ไม่ได้ (ไม่อยู่ใน Civil 3D)\");");
                     continue;
                 }
                 // มีเส้นโค้ง (Link[]) = ต่อ array ตามลำดับด้วย Join
                 bool arcs = sh.Links.Any(id => _s.Links.Any(l => l.Id == id && l.IsArc));
                 string list = arcs ? $"Join({string.Join(", ", sh.Links.Select(id => _s.Links.First(l => l.Id == id).IsArc ? Lc(id) : $"new[] {{ {Lc(id)} }}"))})"
                                    : $"new[] {{ {string.Join(", ", sh.Links.Select(Lc))} }}";
-                L(ok ? $"        AddShape(cs, \"{sh.Id}\", {list}{Codes(sh.Codes)});"
+                L(ok ? $"        {shOn}AddShape(cs, \"{sh.Id}\", {list}{Codes(sh.Codes)});{BrNote(sh.Branch)}"
                      : $"        // {sh.Id}: มี link ที่ไม่มีอยู่จริง ข้าม");
             }
             L("    }");
@@ -410,21 +449,21 @@ public static class CodeGenerator
                 "between" => ($"Between(cs, {Q}, {From(d.A)}, {From(d.B)}, {Ex(d.T, "t")})", $"{id} บนเส้น {d.A}-{d.B}"),
                 "intersect" => ($"Intersect(cs, {Q}, {From(d.A1)}, {From(d.A2)}, {From(d.B1)}, {From(d.B2)})", $"{id} จุดตัด {d.A1}-{d.A2} กับ {d.B1}-{d.B2}"),
                 "tangent" => ($"Tangent(cs, {Q}, {From(d.Corner)}, {From(d.Toward)}, {From(d.Other)}, {Ex(d.Radius, "radius")})", $"{id} จุดสัมผัสของ Fillet ที่มุม {d.Corner}"),
+                "firstOf" => ($"FirstOf(cs, {Q}{string.Concat((d.Points ?? new()).Select(x => ", " + From(x)))})", $"{id} จุดแรกที่เกิดใน {string.Join(", ", d.Points ?? new())}"),
                 "external" => throw new FormatException($"{id}: จุดจากโค้ดเดิม (external) ใช้ได้กับไฟล์ที่เขียนเองเท่านั้น — รองรับใน Milestone 4"),
                 _ => throw new FormatException($"{id}: ไม่รู้จักชนิดจุด {d.Type}")
             };
             // นิพจน์ที่อ้างจุด (P3.y, ground(P3) ...): จุดที่อ้างหาไม่ได้ = จุดนี้หาไม่ได้ + เตือน (แบบเดียวกับในเว็บ) ไม่ทำให้ Draw ล้มทั้งตัว
-            if (UsesPoints(d.Exprs())) rhs = $"Try(cs, {Q}, () => {rhs})";
-            L($"        Pt? {id} = {rhs};   // {note}");
+            if (UsesRuntime(d.Exprs())) rhs = $"Try(cs, {Q}, () => {rhs})";
+            L($"        Pt? {id} = {InBranch(p.Branch, rhs)};   // {note}{BrTag(p.Branch)}");
         }
-        private static bool UsesPoints(IEnumerable<string?> exprs) => exprs.Any(e => SpecExpr.PointRefs(e).Count > 0);
 
         // กลุ่มหมุน: สมาชิกคำนวณตาม def ก่อน (ค่าก่อนหมุน) แล้ว Rotate ทีละจุดรอบ pivot
         private void RotationLines(SpecRotation g)
         {
             string pv = Exists(g.Pivot) ? g.Pivot : "null", a = X(g.Angle, "มุมหมุน", g.Id, 1);
             L($"        // กลุ่มหมุน {g.Id}: หมุนรอบ {g.Pivot} มุม {g.Angle}° (ทวนเข็ม + ในกรอบ Side = Right)");
-            bool wrap = UsesPoints(new[] { g.Angle });     // มุมอ้างจุด: หาจุดไม่ได้ = สมาชิกหาไม่ได้ + เตือน
+            bool wrap = UsesRuntime(new[] { g.Angle });    // มุมอ้างจุด / เงื่อนไข: หาไม่ได้ = สมาชิกหาไม่ได้ + เตือน
             foreach (var m in g.Points.Where(Exists))
                 L(wrap ? $"        {m} = Try(cs, \"{m}\", () => Rotate(cs, \"{m}\", {m}, {pv}, F * {a}));"
                        : $"        {m} = Rotate(cs, \"{m}\", {m}, {pv}, F * {a});");
@@ -454,6 +493,41 @@ public static class CodeGenerator
             }
             var done = new HashSet<string>(); var order = new List<object>(); var cyc = new List<string>();
             var state = new Dictionary<string, int>();
+            // จุดที่ viewer (จุด / null = เงื่อนไข) อ้าง: คำนวณก่อน + ถ้าเห็นค่าที่หมุนแล้วต้องหลังบรรทัดหมุน
+            bool NeedPt(string r, string? viewer)
+            {
+                var q = _s.Points.FirstOrDefault(x => x.Id == r);
+                if (q == null) return true;
+                bool ok = Visit(q);
+                if (groupOf.TryGetValue(r, out var g) && (viewer == null || (groupOf.GetValueOrDefault(viewer) != g && !pre[g.Id].Contains(viewer))) && !VisitRot(g)) ok = false;
+                return ok;
+            }
+            // เงื่อนไข: จุดในนิพจน์ + เงื่อนไขอื่นที่อ้าง
+            bool VisitCond(SpecCondition c)
+            {
+                string key = "?" + c.Name;
+                if (done.Contains(key)) return true;
+                if (state.GetValueOrDefault(key) == 1) return false;
+                state[key] = 1;
+                bool ok = SpecExpr.PointRefs(c.Expr).All(r => NeedPt(r, null)) & CondDeps(c.Expr).All(VisitCond);
+                state[key] = 2;
+                if (ok) { done.Add(key); order.Add(c); } else if (!cyc.Contains(key)) cyc.Add(key);
+                return ok;
+            }
+            // decision (+ บรรทัดกิ่งของมัน): test + กิ่งแม่
+            bool VisitDec(SpecDecision d)
+            {
+                string key = "!" + d.Id;
+                if (done.Contains(key)) return true;
+                if (state.GetValueOrDefault(key) == 1) return false;
+                state[key] = 1;
+                bool ok = SpecExpr.PointRefs(d.Test).All(r => NeedPt(r, null)) & CondDeps(d.Test).All(VisitCond);
+                if (d.Parent != null && DecOf(d.Parent) is { } pd && !VisitDec(pd)) ok = false;
+                state[key] = 2;
+                if (ok) { done.Add(key); order.Add(d); } else if (!cyc.Contains(key)) cyc.Add(key);
+                return ok;
+            }
+            bool VisitBranch(string? branch) => branch == null || DecOf(branch) is not { } d || VisitDec(d);
             bool VisitRot(SpecRotation g)
             {
                 string key = "#" + g.Id;
@@ -476,24 +550,71 @@ public static class CodeGenerator
                 if (done.Contains(p.Id)) return true;
                 if (state.GetValueOrDefault(p.Id) == 1) return false;
                 state[p.Id] = 1;
-                bool ok = true;
-                foreach (var r in p.Def.Refs())
-                {
-                    var q = _s.Points.FirstOrDefault(x => x.Id == r);
-                    if (q == null) continue;
-                    if (!Visit(q)) ok = false;
-                    // อ้างสมาชิกกลุ่มหมุนแบบเห็นค่าที่หมุนแล้ว = ต้องอยู่หลังบรรทัดหมุนของกลุ่มนั้น
-                    if (groupOf.TryGetValue(r, out var g) && groupOf.GetValueOrDefault(p.Id) != g && !pre[g.Id].Contains(p.Id) && !VisitRot(g)) ok = false;
-                }
+                // อ้างสมาชิกกลุ่มหมุนแบบเห็นค่าที่หมุนแล้ว = ต้องอยู่หลังบรรทัดหมุนของกลุ่มนั้น (NeedPt) · อยู่ในกิ่ง = หลังบรรทัดกิ่ง
+                bool ok = p.Def.Refs().All(r => NeedPt(r, p.Id)) & VisitBranch(p.Branch) & p.Def.Exprs().SelectMany(CondDeps).All(VisitCond);
                 state[p.Id] = 2;
                 if (ok) { done.Add(p.Id); order.Add(p); } else if (!cyc.Contains(p.Id)) cyc.Add(p.Id);
                 return ok;
             }
+            // เงื่อนไขคำนวณทุกตัวเสมอ (แบบในเว็บ) แม้ไม่มีใครใช้
+            foreach (var c in _logic.Conditions) VisitCond(c);
             foreach (var p in _s.Points) Visit(p);
             foreach (var g in _s.Rotations) VisitRot(g);
+            foreach (var d in _logic.Decisions) VisitDec(d);
             // จุดที่พึ่งจุดในวงก็คำนวณไม่ได้ (อยู่ใน order แต่ from = null) — ประกาศจุดในวงไว้ก่อน
             cyclic = cyc;
-            return order.Where(o => o is not SpecPoint p || !cyc.Contains(p.Id)).ToList();
+            return order.Where(o => o switch
+            {
+                SpecPoint p => !cyc.Contains(p.Id), SpecCondition c => !cyc.Contains("?" + c.Name), SpecDecision d => !cyc.Contains("!" + d.Id), _ => true
+            }).ToList();
+        }
+
+        // ---------------- Logic ----------------
+        // ชื่อเงื่อนไขที่นิพจน์ใช้
+        private IEnumerable<SpecCondition> CondDeps(string? expr) =>
+            SpecExpr.NamesOf(expr).Select(n => _logic.Conditions.FirstOrDefault(c => c.Name == n)).Where(c => c != null)!;
+        private SpecDecision? DecOf(string branch) =>
+            _logic.Branches.FirstOrDefault(b => b.Id == branch) is { } b ? _logic.Decisions.FirstOrDefault(d => d.Id == b.Decision) : null;
+        // ตัวแปรกิ่ง: กิ่งที่ไม่มี (หรือ decision ของมันไม่มี) = ไม่เกิดเลย
+        private string Br(string branch) => DecOf(branch) != null ? branch : "false";
+        private string BrLabel(string branch) => _logic.Branches.FirstOrDefault(b => b.Id == branch)?.Label ?? branch;
+        // object ในกิ่ง: ค่า = null เมื่อกิ่งไม่เกิด
+        private string InBranch(string? branch, string expr) => branch == null ? expr : $"{Br(branch)} ? {expr} : null";
+        private string BrTag(string? branch) => branch == null ? "" : $" [กิ่ง {BrLabel(branch)}]";            // ต่อท้ายคอมเมนต์ที่มีอยู่
+        private string BrNote(string? branch) => branch == null ? "" : $"   // [กิ่ง {BrLabel(branch)}]";      // คอมเมนต์ท้ายบรรทัด
+        private bool UsesRuntime(IEnumerable<string?> exprs) => exprs.Any(e => SpecExpr.PointRefs(e).Count > 0 || CondDeps(e).Any());
+
+        private void ConditionLine(SpecCondition c)
+        {
+            L($"        bool? {c.Name} = Cond(cs, \"{c.Name}\", () => {X(c.Expr, "เงื่อนไข", c.Name, 0, "bool")});   // {c.Id} {c.Name}{(string.IsNullOrWhiteSpace(c.Note) ? "" : ": " + c.Note)}");
+        }
+
+        // decision: ค่าของ test (ไม่รู้ = null) แล้วบรรทัดละกิ่ง — กิ่งเกิด = กิ่งแม่เกิด && ค่าตรง case
+        private void DecisionLines(SpecDecision d)
+        {
+            var test = (d.Test ?? "").Trim();
+            string parent = d.Parent != null ? Br(d.Parent) : "";
+            string guard(string e) => d.Parent != null ? $"{parent} ? {e} : null" : e;
+            string head = parent.Length > 0 ? parent + " && " : "";
+            L($"        // {d.Id} {(d.Kind == "switch" ? "switch" : "decision")}{(string.IsNullOrWhiteSpace(d.Label) ? "" : " " + d.Label)}{(d.Parent != null ? $" (ในกิ่ง {BrLabel(d.Parent)})" : "")}");
+            var outs = _logic.Branches.Where(b => b.Decision == d.Id).ToList();
+            if (d.Kind == "switch")
+            {
+                L($"        double? {d.Id} = {guard($"Val(cs, \"{d.Id}\", () => {X(test, "switch", d.Id)})")};");
+                foreach (var b in outs)
+                {
+                    string on = b.IsElse
+                        ? $"{d.Id} != null" + string.Concat(outs.Where(o => !o.IsElse).Select(o => $" && !Eq({d.Id}.Value, {SpecExpr.Lit(o.AsNumber)})"))
+                        : $"{d.Id} != null && Eq({d.Id}.Value, {SpecExpr.Lit(b.AsNumber)})";
+                    L($"        bool {b.Id} = {head}{on};   // กิ่ง \"{b.Label ?? b.Id}\"");
+                }
+                return;
+            }
+            string val;
+            if (_logic.Conditions.Any(c => c.Name == test)) val = test;                 // test = ชื่อเงื่อนไข (คำนวณไว้แล้ว)
+            else { L($"        bool? {d.Id} = {guard($"Cond(cs, \"{d.Id}\", () => {X(test, "decision", d.Id, 0, "bool")})")};"); val = d.Id; }
+            foreach (var b in outs)
+                L($"        bool {b.Id} = {head}{val} == {(b.AsBool ? "true" : "false")};   // กิ่ง \"{b.Label ?? b.Id}\"");
         }
 
         private void Helpers()
@@ -657,6 +778,53 @@ public static class CodeGenerator
         {
             throw new InvalidOperationException("ground(): " + e.Message);
         }
+    }
+
+    // ---- เงื่อนไข / กิ่ง ----
+    // เงื่อนไขคำนวณไม่ได้ (อ้างจุดที่หาไม่ได้ / เงื่อนไขที่ไม่รู้ค่า) = null + เตือน -> ไม่เข้ากิ่งไหน (ตรงกับตัวคำนวณในเว็บ)
+
+    private static bool? Cond(CorridorState cs, string name, Func<bool> test)
+    {
+        try
+        {
+            return test();
+        }
+        catch (InvalidOperationException e)
+        {
+            Warn(cs, CorridorError.Failure, "เงื่อนไข " + name + ": " + e.Message);
+            return null;
+        }
+    }
+
+    private static double? Val(CorridorState cs, string name, Func<double> value)
+    {
+        try
+        {
+            return value();
+        }
+        catch (InvalidOperationException e)
+        {
+            Warn(cs, CorridorError.Failure, name + ": " + e.Message);
+            return null;
+        }
+    }
+
+    // ค่าของเงื่อนไขที่ใช้ในนิพจน์อื่น — ไม่รู้ค่า = โยน (ให้ Cond / Try ข้างนอกจัดการ)
+    private static bool V(bool? b)
+    {
+        if (b == null) throw new InvalidOperationException("เงื่อนไขที่อ้างไม่รู้ค่า");
+        return b.Value;
+    }
+
+    // จุดแรกในรายการที่เกิด (ไว้ต่อเรขาคณิตหลังกิ่ง) · ไม่มีสักจุด = หาไม่ได้ + เตือน
+    private static Pt? FirstOf(CorridorState cs, string id, params Pt?[] points)
+    {
+        foreach (Pt? p in points)
+        {
+            if (p != null) return p;
+        }
+        Warn(cs, CorridorError.Failure, id + ": ไม่มีจุดในรายการที่เกิด");
+        return null;
     }
 
     private static T Try<T>(CorridorState cs, string id, Func<T> calc)
@@ -1008,15 +1176,17 @@ public static class CodeGenerator
     private static readonly System.Text.RegularExpressions.Regex[] MapPatterns =
     {
         new(@"^\s*Pt\? (\w+) = (?!null;)"),
-        new(@"^\s*Point \w+ = AddPoint\(cs, (\w+)"),
-        new(@"^\s*Link \w+ = (?:AddLink|FollowSurface)\(cs, ""([^""]+)"""),
-        new(@"^\s*Link\[\] \w+ = (?:Try\(cs, ""[^""]+"", \(\) => )?(?:Arc3|ArcR|Fillet)\(cs, ""([^""]+)"""),
+        new(@"^\s*Point \w+ = (?:\w+ \? )?AddPoint\(cs, (\w+)"),
+        new(@"^\s*Link \w+ = (?:\w+ \? )?(?:AddLink|FollowSurface)\(cs, ""([^""]+)"""),
+        new(@"^\s*Link\[\] \w+ = (?:\w+ \? )?(?:Try\(cs, ""[^""]+"", \(\) => )?(?:Arc3|ArcR|Fillet)\(cs, ""([^""]+)"""),
+        new(@"^\s*bool\?? (\w+) = "),                         // เงื่อนไข (ชื่อ) / decision (D1) / กิ่ง (B1)
+        new(@"^\s*double\? (\w+) = "),                        // switch
         new(@"^\s*\w+ = (?:Try\(cs, ""[^""]+"", \(\) => )?Rotate\(cs, ""([^""]+)"""),
         new(@"^\s*Link(?:\[\])? \w+ = null;\s+// ([^:]+):"),
         new(@"^\s*// (\w+): (?:ไม่มีจุด|ปลาย \w+ เป็นจุด auxiliary)"),
         new(@"^\s*// (\w+) auxiliary:"),
         new(@"^\s*// (\w+): ใช้ link auxiliary"),
-        new(@"^\s*AddShape\(cs, ""([^""]+)"""),
+        new(@"^\s*(?:if \(\w+\) )?AddShape\(cs, ""([^""]+)"""),
         new(@"^\s*// (\w+): มี link ที่ไม่มีอยู่จริง"),
     };
     public static Dictionary<string, List<int>> SourceMap(string source)

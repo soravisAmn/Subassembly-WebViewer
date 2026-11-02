@@ -1276,5 +1276,104 @@
       ],
       "links": [{ "id": "L1", "points": ["P1", "P5"], "codes": [] }, { "id": "L2", "points": ["P1", "P3"], "codes": [] }],
       "shapes": [], "side": { "param": "Side", "mirror": true } }
-  }
+  },
+  {
+    "name": "กิ่ง ตัด / ถม ที่ hinge + กิ่งซ้อน ถมสูง + firstOf + shape ในกิ่ง (Right: ตัด)",
+    "surface": [{ "x": -30, "y": -5 }, { "x": 0, "y": -1 }, { "x": 30, "y": 30 }],
+    "spec": { "className": "LogicCutFill", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }, { "name": "Width", "kind": "double", "default": 3 }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": ["Crown"], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["Hinge"], "def": { "type": "delta", "from": "P1", "dx": "Width", "dy": "0" } },
+        { "id": "P3", "codes": ["Daylight_Cut"], "branch": "B1", "def": { "type": "slopeToSurface", "from": "P2", "slope": "2", "dir": 1, "target": "TargetSurface", "maxDistance": "50", "layoutLength": "2" } },
+        { "id": "P4", "codes": ["Daylight_Fill"], "branch": "B2", "def": { "type": "slopeToSurface", "from": "P2", "slope": "-0.5", "dir": 1, "target": "TargetSurface", "maxDistance": "50", "layoutLength": "3" } },
+        { "id": "P5", "codes": [], "auxiliary": true, "def": { "type": "firstOf", "points": ["P3", "P4"] } },
+        { "id": "P6", "codes": ["Ditch"], "def": { "type": "delta", "from": "P5", "dx": "1", "dy": "0" } },
+        { "id": "P7", "codes": ["Bench"], "branch": "B3", "def": { "type": "delta", "from": "P4", "dx": "2", "dy": "0" } },
+        { "id": "P8", "codes": [], "def": { "type": "delta", "from": "P3", "dx": "1", "dy": "if(IsCut, 1, 0)" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Top"] },
+        { "id": "L2", "points": ["P2", "P3"], "codes": ["Cut"], "branch": "B1" },
+        { "id": "L3", "points": ["P2", "P4"], "codes": ["Fill"], "branch": "B2" },
+        { "id": "L4", "points": ["P4", "P7"], "codes": [], "branch": "B3" },
+        { "id": "L5", "points": ["P3", "P6"], "codes": ["Ditch"], "branch": "B1" },
+        { "id": "L8", "points": ["P4", "P6"], "codes": ["Ditch"], "branch": "B2" },
+        { "id": "L6", "points": ["P3", "P1"], "codes": [], "branch": "B1" },
+        { "id": "L7", "type": "followSurface", "from": "P4", "to": "P7", "target": "TargetSurface", "codes": [], "branch": "B3", "auxiliary": true }
+      ],
+      "shapes": [{ "id": "S1", "links": ["L1", "L2", "L6"], "codes": ["CutArea"], "branch": "B1" }],
+      "logic": {
+        "conditions": [{ "id": "C1", "name": "IsCut", "expr": "ground(P2) > P2.y", "note": "ดินสูงกว่า hinge" },
+                       { "id": "C2", "name": "HighFill", "expr": "P2.y - ground(P2) > 1 and not IsCut" }],
+        "decisions": [{ "id": "D1", "kind": "if", "test": "IsCut", "label": "ตัดไหม" },
+                      { "id": "D2", "parent": "B2", "kind": "if", "test": "HighFill", "label": "ถมสูงไหม" }],
+        "branches": [{ "id": "B1", "decision": "D1", "case": true, "label": "ตัด" }, { "id": "B2", "decision": "D1", "case": false, "label": "ถม" },
+                     { "id": "B3", "decision": "D2", "case": true, "label": "ถมสูง" }, { "id": "B4", "decision": "D2", "case": false, "label": "ถมต่ำ" }]
+      },
+      "side": { "param": "Side", "mirror": true } }
+  },
+  { "name": "กิ่ง ตัด / ถม Side = Left (ถมสูง: กิ่งซ้อนเกิด)", "surface": [{ "x": -30, "y": -5 }, { "x": 0, "y": -1 }, { "x": 30, "y": 30 }], "values": { "Side": 1 }, "copySpecFrom": 36 },
+  { "name": "กิ่ง ตัด / ถม ถมต่ำ (ดินราบ -0.5)", "surface": [{ "x": -30, "y": -0.5 }, { "x": 30, "y": -0.5 }], "values": { "Side": 1 }, "copySpecFrom": 36 },
+  { "name": "กิ่ง ตัด / ถม Layout mode (ไม่มีดิน -> ถม ยาว layoutLength, ไม่เตือน)", "surface": [{ "x": -30, "y": -5 }, { "x": 0, "y": -1 }, { "x": 30, "y": 30 }], "layout": true, "copySpecFrom": 36 },
+  { "name": "กิ่ง ตัด / ถม ไม่ได้กำหนด Target Surface (ground = ระดับจุดเอง + เตือน)", "surface": [{ "x": -30, "y": -5 }, { "x": 0, "y": -1 }, { "x": 30, "y": 30 }], "surfaceAssigned": false, "copySpecFrom": 36 },
+  {
+    "name": "เงื่อนไขไม่รู้ค่า (อ้างจุดที่ไม่มี) -> ไม่เข้ากิ่งไหน + เตือน, firstOf ไม่มีจุด",
+    "surface": [{ "x": -30, "y": -5 }, { "x": 0, "y": -1 }, { "x": 30, "y": 30 }],
+    "spec": { "className": "LogicUnknown", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "P9.x", "dy": "0" } },
+        { "id": "P3", "codes": [], "branch": "B1", "def": { "type": "delta", "from": "P1", "dx": "2", "dy": "1" } },
+        { "id": "P4", "codes": [], "branch": "B2", "def": { "type": "delta", "from": "P1", "dx": "2", "dy": "-1" } },
+        { "id": "P5", "codes": [], "def": { "type": "firstOf", "points": ["P3", "P4"] } },
+        { "id": "P6", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "-2", "dy": "0" } }
+      ],
+      "links": [{ "id": "L1", "points": ["P1", "P6"], "codes": [] }, { "id": "L2", "points": ["P1", "P5"], "codes": [] }],
+      "shapes": [],
+      "logic": {
+        "conditions": [{ "id": "C1", "name": "Up", "expr": "P2.y > 0" }],
+        "decisions": [{ "id": "D1", "kind": "if", "test": "Up" }],
+        "branches": [{ "id": "B1", "decision": "D1", "case": true }, { "id": "B2", "decision": "D1", "case": false }]
+      },
+      "side": { "param": "Side", "mirror": true } }
+  },
+  {
+    "name": "switch จำนวนช่อง (case 1 / 2 / else) + firstOf · นิพจน์ใน decision ใช้ if ได้",
+    "surface": [{ "x": -30, "y": -2 }, { "x": 30, "y": -2 }],
+    "spec": { "className": "LogicSwitch", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }, { "name": "Lanes", "kind": "long", "default": 2 }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["Edge"], "branch": "B1", "def": { "type": "delta", "from": "P1", "dx": "3", "dy": "0" } },
+        { "id": "P3", "codes": ["Edge"], "branch": "B2", "def": { "type": "delta", "from": "P1", "dx": "6", "dy": "0" } },
+        { "id": "P4", "codes": ["Edge"], "branch": "B3", "def": { "type": "delta", "from": "P1", "dx": "Lanes * 3", "dy": "0" } },
+        { "id": "P5", "codes": [], "auxiliary": true, "def": { "type": "firstOf", "points": ["P2", "P3", "P4"] } },
+        { "id": "P6", "codes": ["Shoulder"], "def": { "type": "slopeLength", "from": "P5", "slope": "-0.04", "length": "1.5", "dir": 1, "measure": "dx" } },
+        { "id": "P7", "codes": [], "branch": "B4", "def": { "type": "delta", "from": "P6", "dx": "0", "dy": "-0.5" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Top"], "branch": "B1" },
+        { "id": "L2", "points": ["P1", "P3"], "codes": ["Top"], "branch": "B2" },
+        { "id": "L3", "points": ["P1", "P4"], "codes": ["Top"], "branch": "B3" },
+        { "id": "L4", "points": ["P5", "P6"], "codes": [], "auxiliary": true },
+        { "id": "L6", "points": ["P2", "P6"], "codes": ["Shoulder"], "branch": "B1" },
+        { "id": "L5", "points": ["P6", "P7"], "codes": [], "branch": "B4" }
+      ],
+      "shapes": [],
+      "logic": {
+        "conditions": [],
+        "decisions": [{ "id": "D1", "kind": "switch", "test": "Lanes", "label": "จำนวนช่อง" },
+                      { "id": "D2", "parent": "B3", "kind": "if", "test": "if(Lanes > 3, P6.x > 10, false)", "label": "กว้างมาก" }],
+        "branches": [{ "id": "B1", "decision": "D1", "case": 1, "label": "1 ช่อง" }, { "id": "B2", "decision": "D1", "case": 2, "label": "2 ช่อง" },
+                     { "id": "B3", "decision": "D1", "case": "else", "label": "อื่นๆ" }, { "id": "B4", "decision": "D2", "case": true, "label": "มีคันหิน" }]
+      },
+      "side": { "param": "Side", "mirror": true } }
+  },
+  { "name": "switch Lanes = 4 (else + กิ่งซ้อน), Side = Left", "surface": [{ "x": -30, "y": -2 }, { "x": 30, "y": -2 }], "values": { "Lanes": 4, "Side": 1 }, "copySpecFrom": 42 },
+  { "name": "switch Lanes = 1", "surface": [{ "x": -30, "y": -2 }, { "x": 30, "y": -2 }], "values": { "Lanes": 1 }, "copySpecFrom": 42 }
 ]

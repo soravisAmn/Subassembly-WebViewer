@@ -79,6 +79,7 @@
     = จุด / link / shape / code ตรงกัน (ต่างที่รู้แล้ว: body เส้นปิดปลายชนดินเลย origin — ตาราง "ต่างกันตรงไหน" ใน README)
     · แก้บั๊ก M2: Offset ระยะเป็นนิพจน์บวก / ลบ ใน C# ขาดวงเล็บ (drawing-case 77) → **รอบ 4c จบ** รอทดสอบใน Civil 3D (`round4c-checklist.md`)
   รอบ 4d เสร็จ (2026-11-07): ลากปรับความกว้างแถบซ้าย / ขวา (`js/panes.js` · `--lw` / `--rw` · `state.leftW` / `rightW` · ดับเบิลคลิก = 280 / 300 · workspace ≥ 320) + tooltip ชื่อเต็มในต้นไม้
+    + แยกแผง: ซ้าย ต้นไม้ / Scenarios · ขวา Drawer / Properties (เลื่อนแยก, เส้นลากแนวนอน `state.drawerH` / `scH`, คลิกหัว = พับ `drawerFold` / `scFold`)
   ถัดไป: **`prompt-5.md`** (Logic API + มุมมองข้อความ + ต้นไม้ Conditions ในแถบซ้ายแทน flowchart + Variables) — ยังไม่เริ่ม · แล้ว prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)

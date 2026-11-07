@@ -57,11 +57,13 @@
   รอบ 4b M2 เสร็จ (2026-11-02): ปุ่ม "Max / Min" ใน drawer + หน้าต่างถามเป็นประโยค (ชิดขวา) + พรีวิวสด (ข้อความ + เส้นประขอบ / ลูกศรบนรูป) — `js/limit.js`
   รอบ 4b M3 เสร็จ (2026-11-02): ไอคอน ↕ + เส้นขอบตอนเลือกจุด, Properties ประโยคสรุป, แท็บ Logic → Max / Min (สถานะสด + scenario), Delete ถาม, Rotate ไม่ให้หมุนจุดที่มี Max / Min,
     branchRisks นับจุดที่ Max / Min อ้าง, README ตาราง "ใช้อันไหนเมื่อไร", `tests-civil3d/round4b-demo.cs` + `round4b-checklist.md` (drawing-cases 61–66) → **รอบ 4b จบ** รอทดสอบใน Civil 3D
-  ถัดไป: **`prompt-5.md`** (Logic ข — flowchart + Logic API ที่ต้องรวม setLimit / removeLimit / limitOptions ของ 4b) — ยังไม่เริ่ม แล้วค่อย **`prompt-5.md`** (Logic ข — flowchart + Logic API สำหรับ MCP ต้องรวมฟังก์ชันของ 4b) — เขียนแล้วทั้งคู่ ยังไม่เริ่ม
+  รอบ 4c M0 เสร็จ (2026-11-07): ข้อเสนอ + คำตอบใน `prompt-4c-design.md` (ชื่อปุ่มเป็นอังกฤษ: Daylight Cut/Fill, Extend to Surface, Clipped Surface Link, Intersect, Offset, Array + เปลี่ยนชื่อปุ่มเดิม · ข้อความอื่นยังไทย · Offset ติ๊ก Aux เอง · Intersect ถามตัด/ไม่ตัดทุกครั้ง)
+  รอบ 4c M1 (กำลังทำ): เอา Max / Min ออกแล้ว (commit แยก) — ของเก่าที่มี `limit` ตัดทิ้งตอนโหลด (`Spec.normalize`) + แจ้งครั้งเดียว · `limited()` = "ไม่มีฟังก์ชัน"
+  ถัดไป: **`prompt-4c.md`** (เอา Max / Min ออก, ขอบเขตค่า → ตาราง Parameter, เปลี่ยนชื่อปุ่มตัด/ถม, ปุ่มใหม่: ต่อลงถึงดิน / ตามดินไม่เกินเส้น / Intersect / Offset / Array — เป้าหมาย: วาด rock-pitching ใหม่ในเว็บโดยไม่เขียนโค้ด) — ยังไม่เริ่ม · จากนั้น **`prompt-5.md` ฉบับย่อ** (Logic API ที่ต้องรวมฟังก์ชันของ 4c + มุมมองข้อความ + Switch ในแท็บ Logic) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)
-2. prompt-5: Logic ข — flowchart แบบ SAC (Decision / Switch) ที่แก้ **ข้อมูลชุดเดียวกับ ก** (ห้ามมี logic สองชุดที่ขัดกัน)
+2. prompt-5 (ฉบับย่อ): Logic API + มุมมองข้อความ + Switch ในแท็บ Logic — flowchart แบบ SAC เลื่อนไปทำพร้อมเว็บสาธารณะ (ต้องแก้ **ข้อมูลชุดเดียวกับ ก** เสมอ)
 3. prompt-6: MCP server ให้ Claude Desktop / Claude Code สั่งเว็บได้ (อ่าน/แก้ spec, compile, รัน scenario) — AI ช่วยทำ logic ซับซ้อนแทนการวาด flowchart เอง
 4. ทีหลัง: เว็บสาธารณะ (บัญชีผู้ใช้, sandbox การ compile C#, ผู้ใช้ใส่ API key ของ AI เอง, โหมด Chat / Code)
    — โค้ดจึงต้องแยก **core** (spec, evaluator, CodeGenerator, shim, หน้าเว็บ) ออกจาก **host** (localhost, ไฟล์ในเครื่อง, compile ในเครื่อง) ให้ชัด

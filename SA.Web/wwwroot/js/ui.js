@@ -339,7 +339,9 @@ async function loadSpecFromFile(it){
   if (!it || !it.file) return;
   const r = await fetch("/api/drawing/spec?file=" + encodeURIComponent(it.file)).then(r => r.json()).catch(() => null);
   if (!r || !r.ok || !r.spec) return;
-  it.spec = Spec.normalize(r.spec); it.generatedFile = true; it.specEdited = !!r.edited;
+  const dropped = [];
+  it.spec = Spec.normalize(r.spec, dropped); it.generatedFile = true; it.specEdited = !!r.edited;
+  limitDroppedNotice(it, dropped);
   it.savedSpec = JSON.stringify(r.spec);
   History.rebase();          // ส่วนของการ Import (ก้อน Undo "เพิ่ม …" เดียวกัน)
   persist(); run();
@@ -676,7 +678,7 @@ function propsMulti(box, list){
 function propsDrawn(box, it, s){
   const sp = it.spec, r = drawRes[it.id];
   if (!canEdit(it)) div("hint", "เข้า Edit (คลิกขวาที่ subassembly) เพื่อแก้ค่า", box);
-  if (s.type === "dpt"){ propsDrawnPoint(box, it, Spec.byId(sp.points, s.id), r); limitGroup(box, it, Spec.byId(sp.points, s.id), r); }
+  if (s.type === "dpt") propsDrawnPoint(box, it, Spec.byId(sp.points, s.id), r);
   else if (s.type === "dlink") propsDrawnLink(box, it, Spec.byId(sp.links, s.id), r);
   else propsDrawnShape(box, it, Spec.byId(sp.shapes, s.id), r);
   const pg = Spec.polygonOf(sp, DRAWN_KIND[s.type], s.id, true);
@@ -684,50 +686,6 @@ function propsDrawn(box, it, s){
   for (const rg of rotationsFor(sp, s)) propsRotation(box, it, rg);
   propsCode(box, it, s);
 }
-// ---------------- Max / Min ของจุด (รอบ 4b) — Properties ขั้นต่ำ (หน้าต่างถามแบบประโยคมาใน M2) ----------------
-// แก้ทุกช่อง = Spec.setLimit ตรวจก่อน (ผิด = แจ้งแล้วไม่เปลี่ยน) · Undo ได้ทีละช่อง
-function limitGroup(box, it, p, r){
-  const sp = it.spec, o = Spec.limitOptions(sp, p.id), L = p.limit, ed_ = canEdit(it);
-  const g = group(box, "Max / Min", L && ed_ ? { label: "ลบ", title: "เอา Max / Min ของจุดนี้ออก", cmd: () => specEdit(s => Spec.removeLimit(s, p.id), it, `ลบ Max / Min ของ ${p.id}`) } : null);
-  if (!o.ok){ div("hint", L ? `⚠ ${esc(o.why)} — ตอนรันจะข้าม` : `ตั้งที่จุดนี้ไม่ได้: ${esc(o.why)}`, g); return; }
-  if (!L){
-    if (ed_) div("btns", null, g).append(btn("+ ตั้ง Max / Min", () => specEdit(s => limitSet(s, p.id, { measure: "depth", side: "below", ref: { type: "ground" }, min: "2", max: null, action: "clampWarn" }), it, `ตั้ง Max / Min ของ ${p.id}`),
-                                             false, "เริ่มที่ ต่ำกว่าผิวดินอย่างน้อย 2 m แล้วแก้ต่อในกลุ่มนี้"));
-    else div("hint", "ไม่มี", g);
-    return;
-  }
-  div("lim-sum", limitSentence(sp, p, r), g);
-  div("lim-preview", limitNowText(sp, r, p.id, false), g);
-  if (ed_) div("btns", null, g).append(btn("แก้ในหน้าต่าง…", () => openLimit(it, p.id), false, "หน้าต่างถามเป็นประโยค + พรีวิวบนรูป"));
-  const set = patch => limitSet(sp, p.id, { ...JSON.parse(JSON.stringify(L)), ...patch });
-  selectRow(g, it, "คุม", o.measures.map(m => [m, Spec.LIMIT_MEASURES[m]]), L.measure, v => {
-    set({ measure: v, along: o.defaultAlong[v], ref: v === "offset" ? { type: "origin" } : v === "length" ? null : { type: "ground" } });
-  });
-  if (L.measure === "depth" || L.measure === "normal")
-    selectRow(g, it, "จุดต้อง", [["below", "ต่ำกว่า"], ["above", "สูงกว่า"]], L.side || "below", v => set({ side: v }));
-  const others = sp.points.filter(q => q.id !== p.id && !Spec.dependsOn(sp, q.id, p.id)).map(q => ["pt:" + q.id, q.id + (q.codes.length ? " " + q.codes.join(",") : "")]);
-  const r0 = L.ref || {};
-  if (L.measure === "depth" || L.measure === "offset"){
-    const opts = (L.measure === "depth" ? [["ground", "ผิวดิน (ที่ offset ของจุดนี้)"], ["elev", "ระดับจริง (เช่น ระดับน้ำ)"]] : [["origin", "แกน (origin)"]]).concat(others);
-    selectRow(g, it, "เทียบกับ", opts, r0.type === "point" ? "pt:" + r0.id : r0.type || "ground", v => {
-      set({ ref: v.startsWith("pt:") ? { type: "point", id: v.slice(3) } : v === "elev" ? { type: "elev", expr: r0.expr || "100" } : { type: v } });
-    });
-  }
-  if (r0.type === "ground" && sp.targets.length > 1)
-    selectRow(g, it, "Target", sp.targets.map(t => [t.name, t.displayName || t.name]), r0.target, v => set({ ref: { ...r0, target: v } }));
-  if (r0.type === "elev") exprRow(g, it, "ระดับจริง", "ไม่ใช่เทียบ origin เช่น DesignWL", r0.expr, v => { L.ref.expr = v; });
-  exprRow(g, it, "อย่างน้อย", "m · ว่าง = ไม่คุม", L.min, v => { L.min = v || null; }, { optional: true });
-  exprRow(g, it, "อย่างมาก", "m · ว่าง = ไม่คุม", L.max, v => { L.max = v || null; }, { optional: true });
-  selectRow(g, it, "ถ้าไม่ผ่าน", Object.entries(Spec.LIMIT_ACTIONS), L.action || "clampWarn", v => set({ action: v }));
-  if (L.action !== "warn") selectRow(g, it, "ขยับ", o.along[L.measure].map(a => [a, Spec.LIMIT_ALONG[a]]), L.along, v => set({ along: v }));
-  if (!L.min && !L.max) div("expr-err", "ใส่อย่างน้อย หรือ อย่างมาก อย่างใดอย่างหนึ่ง", g);
-}
-// ตั้ง Max / Min ผ่าน Spec.setLimit — ผิด = แจ้ง (ไม่เปลี่ยน spec)
-function limitSet(sp, id, lim){
-  try{ return Spec.setLimit(sp, id, lim); }
-  catch(e){ setTimeout(() => alert(e.message)); return null; }
-}
-
 // กลุ่มหมุนที่เกี่ยวกับ object ที่เลือก: จุด = กลุ่มของมันเอง / กลุ่มที่ใช้มันเป็นจุดหมุน · link / shape = กลุ่มของจุดปลาย
 function rotationsFor(sp, s){
   const ids = s.type === "dpt" ? [s.id] : s.type === "dlink" ? Spec.linkRefs(Spec.byId(sp.links, s.id))
@@ -985,7 +943,7 @@ function newCondition(sp, parent){
 // ชื่อเงื่อนไขใช้ได้ไหม (null = ได้) — ห้ามซ้ำ parameter / เงื่อนไข / จุด และห้ามชื่อที่โค้ดใช้เอง
 function condNameError(sp, name){
   const used = new Set(Spec.names(sp).concat(((sp.logic || {}).conditions || []).map(c => c.name), sp.points.map(p => p.id)));
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || used.has(name) || RESERVED.has(name) || /^([PpLlSsBbDd]\d+|surface\d+|[Pp]\d+_lim)$/.test(name)
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || used.has(name) || RESERVED.has(name) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(name)
       || Expr.KEYWORDS.has(name.toLowerCase()) || Expr.FUNCS[name.toLowerCase()]) return `ตั้งชื่อ ${name} ไม่ได้ (ซ้ำ / เป็นชื่อที่โค้ดใช้เอง)`;
   return null;
 }
@@ -1162,7 +1120,7 @@ const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
 const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
   "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
-  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf Limit SolveLimit Normal AlongLen F2 LimAlong LimAct _p abstract as base bool break byte case catch char checked class const continue " +
+  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf abstract as base bool break byte case catch char checked class const continue " +
   "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
   "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +
   "static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while var").split(" "));
@@ -1193,7 +1151,7 @@ function usesParam(sp, name){
 function renameSpecParam(it, p, v){
   if (v === p.name) return true;
   if (!IDENT.test(v)){ alert("ชื่อ parameter ต้องเป็นตัวอังกฤษ/ตัวเลข/_ และไม่ขึ้นต้นด้วยตัวเลข"); return false; }
-  if (RESERVED.has(v) || /^([PpLlSsBbDd]\d+|surface\d+|[Pp]\d+_lim)$/.test(v)){ alert(`ตั้งชื่อ ${v} ไม่ได้ — โค้ดที่สร้างใช้ชื่อนี้เอง (เช่น F, P1, cs, double)`); return false; }
+  if (RESERVED.has(v) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(v)){ alert(`ตั้งชื่อ ${v} ไม่ได้ — โค้ดที่สร้างใช้ชื่อนี้เอง (เช่น F, P1, cs, double)`); return false; }
   if (Expr.KEYWORDS.has(v.toLowerCase())){ alert(`ตั้งชื่อ ${v} ไม่ได้ — เป็นคำในนิพจน์ (and or not true false)`); return false; }
   if (specNames(it).includes(v) || Expr.FUNCS[v.toLowerCase()]){ alert(`มีชื่อ ${v} อยู่แล้ว (หรือเป็นชื่อฟังก์ชัน)`); return false; }
   const old = p.name, re = new RegExp(`\\b${old}\\b`, "g");
@@ -1278,17 +1236,9 @@ function updateLogicLive(){
   for (const e of box.querySelectorAll("[data-cond]")) lgChip(e, r.logic.conds[e.dataset.cond]);
   for (const e of box.querySelectorAll("[data-dec]")) lgChip(e, r.logic.decisions[e.dataset.dec]);
   for (const e of box.querySelectorAll("[data-br]")){ const on = !!r.logic.branches[e.dataset.br]; lgChip(e, on, "br"); const row = e.closest(".lg-br"); if (row) row.classList.toggle("off", !on); }
-  for (const e of box.querySelectorAll("[data-lim]")) limChip(e, r.limits && r.limits[e.dataset.lim]);
 }
-// สถานะ Max / Min: ผ่าน / ถูกขยับ / ไม่ผ่าน (เตือน) / ไม่รู้ค่า
-function limChip(e, info){
-  const sp = (logicItem() || {}).spec, p = sp && Spec.byId(sp.points, e.dataset.lim), warnOnly = p && p.limit && p.limit.action === "warn";
-  if (!info || info.v0 == null){ e.textContent = "ไม่รู้ค่า"; e.className = "lg-val u"; return; }
-  e.textContent = !info.hit ? `ผ่าน ${info.v0.toFixed(2)}` : warnOnly ? `ไม่ผ่าน ${info.v0.toFixed(2)}` : `ขยับ ${info.v0.toFixed(2)} → ${info.tgt.toFixed(2)}`;
-  e.className = "lg-val " + (info.hit ? "f" : "t");
-}
-// คำนวณ spec ปัจจุบันของ it กับผิวดิน / parameter / Layout ของ scenario s — null = scenario ไม่มีตัวนี้
-function scenarioEval(s, it){
+// กิ่งที่เกิดใน scenario s (ใช้ spec ปัจจุบันของ it กับผิวดิน / parameter / Layout ของ scenario) — null = scenario ไม่มีตัวนี้
+function scenarioBranches(s, it){
   const ws = s.ws || s.asm;
   if (!ws) return null;
   const items = ws.assemblies ? ws.assemblies.flatMap(a => a.items || []) : (ws.items || []);
@@ -1300,14 +1250,8 @@ function scenarioEval(s, it){
   c.values = si.params || {};
   c.surface = ws.surfaceOn !== false && sf.length >= 2 ? sf.map(p => ({ x: p.x - o.x, y: p.y - o.y })) : null;
   c.layout = !!ws.layout; c.extendEnds = ws.extendEnds !== false;
-  if (ws.originElevation != null) c.originElevation = ws.originElevation + o.y;
-  try{ return Spec.evaluate(it.spec, c); }
+  try{ const r = Spec.evaluate(it.spec, c); return new Set(Object.keys(r.logic.branches).filter(k => r.logic.branches[k])); }
   catch{ return null; }
-}
-// กิ่งที่เกิดใน scenario s — null = scenario ไม่มีตัวนี้
-function scenarioBranches(s, it){
-  const r = scenarioEval(s, it);
-  return r ? new Set(Object.keys(r.logic.branches).filter(k => r.logic.branches[k])) : null;
 }
 function logicCoverage(it){
   const brs = ((it.spec.logic || {}).branches || []), by = {};
@@ -1317,7 +1261,7 @@ function logicCoverage(it){
 }
 function renderLogic(){
   const box = $("logic-pane"), it = logicItem();
-  const lg = it ? it.spec.logic || {} : {}, nC = (lg.conditions || []).length + (it ? it.spec.points.filter(p => p.limit).length : 0);
+  const lg = it ? it.spec.logic || {} : {}, nC = (lg.conditions || []).length;
   $("n-logic").textContent = nC ? String(nC) : "";
   if (state.dock.tab !== "logic" || !state.dock.open) return;
   // กำลังพิมพ์ในแผงอยู่: อัปเดตแค่ค่า (สร้างใหม่ตอนออกจากช่อง)
@@ -1380,30 +1324,7 @@ function renderLogic(){
     }
   };
   walk(null, 0);
-
-  // ---- Max / Min ของจุด (รอบ 4b) ----
-  const lims = sp.points.filter(p => p.limit);
-  const s3 = div("lg-sec", "<h4>Max / Min <small>จุดที่มีขอบเขต · คลิกชื่อ = เลือกจุด · สถานะอัปเดตตามผิวดิน / parameter</small></h4>", box);
-  if (!lims.length) div("empty", "ยังไม่มี — ปุ่ม Max / Min ใน Drawer (กลุ่ม Logic)", s3);
-  const lcov = lims.length && scenarios.length ? limitCoverage(it) : null;
-  for (const p of lims){
-    const row = div("lg-row", "", s3);
-    const nm = btn(p.id, () => setSel({ type: "dpt", item: it.id, id: p.id }), false, "เลือกจุดนี้"); nm.className = "nm";
-    row.append(nm);
-    const t = document.createElement("span"); t.innerHTML = limitSentence(sp, p, r); t.style.flex = "1"; row.append(t);
-    const chip = document.createElement("span"); chip.dataset.lim = p.id; limChip(chip, r && r.limits && r.limits[p.id]); row.append(chip);
-    const rr = asmRes[it.id], L = rr && rr.ok && rr.drawnLines && rr.drawnLines[p.id];
-    if (L && L.length > 1) row.append(btn("โค้ด", () => gotoCode(it, [L[1]], rr.linesFor), false, `ไปบรรทัด ${L[1]} (Limit) ของโค้ด`));
-    if (ed_) row.append(btn("แก้", () => openLimit(it, p.id), false, "หน้าต่าง Max / Min"));
-    if (lcov){
-      const c = lcov[p.id], sm = document.createElement("small");
-      sm.textContent = c.hit.length ? `ไม่ผ่านใน: ${c.hit.join(", ")}` : "ยังไม่มี scenario ที่ทำให้ไม่ผ่าน";
-      if (!c.hit.length || !c.pass.length) sm.className = "lg-miss";
-      if (!c.pass.length && c.hit.length) sm.textContent += " · ยังไม่มี scenario ที่ผ่าน";
-      div("lg-row", "", s3).append(sm);
-    }
-  }
-  if (!ed_ && (conds.length || decs.length || lims.length)) div("hint", "เข้า Edit เพื่อแก้เงื่อนไข / กิ่ง / Max / Min", box);
+  if (!ed_ && (conds.length || decs.length)) div("hint", "เข้า Edit เพื่อแก้เงื่อนไข / กิ่ง", box);
 }
 function renameCondition(it, c){
   const v = (prompt(`ชื่อใหม่ของเงื่อนไข ${c.name}`, c.name) || "").trim();
@@ -1612,10 +1533,7 @@ function openDialog(title, build){
   build(b);
   $("modal").hidden = false;
 }
-function closeDialog(){
-  $("modal").hidden = true; $("modal").classList.remove("side");
-  limitPreviewClear();                              // พรีวิวของหน้าต่าง Max / Min
-}
+function closeDialog(){ $("modal").hidden = true; }
 $("dlg-x").onclick = closeDialog;
 $("modal").addEventListener("pointerdown", e => { if (e.target === $("modal")) closeDialog(); });
 
@@ -1758,9 +1676,7 @@ function renderScenarios(){
     const row = document.createElement("div");
     const name = document.createElement("span");
     const li = logicItem(), on = li && ((li.spec.logic || {}).branches || []).length ? scenarioBranches(s, li) : null;
-    const sr = li && li.spec.points.some(p => p.limit) ? scenarioEval(s, li) : null;
-    const hits = sr ? Object.keys(sr.limits).filter(id => sr.limits[id].hit) : [];
-    const brTxt = (on ? " · กิ่ง: " + ([...on].map(id => Spec.branchLabel(li.spec, id)).join(", ") || "—") : "") + (sr ? " · Max / Min ไม่ผ่าน: " + (hits.join(", ") || "—") : "");
+    const brTxt = on ? " · กิ่ง: " + ([...on].map(id => Spec.branchLabel(li.spec, id)).join(", ") || "—") : "";
     name.innerHTML = `${esc(s.name)}<small>${esc((s.file || "") + brTxt)}</small>`; name.title = "โหลดกรณีนี้ (แทนที่ workspace)" + (on ? `\nกิ่งของ ${itemLabel(li)} ที่เกิดในกรณีนี้ (spec ตอนนี้)` : "");
     name.onclick = () => loadScenario(s);
     const del = document.createElement("button"); del.textContent = "×"; del.title = "ลบ";

@@ -61,15 +61,19 @@ static class ExprTests
                 if (!CodeGenerator.IsReservedName(n)) throw new Exception($"{n} ต้องเป็นคำสงวน");
         });
 
-        Console.WriteLine("\nMax / Min -> C#");
-        test("limited(P3) = P3_lim · จุดที่ไม่มี = false · จุดที่ไม่มี Max / Min ใช้ไม่ได้ · ชื่อสงวน", () =>
+        Console.WriteLine("\nของเก่าจากรอบ 4b (Max / Min ถูกเอาออก)");
+        test("spec ที่มี limit อ่านได้ สร้างโค้ดได้ (ไม่มี Limit) · limited() = ไม่มีฟังก์ชัน", () =>
         {
-            var ls = new ExprScope { Params = sc.Params, Points = new HashSet<string> { "P2", "P3" }, AllowMissingPoints = true, Limits = new HashSet<string> { "P3" }, Surface = sc.Surface };
-            Eq("P3_lim && Width > 1.0", SpecExpr.ToCs("limited(P3) and Width > 1", ls, 0, "bool"), "limited");
-            Eq("false", SpecExpr.ToCs("limited(P9)", ls, 0, "bool"), "จุดที่ไม่มี");
-            Throws(() => SpecExpr.ToCs("limited(P2)", ls, 0, "bool"), "P2 ไม่มี Max / Min", "ไม่มี Max / Min");
-            foreach (var n in new[] { "P3_lim", "p12_lim", "Limit", "SolveLimit", "Normal", "AlongLen" })
-                if (!CodeGenerator.IsReservedName(n)) throw new Exception($"{n} ต้องเป็นคำสงวน");
+            const string json = """
+            { "className": "Old4b", "params": [{ "name": "Side", "kind": "long", "default": 0 }], "targets": [], "links": [], "shapes": [],
+              "points": [{ "id": "P1", "def": { "type": "origin" } },
+                         { "id": "P2", "def": { "type": "delta", "from": "P1", "dx": "1", "dy": "-1" },
+                           "limit": { "measure": "depth", "side": "below", "ref": { "type": "ground" }, "min": "2" } }],
+              "side": { "param": "Side", "mirror": true } }
+            """;
+            var code = CodeGenerator.GenerateFile(DrawingSpec.Parse(json), json, "Old4b.cs");
+            if (code.Contains("Limit(")) throw new Exception("ต้องไม่มี Limit");
+            Throws(() => Cs("limited(P2)", "bool"), "ไม่มีฟังก์ชัน limited()", "limited()");
         });
 
         Console.WriteLine("\nกิ่ง -> C#");

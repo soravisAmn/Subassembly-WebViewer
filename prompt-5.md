@@ -1,147 +1,129 @@
-# งานรอบ 5: Logic แบบ ข — Flowchart แบบ SAC ที่แก้ข้อมูล logic ชุดเดียวกับแบบ ก
+# งานรอบ 5 (ฉบับย่อ): Logic API + มุมมองข้อความ + แก้ Switch / decision ซ้อนในแท็บ Logic
 
 > วิธีใช้: สั่ง Claude Code ว่า "อ่าน CLAUDE.md กับ prompt-5.md แล้วทำ Milestone 0"
 > ทำทีละ milestone หยุดให้ผู้ใช้ลองทุกครั้ง รายงานเป็นภาษาไทยสั้นๆ (ทำอะไร / ลองยังไง / อะไรยังไม่ได้)
+> **ทำหลัง `prompt-4b.md` เสร็จ** (4b เสร็จแล้ว — `setLimit` / `removeLimit` / `limitOptions` ต้องอยู่ใน Logic API ด้วย)
 
 ## 0. บริบท
 
-อ่าน `CLAUDE.md` (กติกา, test, แผน) และ **`prompt-4-design.md`** (โครงข้อมูล logic ที่ตกลงแล้ว) ก่อน
-รอบ 4 เสร็จแล้ว: นิพจน์เงื่อนไข, `logic.conditions / decisions / branches` (กิ่ง = ทางออกของ decision, รองรับ if / switch / ซ้อน),
-`firstOf`, ปุ่ม "ถ้าตัด / ถม", แท็บ Logic ใน dock ล่าง (ค่าสด, ต้นไม้กิ่ง, scenario ครอบคลุมกิ่ง), `B` = วาดลงกิ่ง, codelink ของเงื่อนไข/กิ่ง
+อ่าน `CLAUDE.md` และ `prompt-4-design.md` (โครงข้อมูล logic ที่ตกลงแล้ว) และ `prompt-4b-design.md` ก่อน
+รอบ 4 + 4b เสร็จแล้ว: นิพจน์เงื่อนไข, `logic.conditions / decisions / branches` (กิ่ง = ทางออกของ decision, รองรับ if / switch / ซ้อน),
+`firstOf`, ปุ่ม "ถ้าตัด / ถม", ปุ่ม "Max / Min", แท็บ Logic
 
-รอบนี้ทำ **แบบ ข: flowchart แบบ Subassembly Composer** — ผู้ใช้คุ้นกับ SAC มาก ให้หน้าตา/ความรู้สึกใกล้ SAC (Flowchart คู่กับ Preview)
-**กติกาสำคัญที่สุดของรอบนี้:** flowchart เป็น **อีกมุมมองของข้อมูลชุดเดียวกัน** — ห้ามมีโครงข้อมูล logic ชุดที่สอง
-แก้ใน flowchart → แท็บ Logic / Properties / รูป / โค้ดเปลี่ยนตาม และกลับกัน
-รอบหน้า (prompt-6) จะให้ **AI ผ่าน MCP** แก้ logic ด้วย → รอบนี้ต้องทำให้ทุกการแก้ logic ผ่าน **ฟังก์ชันล้วนชุดเดียว** (ข้อ 1)
-ที่ MCP เรียกต่อได้เลย
+**ตกลงกับผู้ใช้แล้ว:** เลื่อน flowchart แบบแคนวาส (SAC) ออกไปทำตอนทำเว็บสาธารณะ
+รอบนี้ทำเฉพาะสิ่งที่ **prompt-6 (MCP ให้ AI แก้ logic)** ต้องใช้ + ช่องว่างของแท็บ Logic:
+1. **Logic API** — ทุกการแก้ logic ผ่านฟังก์ชันล้วนชุดเดียว (AI จะเรียกชุดนี้ผ่าน MCP)
+2. **มุมมองข้อความ** — logic เป็น pseudo-code อ่านง่าย (AI ใช้สรุปสิ่งที่แก้ให้ผู้ใช้ตรวจ)
+3. **แท็บ Logic แก้ได้ครบ** — สร้าง Switch, เพิ่ม/แก้/เรียง case, ซ้อน decision ในกิ่ง (ตอนนี้โครงข้อมูลรองรับแต่ยังไม่มีหน้าจอ)
+
+**ห้ามเปลี่ยนรูปแบบ `spec.logic`** — flowchart ในอนาคตจะวาดบนข้อมูลชุดเดียวกันนี้
 
 ไฟล์ที่ต้องอ่านก่อนแก้:
 | ไฟล์ | เกี่ยวกับรอบนี้ยังไง |
 |---|---|
-| `prompt-4-design.md` | โครงข้อมูล logic, ความหมายของกิ่ง, `firstOf`, การไม่เกิด ≠ error |
-| `SA.Web/wwwroot/js/spec.js` | `branchChain`, `branchRisks`, `branchObjects`, `renameCond`, `decisionTree`, `removeDecision`, `addCutFill`, evaluate ส่วน logic |
-| `SA.Web/wwwroot/js/ui.js` | `renderLogic` (แท็บ Logic), `newCondition`, `removeDecisionsDialog`, `renameBranch`, `logicCoverage`, `scenarioBranches`, `branchColor`, `liveEdit` |
+| `SA.Web/wwwroot/js/spec.js` | `branchChain`, `branchRisks`, `branchObjects`, `renameCond`, `decisionTree`, `removeDecision`, `addCutFill`, ส่วน limit ของ 4b, evaluate ส่วน logic |
+| `SA.Web/wwwroot/js/ui.js` | `renderLogic`, `newCondition`, `removeDecisionsDialog`, `renameBranch`, `renameCondition`, `deleteCondition`, `logicCoverage`, `liveEdit`, หน้าต่างถ้าตัด/ถม และของ 4b |
 | `SA.Web/wwwroot/js/draw.js` | `specEdit` (แก้ spec + undo), `chooseDrawBranch` |
-| `SA.Web/wwwroot/js/history.js`, `codelink.js`, `select.js` | undo/redo, object/logic → บรรทัดโค้ด, การเลือก |
-| `SA.Web/wwwroot/js/workspace.js`, `view.js` | pan/zoom ของ workspace (ใช้เป็นแบบให้ flowchart) |
-| `SA.Web/wwwroot/index.html` | โครงหน้า: `#left`, `#center` (`#main` + `#dock`), `#right` |
-| `SA.Web/Drawing/CodeGenerator.cs` | โค้ดของ decision / switch / กิ่ง (ต้องไม่เปลี่ยนเพราะ layout ของ flowchart) |
+| `SA.Web/wwwroot/js/history.js`, `codelink.js` | undo/redo, logic → บรรทัดโค้ด |
+| `SA.Web/Drawing/CodeGenerator.cs` | โค้ดของ decision / switch / กิ่ง (ลำดับ case มีผลกับโค้ด) |
 | `SA.Tests/js/logic.test.js`, `cond.test.js`, `SA.Tests/DrawingTests.cs` | test logic เดิม |
 
-Shortcut ที่ใช้แล้ว ห้ามชน: `P L S M C R X A F Z B`, `T/E` (ตอนวาด Arc), `C` (ปิด Polygon / Copy ใน Rotate), `Space`, `Tab`, `Enter`, `Esc`,
-`F1/? F3 F8 F9 F11`, `Delete`, `Ctrl+A/C/X/V/Z/Y/E/S` — shortcut ใหม่ต้องอยู่ในตาราง `?`
+Shortcut ที่ใช้แล้ว ห้ามชน: `P L S M C R X A F Z B`, `T/E` (Arc), `C` (ปิด Polygon / ตัวเลือก Rotate), `Space`, `Tab`, `Enter`, `Esc`,
+`F1/? F3 F8 F9 F11`, `Delete`, `Ctrl+A/C/X/V/Z/Y/E/S` (+ ที่ 4b เพิ่ม) — รอบนี้ไม่จำเป็นต้องมี shortcut ใหม่
 
-กติกาเดิมทั้งหมดใน `CLAUDE.md` ใช้ต่อ (CRLF, UI/คอมเมนต์ไทย, localhost, ห้ามทำของเดิมพัง, ห้ามแก้ .cs ของผู้ใช้ระหว่างทดสอบ,
-ห้าม commit/push เอง, อัปเดต README + สถานะใน CLAUDE.md, บอกว่าต้องเปิด `run-viewer.bat` ใหม่หรือแค่ Ctrl+F5, ห้ามเพิ่ม API ปลอมใน shim)
+กติกาเดิมใน `CLAUDE.md` ใช้ทั้งหมด (CRLF, UI/คอมเมนต์ไทย, localhost, ห้ามทำของเดิมพัง, ห้ามแก้ .cs ของผู้ใช้ระหว่างทดสอบ,
+ห้าม commit/push เอง, อัปเดต README + สถานะใน CLAUDE.md, บอกเรื่อง run-viewer.bat, ห้ามเพิ่ม API ปลอมใน shim)
 
 ---
 
-## 1. ฟังก์ชันแก้ logic ชุดเดียว (ฐานของ flowchart และ MCP รอบหน้า)
+## 1. Logic API (ฟังก์ชันล้วนชุดเดียว)
 
-รวมทุกการแก้ logic เป็นฟังก์ชันล้วน (ไม่แตะ DOM / state) ในไฟล์ใหม่ `js/logicops.js` (หรือใน `spec.js` ถ้าเหมาะกว่า — บอกเหตุผล) ทุกตัว:
-รับ `spec` + ค่า → แก้ spec หรือคืน error ภาษาไทย (ไม่แก้อะไรเลยถ้า error) และมี test
+ไฟล์ใหม่ `js/logicops.js` (หรือใน `spec.js` ถ้าเหมาะกว่า — บอกเหตุผล) ไม่แตะ DOM / state ทดสอบด้วย node ได้
+ทุกตัว: รับ `spec` + ค่า → แก้ spec และคืน `{ ok: true, warnings? }` หรือ `{ ok: false, error: "ข้อความไทย" }` **โดยไม่แก้อะไรเลยถ้า error**
 
 | ฟังก์ชัน (ชื่อเสนอ) | ทำอะไร |
 |---|---|
-| `addCondition(spec, name, expr, note?)` / `editCondition` / `renameCondition` / `removeCondition(how)` | เงื่อนไขที่ตั้งชื่อ |
-| `addDecision(spec, { parentBranch, kind: "if" \| "switch", test, label, cases? })` | if = สร้างกิ่ง ใช่/ไม่ใช่ ให้เลย · switch = กิ่งตาม cases + `else` |
-| `editDecision` (test / label / kind) · `removeDecision(spec, id, how)` | `how` = เอา object ในกิ่งไปไว้ไหน (กิ่งแม่ / เกิดเสมอ / ลบทิ้ง) — ใช้ร่วมกับ dialog เดิม |
-| `addCase` / `editCase` / `removeCase` / `moveCase(spec, branchId, newIndex)` | กิ่งของ switch (ห้ามค่า case ซ้ำ, `else` มีได้อันเดียวและอยู่ท้ายเสมอ) |
-| `setBranch(spec, objectIds, branchId \| null)` | ย้าย point / link / shape / กลุ่มหมุน เข้ากิ่ง (ตรวจ `branchRisks` แล้วคืนคำเตือน) |
-| `moveDecision(spec, id, newParentBranch)` | ย้าย decision ทั้งก้อนไปซ้อนในกิ่งอื่น (ห้ามย้ายเข้าไปในตัวเอง) |
-| `setLayout(spec, nodeId, {x, y})` / `clearLayout` | ตำแหน่งกล่องใน flowchart (ข้อ 2) |
+| `addCondition(spec, name, expr, note?)` / `editCondition` / `renameCondition` / `removeCondition(how)` | เงื่อนไขที่ตั้งชื่อ (ตรวจคำสงวน / ชื่อซ้ำ / ชนิดนิพจน์) |
+| `addDecision(spec, { parentBranch, kind: "if" \| "switch", test, label, cases? })` | if = สร้างกิ่ง ใช่ / ไม่ใช่ ให้เลย · switch = กิ่งตาม cases + `else` |
+| `editDecision` (test / label / kind) · `removeDecision(spec, id, how)` | `how` = เอา object ในกิ่งไปไว้ไหน (กิ่งแม่ / เกิดเสมอ / ลบทิ้ง) |
+| `addCase` / `editCase` / `removeCase` / `moveCase(spec, branchId, newIndex)` | กิ่งของ switch (ค่า case ห้ามซ้ำ, `else` มีอันเดียวและอยู่ท้ายเสมอ) |
+| `renameBranch(spec, id, label)` | ชื่อกิ่ง |
+| `setBranch(spec, objectIds, branchId \| null)` | ย้าย point / link / shape / กลุ่มหมุน เข้ากิ่ง — คืนคำเตือนจาก `branchRisks` |
+| `moveDecision(spec, id, newParentBranch)` | ย้าย decision ทั้งก้อนไปซ้อนในกิ่งอื่น (ห้ามย้ายเข้าในตัวเอง) |
+| `addCutFill(spec, o)` (เดิม) · `setLimit` / `removeLimit` / `limitOptions` (จาก 4b — ใน spec.js แล้ว) | รวมเข้าชุดเดียวกัน |
+| `describe(spec)` | สรุปโครง logic เป็น JSON สั้น (id, ชื่อ, นิพจน์, กิ่ง, จำนวน object) — ไว้ให้ MCP อ่าน |
 
-- UI เดิม (แท็บ Logic, Properties "เกิดเมื่อ", ปุ่มถ้าตัด/ถม, `B`) ต้องเปลี่ยนมาเรียกชุดนี้ด้วย — ไม่มีที่ไหนแก้ `spec.logic` ตรงๆ อีก
-- ทุกการแก้ผ่าน `specEdit` → undo/redo ได้ครั้งเดียวต่อหนึ่งการกระทำ
-- เขียนรายการฟังก์ชัน + พารามิเตอร์ + error ไว้ใน README หัวข้อใหม่ "Logic API" (prompt-6 จะห่อเป็นเครื่องมือ MCP จากรายการนี้)
+- **UI เดิมทั้งหมด** (แท็บ Logic, Properties "เกิดเมื่อ", ปุ่มถ้าตัด/ถม, ปุ่ม Max / Min, `B`) เปลี่ยนมาเรียกชุดนี้ — ไม่มีที่ไหนแก้ `spec.logic` ตรงๆ อีก
+  พฤติกรรมที่ผู้ใช้เห็นต้องเหมือนเดิม
+- ทุกการแก้ผ่าน `specEdit` → undo/redo ได้ครั้งเดียวต่อการกระทำ
+- README หัวข้อใหม่ **"Logic API"**: รายการฟังก์ชัน + พารามิเตอร์ + ตัวอย่าง + error ที่เป็นไปได้ (prompt-6 จะห่อเป็นเครื่องมือ MCP จากหัวข้อนี้)
 
-## 2. หน้าจอ Flowchart
+## 2. มุมมองข้อความ
 
-**ตำแหน่ง** (เสนอ — ถามใน M0): แบบ SAC = แบ่ง `#main` เป็น **Flowchart | Preview (workspace)** ลากเส้นแบ่งปรับขนาดได้
-เปิด/ปิดด้วยปุ่มบนแถบ Edit + shortcut (เสนอ `G`) จำสถานะไว้ในเบราว์เซอร์ · ใช้ได้เมื่ออยู่ใน Edit ของ subassembly ที่มีส่วนที่วาด
-(นอก Edit = ดูได้อย่างเดียว เหมือนแท็บ Logic)
+ฟังก์ชันล้วน `Logic.toText(spec, evalResult?)` → pseudo-code ภาษาไทย เช่น
+```
+เงื่อนไข:
+  IsCut = ground(P2) > P2.y          ← ตอนนี้: จริง
+เกิดเสมอ: P1, P2, L1
+ถ้า IsCut:                            [D1 ตัดหรือถม?]
+    ตัด (B1): P3, L2                  ← เกิดตอนนี้
+ไม่ใช่:
+    ถม (B2): P4, L3
+    ถ้า HighFill:                     [D2]
+        ถมสูง (B3): P7, L6
+switch ProtectionType:               [D3]
+    = 1  หินเรียง (B5): ...
+    = 2  คอนกรีต (B6): ...
+    อื่นๆ (B7): (ว่าง)
+Max / Min:
+  P5 ต่ำกว่าผิวดินอย่างน้อย MinDepth  ← ตอนนี้: ถูกปรับ +0.60
+```
+- ใส่ค่าตอนนี้ได้เมื่อส่ง `evalResult` มา · ไม่ส่ง = โครงอย่างเดียว (สำหรับ diff)
+- **`Logic.diffText(before, after)`** — สรุปสิ่งที่เปลี่ยนระหว่าง spec สองชุดเป็นบรรทัดภาษาไทย (เพิ่ม/ลบ/แก้ เงื่อนไข, กิ่ง, object ที่ย้ายกิ่ง)
+  — prompt-6 ใช้แสดงให้ผู้ใช้ดูก่อนกดยืนยันสิ่งที่ AI แก้
+- แท็บ Logic มีปุ่มสลับ "ตาราง / ข้อความ" + ปุ่มคัดลอกข้อความ (ไว้วางให้ AI หรือเก็บในรายงาน)
 
-**สิ่งที่วาด** (SVG ทำเอง ไม่ต้องเพิ่ม library):
-- กล่อง **Start** บนสุด → กล่อง **"เกิดเสมอ"** (object ที่ไม่มีกิ่ง)
-- **Decision** = รูปข้าวหลามตัด มีชื่อ + นิพจน์ `test` + ชิป จริง/เท็จ สด, ทางออก "ใช่" / "ไม่ใช่"
-- **Switch** = กล่องหลายทางออก (ป้ายค่า case ของแต่ละทาง + `else`)
-- **กิ่ง** = กล่องปลายทางของแต่ละทางออก: ชื่อกิ่ง, สีกิ่ง (`branchColor` เดิม), **ชิป object** ในกิ่ง (P3, L2, …) และ decision ที่ซ้อนอยู่ต่อลงไป
-- เส้นเชื่อมมีลูกศร; **ทางที่เกิดตอนนี้** (ตามผิวดิน / parameter ปัจจุบัน) เป็นเส้นเข้ม ส่วนที่ไม่เกิดจาง — อัปเดตสดตอนลากจุด surface
-- layout อัตโนมัติแบบต้นไม้บนลงล่าง (ไม่ทับกัน) · ผู้ใช้ลากกล่องไปวางเองได้ → เก็บใน `spec.logic.layout` (ข้อ 1)
-  ปุ่ม "จัดใหม่อัตโนมัติ" · **layout ต้องไม่ทำให้โค้ด C# ที่สร้างเปลี่ยนแม้แต่ตัวอักษรเดียว** (มี test)
-- pan / zoom แบบเดียวกับ workspace (ล้อเมาส์, ปุ่มกลาง / Space + ลาก, `F` = fit เมื่อเมาส์อยู่ใน flowchart)
+## 3. แท็บ Logic แก้ได้ครบ
 
-**เชื่อมกับ Preview (workspace):**
-- คลิกชิป object ใน flowchart = เลือก object นั้นในรูป (และกลับกัน: เลือกในรูป → ชิปถูก highlight + กล่องกิ่งของมัน)
-- hover กล่องกิ่ง = เน้น object ทั้งกิ่งในรูป (แบบ "แสดงทุกกรณี" แม้กิ่งนั้นไม่เกิดตอนนี้)
-- คลิกกล่องกิ่ง = ตั้งเป็นกิ่งสำหรับวาด (เหมือน `B`) — banner บอกชัด
+- **+ Switch** (ข้าง "+ เงื่อนไขใหม่"): ใส่นิพจน์ตัวเลข (เช่น parameter `ProtectionType`) + รายการ case เริ่มต้น → สร้าง decision แบบ switch + กิ่ง + `else`
+- ในแถว switch: เพิ่ม case, แก้ค่า case / ชื่อกิ่ง ในที่, ลบ case (ถามว่าจะเอา object ไปไหน), **เรียง case** ด้วยปุ่ม ↑↓ (หรือลาก)
+- ในแถวกิ่งใดก็ได้: **"+ decision ในกิ่งนี้"** (if / switch) — ซ้อนได้หลายชั้น
+- ในแถว decision: แก้ `test` ในที่ (ตรวจด้วย `Expr.check` ตามชนิด bool / number, error ภาษาไทยใต้ช่อง), เปลี่ยนชื่อ, **ย้ายไปกิ่งอื่น** (เลือกจากรายการ)
+- ทุกอย่างผ่าน Logic API ข้อ 1 และ undo ได้
+- Properties "เกิดเมื่อ" ต้องเลือกกิ่งของ switch และกิ่งที่ซ้อนได้ (แสดงเป็นเส้นทาง เช่น "ถม › ถมสูง")
 
-## 3. แก้ logic ใน Flowchart
+## 4. Test
 
-- **คลิกขวา / ปุ่ม `+`** บนกล่อง: เพิ่ม Decision (if) / Switch ใต้ Start หรือในกิ่ง, เพิ่ม case, แก้ชื่อ, ลบ (ใช้ dialog `removeDecisionsDialog` เดิม)
-- **ดับเบิลคลิก** decision / case = แก้ `test` / ค่า case ในกล่องเลย (ตรวจด้วย `Expr.check` แบบ want bool / number, แสดง error ภาษาไทยใต้ช่อง)
-  ใส่ชื่อเงื่อนไข หรือพิมพ์นิพจน์ตรงๆ ก็ได้ (มีปุ่ม "ตั้งเป็นเงื่อนไขชื่อ…" ให้แปลงนิพจน์เป็นเงื่อนไขที่ใช้ซ้ำได้)
-- **ลากชิป object** จากกล่องกิ่งหนึ่งไปอีกกล่อง = `setBranch` (ลากไปกล่อง "เกิดเสมอ" = เอาออกจากกิ่ง) — ถ้ามีคำเตือน `branchRisks`
-  ให้ขึ้นหลังวาง พร้อมทางแก้เดิม (ย้ายเข้ากิ่ง / ใช้ firstOf) · เลือกหลายชิ้นแล้วลากพร้อมกันได้
-- **ลาก decision** ไปวางในกิ่งอื่น = `moveDecision`
-- **ลากเรียง case** ของ switch = `moveCase` (ลำดับมีผลกับโค้ดที่สร้าง — บอกผู้ใช้)
-- `Delete` ตอนเลือกกล่องใน flowchart = ลบกล่องนั้น (ผ่าน dialog) ไม่ใช่ลบ object ในรูป — โฟกัสอยู่ที่ไหนคำสั่งไปที่นั่น
-- ทุกการแก้ undo/redo ได้ (`Ctrl+Z/Y` ทำงานทั้งใน flowchart และ workspace ใช้ history ชุดเดียว)
-
-## 4. ตรวจสอบ / ทดสอบครบทุก case ใน Flowchart
-
-- **coverage**: กล่องกิ่งที่ยังไม่มี scenario ไหนเข้า มีป้าย ⚠ "ยังไม่ทดสอบ" (ใช้ `logicCoverage` เดิม)
-  เลือก scenario ในแผงซ้าย → flowchart เน้นเส้นทางของ scenario นั้น
-- **คำเตือน**: decision ที่ผล "ไม่รู้" (อ้างจุดที่ไม่เกิด), กิ่งว่าง, object ที่ `branchRisks` เตือน → ไอคอนบนกล่อง + tooltip
-- **codelink**: ปุ่ม/เมนู "ไปที่โค้ด" บนกล่องเงื่อนไข / decision / กิ่ง (ใช้ `logicCodeBtn` เดิม) และเคอร์เซอร์ในโค้ด → กล่องที่ตรงกัน highlight
-- **มุมมองข้อความ** (สลับในหัว flowchart): แสดง logic เป็น pseudo-code อ่านง่าย แก้ไม่ได้ เช่น
-  ```
-  เกิดเสมอ: P1, P2, L1
-  ถ้า IsCut (ground(P2) > P2.y):
-      ตัด: P3, L2
-  ไม่ใช่:
-      ถม: P4, L3
-      ถ้า HighFill: ...
-  ```
-  (prompt-6 จะใช้รูปแบบนี้ให้ AI สรุปสิ่งที่แก้ให้ผู้ใช้ดู — ทำเป็นฟังก์ชันล้วน `Logic.toText(spec)` มี test)
-- **ไฟล์ .cs ที่เขียนเอง (import)**: flowchart แสดงเฉพาะส่วนที่วาด + กล่องทึบ "โค้ดเดิม (นอกช่วง SA-DRAWING)" หนึ่งกล่อง ไม่ต้องแยก if ในโค้ดเดิม
-
-## 5. Test
-
-- JS `logicops.test.js`: ทุกฟังก์ชันข้อ 1 ทั้งกรณีปกติและ error (ชื่อซ้ำ, คำสงวน, case ซ้ำ, else ซ้ำ, ย้าย decision เข้าตัวเอง, ลบแบบ 3 `how`),
-  undo/redo, `setBranch` คืนคำเตือนตรงกับ `branchRisks`, `toText` ของ if / switch / ซ้อน / ว่าง
-- layout: เปลี่ยน/ล้าง layout แล้ว **โค้ด C# ที่สร้างเหมือนเดิมทุกตัวอักษร** และ spec เก่าที่ไม่มี layout เปิดได้ (จัดอัตโนมัติ)
-- auto-layout: ฟังก์ชันล้วนคืนตำแหน่งที่ไม่ทับกันสำหรับต้นไม้ตัวอย่าง (if ซ้อน 3 ชั้น, switch 5 case)
-- เทียบ JS กับ C# (`DrawingTests.cs`) สำหรับ spec ที่สร้างด้วย logicops: switch หลาย case + else, decision ที่ถูก `moveDecision`, case ที่ถูกเรียงใหม่ — ทั้ง Right / Left
+- JS `logicops.test.js`: ทุกฟังก์ชันข้อ 1 ทั้งกรณีปกติและ error (ชื่อซ้ำ, คำสงวน, ชนิดนิพจน์ผิด, case ซ้ำ, else ซ้ำ/ไม่อยู่ท้าย,
+  ย้าย decision เข้าตัวเอง, ลบแบบ 3 `how`) และยืนยันว่า **error แล้ว spec ไม่เปลี่ยนเลย**
+- `toText` / `diffText`: if, switch, ซ้อน 3 ชั้น, กิ่งว่าง, มี Max / Min, มี/ไม่มีค่าตอนนี้
+- UI เดิมเรียก API แล้วผลเหมือนเดิม: รัน test เดิมทั้งหมด (`logic.test.js`, `cond.test.js`, ของ 4b) ผ่านโดยไม่แก้ค่าที่คาด
+- เทียบ JS กับ C# (`DrawingTests.cs`) สำหรับ spec ที่สร้างด้วย API: switch หลาย case + else, case ที่ถูกเรียงใหม่, decision ที่ถูกย้าย — Right / Left
 - เพิ่มกรณีใน `SA.Tests/js/drawing-cases.json`
 
-## 6. Milestones
+## 5. Milestones
 
 | M | งาน | ผู้ใช้ลองยังไง |
 |---|---|---|
-| 0 | `git status`, รัน test เดิมผ่าน, เสนอ: ตำแหน่ง flowchart (ภาพร่าง ASCII), รายการฟังก์ชันข้อ 1, รูปแบบ `logic.layout`, ถามข้อ 8 · บันทึกข้อเสนอ + คำตอบใน `prompt-5-design.md` | ตอบคำถาม |
-| 1 | ข้อ 1 `logicops` + test + เปลี่ยน UI เดิมมาใช้ (พฤติกรรมเดิมต้องเหมือนเดิม) + README "Logic API" | ใช้แท็บ Logic / ถ้าตัด-ถม / `B` แบบเดิม ต้องไม่มีอะไรพัง |
-| 2 | ข้อ 2 flowchart แบบดูอย่างเดียว: วาด, layout อัตโนมัติ, เส้นทางที่เกิดสด, pan/zoom, เชื่อมการเลือกกับ Preview | เปิด `round4-demo` ดู flowchart แล้วลาก surface ดูเส้นทางเปลี่ยน |
-| 3 | ข้อ 3 แก้ใน flowchart: เพิ่ม/แก้/ลบ decision-switch-case, ลากชิป object, ลาก decision, เรียง case, ลากกล่อง (layout), undo | สร้าง switch ตาม parameter ใหม่ทั้งหมดจาก flowchart |
-| 4 | ข้อ 4: coverage, คำเตือน, codelink, มุมมองข้อความ, ไฟล์ import | ดูกิ่งที่ยังไม่ทดสอบ, กดไปที่โค้ด |
-| 5 | รวมงาน + test ข้อ 5 ครบ, README, `tests-civil3d/round5-demo.cs` + `round5-checklist.md`, อัปเดตสถานะใน `CLAUDE.md` | ทดสอบใน Civil 3D (ด้านล่าง) |
+| 0 | `git status`, test เดิมผ่าน, เสนอรายการฟังก์ชันข้อ 1 + ตัวอย่าง `toText` จากไฟล์ round4-demo, ถามข้อ 7 → บันทึกใน `prompt-5-design.md` | ตอบคำถาม |
+| 1 | ข้อ 1 Logic API + test + เปลี่ยน UI เดิมมาใช้ + README "Logic API" | ใช้แท็บ Logic / ถ้าตัด-ถม / Max-Min / `B` แบบเดิม ต้องไม่มีอะไรพัง |
+| 2 | ข้อ 2 มุมมองข้อความ + `diffText` | เปิด round4-demo ดูแบบข้อความ ลากผิวดินแล้วค่าตอนนี้เปลี่ยน |
+| 3 | ข้อ 3 Switch / case / decision ซ้อน ในแท็บ Logic | สร้าง switch ตาม parameter ใหม่ทั้งหมดจากแท็บ Logic |
+| 4 | รวมงาน, README, `tests-civil3d/round5-demo.cs` + checklist, อัปเดตสถานะใน `CLAUDE.md` | ทดสอบใน Civil 3D |
 
-**ชุดทดสอบ Civil 3D (M5):** `round5-demo.cs` สร้างจาก flowchart ทั้งหมด เช่น เขื่อน/คันดินที่มี
-**switch ตาม parameter `ProtectionType`** (1 = หินเรียง, 2 = คอนกรีต, else = ไม่มีชั้นป้องกัน) + ใต้กิ่ง "ถม" มี **if `HighFill`** (ถมสูงเกิน X = มีขั้นบันได berm)
-+ ตัด/ถม เดิม · checklist: เปลี่ยน `ProtectionType` ใน Properties ของ subassembly ใน Civil 3D แล้วรูปเปลี่ยนตาม, corridor ผ่านช่วงตัด/ถม/ถมสูง แล้วรูปตัดสลับถูก,
-ไม่มี error แปลกใน Event Viewer · ตัวอย่างนี้ให้ผู้ใช้ปรับให้ตรงงานจริงได้ (ถามใน M0)
+**ชุดทดสอบ Civil 3D (M4):** คันดิน/เขื่อนที่มี **switch ตาม `ProtectionType`** (1 = หินเรียง, 2 = คอนกรีต, else = ไม่มีชั้นป้องกัน)
++ ตัด/ถม + ใต้กิ่งถมมี if `HighFill` (ขั้นบันได) · checklist: เปลี่ยน `ProtectionType` ใน Properties ของ subassembly ใน Civil 3D แล้วรูปเปลี่ยนตาม,
+corridor ผ่านช่วงตัด/ถม/ถมสูง แล้วรูปตัดถูก, ไม่มี error แปลกใน Event Viewer
 
-## 7. สิ่งที่ไม่ต้องทำในรอบนี้
+## 6. สิ่งที่ไม่ต้องทำในรอบนี้
 
-- MCP / AI (prompt-6) — แต่ Logic API ข้อ 1 ต้องพร้อมให้ห่อ
-- Loop, Variable, Output parameter แบบ SAC (โครงข้อมูลยังไม่รองรับ Loop — ดู prompt-4-design ข้อ 3)
-- แปลง if/else ในโค้ดที่ผู้ใช้เขียนเองเป็น flowchart
-- เว็บสาธารณะ / แยก core-host จริงจัง (แค่อย่าผูกโค้ดใหม่กับไฟล์ในเครื่อง — logicops / layout / toText เป็นฟังก์ชันล้วน)
+- **Flowchart แบบแคนวาส** (เลื่อนไปทำพร้อมเว็บสาธารณะ — อยู่ใน Trello "ไอเดีย / ทีหลัง")
+- MCP / AI (prompt-6) — แต่ Logic API + `describe` + `toText` / `diffText` ต้องพร้อมให้ห่อ
+- Loop / Variable / Output parameter แบบ SAC, แปลง if/else ในโค้ดที่เขียนเองเป็นกิ่ง
+- เว็บสาธารณะ / แยก core-host จริงจัง (แค่อย่าผูกโค้ดใหม่กับไฟล์ในเครื่อง)
 
-## 8. คำถามที่ต้องถามผู้ใช้ใน Milestone 0 (มีค่าที่เสนอไว้ ถ้าผู้ใช้ตอบ "ตามที่เสนอ" ใช้ค่านี้)
+## 7. คำถามที่ต้องถามผู้ใช้ใน Milestone 0 (มีค่าที่เสนอไว้ ถ้าผู้ใช้ตอบ "ตามที่เสนอ" ใช้ค่านี้)
 
-1. ตำแหน่ง flowchart — เสนอ **แบ่งจอ Flowchart | Preview แบบ SAC** (อีกแบบ: แท็บสลับกับ workspace เต็มจอ)
-2. Shortcut เปิด/ปิด flowchart — เสนอ **`G`**
-3. ตำแหน่งกล่องที่ลากเอง — เสนอเก็บใน **`spec.logic.layout`** (ไปกับไฟล์ .cs ผ่าน sa-spec) แทนการเก็บใน `.saproj`
-4. ลากชิป object ไปกิ่งอื่น = **ย้าย** (เสนอ) หรือถามทุกครั้งว่าย้าย/คัดลอก
-5. ตัวอย่าง round5-demo (switch ตามชนิดชั้นป้องกัน + ขั้นบันไดเมื่อถมสูง) ตรงกับงานจริงไหม หรืออยากได้เงื่อนไขอื่น
+1. มุมมองข้อความเป็นภาษาไทย (เสนอ) หรืออังกฤษ (`if / else`) — AI อ่านได้ทั้งคู่
+2. เรียง case ด้วยปุ่ม ↑↓ (เสนอ — ง่ายและ undo ชัด) หรือลาก
+3. ตัวอย่าง round5-demo (switch ชนิดชั้นป้องกัน + ขั้นบันไดเมื่อถมสูง) ตรงกับงานจริงไหม

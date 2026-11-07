@@ -86,10 +86,12 @@ const Spec = (() => {
   const isAux = o => !!(o && (o.auxiliary || o.construction));
   const isAuxPoint = (spec, id) => isAux(byId(spec.points, id));
   // construction (รุ่นก่อน) -> auxiliary — แก้ในที่ คืน spec เดิม (เรียกซ้ำได้)
-  function normalize(spec){
+  //   Max / Min (รอบ 4b ถูกเอาออกในรอบ 4c) -> ตัดทิ้ง จุดใช้ตำแหน่งตามนิยามเดิม · dropped = รายการจุดที่ถูกตัด (ไว้แจ้งผู้ใช้)
+  function normalize(spec, dropped){
     if (!spec) return spec;
     for (const o of (spec.points || []).concat(spec.links || []))
       if ("construction" in o){ if (o.construction) o.auxiliary = true; delete o.construction; }
+    for (const p of spec.points || []) if ("limit" in p){ delete p.limit; if (dropped) dropped.push(p.id); }
     return spec;
   }
   function nextId(spec, prefix){
@@ -146,7 +148,7 @@ const Spec = (() => {
       const mine = new Set(o.branch ? branchChain(spec, o.branch) : []);
       for (const r of ids) for (const b of need(r)) if (!mine.has(b)){ out.push({ id: o.id, kind, ref: r, branch: b }); return; }
     };
-    for (const p of spec.points) if (p.def.type !== "firstOf") check(p, "point", strictRefs(p.def).concat(limitRefs(p)));
+    for (const p of spec.points) if (p.def.type !== "firstOf") check(p, "point", strictRefs(p.def));
     for (const l of spec.links) check(l, "link", linkRefs(l));
     for (const s of spec.shapes){
       const mine = new Set(s.branch ? branchChain(spec, s.branch) : []);
@@ -166,7 +168,7 @@ const Spec = (() => {
   //   self = id ของ object ที่ช่องนี้เป็นของ (อ้างตัวเองไม่ได้)
   function exprOpts(spec, self){
     return { points: spec.points.map(p => p.id).filter(id => id !== self), targets: spec.imported ? null : spec.targets.map(t => t.name),
-             conds: ((spec.logic && spec.logic.conditions) || []).map(c => c.name), limits: spec.points.filter(p => p.limit).map(p => p.id) };
+             conds: ((spec.logic && spec.logic.conditions) || []).map(c => c.name) };
   }
   // ช่องนิพจน์ของ def แต่ละชนิด
   const EXPR_FIELDS = { delta: ["dx", "dy"], polar: ["length", "angle"], slopeLength: ["slope", "length"], slopeToSurface: ["slope", "maxDistance", "layoutLength"],
@@ -177,8 +179,7 @@ const Spec = (() => {
   // ---------- คำนวณ ----------
   // ctx = { values: {ชื่อ: ค่า}, codeParams: [...], codePoints: [{x, y, codes}] (เทียบ origin),
   //         surface: [{x, y}] เทียบ origin หรือ null (ไม่มี/ไม่ได้กำหนด), extendEnds, layout,
-  //         allBranches: ทุกกิ่งเกิด (ใช้วาด "แสดงทุกกรณี" เท่านั้น — ลาดจนชนดินที่ไม่ชน = ยาว layoutLength ไม่ใช่ maxDistance),
-  //         originElevation: ระดับจริงของ origin (Max / Min อ้าง "ระดับจริง") }
+  //         allBranches: ทุกกิ่งเกิด (ใช้วาด "แสดงทุกกรณี" เท่านั้น — ลาดจนชนดินที่ไม่ชน = ยาว layoutLength ไม่ใช่ maxDistance) }
   function evaluate(spec, ctx){
     const issues = [];
     const warn = (obj, msg) => issues.push({ level: "w", obj, msg });
@@ -214,7 +215,6 @@ const Spec = (() => {
       },
       exists: id => { try{ needFrom(viewer, id); return true; }catch{ return false; } },
       hasGround: () => !!ground,
-      limited: id => { try{ needFrom(viewer, id); }catch{ return false; } return !!limInfo[id] && limInfo[id].hit; },
       isCond: name => name in condByName,
       cond: name => { const v = cond(name); if (v === null) throw new Error(`เงื่อนไข ${name} ไม่รู้ค่า`); return v; }
     });
@@ -275,7 +275,7 @@ const Spec = (() => {
         if (p) stack.push(...refs(p.def));
       }
     }
-    const pts = {}, raws = {}, visiting = new Set(), limInfo = {};
+    const pts = {}, raws = {}, visiting = new Set();
     const memo = (store, key, id, fn) => {
       if (store[id]) return store[id];
       if (visiting.has(key)) return (store[id] = { err: `จุด ${id} อ้างถึงตัวเองเป็นวง` });
@@ -292,9 +292,8 @@ const Spec = (() => {
       if (!p) return (pts[id] = { err: `ไม่มีจุด ${id}` });
       if (!(id in pts)){ const o = offOf(p); if (o) return (pts[id] = o); }
       const g = groupOf[id];
-      if (!g) return memo(pts, "f:" + id, id, () => limitPt(p, calcPoint(p)));
+      if (!g) return memo(pts, "f:" + id, id, () => calcPoint(p));
       return memo(pts, "f:" + id, id, () => {
-        if (p.limit) warn(p.id, `${p.id} Max / Min: สมาชิกกลุ่มหมุน ${g.id} ใช้ไม่ได้ — ข้าม`);
         const q = rawPt(id);
         if (q.err) return q;
         const c = pt(g.pivot);
@@ -318,67 +317,6 @@ const Spec = (() => {
       return q;
     }
     const need = id => needFrom(null, id);          // link: เห็นค่าที่หมุนแล้ว
-    // Max / Min: ค่าที่คุมนอกขอบ = ขยับตาม along จนถึงขอบ (limInfo[id] = { v0, tgt, hit, from } ไว้แสดงผล)
-    //   อ้างอิงหาไม่ได้ / นิพจน์ผิด = ไม่ขยับ + เตือน · Layout mode + ผิวดิน = ไม่ขยับ ไม่เตือน — ตรงกับ Limit ใน CodeGenerator.cs
-    function limitPt(p, q){
-      const L = p.limit;
-      if (!L) return q;
-      const tag = `${p.id} Max / Min`;
-      if (LIMIT_NO[p.def.type]){ warn(p.id, `${tag}: ใช้กับจุดชนิดนี้ไม่ได้ — ข้าม`); return q; }
-      const need = id => needFrom(p.id, id), X = (src, what) => Xv(src, what, p.id);
-      const m = L.measure || "depth", below = L.side !== "above", r = L.ref || {};
-      const info = limInfo[p.id] = { v0: null, tgt: null, hit: false, from: q };
-      const groundRef = m === "normal" || (m === "depth" && (r.type || "ground") === "ground");
-      if (groundRef && !ground){ if (!ctx.layout) warn(p.id, `${tag}: ${noTargetMsg} — ไม่ขยับ`); return q; }
-      try{
-        const val = (s, what) => s == null || String(s).trim() === "" ? null : X(String(s), what);
-        const mn = val(L.min, "อย่างน้อย");
-        let mx = val(L.max, "อย่างมาก");
-        if (mn == null && mx == null) return q;
-        if (mn != null && mx != null && mn > mx){ warn(p.id, `${tag}: อย่างน้อย ${f2(mn)} > อย่างมาก ${f2(mx)} — ใช้อย่างน้อย`); mx = null; }
-        info.mn = mn; info.mx = mx;                       // ไว้วาดขอบที่ยอมได้ (limit.js)
-        const sk = LIMIT_START[p.def.type], S = info.S = sk ? need(p.def[sk]) : { x: 0, y: 0 };
-        let Q;
-        if (m === "normal") Q = pt => {
-          const h = 0.01, s = (ground.elev(pt.x + h) - ground.elev(pt.x - h)) / (2 * h), v = (ground.elev(pt.x) - pt.y) / Math.sqrt(1 + s * s);
-          return below ? v : -v;
-        };
-        else if (m === "length"){
-          const ex = q.x - S.x, ey = q.y - S.y, n = Math.hypot(ex, ey);
-          if (n < 1e-9){ warn(p.id, `${tag}: จุดอยู่ที่จุดต้นของแนว — ไม่ขยับ`); return q; }
-          Q = pt => (pt.x - S.x) * ex / n + (pt.y - S.y) * ey / n;
-          info.u = { x: ex / n, y: ey / n };
-        }
-        else if (m === "offset"){ const rx = info.rx = r.type === "point" ? need(r.id).x : 0; Q = pt => F * (pt.x - rx); }
-        else if (groundRef) Q = pt => below ? ground.elev(pt.x) - pt.y : pt.y - ground.elev(pt.x);
-        else {
-          const ry = info.ry = r.type === "point" ? need(r.id).y : X(r.expr, "ระดับ") - (ctx.originElevation || 0);
-          Q = pt => below ? ry - pt.y : pt.y - ry;
-        }
-        const v0 = info.v0 = Q(q);
-        const tgt = mn != null && v0 < mn - 1e-9 ? mn : mx != null && v0 > mx + 1e-9 ? mx : null;
-        if (tgt == null) return q;
-        info.tgt = tgt; info.hit = true;
-        const msg = `${p.id} ${limitWhat(p)} ${f2(v0)} m ${v0 < tgt ? "<" : ">"} ${f2(tgt)} m `;
-        const act = L.action || "clampWarn";
-        if (act === "warn"){ warn(p.id, msg + "(ไม่ขยับ)"); return q; }
-        let dx = 0, dy = 1;
-        const al = L.along || "vertical";
-        if (al === "horizontal"){ dx = 1; dy = 0; }
-        else if (al === "slope"){
-          const ex = q.x - S.x, ey = q.y - S.y, n = Math.hypot(ex, ey);
-          if (n < 1e-9){ warn(p.id, `${tag}: จุดอยู่ที่จุดต้นของแนว — ไม่ขยับ`); return q; }
-          dx = ex / n; dy = ey / n;
-        }
-        const t = solveLimit(u => { try{ return Q({ x: q.x + u * dx, y: q.y + u * dy }) - tgt; }catch{ return NaN; } });
-        if (t == null){ warn(p.id, `${tag}: หาตำแหน่งที่ถึงขอบไม่ได้ภายใน 50 m — ไม่ขยับ`); return q; }
-        if (act === "clampWarn") warn(p.id, msg + `ใช้ ${f2(tgt)} m แทน`);
-        return { x: q.x + t * dx, y: q.y + t * dy };
-      }catch(e){
-        warn(p.id, `${tag}: ${e.message} — ไม่ขยับ`);
-        return q;
-      }
-    }
     function calcPoint(p){
       const d = p.def, need = id => needFrom(p.id, id), X = (src, what) => Xv(src, what, p.id);
       switch (d.type){
@@ -509,7 +447,7 @@ const Spec = (() => {
       shapes[s.id] = { poly };
     }
     for (const b of BRS) branchOn(b.id);
-    return { pts, links, shapes, issues, flip: F, env, raw: raws, logic: { conds: condVal, decisions: decVal, branches: brVal }, limits: limInfo, ground };
+    return { pts, links, shapes, issues, flip: F, env, raw: raws, logic: { conds: condVal, decisions: decVal, branches: brVal } };
   }
   // หมุนจุด q รอบ c ด้วยมุม a องศา (ทวนเข็ม +) — ตรงกับ Rotate ใน CodeGenerator.cs
   function rotatePt(q, c, a){
@@ -779,107 +717,6 @@ const Spec = (() => {
     }
     return touched;
   }
-  // ---------- Max / Min ของจุด (รอบ 4b — prompt-4b-design.md) ----------
-  // p.limit = { measure, side, ref, min, max, action, along } — ดูหัวข้อ "ตกลงแล้ว" ใน prompt-4b-design.md
-  //   measure: depth = ระยะดิ่งจากอ้างอิง (ผิวดิน / จุด / ระดับจริง) · normal = ระยะตั้งฉากกับผิวดิน · length = ความยาวจากจุดต้นตามแนวเดิม
-  //            offset = ระยะราบจากอ้างอิง (จุด / แกน) ออกด้านนอก (+)
-  //   ไม่ผ่าน = ขยับจุดตาม along (vertical / horizontal / slope = ตามแนวจากจุดต้น) จนค่าที่คุมเท่าขอบ — ตรงกับ Limit ใน CodeGenerator.cs
-  const LIMIT_MEASURES = { depth: "ระยะดิ่ง", normal: "ระยะตั้งฉากกับผิวดิน", length: "ความยาวจากจุดต้น", offset: "ระยะราบ" };
-  const LIMIT_ALONG = { vertical: "แนวดิ่ง", horizontal: "แนวราบ", slope: "ตามแนวเดิม" };
-  const LIMIT_ACTIONS = { clampWarn: "ขยับให้ถึงขอบ + เตือน", clamp: "ขยับเงียบๆ", warn: "เตือนอย่างเดียว ไม่ขยับ" };
-  const LIMIT_START = { delta: "from", slopeLength: "from", polar: "from", between: "a" };     // จุดต้นของ "แนวเดิม"
-  const LIMIT_NO = {
-    origin: "origin อยู่กับที่เสมอ", external: "จุดจากโค้ดเดิม — ตำแหน่งมาจากโค้ด",
-    firstOf: "จุดแรกที่เกิด — ตั้งที่จุดในรายการแทน",
-    slopeToSurface: "ลาดจนชนดิน — ตำแหน่งถูกกำหนดโดยผิวดินอยู่แล้ว (คุมจุดที่มันเริ่ม หรือใช้ปุ่ม ถ้าตัด / ถม)",
-    tangent: "จุดสัมผัสของ Fillet — ตำแหน่งขึ้นกับรัศมี"
-  };
-  // คุมอะไรได้ / ขยับแบบไหนได้ / เหตุผลที่ตั้งไม่ได้ (ใช้ทั้งหน้าต่าง, Properties, Logic API)
-  function limitOptions(spec, id){
-    const p = byId(spec.points, id);
-    if (!p) return { ok: false, why: `ไม่มีจุด ${id}` };
-    const t = p.def.type;
-    if (LIMIT_NO[t]) return { ok: false, why: LIMIT_NO[t] };
-    const g = (spec.rotations || []).find(x => x.points.includes(id));
-    if (g) return { ok: false, why: `อยู่ในกลุ่มหมุน ${g.id} — รอบนี้ยังตั้ง Max / Min ให้สมาชิกกลุ่มหมุนไม่ได้` };
-    const line = !!LIMIT_START[t], sl = line ? ["slope"] : [];
-    const along = { depth: ["vertical", ...sl], normal: ["vertical", ...sl], length: sl, offset: ["horizontal", ...sl] };
-    const lean = t === "slopeLength" || t === "polar";      // จุดแบบลาด / มุม: default ขยับตามแนวเดิม
-    return { ok: true, measures: Object.keys(along).filter(m => along[m].length), along,
-             defaultAlong: { depth: lean ? "slope" : "vertical", normal: lean ? "slope" : "vertical", length: "slope", offset: lean ? "slope" : "horizontal" },
-             start: line ? (p.def[LIMIT_START[t]] || null) : null };
-  }
-  // จุดที่ Max / Min อ้าง (จุดอ้างอิง + จุดในนิพจน์)
-  function limitRefs(p){
-    const L = p && p.limit, out = [];
-    if (!L) return out;
-    if (L.ref && L.ref.type === "point" && L.ref.id) out.push(L.ref.id);
-    for (const e of [L.min, L.max, L.ref && L.ref.expr]) for (const id of Expr.pointRefsOf(e)) if (!out.includes(id)) out.push(id);
-    return out;
-  }
-  // ตั้ง / แก้ Max / Min ของจุด (ชุดเดียวต่อจุด) — ผิด = throw Error ข้อความไทย · คืน limit ที่เก็บ
-  function setLimit(spec, id, lim){
-    const o = limitOptions(spec, id);
-    if (!o.ok) throw new Error(`ตั้ง Max / Min ที่ ${id} ไม่ได้: ${o.why}`);
-    const m = lim.measure || "depth";
-    if (!o.measures.includes(m)) throw new Error(`${id} คุม${LIMIT_MEASURES[m] || m}ไม่ได้ (จุดชนิดนี้ไม่มีแนวเดิม)`);
-    const along = lim.along || o.defaultAlong[m];
-    if (!o.along[m].includes(along)) throw new Error(`คุม${LIMIT_MEASURES[m]}แล้วขยับ${LIMIT_ALONG[along] || along}ไม่ได้`);
-    const blank = v => v == null || String(v).trim() === "";
-    const mn = blank(lim.min) ? null : String(lim.min).trim(), mx = blank(lim.max) ? null : String(lim.max).trim();
-    if (mn == null && mx == null) throw new Error("ใส่อย่างน้อย หรือ อย่างมาก อย่างใดอย่างหนึ่ง");
-    if (mn != null && mx != null && /^-?[\d.]+$/.test(mn) && /^-?[\d.]+$/.test(mx) && +mn > +mx) throw new Error(`อย่างน้อย (${mn}) มากกว่า อย่างมาก (${mx})`);
-    let ref = null;
-    const r = lim.ref || {};
-    if (m === "depth"){
-      const t = r.type || "ground";
-      if (t === "ground") ref = { type: "ground", target: r.target || (spec.targets[0] || {}).name || "TargetSurface" };
-      else if (t === "point") ref = { type: "point", id: r.id };
-      else if (t === "elev"){ if (blank(r.expr)) throw new Error("ใส่ระดับจริงของอ้างอิง"); ref = { type: "elev", expr: String(r.expr).trim() }; }
-      else throw new Error(`ไม่รู้จักอ้างอิง ${t}`);
-    }
-    else if (m === "normal") ref = { type: "ground", target: r.target || (spec.targets[0] || {}).name || "TargetSurface" };
-    else if (m === "offset") ref = r.type === "point" ? { type: "point", id: r.id } : { type: "origin" };
-    if (ref && ref.type === "point"){
-      if (!ref.id || !byId(spec.points, ref.id)) throw new Error(`ไม่มีจุดอ้างอิง ${ref.id || ""}`.trim());
-      if (ref.id === id || dependsOn(spec, ref.id, id)) throw new Error(`${ref.id} คำนวณจาก ${id} — อ้างกันเป็นวง`);
-    }
-    const out = { measure: m, ...(m === "depth" || m === "normal" ? { side: lim.side === "above" ? "above" : "below" } : {}), ...(ref ? { ref } : {}),
-                  min: mn, max: mx, action: LIMIT_ACTIONS[lim.action] ? lim.action : "clampWarn", along };
-    byId(spec.points, id).limit = out;
-    return out;
-  }
-  function removeLimit(spec, id){ const p = byId(spec.points, id); if (p) delete p.limit; }
-  // ข้อความของค่าที่คุม เช่น "ต่ำกว่าผิวดิน" / "สูงกว่า P2" / "ยาวจาก P4" (ใช้ในคำเตือน — ตรงกับ what ใน CodeGenerator)
-  function limitWhat(p){
-    const L = p.limit, r = L.ref || {}, below = L.side !== "above";
-    if (L.measure === "normal") return `${below ? "ต่ำกว่า" : "สูงกว่า"}ผิวดิน (ตั้งฉาก)`;
-    if (L.measure === "length") return `ยาวจาก ${p.def[LIMIT_START[p.def.type]] || "origin"}`;
-    if (L.measure === "offset") return `ห่างแนวราบจาก${r.type === "point" ? " " + r.id : "แกน"}`;
-    return `${below ? "ต่ำกว่า" : "สูงกว่า"}${r.type === "point" ? " " + r.id : r.type === "elev" ? " ระดับ " + r.expr : "ผิวดิน"}`;
-  }
-  // หา t ที่ f(t) = 0 ใกล้ 0 ที่สุด: ขยายช่วง 0.01, 0.02, ... ถึง 50 สลับ + / − แล้วแบ่งครึ่ง 60 รอบ (เหมือน SolveLimit ใน C#) · ไม่เจอ = null
-  function solveLimit(f){
-    const f0 = f(0);
-    if (!isFinite(f0)) return null;
-    if (Math.abs(f0) < 1e-12) return 0;
-    let prevP = 0, prevN = 0;
-    for (let s = 0.01; ; s = Math.min(s * 2, 50)){
-      for (const sg of [1, -1]){
-        const t = sg * s, ft = f(t);
-        if (!isFinite(ft)) continue;
-        if (ft * f0 <= 0){
-          let a = sg > 0 ? prevP : prevN, b = t, fa = f(a);
-          for (let k = 0; k < 60; k++){ const m = (a + b) / 2, fm = f(m); if (fm * fa > 0){ a = m; fa = fm; } else b = m; }
-          return (a + b) / 2;
-        }
-        if (sg > 0) prevP = t; else prevN = t;
-      }
-      if (s >= 50) return null;
-    }
-  }
-  const f2 = v => (Math.abs(v) < 0.005 ? 0 : v).toFixed(2);
-
   // ปุ่มสำเร็จรูป "ถ้าตัด / ถม" ที่จุดบานพับ hinge — ตัด = ผิวดินสูงกว่าบานพับ (ground(hinge) > hinge.y), ไม่มีผิวดิน = ถม
   //   o = { hinge, target, cut: 1.5, fill: 2 (ลาด 1:x), params: สร้าง CutSlope / FillSlope, dir: 1 | -1, cutCode, fillCode }
   //   ได้: เงื่อนไข IsCut + กิ่ง ตัด / ถม (ซ้อนใต้กิ่งของบานพับ ถ้ามี), จุดลาดจนชนดินกิ่งละจุด + link, จุด firstOf "Daylight" (auxiliary)
@@ -925,7 +762,6 @@ const Spec = (() => {
     for (const l of spec.links) if (linkRefs(l).some(r => gone.points.has(r))) gone.links.add(l.id);
     for (const s of spec.shapes) if (s.links.some(r => gone.links.has(r))) gone.shapes.add(s.id);
     spec.points = spec.points.filter(p => !gone.points.has(p.id));
-    for (const p of spec.points) if (limitRefs(p).some(r => gone.points.has(r))) delete p.limit;
     spec.links = spec.links.filter(l => !gone.links.has(l.id));
     spec.shapes = spec.shapes.filter(s => !gone.shapes.has(s.id));
     // polygon ที่เสียชิ้นส่วนไป = เหลือเป็นจุด / link / shape ธรรมดา (เลิกแก้ N / R / θ ได้)
@@ -947,7 +783,7 @@ const Spec = (() => {
     const p = byId(spec.points, id);
     if (!p) return false;
     if (id === target) return true;
-    return refs(p.def).concat(limitRefs(p)).some(r => dependsOn(spec, r, target));
+    return refs(p.def).some(r => dependsOn(spec, r, target));
   }
 
   // ---------- polygon ด้านเท่า ----------
@@ -1022,11 +858,6 @@ const Spec = (() => {
     }
     for (const g of spec.polygons || []) for (const k of ["radius", "angle"]) out.push({ obj: g, key: k, id: g.id });
     for (const g of spec.rotations || []) out.push({ obj: g, key: "angle", id: g.id });
-    // Max / Min ของจุด
-    for (const p of spec.points) if (p.limit){
-      for (const k of ["min", "max"]) if (p.limit[k] != null) out.push({ obj: p.limit, key: k, id: p.id });
-      if (p.limit.ref && p.limit.ref.expr != null) out.push({ obj: p.limit.ref, key: "expr", id: p.id });
-    }
     // เงื่อนไข / decision (เปลี่ยนชื่อ parameter แล้วนิพจน์ในเงื่อนไขเปลี่ยนตาม)
     const lg = spec.logic || {};
     for (const c of lg.conditions || []) if (c.expr != null) out.push({ obj: c, key: "expr", id: c.name });
@@ -1110,8 +941,7 @@ const Spec = (() => {
     return g;
   }
 
-  return { exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill,
-           LIMIT_MEASURES, LIMIT_ALONG, LIMIT_ACTIONS, LIMIT_START, limitOptions, limitRefs, setLimit, removeLimit, limitWhat, solveLimit, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
+  return { exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
            isAux, isAuxPoint, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,

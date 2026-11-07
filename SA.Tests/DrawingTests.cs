@@ -124,46 +124,6 @@ static class DrawingTests
             if (!cut.Contains("UserMark") || !cut.Contains("Daylight_Cut") || cut.Contains("Daylight_Fill")) throw new Exception("ผิวดินสูง ต้องเป็นตัด: " + cut);
             if (!fill.Contains("UserMark") || !fill.Contains("Daylight_Fill") || fill.Contains("Daylight_Cut")) throw new Exception("ผิวดินต่ำ ต้องเป็นถม: " + fill);
         });
-        test("Max / Min เทียบ base_rock-pitching.cs: ฐานต่ำกว่าจุดบนอย่างน้อย 2 (Depth 1.5 -> 2 + เตือน, Depth 3 ไม่เตือน) Right / Left", () =>
-        {
-            // ไฟล์ของผู้ใช้: อ่านอย่างเดียว คอมไพล์จากข้อความในหน่วยความจำ
-            var rock = compiler.Compile(File.ReadAllText(Path.Combine(root, "base_rock-pitching.cs")), "base_rock-pitching.cs");
-            if (!rock.Success) throw new Exception("คอมไพล์ base_rock-pitching.cs ไม่ผ่าน");
-            const string json = """
-            { "className": "RockLimit", "params": [{ "name": "Side", "kind": "long", "default": 0 }, { "name": "TopWidth", "kind": "double", "default": 2 },
-                { "name": "SideSlope", "kind": "double", "default": 1.5 }, { "name": "Depth", "kind": "double", "default": 2 }],
-              "targets": [], "links": [], "shapes": [], "side": { "param": "Side", "mirror": true },
-              "points": [
-                { "id": "P1", "codes": ["TrapTopInside"], "def": { "type": "origin" } },
-                { "id": "P2", "codes": ["TrapTopOutside"], "def": { "type": "delta", "from": "P1", "dx": "TopWidth", "dy": "0" } },
-                { "id": "P3", "codes": ["TrapBaseOutside"], "def": { "type": "slopeLength", "from": "P2", "slope": "-1/SideSlope", "length": "Depth", "dir": 1, "measure": "dy" },
-                  "limit": { "measure": "depth", "side": "below", "ref": { "type": "point", "id": "P2" }, "min": "2", "action": "clampWarn", "along": "slope" } },
-                { "id": "P4", "codes": ["TrapBaseInside"], "def": { "type": "slopeLength", "from": "P1", "slope": "-1/SideSlope", "length": "Depth", "dir": -1, "measure": "dy" },
-                  "limit": { "measure": "depth", "side": "below", "ref": { "type": "point", "id": "P1" }, "min": "2", "action": "clampWarn", "along": "slope" } } ] }
-            """;
-            var spec = DrawingSpec.Parse(json);
-            var drawn = compiler.Compile(CodeGenerator.GenerateFile(spec, json, "RockLimit.cs"), "RockLimit.cs");
-            if (!drawn.Success) throw new Exception("คอมไพล์โค้ดที่สร้างไม่ผ่าน: " + string.Join(" | ", drawn.Diagnostics.Where(d => d.Severity == "Error").Select(d => d.Message)));
-            foreach (var (depth, side) in new[] { (1.5, 0), (3.0, 0), (1.5, 1) })
-            {
-                var values = new Dictionary<string, JsonElement>
-                {
-                    ["Depth"] = JsonDocument.Parse(depth.ToString(System.Globalization.CultureInfo.InvariantCulture)).RootElement,
-                    ["Side"] = JsonDocument.Parse(side.ToString()).RootElement
-                };
-                var world = new WorldInput { LayoutMode = true, OriginElevation = 100 };    // Layout = rock-pitching วาดคางหมูปกติ
-                var a = runner.Run(rock.Classes[0], values, world);
-                var b = runner.Run(drawn.Classes[0], values, world);
-                foreach (var code in new[] { "TrapTopInside", "TrapTopOutside", "TrapBaseOutside", "TrapBaseInside" })
-                {
-                    var pa = a.Points.First(p => p.Codes.Contains(code)); var pb = b.Points.First(p => p.Codes.Contains(code));
-                    if (Math.Abs(pa.X - pb.X) > 1e-6 || Math.Abs(pa.Y - pb.Y) > 1e-6)
-                        throw new Exception($"Depth {depth} Side {side} {code}: rock-pitching ({pa.X:0.###}, {pa.Y:0.###}) / วาด ({pb.X:0.###}, {pb.Y:0.###})");
-                }
-                if ((a.Issues.Count > 0) != (b.Issues.Count > 0))
-                    throw new Exception($"Depth {depth}: เตือน rock-pitching {a.Issues.Count} / วาด {b.Issues.Count} ({string.Join(" | ", b.Issues.Select(x => x.Message))})");
-            }
-        });
         test("object → บรรทัดโค้ด ครบทุกชนิด (polar, polygon, โค้ง, Fillet, กลุ่มหมุน, auxiliary) ในทุกกรณีทดสอบ", () =>
         {
             foreach (var c in cases)

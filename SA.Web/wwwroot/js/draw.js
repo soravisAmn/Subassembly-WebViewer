@@ -74,9 +74,7 @@ function chooseDrawBranch(){
 const branchPath = (sp, id) => Spec.branchChain(sp, id).reverse().map(b => Spec.branchLabel(sp, b)).join(" › ");
 let drawRes = {};                  // item id -> ผล Spec.evaluate (เทียบ origin) จาก render ล่าสุด
 const TOOL_NAMES = { point: "Point", link: "Link", shape: "Shape", daylight: "ลาดจนชนดิน", follow: "วิ่งตามผิวดิน", polygon: "Polygon", ngon: "Polygon ด้านเท่า",
-                     arc: "Arc", fillet: "Fillet", cutfill: "ถ้าตัด / ถม", limit: "Max / Min", limitref: "Max / Min (จุดอ้างอิง)" };
-// เครื่องมือที่คลิกจุดเดิมอย่างเดียว (ไม่สร้างของใหม่ / ไม่มีพิมพ์ค่า)
-const PICK_TOOLS = ["cutfill", "limit", "limitref"];
+                     arc: "Arc", fillet: "Fillet", cutfill: "ถ้าตัด / ถม" };
 // Polygon ด้านเท่า: จำนวนด้าน / โหมดที่ใช้ล่าสุด (inscribed = รัศมีถึงมุม · circumscribed = รัศมีถึงกึ่งกลางด้าน)
 const ngonOpt = () => (state.ngon ||= { n: 5, mode: "inscribed" });
 // Arc: โหมด 3p = ผ่าน 3 จุด · ser = เริ่ม-ปลาย-รัศมี (สลับระหว่างวาดด้วย T / E แบบตัวเลือกใน banner ของ AutoCAD)
@@ -113,7 +111,7 @@ function specCtx(it, o){
     values: it.params || {}, codeParams: codeParamsOf(it),
     codePoints: r && r.result ? r.result.points.map(p => ({ x: p.x - r.originX, y: p.y - r.originY, codes: p.codes })) : [],
     surface: state.surfaceOn && state.surface.length >= 2 ? state.surface.map(p => ({ x: p.x - o.x, y: p.y - o.y })) : null,
-    extendEnds: state.extendEnds, layout: state.layout, originElevation: elevOf(o.y)   // ระดับจริงของ origin (Max / Min อ้าง "ระดับจริง")
+    extendEnds: state.extendEnds, layout: state.layout
   };
 }
 function evalItem(it){
@@ -151,10 +149,18 @@ function csharpMismatch(it){
 }
 // spec ต่างจากที่ Save ลงไฟล์ล่าสุด
 // spec / savedSpec รุ่นก่อน (construction) -> auxiliary — เรียกตอนโหลด (localStorage, .assembly.json, spec ที่ฝังใน .cs)
+//   Max / Min ที่ตัดทิ้ง: แจ้งครั้งเดียว (ตัดแล้ว รอบหน้าไม่มีให้แจ้งอีก · Save ครั้งถัดไปเขียนไฟล์ใหม่โดยไม่มีมัน)
 function normItem(it){
   if (!it || !it.spec) return;
-  Spec.normalize(it.spec);
+  const dropped = [];
+  Spec.normalize(it.spec, dropped);
   if (it.savedSpec){ try{ it.savedSpec = JSON.stringify(Spec.normalize(JSON.parse(it.savedSpec))); }catch{} }
+  limitDroppedNotice(it, dropped);
+}
+function limitDroppedNotice(it, ids){
+  if (!ids.length) return;
+  const msg = `Max / Min ถูกเอาออกแล้ว — จุด ${ids.join(", ")} ของ ${itemLabel(it)} ใช้ตำแหน่งตามนิยามเดิม`;
+  setTimeout(() => { showBanner(msg); setTimeout(() => { if ($("banner").textContent === msg) showBanner(draw.tool ? drawBanner() : ""); }, 8000); }, 300);
 }
 const drawingDirty = it => !!it.spec && it.savedSpec !== JSON.stringify(it.spec);
 // Save (.cs) ได้ไหม: ยังไม่มีไฟล์ / ไฟล์ที่มีช่วง SA-DRAWING แล้ว (ไฟล์เขียนเองที่ยังไม่มีช่วงนี้ = Milestone 4)
@@ -191,10 +197,7 @@ function deleteDrawnSet(it, list){
   const extra = [...gone].filter(g => !picked.has(g));
   const what = objs.length === 1 ? objs[0].id : `${objs.length} objects ที่เลือก`;
   const list_ = extra.length > 15 ? extra.slice(0, 15).join(", ") + ` … และอีก ${extra.length - 15} ชิ้น` : extra.join(", ");
-  // Max / Min ที่อ้างจุดที่ลบ (จุดยังอยู่ แต่ขอบเขตหาย)
-  const lostLim = it.spec.points.filter(p => p.limit && !gone.has(p.id) && !Spec.byId(trial.points, p.id).limit).map(p => p.id);
-  const limTxt = lostLim.length ? `\n\nMax / Min ของ ${lostLim.join(", ")} อ้างจุดที่ลบ — จะถูกลบด้วย (จุดยังอยู่)` : "";
-  if ((extra.length || lostLim.length) && !confirm(`ลบ ${what}${extra.length ? ` จะลบ ${list_} ที่พึ่งอยู่ไปด้วย (รวม ${extra.length} ชิ้น)` : ""}${limTxt}\n\nตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
+  if (extra.length && !confirm(`ลบ ${what} จะลบ ${list_} ที่พึ่งอยู่ไปด้วย (รวม ${extra.length} ชิ้น) ตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
   const n = picked.size + extra.length;
   specEdit(s => { for (const o of objs) Spec.removeCascade(s, DRAWN_KIND[o.type], o.id); }, it, n === 1 ? `ลบ ${objs[0].id}` : `ลบ ${n} objects`);
   setSel({ type:"item", item: it.id });
@@ -203,7 +206,6 @@ function deleteDrawnSet(it, list){
 // ---------------- เครื่องมือ ----------------
 function setTool(t){
   if (t && !state.editing) return;
-  if (draw.tool === "limitref" && t !== "limitref") limitToolLeave();   // กลับหน้าต่าง Max / Min
   if (t && cmd.name) endCmd();
   draw.tool = t; draw.chain = []; draw.cand = null; draw.hover = null; draw.list = []; draw.lastCyc = null; closeTyping(); tip.style.display = "none";
   if (!t) document.body.classList.remove("aux-mode");
@@ -226,15 +228,13 @@ function drawBanner(){
     arc: arcBanner(),
     fillet: `Fillet R = ${filletOpt().r}: ` + (draw.chain.length ? `คลิก link ที่ 2 (ต่อกับ ${draw.chain[0]} ที่มุม)` : "คลิก link ที่ 1") + " · Tab / พิมพ์ = เปลี่ยน R"
             + (auxDrawing() ? " · Auxiliary = โค้งช่วยสร้างทับมุมเดิม (เส้นเดิมไม่เปลี่ยน)" : ""),
-    cutfill: "ถ้าตัด / ถม: คลิกจุดบานพับ (ไหล่คันดิน / ขอบไหล่ทาง — จุดที่วาดแล้ว)",
-    limit: "Max / Min: คลิกจุดที่จะคุม (จุดที่วาดแล้ว)",
-    limitref: "Max / Min: คลิกจุดอ้างอิงบนรูป · Esc = กลับหน้าต่างโดยไม่เปลี่ยน"
+    cutfill: "ถ้าตัด / ถม: คลิกจุดบานพับ (ไหล่คันดิน / ขอบไหล่ทาง — จุดที่วาดแล้ว)"
   }[draw.tool];
   document.body.classList.toggle("aux-mode", auxDrawing());
   // โหมด Auxiliary: ป้ายชัดๆ หน้าข้อความ (X = สลับ)
-  const br = !PICK_TOOLS.includes(draw.tool) && drawBranch() ? `▶ กิ่ง ${branchPath(editItem().spec, draw.branch)} · ` : "";
-  return br + (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (PICK_TOOLS.includes(draw.tool) ? "" : " · Tab = พิมพ์ค่า")
-       + (AUX_TOOLS.includes(draw.tool) ? ` · X = ${draw.aux ? "กลับเป็นของจริง" : "Auxiliary"}` : "") + (draw.tool === "limitref" ? "" : " · Esc = ยกเลิก");
+  const br = draw.tool !== "cutfill" && drawBranch() ? `▶ กิ่ง ${branchPath(editItem().spec, draw.branch)} · ` : "";
+  return br + (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (draw.tool === "cutfill" ? "" : " · Tab = พิมพ์ค่า")
+       + (AUX_TOOLS.includes(draw.tool) ? ` · X = ${draw.aux ? "กลับเป็นของจริง" : "Auxiliary"}` : "") + " · Esc = ยกเลิก";
 }
 function arcBanner(){
   const o = arcOpt(), n = draw.chain.length;
@@ -255,8 +255,6 @@ document.getElementById("drawer").addEventListener("click", e => {
   if (t === "bounds"){ const it = editItem(); if (it){ state.open["i:" + it.id] = true; setSel({ type:"params", item: it.id }); } return; }
   // ถ้าตัด / ถม: เลือกจุดไว้จุดเดียว = ใช้เป็นจุดบานพับเลย ไม่งั้นให้คลิกจุด
   if (t === "cutfill"){ const it = editItem(), s = pickedList().filter(o => o.item === it.id); if (s.length === 1 && s[0].type === "dpt"){ setTool(null); return openCutFill(it, s[0].id); } }
-  // Max / Min: เลือกจุดไว้จุดเดียว = เปิดหน้าต่างของจุดนั้นเลย
-  if (t === "limit"){ const it = editItem(), s = pickedList().filter(o => o.item === it.id); if (s.length === 1 && s[0].type === "dpt"){ setTool(null); return openLimit(it, s[0].id); } }
   setTool(draw.tool === t ? null : t);
 });
 function renderDrawer(){
@@ -523,7 +521,6 @@ function drawClick(px, py){
   if (draw.tool === "fillet") return filletClick();
   const c = snapAt(draw.mouse);
   if (!c) return;
-  if (draw.tool === "limit" || draw.tool === "limitref") return limitToolClick(it, c);   // จุด auxiliary ตั้ง / อ้างอิงได้
   // Arc เริ่ม-ปลาย-รัศมี คลิกที่สาม = รัศมี / ทิศจากตำแหน่งเมาส์ (โค้งผ่านจุดนั้น)
   if (arcSerStage()){
     const g = arcFromMouse(c);
@@ -862,7 +859,7 @@ function checkTyped(field, v, names){
 function openTyping(first){
   if (draw.tool === "ngon" && draw.mouse) return openNgonTyping(first);
   if (draw.tool === "fillet" || (arcSerStage() && draw.mouse)) return openRadiusTyping(first);
-  if (!draw.tool || draw.tool === "shape" || draw.tool === "follow" || PICK_TOOLS.includes(draw.tool) || !draw.mouse) return;
+  if (!draw.tool || draw.tool === "shape" || draw.tool === "follow" || draw.tool === "cutfill" || !draw.mouse) return;
   const it = editItem(), box = $("dyn");
   draw.typing = true;
   const A = prevPoint(), R = typingRef(), B = R || A;

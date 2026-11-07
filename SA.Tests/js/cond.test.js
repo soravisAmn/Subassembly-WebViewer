@@ -129,5 +129,16 @@ test("การพึ่งพา: refs นับจุดในนิพจน�
   ok(r.pts.P2.err && r.pts.P3.err, "วน = error");
 });
 
+console.log("ของเก่าจากรอบ 4b (Max / Min ถูกเอาออกในรอบ 4c)");
+test("normalize ตัด limit ทิ้ง + คืนรายการจุด · จุดใช้ตำแหน่งตามนิยามเดิม · limited() = ไม่มีฟังก์ชัน (บอกตำแหน่ง)", () => {
+  const s = spec([["P2", { type: "delta", from: "P1", dx: "1", dy: "-1" }]]);
+  s.points[1].limit = { measure: "depth", side: "below", ref: { type: "ground" }, min: "2", action: "clampWarn", along: "vertical" };
+  const dropped = [];
+  Spec.normalize(s, dropped);
+  eq("P2", dropped.join(","), "รายการที่ตัด"); ok(!("limit" in s.points[1]), "ไม่มี limit แล้ว");
+  near(-1, P(run(s), "P2").y, "ตำแหน่งตามนิยามเดิม");
+  bad(Expr.check("limited(P2)", ["Width"], { want: "bool", points: ["P1", "P2"] }), "ไม่มีฟังก์ชัน limited() (ตำแหน่ง 1)", "limited()");
+});
+
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
 process.exitCode = failed ? 1 : 0;

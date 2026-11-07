@@ -3,7 +3,6 @@
 //   เงื่อนไข: > < >= <= == != (== / != เทียบด้วย Eps) · and or not (&& || !) · true false · if(เงื่อนไข, a, b)
 //   ค่าจากเรขาคณิต: P3.x (กรอบ Side = Right -> F * PX(P3)) · P3.y -> PY(P3) · ground(P3[, "T"]) -> Ground(cs, surface, P3)
 //                   exists(P3) -> Exists(P3) · hasGround(["T"]) -> !surface.IsNull
-//   Max / Min (รอบ 4b): limited(P3) -> P3_lim (ตัวแปรที่บรรทัด Limit ของ P3 ตั้ง) · จุดที่ไม่มี = false
 // ตัวเลขเขียนเป็น double เสมอ (1 -> 1.0) กันการหารจำนวนเต็มของ C# (-1/2 จะได้ 0)
 
 using System.Globalization;
@@ -20,7 +19,6 @@ public sealed class ExprScope
     public ISet<string>? Conds { get; init; }             // ชื่อเงื่อนไข (จริง/เท็จ)
     public ISet<string>? Targets { get; init; }           // null = ไม่ตรวจชื่อ target
     public Func<string?, string>? Surface { get; init; }  // ชื่อ target (null = TargetSurface) -> ตัวแปร ObjectId
-    public ISet<string>? Limits { get; init; }            // จุดที่มี Max / Min (limited(P) ใช้ได้) · null = ไม่ตรวจ
 }
 
 public static class SpecExpr
@@ -31,7 +29,7 @@ public static class SpecExpr
     {
         ["min"] = (1, 99), ["max"] = (1, 99), ["abs"] = (1, 1), ["sqrt"] = (1, 1), ["pow"] = (2, 2),
         ["sin"] = (1, 1), ["cos"] = (1, 1), ["tan"] = (1, 1), ["atan"] = (1, 1),
-        ["if"] = (3, 3), ["ground"] = (1, 2), ["exists"] = (1, 1), ["hasground"] = (0, 1), ["limited"] = (1, 1)
+        ["if"] = (3, 3), ["ground"] = (1, 2), ["exists"] = (1, 1), ["hasground"] = (0, 1)
     };
     public static readonly HashSet<string> Keywords = new(StringComparer.OrdinalIgnoreCase) { "and", "or", "not", "true", "false" };
     private static readonly HashSet<string> Cmp = new() { "<", ">", "<=", ">=", "==", "!=" };
@@ -41,7 +39,7 @@ public static class SpecExpr
     private record Bool(bool V, int At) : Node(At);
     private record Str(string V, int At) : Node(At);
     private record Var(string Name, int At) : Node(At);
-    private record PtRef(string Id, string Axis, int At) : Node(At);   // Axis: x | y | "" (ชื่อจุดใน ground / exists / limited)
+    private record PtRef(string Id, string Axis, int At) : Node(At);   // Axis: x | y | "" (ชื่อจุดใน ground / exists)
     private record Neg(Node A, int At) : Node(At);
     private record Bin(string Op, Node A, Node B, int At) : Node(At);   // + - * / < > <= >= == != and or
     private record Not(Node A, int At) : Node(At);
@@ -200,7 +198,7 @@ public static class SpecExpr
                     }
                     Expect(")");
                     if (args.Count < ar.Min || args.Count > ar.Max) throw Err(x.At, $"{x.V}() จำนวนค่าไม่ถูกต้อง");
-                    if (low is "ground" or "exists" or "limited")
+                    if (low is "ground" or "exists")
                     {
                         if (args[0] is not Var v) throw Err(args[0].At, $"{x.V}() ต้องใส่ชื่อจุด เช่น {x.V}(P3)");
                         args[0] = new PtRef(v.Name, "", v.At);
@@ -297,11 +295,9 @@ public static class SpecExpr
                     if (a != b || a == "str") throw Err(c.At, $"if() ค่าที่ 2 กับ 3 ต้องชนิดเดียวกัน แต่ได้{Th(a)}กับ{Th(b)}");
                     return a;
                 }
-                if (c.F is "ground" or "exists" or "limited")
+                if (c.F is "ground" or "exists")
                 {
                     TypeOf(A[0], sc);
-                    if (c.F == "limited" && A[0] is PtRef lr && sc.Limits != null && sc.Points != null && sc.Points.Contains(lr.Id) && !sc.Limits.Contains(lr.Id))
-                        throw Err(lr.At, $"{lr.Id} ไม่มี Max / Min");
                     if (A.Count > 1) Target(A[1]);
                     return c.F == "ground" ? "num" : "bool";
                 }
@@ -361,7 +357,6 @@ public static class SpecExpr
                     case "if": return Wrap($"{E(A[0], -3)} ? {E(A[1], -4)} : {E(A[2], -4)}", -4, need);
                     case "ground": return $"Ground(cs, {Surf(T(1))}, {Pt(((PtRef)A[0]).Id)})";
                     case "exists": return $"Exists({Pt(((PtRef)A[0]).Id)})";
-                    case "limited": { var id = ((PtRef)A[0]).Id; return sc.Limits != null && sc.Limits.Contains(id) ? id + "_lim" : "false"; }
                     case "hasground": return Wrap($"!{Surf(T(0))}.IsNull", 2, need);
                 }
                 var a = A.Select(x => E(x, 0)).ToList();

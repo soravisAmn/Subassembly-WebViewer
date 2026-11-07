@@ -11,8 +11,7 @@ cases.forEach(c => { if (c.copySpecFrom != null) c.spec = cases[c.copySpecFrom].
 const out = cases.map(c => {
   const r = ctx.Spec.evaluate(c.spec, {
     values: c.values || {}, codeParams: [], codePoints: [],
-    surface: c.surfaceAssigned === false ? null : c.surface, extendEnds: c.extendEnds !== false, layout: !!c.layout,
-    originElevation: 100                                   // = WorldInput.OriginElevation ใน DrawingTests.cs
+    surface: c.surfaceAssigned === false ? null : c.surface, extendEnds: c.extendEnds !== false, layout: !!c.layout
   });
   return {
     name: c.name,

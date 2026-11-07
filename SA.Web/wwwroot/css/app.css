@@ -342,27 +342,6 @@ input.expr{font-family:"IBM Plex Mono",monospace}
 .lg-br.off .lbl{opacity:.6}
 .lg-br small,.lg-row small{color:var(--muted)}
 .lg-miss{color:#9b2c2c}
-/* Max / Min (รอบ 4b): หน้าต่างชิดขวาไม่บังรูป + ประโยคเติมคำ + เส้นขอบบนรูป */
-.modal.side{justify-content:flex-end;align-items:flex-start;background:transparent;pointer-events:none}
-.modal.side .dlg{pointer-events:auto;margin-top:56px;width:min(470px,100%)}
-.lim-sentence{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0;font-size:13px}
-.lim-sentence select,.lim-sentence input{font-size:13px;width:auto;flex:none;max-width:100%}
-.lim-sentence label.check{width:auto;margin:0}
-.lim-radio{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin:6px 0;font-size:12px}
-.lim-radio .lbl{color:var(--muted);min-width:70px}
-.lim-preview{margin:8px 0 4px;padding:6px 8px;border-radius:6px;background:var(--paper);font-size:12px;min-height:1.4em}
-.lim-ok{color:#24723a;font-weight:600}
-.lim-bad{color:#9b2c2c;font-weight:600}
-.lim-band path{fill:none;stroke:#e0892b;stroke-width:1.6;pointer-events:none}
-.lim-band .lim-min{stroke-dasharray:6 4}
-.lim-band .lim-max{stroke-dasharray:2 4}
-.lim-lbl{fill:#c06a12;font:11px "IBM Plex Mono",monospace;paint-order:stroke;stroke:var(--paper);stroke-width:3px;pointer-events:none}
-.lim-from{fill:none;stroke:#e0892b;stroke-dasharray:2 2;opacity:.8;pointer-events:none}
-.lim-to{fill:none;stroke:#e0892b;stroke-width:2;pointer-events:none}
-.lim-arrow{stroke:#e0892b;stroke-width:1.4;stroke-dasharray:3 3;pointer-events:none}
-.lim-icon{fill:#8a8f98;font:bold 12px sans-serif;cursor:pointer;paint-order:stroke;stroke:var(--paper);stroke-width:3px}
-.lim-icon.hit{fill:#e0892b}
-.lim-sum{font-size:12px;margin:2px 0 4px;line-height:1.5}
 .trk-acq{stroke:#4fd2e0;stroke-width:2;fill:none;pointer-events:none}
 .trk-acq.main{stroke-width:3}
 .trk-line{stroke:#4fd2e0;stroke-width:1;stroke-dasharray:3 4;opacity:.8;pointer-events:none}

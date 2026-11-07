@@ -45,6 +45,7 @@
   M1 เสร็จ (2026-11-02): นิพจน์เงื่อนไข + P3.x/y, ground(), exists(), hasGround() ใน JS / C# (test: `cond.test.js`, `ExprTests.cs`, drawing-cases 31–35)
   M2 เสร็จ (2026-11-02): กิ่ง if / switch / ซ้อน + `firstOf` ใน JS / C# + UI ขั้นต่ำ "เกิดเมื่อ" ใน Properties (test: `logic.test.js`, ExprTests "กิ่ง -> C#", drawing-cases 36–44)
   - ตกลงระหว่างทำ: firstOf เป็น auxiliary → link จริงหลังกิ่งต้องต่อจากจุดในแต่ละกิ่งเอง (ยังไม่มี "จุดแทน" ที่ AddLink ได้)
+    — **รอบ 4c M3 เปลี่ยนแล้ว**: firstOf aux = "ปลายจริง" เป็นปลาย link จริงได้ (ถ้าจุดในรายการเป็นจุดจริงทั้งหมด)
   - object ที่ไม่เกิดถูกซ่อน (เลือกบนรูปไม่ได้จนกว่าจะเกิด) — "แสดงทุกกรณี" อยู่ M4
   M3 เสร็จ (2026-11-02): ปุ่ม "ถ้าตัด / ถม" ใน drawer (`Spec.addCutFill` + หน้าต่างใน ui.js; test: `logic.test.js`, drawing-cases 45–49)
   M4 เสร็จ (2026-11-02): แท็บ Logic (ค่าสด, ต้นไม้กิ่ง, เปลี่ยนชื่อ / ลบ), แสดงทุกกรณี (`evaluate` + `allBranches`), ป้ายกิ่งในต้นไม้, scenario ครอบคลุมกิ่ง, B = วาดลงกิ่ง, เกิดเมื่อหลายชิ้น
@@ -63,8 +64,11 @@
     ชื่อปุ่มอังกฤษ (Daylight Cut/Fill, Slope to Surface, Follow Surface, Regular Polygon, Cut at Level, My Shapes) + คำอธิบาย / ภาพในหน้าต่าง Daylight Cut/Fill
   รอบ 4c M2 เสร็จ (2026-11-07): ชนิดจุด `offset` (JS + C# `Offset()`), `Spec.addOffset` / `addIntersect`, เครื่องมือ Intersect (`I` — หน้าต่าง T ตัด/ยืด · N ไม่ตัด · ไม่มี default)
     + Offset (`O` — ระยะเป็นนิพจน์ / parameter, คลิกด้าน, ทำซ้ำได้, X = aux), Properties จุด offset (แก้คู่พร้อมกัน), Move ตามเอง
-    (test: `offset.test.js` เทียบ ParallelY ของ body_rock-pitching, drawing-cases 58–60) · ถัดไป M3 (Extend to Surface)
-  ถัดไป: **`prompt-4c.md`** (เอา Max / Min ออก, ขอบเขตค่า → ตาราง Parameter, เปลี่ยนชื่อปุ่มตัด/ถม, ปุ่มใหม่: ต่อลงถึงดิน / ตามดินไม่เกินเส้น / Intersect / Offset / Array — เป้าหมาย: วาด rock-pitching ใหม่ในเว็บโดยไม่เขียนโค้ด) — กำลังทำ (M1–M2 เสร็จ) · จากนั้น **`prompt-5.md` ฉบับย่อ** (Logic API ที่ต้องรวมฟังก์ชันของ 4c + มุมมองข้อความ + Switch ในแท็บ Logic) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+    (test: `offset.test.js` เทียบ ParallelY ของ body_rock-pitching, drawing-cases 58–60)
+  รอบ 4c M3 เสร็จ (2026-11-07): Extend to Surface — ชนิดจุด `extendToGround` (ไม่ลอย / ไม่มีดิน = off `Spec.GROUND_OFF` เงียบ) + C# `ExtendToGround()`,
+    link `optional` ใน shape (C# `Opt()`), **ปลายจริง** = firstOf aux เป็นปลาย link จริงได้ (`Spec.isAlias` / `auxEnd` · C# alias Point var), `Spec.addExtendToGround`
+    (rewire เส้นที่ต่อที่ปลายไปปลายจริง + แทรกใน shape), ปุ่มกลุ่ม Surface + หน้าต่าง, Properties (test: `extend.test.js`, drawing-cases 61–67) · ถัดไป M4 (Clipped Surface Link)
+  ถัดไป: **`prompt-4c.md`** (เอา Max / Min ออก, ขอบเขตค่า → ตาราง Parameter, เปลี่ยนชื่อปุ่มตัด/ถม, ปุ่มใหม่: ต่อลงถึงดิน / ตามดินไม่เกินเส้น / Intersect / Offset / Array — เป้าหมาย: วาด rock-pitching ใหม่ในเว็บโดยไม่เขียนโค้ด) — กำลังทำ (M1–M3 เสร็จ) · จากนั้น **`prompt-5.md` ฉบับย่อ** (Logic API ที่ต้องรวมฟังก์ชันของ 4c + มุมมองข้อความ + Switch ในแท็บ Logic) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

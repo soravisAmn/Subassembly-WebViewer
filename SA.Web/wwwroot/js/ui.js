@@ -788,6 +788,12 @@ function propsDrawnPoint(box, it, p, r){
       selectRow(g, it, "ด้าน", [["1", `ซ้ายของทิศ ${d.a}→${d.b}`], ["-1", `ขวาของทิศ ${d.a}→${d.b}`]], String(d.side === -1 ? -1 : 1), v => both(o => { o.side = +v; }), "ในกรอบ Side = Right");
       break;
     }
+    case "extendToGround":
+      refRow("from", "ปลายที่ต่อ", "ลอยเหนือดิน = ต่อ · ไม่ลอย = ไม่เกิด");
+      refRow("along", "ทิศจาก", `ต่อแนว ${d.along}→${d.from} เลยออกไป`);
+      ex("maxDistance", "ไม่ชนดินใน", "ระยะราบสูงสุด (m) — เกิน = เตือน + ไม่ต่อ");
+      if (sp.targets.length > 1) selectRow(g, it, "Target", sp.targets.map(t => [t.name, t.displayName || t.name]), d.target, v => { d.target = v; });
+      break;
     case "tangent": {
       refRow("corner", "มุม"); refRow("toward", "บนเส้นไปทาง"); refRow("other", "อีกเส้นไปทาง");
       // รัศมีของจุดสัมผัสคู่นี้กับ link Fillet ต้องเท่ากัน -> แก้ที่ไหนก็แก้ทั้งสาม
@@ -806,7 +812,7 @@ function propsDrawnPoint(box, it, p, r){
   auxCheck(g, it, { type:"dpt", id: p.id }, p, "ไม่เพิ่มลง Civil 3D · อ้างอิง / snap ได้");
   branchRow(g, it, [p], r);
   const gq = q && q.off ? ghostOf(it, r, "pts", p.id) : null;
-  if (q && q.off) div("hint", `ไม่เกิดตอนนี้ (กิ่ง ${esc(branchPath(sp, q.off))})` + (gq ? " — ค่าด้านล่าง = ตำแหน่งเมื่อกิ่งนี้เกิด" : ""), g);
+  if (q && q.off) div("hint", esc(offText(sp, q.off)) + (gq ? " — ค่าด้านล่าง = ตำแหน่งเมื่อกิ่งนี้เกิด" : ""), g);
   else if (q && q.err) div("expr-err", "⚠ " + esc(q.err), g);
   const qq = q && !q.err ? q : gq;
   if (qq){
@@ -835,6 +841,7 @@ function convertPoint(it, p, type, r){
     between: () => ({ type, a: others[0] || "", b: others[1] || others[0] || "", t: "0.5" }),
     intersect: () => ({ type, a1: others[0] || "", a2: others[1] || "", b1: others[2] || "", b2: others[3] || "" }),
     offset: () => ({ type, a: others[0] || "", b: others[1] || others[0] || "", end: "a", dist: "1", side: 1 }),
+    extendToGround: () => ({ type, from: from || others[0] || "", along: others.find(x => x !== from) || "", target: "TargetSurface", maxDistance: "50" }),
     external: () => { const rr = asmRes[it.id], c = rr && rr.result ? rr.result.points.find(x => x.codes.length) : null; return { type, code: c ? c.codes[0] : "" }; },
     firstOf: () => ({ type, points: others.slice(0, 2) }),
     tangent: () => d
@@ -862,7 +869,9 @@ function propsDrawnLink(box, it, l, r){
   });
   // link จริง: จุด auxiliary เป็นปลายไม่ได้ (ไม่อยู่ใน Civil 3D) · link auxiliary ต่อได้ทุกจุด
   const laux = Spec.isAux(l);
-  const opts = sp.points.filter(o => laux || !Spec.isAux(o) || o.id === a || o.id === b).map(o => [o.id, o.id + (o.codes.length ? " " + o.codes.join(",") : "") + (Spec.isAux(o) ? " (aux)" : "")]);
+  // ปลายจริง (firstOf aux) เป็นปลาย link จริงได้ (Spec.auxEnd)
+  const opts = sp.points.filter(o => laux || !Spec.auxEnd(sp, o.id) || o.id === a || o.id === b)
+    .map(o => [o.id, o.id + (o.codes.length ? " " + o.codes.join(",") : "") + (Spec.isAlias(sp, o.id) ? " (ปลายจริง)" : Spec.isAux(o) ? " (aux)" : "")]);
   const setEnd = (i, v) => { if (l.points) l.points[i] = v; else l[i ? "to" : "from"] = v; };
   if (l.type !== "fillet"){
     selectRow(g, it, "จาก", opts, a, v => setEnd(0, v));
@@ -886,8 +895,16 @@ function propsDrawnLink(box, it, l, r){
     exprRow(g, it, sg.by === "count" ? "จำนวนท่อน" : "ท่อนยาวไม่เกิน", "", sg.value, v => { l.seg = { by: sg.by, value: v }; });
   }
   auxCheck(g, it, { type:"dlink", id: l.id }, l, "ไม่ Links.Add ลง Civil 3D · อ้างอิง / snap ได้ · ใช้ใน shape ไม่ได้");
+  // optional ใน shape (เส้นต่อของ Extend to Surface): ไม่เกิด / วาดไม่ได้ = shape ข้ามเส้นนี้ไป
+  if (l.optional || sp.shapes.some(s => s.links.includes(l.id))){
+    const oc = document.createElement("label"); oc.className = "check";
+    oc.innerHTML = `<input type="checkbox"${l.optional ? " checked" : ""}> ข้ามได้ใน shape (optional) <small>(link นี้ไม่เกิด / วาดไม่ได้ = shape ข้ามไป ไม่เตือน)</small>`;
+    const cb = oc.querySelector("input"); cb.disabled = !canEdit(it);
+    cb.onchange = () => specEdit(() => { if (cb.checked) l.optional = true; else delete l.optional; }, it, `${l.id} ${cb.checked ? "" : "ไม่"}ข้ามได้ใน shape`);
+    g.appendChild(oc);
+  }
   branchRow(g, it, [l], r);
-  if (q && q.off) div("hint", `ไม่เกิดตอนนี้ (กิ่ง ${esc(branchPath(sp, q.off))})`, g);
+  if (q && q.off) div("hint", esc(offText(sp, q.off)), g);
   else if (q && q.err){
     div("expr-err", "⚠ " + esc(q.err), g);
     // quick fix: link จริงที่ปลายเป็นจุด auxiliary (ไม่เปลี่ยนให้เองเงียบๆ)
@@ -915,7 +932,7 @@ function propsDrawnShape(box, it, s, r){
   codesRow(g, it, s);
   let area = null;
   if (q && q.poly){ area = 0; q.poly.forEach((a, j) => { const b = q.poly[(j + 1) % q.poly.length]; area += a.x * b.y - b.x * a.y; }); area = Math.abs(area) / 2; }
-  kv(g, [["Links", s.links.join(", ")], ["พื้นที่", q && q.off ? `ไม่เกิดตอนนี้ (กิ่ง ${branchPath(it.spec, q.off)})` : q && q.err ? "⚠ " + q.err : area == null ? "(link ต่อกันไม่เป็นรูปปิด)" : f3(area) + " m²"]]);
+  kv(g, [["Links", s.links.join(", ")], ["พื้นที่", q && q.off ? offText(it.spec, q.off) : q && q.err ? "⚠ " + q.err : area == null ? "(link ต่อกันไม่เป็นรูปปิด)" : f3(area) + " m²"]]);
   branchRow(g, it, [s], r);
   // quick fix: shape ที่มี link auxiliary
   if (q && q.auxLink && canEdit(it)) div("btns", null, g).append(
@@ -1032,6 +1049,57 @@ function cutFillCommit(it, opts){
   const cn = Spec.byId(it.spec.logic.conditions, r.cond).name;
   flashBanner(`Daylight Cut/Fill: ${cn} · ตัด = ${r.cut.point} · ถม = ${r.fill.point} · Daylight = ${r.daylight} — ลากจุดผิวดินขึ้นลงดูรูปสลับ (Ctrl+Z ย้อนได้)`);
 }
+// Extend to Surface (รอบ 4c): หน้าต่างเล็กหลังคลิก link ใกล้ปลายที่จะต่อ
+function openExtend(it, id, end){
+  const sp = it.spec, l = Spec.byId(sp.links, id);
+  if (!l || !l.points) return;
+  const along = l.points.find(p => p !== end);
+  const others = sp.links.filter(o => o !== l && Spec.linkEnds(o).includes(end) && !Spec.isArc(o) && (!Spec.isAux(l) || Spec.isAux(o))).map(o => o.id);
+  const o = { codes: l.codes.join(", "), pointCodes: "", maxDistance: "50", rewire: true, target: (sp.targets[0] || {}).name || "TargetSurface" };
+  openDialog(`Extend to Surface: ปลาย ${end} ของ ${id}`, b => {
+    div("cf-explain", `<p>ถ้าปลาย <b>${esc(end)}</b> ลอยเหนือดิน → ต่อแนวเดิม (${esc(along)} → ${esc(end)}) ลงไปชนดิน · ไม่ลอย / ไม่มีดิน = <b>ไม่ต่อ</b> (ไม่เตือน)</p>
+      <div class="cf-pics">
+        <figure><svg viewBox="0 0 120 56" aria-hidden="true"><path class="cf-gnd" d="M0 46L60 52L120 44V56H0Z"/><path class="cf-road" d="M20 6L58 34"/><path class="cf-fill" d="M58 34L78 49" stroke-dasharray="4 3"/><circle class="cf-pt" cx="58" cy="34" r="3"/></svg><figcaption>ปลายลอย → ต่อลงถึงดิน</figcaption></figure>
+        <figure><svg viewBox="0 0 120 56" aria-hidden="true"><path class="cf-gnd" d="M0 26L60 30L120 22V56H0Z"/><path class="cf-road" d="M20 6L58 34"/><circle class="cf-pt" cx="58" cy="34" r="3"/></svg><figcaption>ปลายจมดิน → ไม่ต่อ</figcaption></figure>
+      </div>`, b);
+    const field = (label, small, key) => {
+      const row = div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, b);
+      const inp = document.createElement("input"); inp.value = o[key]; inp.dataset.k = key;
+      inp.oninput = () => { o[key] = inp.value.trim(); };
+      row.appendChild(inp); return inp;
+    };
+    if (sp.targets.length > 1){
+      const row = div("row", `<label>Target surface</label>`, b), s = document.createElement("select");
+      s.innerHTML = sp.targets.map(t => `<option value="${esc(t.name)}">${esc(t.displayName || t.name)}</option>`).join(""); s.value = o.target;
+      s.onchange = () => { o.target = s.value; }; row.appendChild(s);
+    }
+    field("Code เส้นต่อ", "คั่นด้วย , (ปกติ = code ของเส้นเดิม)", "codes");
+    field("Code จุดชนดิน", "คั่นด้วย ,", "pointCodes");
+    field("ไม่ชนดินใน", "ระยะราบ (m) — เกินแล้วเตือน + ไม่ต่อ", "maxDistance");
+    if (others.length){
+      const pc = document.createElement("label"); pc.className = "check";
+      pc.innerHTML = `<input type="checkbox" checked> เส้นอื่นที่ต่อที่ ${esc(end)} (${esc(others.join(", "))}) ย้ายไปต่อที่ <b>ปลายจริง</b> <small>(ต่อ = จุดชนดิน · ไม่ต่อ = ${esc(end)})</small>`;
+      pc.querySelector("input").onchange = e => { o.rewire = e.target.checked; };
+      b.appendChild(pc);
+    }
+    const err = div("expr-err", "", b);
+    div("hint", `ได้: จุดต่อลงถึงดิน + link ต่อ (<b>optional</b> ใน shape: ไม่ต่อ = ข้าม) + จุด <b>ปลายจริง</b> (จุดแรกที่เกิดใน [จุดต่อ, ${esc(end)}] · auxiliary)<br>`
+              + `shape ที่ใช้ ${esc(id)} ได้เส้นต่อแทรกเอง → ปิดรูปได้ทั้งตอนต่อ / ไม่ต่อ`, b);
+    div("btns", null, b).append(
+      btn("สร้าง", () => {
+        const chk = Expr.check(o.maxDistance || "50", specNames(it), Spec.exprOpts(sp));
+        if (!chk.ok){ err.textContent = "ไม่ชนดินใน: " + chk.error; return; }
+        closeDialog();
+        const list = s => s.split(",").map(x => x.trim()).filter(Boolean);
+        const opt = { codes: list(o.codes), pointCodes: list(o.pointCodes), maxDistance: o.maxDistance || "50", rewire: o.rewire, target: o.target };
+        let res = null;
+        specEdit(s => { res = Spec.addExtendToGround(s, id, end, opt); if (res.point) state.sel = { type:"dpt", item: it.id, id: res.point }; }, it, `Extend to Surface ${id} ที่ ${end}`);
+        if (res && res.error) return flashBanner(res.error);
+        if (res) flashBanner(`Extend to Surface: ${res.point} (ต่อ) · ${res.link} (optional) · ปลายจริง ${res.tip}` + (res.rewired.length ? ` · ${res.rewired.join(", ")} ต่อที่ปลายจริงแล้ว` : "") + " — ลากผิวดินขึ้นลงดู (Ctrl+Z ย้อนได้)");
+      }),
+      btn("ยกเลิก", closeDialog));
+  });
+}
 // firstOf: จุดแรกในรายการที่เกิด (ต่อเรขาคณิตหลังกิ่ง เช่น ปลายลาดตัด / ปลายลาดถม)
 function firstOfRow(g, it, p, others){
   const row = div("row", `<label>จุด (ตามลำดับ)<small>คั่นด้วย , · ใช้จุดแรกที่เกิด</small></label>`, g);
@@ -1082,7 +1150,7 @@ function setAux(it, objs, on){
   if (!on){
     const P = new Set(objs.filter(o => o.type === "dpt").map(o => o.id));
     const ends = [...new Set(objs.filter(o => o.type === "dlink").flatMap(o => Spec.linkEnds(Spec.byId(sp.links, o.id))))]
-      .filter(id => !P.has(id) && Spec.isAuxPoint(sp, id));
+      .filter(id => !P.has(id) && Spec.auxEnd(sp, id));          // ปลายจริง (firstOf aux) ที่จุดในรายการเป็นจุดจริง = ต่อได้อยู่แล้ว
     if (ends.length && confirm(`ปลายของ link เป็นจุด auxiliary: ${ends.join(", ")}\n\nOK = ทำจุดพวกนี้เป็นจุดจริงด้วย\nCancel = ทำเฉพาะ link (link จะขึ้นเตือนจนกว่าจะแก้)`))
       objs = objs.concat(ends.map(id => ({ type: "dpt", item: it.id, id })));
   }
@@ -1156,7 +1224,7 @@ function propsParamTable(box, it){
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
 const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
-  "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Offset Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
+  "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Offset ExtendToGround Opt Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
   "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf Severe abstract as base bool break byte case catch char checked class const continue " +
   "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
   "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +

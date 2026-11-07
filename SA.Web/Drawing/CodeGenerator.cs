@@ -38,7 +38,7 @@ public static class CodeGenerator
     {
         "cs", "F", "Deg", "Pt", "Measure", "Source", "surface",
         // ชื่อตัวช่วยในโค้ดที่สร้าง (ตัวแปรชื่อเดียวกันจะบังเมธอด / ชนิด)
-        "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Offset", "Tangent", "Rotate",
+        "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Offset", "ExtendToGround", "Opt", "Tangent", "Rotate",
         "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
         "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "FirstOf", "Severe",
         // คำในนิพจน์ (and or not true false — ไม่สนตัวพิมพ์ ตรวจใน IsReservedName)
@@ -312,7 +312,7 @@ public static class CodeGenerator
             L();
 
             // surface ที่ต้องใช้
-            var usesSurface = _s.Points.Where(p => p.Def.Type is "slopeToSurface" or "onSurface").Select(p => p.Def.Target)
+            var usesSurface = _s.Points.Where(p => p.Def.Type is "slopeToSurface" or "onSurface" or "extendToGround").Select(p => p.Def.Target)
                 .Concat(_s.Links.Where(l => l.Follow).Select(l => l.Target))
                 // ground() / hasGround() ในนิพจน์
                 .Concat(_s.Points.SelectMany(p => p.Def.Exprs()).Concat(_s.Links.SelectMany(LinkExprs)).Concat(_s.Rotations.Select(g => g.Angle))
@@ -362,6 +362,11 @@ public static class CodeGenerator
                 // จุด auxiliary: ไม่ประกาศตัวแปร Point (ไม่มีใครใช้ — กันคำเตือน CS0219 ของ compiler)
                 L(p.Auxiliary ? $"        // {p.Id} auxiliary: ใช้คำนวณอย่างเดียว ไม่เพิ่มลง Civil 3D"
                               : $"        Point {Lc(p.Id)} = {InBranch(p.Branch, $"AddPoint(cs, {p.Id}{Codes(p.Codes)})")};{BrNote(p.Branch)}");
+            // ปลายจริง (firstOf auxiliary) ที่ link จริงใช้: Point = ของจุดแรกในรายการที่เกิด (ไม่ Points.Add ซ้ำ)
+            var aliasUsed = _s.Links.Where(l => !l.Auxiliary).SelectMany(l => new[] { l.Ends.A, l.Ends.B })
+                                    .Where(id => IsAlias(id) && AuxEnd(id) == null).Distinct().ToHashSet();
+            foreach (var p in _s.Points.Where(p => aliasUsed.Contains(p.Id)))
+                L($"        Point {Lc(p.Id)} = {AliasExpr(p.Id, new HashSet<string>())};   // {p.Id} ปลายจริง = จุดแรกที่เกิดใน {string.Join(", ", p.Def.Points ?? new())}");
             foreach (var l in _s.Links)
             {
                 var (a, b) = l.Ends;
@@ -375,7 +380,7 @@ public static class CodeGenerator
                 bool used = _s.Shapes.Any(sh => sh.Links.Contains(l.Id));
                 string skip = used ? $"        {lt} {Lc(l.Id)} = null;   // " : "        // ";
                 if (missing != null) { L($"{skip}{l.Id}: ไม่มีจุด {missing}"); continue; }
-                var aux = new[] { a, b }.FirstOrDefault(id => _s.Points.First(p => p.Id == id).Auxiliary);
+                var aux = new[] { a, b }.Select(AuxEnd).FirstOrDefault(id => id != null);
                 // เตือนเฉพาะเมื่อกิ่งของ link นี้เกิด (แบบในเว็บ)
                 string whenOn = l.Branch != null ? $"if ({Br(l.Branch)}) " : "";
                 if (aux != null)
@@ -418,8 +423,10 @@ public static class CodeGenerator
                     continue;
                 }
                 // มีเส้นโค้ง (Link[]) = ต่อ array ตามลำดับด้วย Join
-                bool arcs = sh.Links.Any(id => _s.Links.Any(l => l.Id == id && l.IsArc));
-                string list = arcs ? $"Join({string.Join(", ", sh.Links.Select(id => _s.Links.First(l => l.Id == id).IsArc ? Lc(id) : $"new[] {{ {Lc(id)} }}"))})"
+                // link optional (ต่อลงถึงดิน) = Opt(...) ข้ามเมื่อ null
+                bool Opt(string id) => _s.Links.Any(l => l.Id == id && l.Optional && !l.Auxiliary);
+                bool arcs = sh.Links.Any(id => _s.Links.Any(l => l.Id == id && l.IsArc) || Opt(id));
+                string list = arcs ? $"Join({string.Join(", ", sh.Links.Select(id => Opt(id) ? $"Opt({Lc(id)})" : _s.Links.First(l => l.Id == id).IsArc ? Lc(id) : $"new[] {{ {Lc(id)} }}"))})"
                                    : $"new[] {{ {string.Join(", ", sh.Links.Select(Lc))} }}";
                 L(ok ? $"        {shOn}AddShape(cs, \"{sh.Id}\", {list}{Codes(sh.Codes)});{BrNote(sh.Branch)}"
                      : $"        // {sh.Id}: มี link ที่ไม่มีอยู่จริง ข้าม");
@@ -429,6 +436,30 @@ public static class CodeGenerator
         }
 
         private bool Exists(string id) => _s.Points.Any(p => p.Id == id);
+        // ปลายจริง = จุด firstOf ที่เป็น auxiliary (ตรงกับ isAlias / auxEnd ใน spec.js)
+        private bool IsAlias(string id) => _s.Points.FirstOrDefault(p => p.Id == id) is { Auxiliary: true } p && p.Def.Type == "firstOf";
+        private string? AuxEnd(string id) => AuxEnd(id, new HashSet<string>());
+        private string? AuxEnd(string id, HashSet<string> seen)
+        {
+            var p = _s.Points.FirstOrDefault(x => x.Id == id);
+            if (p == null) return null;
+            if (!IsAlias(id)) return p.Auxiliary ? id : null;
+            if (!seen.Add(id)) return null;
+            return (p.Def.Points ?? new()).Any(m => AuxEnd(m, seen) != null) ? id : null;
+        }
+        // Point ของปลายจริง: P8 == null ? null : (P7 != null ? p7 : P3 != null ? p3 : null)
+        private string AliasExpr(string id, HashSet<string> seen)
+        {
+            seen.Add(id);
+            var members = (_s.Points.First(p => p.Id == id).Def.Points ?? new()).Where(m => Exists(m) && !seen.Contains(m)).ToList();
+            string chain = "null";
+            for (int i = members.Count - 1; i >= 0; i--)
+            {
+                string m = members[i], pt = IsAlias(m) ? $"({AliasExpr(m, seen)})" : Lc(m);
+                chain = $"{m} != null ? {pt} : {chain}";
+            }
+            return $"{id} == null ? null : ({chain})";
+        }
         private static IEnumerable<string?> LinkExprs(SpecLink l) => new[] { l.Radius, l.Seg?.Value };
 
         private void PointLine(SpecPoint p)
@@ -453,6 +484,8 @@ public static class CodeGenerator
                 "intersect" => ($"Intersect(cs, {Q}, {From(d.A1)}, {From(d.A2)}, {From(d.B1)}, {From(d.B2)})", $"{id} จุดตัด {d.A1}-{d.A2} กับ {d.B1}-{d.B2}"),
                 "offset" => ($"Offset(cs, {Q}, {From(d.A)}, {From(d.B)}, {(d.End == "b" ? From(d.B) : From(d.A))}, F * {(d.Side == -1 ? "-1.0" : "1.0")} * {Ex(d.Dist, "dist")})",
                              $"{id} offset ปลาย {(d.End == "b" ? d.B : d.A)} ของเส้น {d.A}-{d.B} ไปทาง{(d.Side == -1 ? "ขวา" : "ซ้าย")}ของทิศ {d.A}→{d.B}"),
+                "extendToGround" => ($"ExtendToGround(cs, {Q}, {SurfVar(d.Target)}, {From(d.From)}, {From(d.Along)}, {Ex(d.MaxDistance ?? "50", "maxDistance")})",
+                                     $"{id} ต่อเส้น {d.Along}→{d.From} ลงถึงดิน (ไม่ลอย / ไม่มีดิน = ไม่เกิด)"),
                 "tangent" => ($"Tangent(cs, {Q}, {From(d.Corner)}, {From(d.Toward)}, {From(d.Other)}, {Ex(d.Radius, "radius")})", $"{id} จุดสัมผัสของ Fillet ที่มุม {d.Corner}"),
                 "firstOf" => ($"FirstOf(cs, {Q}{string.Concat((d.Points ?? new()).Select(x => ", " + From(x)))})", $"{id} จุดแรกที่เกิดใน {string.Join(", ", d.Points ?? new())}"),
                 "external" => throw new FormatException($"{id}: จุดจากโค้ดเดิม (external) ใช้ได้กับไฟล์ที่เขียนเองเท่านั้น — รองรับใน Milestone 4"),
@@ -738,6 +771,54 @@ public static class CodeGenerator
         if (n < 1e-9) { Warn(cs, CorridorError.Failure, id + ": เส้นยาวเป็นศูนย์ หาทิศ offset ไม่ได้"); return null; }
         return Check(cs, id, new Pt(e.Value.X - dy * k / n, e.Value.Y + dx * k / n));
     }
+
+    // Extend to Surface: ต่อเส้น along→from เลย from ออกไป (ทิศเดิม) จนชนดิน — เฉพาะเมื่อปลาย from ลอยเหนือดิน
+    //   ไม่ลอย / ไม่มีดิน (Layout / ไม่มี target) = null เงียบๆ (link / shape ที่ใช้ = ไม่เกิด) · ไม่ชนดินภายใน maxDistance (ระยะราบ) = เตือน + null
+    private static Pt? ExtendToGround(CorridorState cs, string id, ObjectId surface, Pt? from, Pt? along, double maxDistance)
+    {
+        if (from == null || along == null || surface.IsNull) return null;
+        Pt f = from.Value;
+        double gy;
+        try
+        {
+            gy = Elevation(cs, surface, cs.CurrentOffset + f.X) - cs.CurrentElevation;
+        }
+        catch (Exception e)
+        {
+            Warn(cs, CorridorError.Failure, id + " ต่อลงถึงดิน: " + e.Message);
+            return null;
+        }
+        if (!(gy < f.Y - 1e-9)) return null;
+        double dx = f.X - along.Value.X, dy = f.Y - along.Value.Y;
+        if (Math.Abs(dx) < 1e-12 && Math.Abs(dy) < 1e-12) { Warn(cs, CorridorError.Failure, id + " ต่อลงถึงดิน: เส้นยาวเป็นศูนย์"); return null; }
+        Pt? hit = null;
+        if (Math.Abs(dx) < 1e-12)
+        {
+            if (dy < 0) hit = new Pt(f.X, gy);
+        }
+        else
+        {
+            try
+            {
+                IPoint h = cs.IntersectSurface(surface, cs.CurrentAlignmentId, Abs(cs, f), dx > 0, dy / Math.Abs(dx));
+                if (h != null) hit = new Pt(h.Offset - cs.CurrentOffset, h.Elevation - cs.CurrentElevation);
+            }
+            catch
+            {
+                hit = null;
+            }
+        }
+        if (hit == null || Math.Abs(hit.Value.X - f.X) > maxDistance + 1e-9)
+        {
+            Warn(cs, CorridorError.NoSideslopeIntersectFound, id + " ต่อลงถึงดิน: ไม่ชนผิวดินภายใน " + maxDistance + " m");
+            return null;
+        }
+        return Check(cs, id, hit.Value);
+    }
+
+    // link optional ใน shape (ต่อลงถึงดิน): ไม่เกิด / วาดไม่ได้ (null) = ข้ามไป
+    private static Link[] Opt(Link l) => l == null ? new Link[0] : new[] { l };
+    private static Link[] Opt(Link[] l) => l ?? new Link[0];
 
     // หมุนจุด p รอบ pivot ด้วยมุม angle (องศา ทวนเข็ม +) — สมาชิกกลุ่มหมุน
     private static Pt? Rotate(CorridorState cs, string id, Pt? p, Pt? pivot, double angle)

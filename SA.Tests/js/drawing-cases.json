@@ -1548,5 +1548,45 @@
       "shapes": [],
       "side": { "param": "Side", "mirror": true }
     }
-  }
+  },
+  {
+    "name": "Extend to Surface แบบ base rock-pitching: มุมฐานนอกลอย = ต่อลงถึงดิน · มุมฐานในจม = ไม่ต่อ · shape เดียวปิดได้ (Right)",
+    "surface": [{ "x": -30, "y": -1 }, { "x": 0, "y": -1.5 }, { "x": 30, "y": -6 }],
+    "spec": {
+      "className": "ExtendTrap", "namespace": "TestSubassembly",
+      "params": [
+        { "name": "Side", "kind": "long", "default": 0 },
+        { "name": "Width", "kind": "double", "default": 3 },
+        { "name": "Depth", "kind": "double", "default": 2, "positive": true },
+        { "name": "MaxExt", "kind": "double", "default": 50 }
+      ],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": ["Top"], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["Top"], "def": { "type": "delta", "from": "P1", "dx": "Width", "dy": "0" } },
+        { "id": "P3", "codes": ["Base"], "def": { "type": "delta", "from": "P2", "dx": "1", "dy": "-Depth" } },
+        { "id": "P4", "codes": ["Base"], "def": { "type": "delta", "from": "P1", "dx": "-1", "dy": "-Depth" } },
+        { "id": "P5", "codes": ["E3"], "def": { "type": "extendToGround", "from": "P3", "along": "P2", "target": "TargetSurface", "maxDistance": "MaxExt" } },
+        { "id": "P6", "codes": [], "auxiliary": true, "def": { "type": "firstOf", "points": ["P5", "P3"] } },
+        { "id": "P7", "codes": ["E4"], "def": { "type": "extendToGround", "from": "P4", "along": "P1", "target": "TargetSurface", "maxDistance": "MaxExt" } },
+        { "id": "P8", "codes": [], "auxiliary": true, "def": { "type": "firstOf", "points": ["P7", "P4"] } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Top"] },
+        { "id": "L2", "points": ["P2", "P3"], "codes": ["TrapSide"] },
+        { "id": "L5", "points": ["P3", "P5"], "codes": ["TrapSide"], "optional": true },
+        { "id": "L3", "points": ["P6", "P8"], "codes": ["TrapBase"] },
+        { "id": "L4", "points": ["P4", "P1"], "codes": ["TrapSide"] },
+        { "id": "L6", "points": ["P4", "P7"], "codes": ["TrapSide"], "optional": true }
+      ],
+      "shapes": [{ "id": "S1", "links": ["L1", "L2", "L5", "L3", "L6", "L4"], "codes": ["Trapezoid"] }],
+      "side": { "param": "Side", "mirror": true }
+    }
+  },
+  { "name": "Extend to Surface Side = Left (ผิวดินภาพกระจก)", "surface": [{ "x": 30, "y": -1 }, { "x": 0, "y": -1.5 }, { "x": -30, "y": -6 }], "values": { "Side": 1 }, "copySpecFrom": 61 },
+  { "name": "Extend to Surface ดินต่ำ -3 = ต่อทั้งสองมุม", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "copySpecFrom": 61 },
+  { "name": "Extend to Surface ดินสูง 0 = ไม่ต่อเลย (ไม่เตือน)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "copySpecFrom": 61 },
+  { "name": "Extend to Surface Layout mode = ไม่ต่อ (ไม่เตือน)", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "layout": true, "copySpecFrom": 61 },
+  { "name": "Extend to Surface ไม่ได้กำหนด Target Surface = ไม่ต่อ (ไม่เตือน)", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "surfaceAssigned": false, "copySpecFrom": 61 },
+  { "name": "Extend to Surface ไม่ชนดินภายใน MaxExt = 0.2 -> เตือน + shape ข้ามเส้นต่อ", "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": -8 }], "values": { "MaxExt": 0.2 }, "copySpecFrom": 61 }
 ]

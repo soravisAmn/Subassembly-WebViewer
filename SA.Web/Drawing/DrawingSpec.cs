@@ -91,9 +91,10 @@ public class PointDef
     public string? End { get; set; }                  // offset: ปลาย "a" | "b" ของเส้น A-B / ระยะ (นิพจน์) / ข้าง 1 = ซ้ายของทิศ A→B, -1 = ขวา
     public string? Dist { get; set; }
     public double? Side { get; set; }
+    public string? Along { get; set; }                // extendToGround: ต่อเส้น Along → From เลย From ลงถึงดิน
 
     // จุดที่ต้องคำนวณก่อน: ช่องอ้างจุด + รายการของ firstOf + จุดในนิพจน์ (P3.x, ground(P3), exists(P3)) — ตรงกับ refs ใน spec.js
-    public IEnumerable<string> Refs() => new[] { From, A, B, A1, A2, B1, B2, Corner, Toward, Other }.Where(r => !string.IsNullOrEmpty(r))
+    public IEnumerable<string> Refs() => new[] { From, A, B, A1, A2, B1, B2, Corner, Toward, Other, Along }.Where(r => !string.IsNullOrEmpty(r))
         .Concat(Type == "firstOf" ? Points ?? new() : new())
         .Concat(Exprs().SelectMany(SpecExpr.PointRefs)).Distinct()!;
 
@@ -119,6 +120,7 @@ public class SpecLink
     public bool Construction { get => false; set { if (value) Auxiliary = true; } }
     public List<string> Codes { get; set; } = new();
     public string? Branch { get; set; }
+    public bool Optional { get; set; }                // ใน shape: วาดไม่ได้ / ไม่เกิด = ข้ามไป (link ต่อของ Extend to Surface)
 
     public bool Follow => Type == "followSurface";
     public bool IsArc => Type is "arc3" or "arcR" or "fillet";

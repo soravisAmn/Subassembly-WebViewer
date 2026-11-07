@@ -18,10 +18,16 @@
 //   intersect      a1, a2, b1, b2              จุดตัดของเส้น a1-a2 กับเส้น b1-b2 (ต่อเส้นออกไปได้)
 //   offset         a, b, end, dist, side       ปลาย end ("a" | "b") ของเส้น a-b เลื่อนตั้งฉากไป dist (side 1 = ซ้ายของทิศ a→b ในกรอบ Side = Right, -1 = ขวา)
 //                                              (2 จุด offset ของปลายทั้งสอง = เส้นขนาน แบบ OFFSET ของ AutoCAD)
+//   extendToGround from, along, target, maxDistance   Extend to Surface: ต่อเส้น along→from เลย from ออกไป (ทิศเดิม) จนชนดิน
+//                                              เฉพาะเมื่อปลาย from ลอยเหนือดิน · ไม่ลอย / ไม่มีดิน = ไม่เกิด (เงียบ แบบกิ่งที่ไม่เกิด: off = GROUND_OFF)
+//                                              · ไม่ชนดินภายใน maxDistance (ระยะราบ) = เตือน + หาไม่ได้
 //   external       code                        จุดจากโค้ดเดิมของผู้ใช้ หาด้วย point code
 //   tangent        corner, toward, other, radius   จุดสัมผัสของ Fillet: บนเส้น corner→toward ห่าง radius / tan(α/2)
 //                                              (α = มุมระหว่างเส้น corner→toward กับ corner→other · ขนานกัน / รัศมีใหญ่เกินเส้น = เตือน + ใช้มุมแหลมเดิม)
 // ชนิด link: เส้นตรง { points: [a, b] } / วิ่งตามผิวดิน { type: "followSurface", from, to, target }
+//   optional: true = ใน shape ถ้า link นี้วาดไม่ได้ / ไม่เกิด ให้ข้ามไป (link ต่อของ Extend to Surface — shape เดียวปิดได้ทั้งตอนต่อ / ไม่ต่อ)
+//   ปลายเป็น "ปลายจริง" (จุด firstOf ที่เป็น auxiliary) = ใช้จุดแรกในรายการที่เกิด (C#: ตัวแปร Point ของจุดนั้น)
+//     ต่อได้เมื่อจุดในรายการเป็นจุดจริงทั้งหมด (มีจุด auxiliary = ข้าม + เตือน แบบปลาย auxiliary)
 //   เส้นโค้ง (1 link ใน spec = หลายท่อนตรงในโค้ดที่สร้าง เพราะ link ใน Civil 3D เป็นเส้นตรงเท่านั้น):
 //   arc3   { from, via, to, seg }                    ผ่าน 3 จุด (เรียงเส้นตรง = เตือน + เส้นตรง)
 //   arcR   { from, to, radius, sweep, large, seg }   เริ่ม-ปลาย-รัศมี · sweep "ccw" | "cw" ในกรอบ Side = Right · large = ทางยาว (> 180°)
@@ -46,7 +52,8 @@
 const Spec = (() => {
   const POINT_TYPES = {
     origin: "Origin", delta: "ห่างจากจุด (dx, dy)", polar: "ระยะ + มุม (polar)", slopeLength: "ลาด + ความยาว", slopeToSurface: "ลาดจนชนดิน",
-    onSurface: "บนผิวดิน", between: "บนเส้นระหว่าง 2 จุด", intersect: "จุดตัดของ 2 เส้น", offset: "Offset (เส้นขนาน)", external: "จุดจากโค้ดเดิม (point code)",
+    onSurface: "บนผิวดิน", between: "บนเส้นระหว่าง 2 จุด", intersect: "จุดตัดของ 2 เส้น", offset: "Offset (เส้นขนาน)",
+    extendToGround: "ต่อลงถึงดิน (Extend to Surface)", external: "จุดจากโค้ดเดิม (point code)",
     tangent: "จุดสัมผัส (Fillet)", firstOf: "จุดแรกที่เกิด (หลังกิ่ง)"
   };
   const LINK_TYPES = { straight: "เส้นตรง", followSurface: "วิ่งตามผิวดิน", arc3: "โค้งผ่าน 3 จุด", arcR: "โค้ง เริ่ม-ปลาย-รัศมี", fillet: "โค้ง Fillet" };
@@ -55,6 +62,8 @@ const Spec = (() => {
   const SEG_DEFAULT = { by: "chord", value: "0.05" };
   const SEG_MIN = 2, SEG_MAX = 180;
   const MEASURES = { along: "ตามแนวลาด", dx: "ระยะราบ", dy: "ระยะดิ่ง" };
+  // off ของจุดต่อลงถึงดินที่ไม่ต้องต่อ (ปลายไม่ลอย / ไม่มีดิน) — ไม่ใช่ id กิ่ง
+  const GROUND_OFF = "~ground";
 
   function newSpec(className){
     return {
@@ -75,8 +84,9 @@ const Spec = (() => {
 
   // ---------- โครงสร้าง ----------
   // จุดที่ def อ้างถึง: ช่องอ้างจุด (from, a, b, ...) + จุดในนิพจน์ (P3.x, ground(P3), exists(P3)) — ต้องคำนวณก่อน / ลบแล้วจุดนี้หาย
+  const REF_KEYS = ["from", "a", "b", "a1", "a2", "b1", "b2", "corner", "toward", "other", "along"];
   const refs = def => {
-    const r = ["from", "a", "b", "a1", "a2", "b1", "b2", "corner", "toward", "other"].map(k => def[k]).filter(Boolean);
+    const r = REF_KEYS.map(k => def[k]).filter(Boolean);
     if (def.type === "firstOf") for (const id of def.points || []) if (id && !r.includes(id)) r.push(id);
     for (const k of EXPR_FIELDS[def.type] || []) for (const id of Expr.pointRefsOf(def[k])) if (!r.includes(id)) r.push(id);
     return r;
@@ -87,6 +97,18 @@ const Spec = (() => {
   const byId = (list, id) => list.find(o => o.id === id) || null;
   const isAux = o => !!(o && (o.auxiliary || o.construction));
   const isAuxPoint = (spec, id) => isAux(byId(spec.points, id));
+  // "ปลายจริง": จุด firstOf ที่เป็น auxiliary — เป็นปลาย link จริงได้ (ใช้จุดแรกในรายการที่เกิด)
+  const isAlias = (spec, id) => { const p = byId(spec.points, id); return !!p && p.def.type === "firstOf" && isAux(p); };
+  // ปลาย link จริงที่ใช้ไม่ได้เพราะเป็น auxiliary: จุด aux ทั่วไป / ปลายจริงที่มีจุด aux ในรายการ — คืน id ของปลายนั้น หรือ null
+  function auxEnd(spec, id, seen){
+    const p = byId(spec.points, id);
+    if (!p) return null;
+    if (!isAlias(spec, id)) return isAux(p) ? id : null;
+    seen = seen || new Set();
+    if (seen.has(id)) return null;
+    seen.add(id);
+    return (p.def.points || []).some(m => auxEnd(spec, m, seen)) ? id : null;
+  }
   // construction (รุ่นก่อน) -> auxiliary — แก้ในที่ คืน spec เดิม (เรียกซ้ำได้)
   //   Max / Min (รอบ 4b ถูกเอาออกในรอบ 4c) -> ตัดทิ้ง จุดใช้ตำแหน่งตามนิยามเดิม · dropped = รายการจุดที่ถูกตัด (ไว้แจ้งผู้ใช้)
   function normalize(spec, dropped){
@@ -161,7 +183,7 @@ const Spec = (() => {
   }
   // จุดที่ต้องมีจริง (ไม่นับ exists(P) ที่แค่ถามว่าเกิดไหม)
   function strictRefs(def){
-    const r = ["from", "a", "b", "a1", "a2", "b1", "b2", "corner", "toward", "other"].map(k => def[k]).filter(Boolean);
+    const r = REF_KEYS.map(k => def[k]).filter(Boolean);
     for (const k of EXPR_FIELDS[def.type] || []) for (const id of Expr.pointRefsOf(def[k], true)) if (!r.includes(id)) r.push(id);
     return r;
   }
@@ -174,7 +196,7 @@ const Spec = (() => {
   }
   // ช่องนิพจน์ของ def แต่ละชนิด
   const EXPR_FIELDS = { delta: ["dx", "dy"], polar: ["length", "angle"], slopeLength: ["slope", "length"], slopeToSurface: ["slope", "maxDistance", "layoutLength"],
-                        onSurface: ["dx"], between: ["t"], tangent: ["radius"], offset: ["dist"] };
+                        onSurface: ["dx"], between: ["t"], tangent: ["radius"], offset: ["dist"], extendToGround: ["maxDistance"] };
   // ช่องนิพจน์ของ link (seg.value แยกต่างหาก)
   const LINK_EXPR_FIELDS = { arcR: ["radius"], fillet: ["radius"] };
 
@@ -380,6 +402,22 @@ const Spec = (() => {
           const e = d.end === "b" ? b : a, k = F * (d.side === -1 ? -1 : 1) * dist / n;
           return { x: e.x - dy * k, y: e.y + dx * k };
         }
+        case "extendToGround": {
+          // ต่อเส้น along→from เลย from จนชนดิน — ตรงกับ ExtendToGround ใน CodeGenerator.cs
+          const f = need(d.from), a = need(d.along);
+          const none = why => Object.assign(new Error(why), { off: GROUND_OFF });
+          if (!ground) throw none("ไม่ต่อ (ไม่มีผิวดิน)");
+          let gy;
+          try{ gy = ground.elev(f.x); }catch(e){ throw new Error(`ต่อลงถึงดิน: ${e.message}`); }
+          if (!(gy < f.y - 1e-9)) throw none(`ไม่ต่อ (ปลาย ${d.from} ไม่ลอยเหนือดิน)`);
+          const dx = f.x - a.x, dy = f.y - a.y, maxD = X(d.maxDistance ?? "50", "maxDistance");
+          if (Math.abs(dx) < 1e-12 && Math.abs(dy) < 1e-12) throw new Error(`ต่อลงถึงดิน: เส้น ${d.along}-${d.from} ยาวเป็นศูนย์`);
+          let hit = null;
+          if (Math.abs(dx) < 1e-12){ if (dy < 0) hit = { x: f.x, y: gy }; }
+          else { try{ hit = ground.intersect(f.x, f.y, Math.sign(dx), dy / Math.abs(dx)); }catch{ hit = null; } }
+          if (!hit || Math.abs(hit.x - f.x) > maxD + 1e-9) throw new Error(`ต่อลงถึงดิน: ไม่ชนผิวดินภายใน ${Expr.num(maxD)} m`);
+          return hit;
+        }
         case "tangent": {
           const c = need(d.corner), t = need(d.toward), o = need(d.other), R = X(d.radius, "radius");
           const r = tangentPoint(c, t, o, R);
@@ -418,8 +456,9 @@ const Spec = (() => {
         continue;
       }
       // link จริงที่ปลายเป็นจุด auxiliary: จุดนั้นไม่อยู่ใน Civil 3D (โค้ด C# ข้าม link นี้ + เตือนแบบเดียวกัน) · link auxiliary ต่อได้ทุกจุด
-      const aux = isAux(l), auxEnd = aux ? null : [a, b].find(id => isAuxPoint(spec, id));
-      if (auxEnd){ links[l.id] = { err: `ปลาย ${auxEnd} เป็นจุด auxiliary (ไม่อยู่ใน Civil 3D)`, auxEnd }; warn(l.id, `${l.id}: ${links[l.id].err}`); continue; }
+      // ปลายจริง (firstOf aux) ต่อได้ถ้าจุดในรายการเป็นจุดจริงทั้งหมด (พิกัด = จุดแรกที่เกิดอยู่แล้ว)
+      const aux = isAux(l), ae = aux ? null : [a, b].map(id => auxEnd(spec, id)).find(Boolean);
+      if (ae){ links[l.id] = { err: `ปลาย ${ae} เป็นจุด auxiliary (ไม่อยู่ใน Civil 3D)`, auxEnd: ae }; warn(l.id, `${l.id}: ${links[l.id].err}`); continue; }
       let path = [A, B], arc = null;
       if (l.type === "followSurface"){
         if (ground) path = [A, ...ground.between(A.x, B.x), B];
@@ -452,12 +491,15 @@ const Spec = (() => {
       const so = offOf(s);
       if (so){ shapes[s.id] = so; continue; }
       // link ที่ไม่เกิด (กิ่งอื่น) ใน shape ที่เกิด = ข้าม + เตือน (โค้ด C# AddShape เตือนแบบเดียวกัน)
-      const bad = s.links.find(id => !links[id] || links[id].err);
+      // link optional (ต่อลงถึงดิน) ที่วาดไม่ได้ / ไม่เกิด = ข้ามไปเฉยๆ (C#: Opt)
+      const optional = id => { const l = byId(spec.links, id); return !!(l && l.optional && !isAux(l)); };
+      const use = s.links.filter(id => !(optional(id) && links[id] && links[id].err));
+      const bad = use.find(id => !links[id] || links[id].err);
       if (bad){ shapes[s.id] = { err: `ข้ามเพราะ link ${bad} วาดไม่ได้` }; warn(s.id, `${s.id}: ${shapes[s.id].err}`); continue; }
       // shape ใน Civil 3D ประกอบจาก link จริงเท่านั้น
-      const ax = s.links.find(id => links[id].aux);
+      const ax = s.links.find(id => links[id] && links[id].aux);
       if (ax){ shapes[s.id] = { err: `ใช้ link auxiliary ${ax} ไม่ได้ (ไม่อยู่ใน Civil 3D)`, auxLink: ax }; warn(s.id, `${s.id}: ${shapes[s.id].err}`); continue; }
-      const poly = chain(s.links.map(id => links[id].path));
+      const poly = chain(use.map(id => links[id].path));
       if (!poly) warn(s.id, `${s.id}: link ต่อกันไม่เป็นรูปปิด`);
       shapes[s.id] = { poly };
     }
@@ -999,6 +1041,46 @@ const Spec = (() => {
     return { a, b, link: nl.id };
   }
 
+  // ---------- Extend to Surface (รอบ 4c) ----------
+  // ต่อ link เส้นตรง id ที่ปลาย end ลงถึงดิน (เมื่อปลายลอย): จุด extendToGround + link ต่อ (optional ใน shape, code = code ของเส้นเดิม)
+  //   + จุด "ปลายจริง" (firstOf [จุดต่อ, end] auxiliary) · opt.rewire (ปกติ true) = link อื่นที่ต่อที่ end ย้ายไปต่อที่ปลายจริง
+  //   shape ที่ใช้เส้นเดิม = แทรก link ต่อถัดจากเส้นเดิม → shape เดียวปิดได้ทั้งตอนต่อ / ไม่ต่อ
+  //   opt = { codes (ของ link ต่อ), pointCodes, target, maxDistance, rewire } · คืน { point, link, tip, rewired } หรือ { error }
+  function addExtendToGround(spec, id, end, opt){
+    opt = opt || {};
+    const l = byId(spec.links, id), e = straightEnds(l);
+    if (!e) return { error: "Extend to Surface ได้เฉพาะ link เส้นตรง" };
+    if (!e.includes(end)) return { error: `${end} ไม่ใช่ปลายของ ${id}` };
+    const along = e.find(p => p !== end);
+    if (!along) return { error: "link ยาวเป็นศูนย์" };
+    const target = opt.target || (spec.targets[0] || {}).name || "TargetSurface";
+    const aux = isAux(l);
+    const P = addPoint(spec, { type: "extendToGround", from: end, along, target, maxDistance: String(opt.maxDistance ?? "50") }, (opt.pointCodes || []).slice(), aux);
+    const nl = { id: nextId(spec, "L"), points: [end, P], codes: (opt.codes || l.codes || []).slice(), optional: true, ...(aux ? { auxiliary: true } : {}) };
+    spec.links.splice(spec.links.indexOf(l) + 1, 0, nl);
+    const tip = addPoint(spec, { type: "firstOf", points: [P, end] }, [], true);
+    if (l.branch) for (const o of [byId(spec.points, P), nl, byId(spec.points, tip)]) o.branch = l.branch;
+    // link อื่นที่ต่อที่ end -> ต่อที่ปลายจริงแทน
+    const rewired = [];
+    if (opt.rewire !== false)
+      for (const o of spec.links){
+        if (o === l || o === nl || (aux && !isAux(o))) continue;     // เส้นเดิมเป็น aux: ไม่ย้าย link จริง (ปลายจริงมีจุด aux = ต่อไม่ได้)
+        if (o.points && o.points.includes(end)){ o.points = o.points.map(p => p === end ? tip : p); rewired.push(o.id); }
+        else if (!o.points && (o.from === end || o.to === end) && !isArc(o)){ if (o.from === end) o.from = tip; if (o.to === end) o.to = tip; rewired.push(o.id); }
+      }
+    // shape: แทรก link ต่อระหว่างเส้นเดิมกับขอบถัดไปที่ต่อที่ปลายนั้น
+    for (const s of spec.shapes){
+      const i = s.links.indexOf(id), n = s.links.length;
+      if (i < 0) continue;
+      const nb = k => byId(spec.links, s.links[(k + n) % n]);
+      const atTip = o => !!o && linkEnds(o).includes(tip);
+      if (atTip(nb(i - 1)) && !atTip(nb(i + 1))) s.links.splice(i, 0, nl.id);
+      else s.links.splice(i + 1, 0, nl.id);
+    }
+    if (spec.polygons) spec.polygons = spec.polygons.filter(g => !g.links.includes(id) && !g.links.some(x => rewired.includes(x)));
+    return { point: P, link: nl.id, tip, rewired };
+  }
+
   // ---------- สลับ Auxiliary ----------
   // แผนสลับ point / link: { points, links (รวม link จริงที่ต้องเป็น aux ด้วยเพราะปลายเป็นจุดที่จะเป็น aux), hitLinks, shapes (ที่ต้องเอา link ออก) }
   function auxPlan(spec, objs, on){
@@ -1033,7 +1115,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           isAux, isAuxPoint, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
+           isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();

@@ -12,10 +12,10 @@ const Ops = (() => {
   const REFS = ["from", "a", "b", "a1", "a2", "b1", "b2", "corner", "toward", "other"];
   // จุดที่ตามไปเองเมื่อจุดที่อ้างถึงย้ายทั้งหมด
   const FOLLOW = { delta: d => [d.from], polar: d => [d.from], slopeLength: d => [d.from], between: d => [d.a, d.b], intersect: d => [d.a1, d.a2, d.b1, d.b2],
-                   tangent: d => [d.corner, d.toward, d.other] };
+                   tangent: d => [d.corner, d.toward, d.other], offset: d => [d.a, d.b] };
   const WHY = { origin: "เป็นจุด origin", slopeToSurface: "ลาดจนชนดิน (ตำแหน่งขึ้นกับผิวดิน)", onSurface: "อยู่บนผิวดิน",
                 between: "อยู่บนเส้นของจุดที่ไม่ได้ย้าย", intersect: "เป็นจุดตัดของเส้นที่ไม่ได้ย้ายทั้งหมด", external: "เป็นจุดของโค้ดเดิม",
-                tangent: "เป็นจุดสัมผัสของ Fillet ที่มุม / เส้นไม่ได้ย้ายทั้งหมด" };
+                tangent: "เป็นจุดสัมผัสของ Fillet ที่มุม / เส้นไม่ได้ย้ายทั้งหมด", offset: "เป็นเส้นขนาน (Offset) ของเส้นที่ไม่ได้ย้ายทั้งหมด" };
   const num = v => Expr.num(v);
 
   // ชุดที่เลือก -> จุด / link / shape ทั้งหมดที่เกี่ยว (ปลาย link, link ของ shape)

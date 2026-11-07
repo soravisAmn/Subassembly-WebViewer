@@ -88,6 +88,9 @@ public class PointDef
     public string? Other { get; set; }
     public string? Radius { get; set; }
     public List<string>? Points { get; set; }         // firstOf: จุดแรกในรายการที่เกิด
+    public string? End { get; set; }                  // offset: ปลาย "a" | "b" ของเส้น A-B / ระยะ (นิพจน์) / ข้าง 1 = ซ้ายของทิศ A→B, -1 = ขวา
+    public string? Dist { get; set; }
+    public double? Side { get; set; }
 
     // จุดที่ต้องคำนวณก่อน: ช่องอ้างจุด + รายการของ firstOf + จุดในนิพจน์ (P3.x, ground(P3), exists(P3)) — ตรงกับ refs ใน spec.js
     public IEnumerable<string> Refs() => new[] { From, A, B, A1, A2, B1, B2, Corner, Toward, Other }.Where(r => !string.IsNullOrEmpty(r))
@@ -95,7 +98,7 @@ public class PointDef
         .Concat(Exprs().SelectMany(SpecExpr.PointRefs)).Distinct()!;
 
     // ช่องนิพจน์ทั้งหมดของ def (ที่ไม่ว่าง)
-    public IEnumerable<string> Exprs() => new[] { Dx, Dy, Slope, Length, Angle, MaxDistance, LayoutLength, T, Radius }.Where(e => !string.IsNullOrWhiteSpace(e))!;
+    public IEnumerable<string> Exprs() => new[] { Dx, Dy, Slope, Length, Angle, MaxDistance, LayoutLength, T, Radius, Dist }.Where(e => !string.IsNullOrWhiteSpace(e))!;
 }
 
 public class SpecLink

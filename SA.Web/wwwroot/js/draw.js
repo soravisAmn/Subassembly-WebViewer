@@ -10,11 +10,13 @@
 // aux = โหมด Auxiliary ของชิ้นที่กำลังจะสร้าง (X สลับ — ใช้กับ AUX_TOOLS)
 // branch = "วาดลงกิ่ง" (B): object ที่สร้างด้วยเครื่องมือวาดเข้ากิ่งนี้ (null = เกิดเสมอ)
 const draw = { tool: null, chain: [], cand: null, mouse: null, typing: false, list: [], cyc: null, lastCyc: null, lastPx: null, lastPy: null, aux: false, branch: null };
-const AUX_TOOLS = ["point", "link", "polygon", "ngon", "arc", "fillet"];
+const AUX_TOOLS = ["point", "link", "polygon", "ngon", "arc", "fillet", "intersect", "offset"];
+// เครื่องมือที่คลิกบน link (ไม่ใช่ snap จุด)
+const LINK_TOOLS = ["fillet", "intersect", "offset"];
 const auxDrawing = () => draw.aux && AUX_TOOLS.includes(draw.tool);
 // X ระหว่างวาด: สลับโหมด Auxiliary ของชิ้นที่กำลังจะสร้าง (จุด / link ที่สร้างใหม่ = aux · จุดเดิมที่ snap ไม่เปลี่ยน)
 function toggleDrawAux(){
-  if (!AUX_TOOLS.includes(draw.tool)) return flashBanner(`X (Auxiliary) ใช้กับ Point / Link / Polygon / Arc / Fillet — ${TOOL_NAMES[draw.tool]} ไม่มีโหมดนี้`);
+  if (!AUX_TOOLS.includes(draw.tool)) return flashBanner(`X (Auxiliary) ใช้กับ Point / Link / Polygon / Arc / Fillet / Intersect / Offset — ${TOOL_NAMES[draw.tool]} ไม่มีโหมดนี้`);
   draw.aux = !draw.aux;
   showBanner(drawBanner()); refreshSnap();
 }
@@ -74,13 +76,15 @@ function chooseDrawBranch(){
 const branchPath = (sp, id) => Spec.branchChain(sp, id).reverse().map(b => Spec.branchLabel(sp, b)).join(" › ");
 let drawRes = {};                  // item id -> ผล Spec.evaluate (เทียบ origin) จาก render ล่าสุด
 const TOOL_NAMES = { point: "Point", link: "Link", shape: "Shape", daylight: "Slope to Surface", follow: "Follow Surface", polygon: "Polygon", ngon: "Regular Polygon",
-                     arc: "Arc", fillet: "Fillet", cutfill: "Daylight Cut/Fill" };
+                     arc: "Arc", fillet: "Fillet", intersect: "Intersect", offset: "Offset", cutfill: "Daylight Cut/Fill" };
 // Polygon ด้านเท่า: จำนวนด้าน / โหมดที่ใช้ล่าสุด (inscribed = รัศมีถึงมุม · circumscribed = รัศมีถึงกึ่งกลางด้าน)
 const ngonOpt = () => (state.ngon ||= { n: 5, mode: "inscribed" });
 // Arc: โหมด 3p = ผ่าน 3 จุด · ser = เริ่ม-ปลาย-รัศมี (สลับระหว่างวาดด้วย T / E แบบตัวเลือกใน banner ของ AutoCAD)
 const arcOpt = () => (state.arc ||= { mode: "3p" });
 // Fillet: รัศมีที่ใช้ล่าสุด (นิพจน์ / ชื่อ parameter ได้)
 const filletOpt = () => (state.fillet ||= { r: "0.5" });
+// Offset: ระยะที่ใช้ล่าสุด (นิพจน์ / ชื่อ parameter ได้ เช่น RockThickness)
+const offsetOpt = () => (state.offset ||= { d: "0.5" });
 const OSNAP_LABEL = { end: "Endpoint", mid: "Midpoint", cen: "Center", int: "Intersection", surf: "Surface", perp: "Perpendicular", near: "Nearest", ray: "ลาดชนดิน", trk: "Tracking" };
 
 // ---------------- spec ของ item ----------------
@@ -207,7 +211,7 @@ function deleteDrawnSet(it, list){
 function setTool(t){
   if (t && !state.editing) return;
   if (t && cmd.name) endCmd();
-  draw.tool = t; draw.chain = []; draw.cand = null; draw.hover = null; draw.list = []; draw.lastCyc = null; closeTyping(); tip.style.display = "none";
+  draw.tool = t; draw.chain = []; draw.cand = null; draw.hover = null; draw.ix = null; draw.list = []; draw.lastCyc = null; closeTyping(); tip.style.display = "none";
   if (!t) document.body.classList.remove("aux-mode");
   trackClear();                                   // จบ / เปลี่ยนเครื่องมือ = ล้างจุดที่จับไว้ (แบบ AutoCAD)
   for (const b of document.querySelectorAll("#drawer [data-tool]")) b.classList.toggle("on", b.dataset.tool === t);
@@ -228,12 +232,16 @@ function drawBanner(){
     arc: arcBanner(),
     fillet: `Fillet R = ${filletOpt().r}: ` + (draw.chain.length ? `คลิก link ที่ 2 (ต่อกับ ${draw.chain[0]} ที่มุม)` : "คลิก link ที่ 1") + " · Tab / พิมพ์ = เปลี่ยน R"
             + (auxDrawing() ? " · Auxiliary = โค้งช่วยสร้างทับมุมเดิม (เส้นเดิมไม่เปลี่ยน)" : ""),
+    intersect: draw.chain.length === 2 && draw.ix ? `Intersect ${draw.chain[0]} กับ ${draw.chain[1]}: [T] ตัด / ยืดเส้นให้จบที่จุดตัด · [N] ไม่ตัด (ได้แค่จุดตัด)`
+             : "Intersect: " + (draw.chain.length ? `คลิก link ที่ 2 (ตัดกับ ${draw.chain[0]})` : "คลิก link เส้นตรงที่ 1 (ฝั่งที่คลิก = ฝั่งที่เก็บไว้ถ้าเลือกตัด)")
+               + (auxDrawing() ? " · Auxiliary = จุดตัดช่วยสร้าง (ใช้กับ ไม่ตัด)" : ""),
+    offset: `Offset ระยะ = ${offsetOpt().d}: ` + (draw.chain.length ? `คลิกด้านที่จะวางเส้นขนานของ ${draw.chain[0]}` : "คลิก link เส้นตรง") + " · Tab / พิมพ์ = เปลี่ยนระยะ",
     cutfill: "Daylight Cut/Fill: คลิกจุดไหล่ (ไหล่คันดิน / ขอบไหล่ทาง — จุดที่วาดแล้ว)"
   }[draw.tool];
   document.body.classList.toggle("aux-mode", auxDrawing());
   // โหมด Auxiliary: ป้ายชัดๆ หน้าข้อความ (X = สลับ)
   const br = draw.tool !== "cutfill" && drawBranch() ? `▶ กิ่ง ${branchPath(editItem().spec, draw.branch)} · ` : "";
-  return br + (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (draw.tool === "cutfill" ? "" : " · Tab = พิมพ์ค่า")
+  return br + (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (["cutfill", "intersect", "offset", "fillet"].includes(draw.tool) ? "" : " · Tab = พิมพ์ค่า")
        + (AUX_TOOLS.includes(draw.tool) ? ` · X = ${draw.aux ? "กลับเป็นของจริง" : "Auxiliary"}` : "") + " · Esc = ยกเลิก";
 }
 function arcBanner(){
@@ -490,6 +498,19 @@ function drawMove(px, py){
     render();
     return showTip(px, py, draw.hover ? `${draw.hover} · R = ${filletOpt().r}` : "ชี้ที่ link เส้นตรง");
   }
+  if (draw.tool === "intersect"){
+    if (draw.ix) return;                                // รอเลือก ตัด / ไม่ตัด
+    draw.hover = filletLinkAt(draw.mouse);
+    render();
+    return showTip(px, py, draw.hover || "ชี้ที่ link เส้นตรง");
+  }
+  if (draw.tool === "offset"){
+    draw.hover = draw.chain.length ? null : filletLinkAt(draw.mouse);
+    render();
+    const g = draw.chain.length ? offsetPreview() : null;
+    return showTip(px, py, draw.chain.length ? (g ? `ไปทาง${g.side * g.F === 1 ? "ซ้าย" : "ขวา"}ของทิศ ${g.a}→${g.b} · ระยะ ${offsetOpt().d}` : "หาระยะ / ทิศไม่ได้")
+                                             : draw.hover ? `${draw.hover} · ระยะ ${offsetOpt().d}` : "ชี้ที่ link เส้นตรง");
+  }
   draw.cand = snapAt(draw.mouse);
   render();
   drawTip(px, py);
@@ -518,6 +539,8 @@ function drawClick(px, py){
   const it = editItem(); if (!it) return;
   draw.mouse = drawLocal(px, py);
   if (draw.tool === "fillet") return filletClick();
+  if (draw.tool === "intersect") return intersectClick();
+  if (draw.tool === "offset") return offsetClick();
   const c = snapAt(draw.mouse);
   if (!c) return;
   // Arc เริ่ม-ปลาย-รัศมี คลิกที่สาม = รัศมี / ทิศจากตำแหน่งเมาส์ (โค้งผ่านจุดนั้น)
@@ -604,6 +627,7 @@ function commitInSpec(spec, make, t, before){
   }
 }
 function finishChain(){
+  if (draw.ix) return;                                  // Intersect รอเลือก ตัด / ไม่ตัด (ไม่มีค่า default)
   if (draw.tool === "shape" && draw.chain.length >= 3) return finishShape();
   if (draw.tool === "polygon" && draw.chain.length >= 3) return closePolygon();
   draw.chain = []; showBanner(drawBanner()); render();
@@ -685,6 +709,109 @@ function filletClick(){
            null, `Fillet ${first} กับ ${id} R = ${R}${opt.overlay ? " (Auxiliary)" : ""}`);
   showBanner(drawBanner());
   if (kept) flashBanner(`จุดมุม ${kept} มี point code จึงยังเพิ่มลง Civil 3D (ติ๊ก "Auxiliary (ช่วยสร้าง)" ใน Properties ถ้าไม่ต้องการ)`);
+}
+
+// ---------------- Intersect (รอบ 4c) ----------------
+// คลิก link เส้นตรง 2 เส้น → ขึ้นทางเลือกเสมอ (ไม่มีค่า default): [T] ตัด / ยืดเส้นให้จบที่จุดตัด · [N] ไม่ตัด (ได้แค่จุดตัด) · Esc = ยกเลิก
+// ตัด: แต่ละเส้นเก็บปลายฝั่งที่คลิก (เทียบกับจุดตัด) อีกปลายแทนด้วยจุดตัด — จุดตัดอยู่เลยปลายเส้น = ยืดเส้นออกไป
+// draw.chain = [{ id, t }] (t = ตำแหน่งที่คลิกบนเส้น 0..1) · draw.ix = ผลที่รอเลือก
+function linkClickT(id){
+  const q = drawRes[editItem().id].links[id];
+  return Spec.projectSeg(q.path[0], q.path[1], draw.mouse).t;
+}
+function intersectClick(){
+  if (draw.ix) return;                                  // รอเลือก ตัด / ไม่ตัด
+  const it = editItem(), r = drawRes[it.id], id = filletLinkAt(draw.mouse);
+  if (!id) return flashBanner("Intersect ได้เฉพาะ link เส้นตรง — คลิกบนเส้น");
+  if (!draw.chain.length || draw.chain[0].id === id){ draw.chain = [{ id, t: linkClickT(id) }]; showBanner(drawBanner()); return render(); }
+  const c1 = draw.chain[0], c2 = { id, t: linkClickT(id) };
+  const test = Spec.addIntersect(JSON.parse(JSON.stringify(it.spec)), c1.id, c2.id, {});
+  if (test.error){ draw.chain = []; showBanner(drawBanner()); render(); return flashBanner(test.error); }
+  const P1 = r.links[c1.id].path, P2 = r.links[c2.id].path, X = Spec.lineX(P1[0], P1[1], P2[0], P2[1]);
+  if (!X){ draw.chain = []; showBanner(drawBanner()); render(); return flashBanner(`${c1.id} กับ ${c2.id} ขนานกัน ไม่มีจุดตัด`); }
+  // ปลายที่เก็บ: ฝั่งเดียวกับที่คลิก เมื่อเทียบกับจุดตัด (tX = ตำแหน่งของจุดตัดบนเส้น ต่อออกไปได้)
+  const keepOf = (c, P) => {
+    const l = Spec.byId(it.spec.links, c.id), dx = P[1].x - P[0].x, dy = P[1].y - P[0].y;
+    const tX = ((X.x - P[0].x) * dx + (X.y - P[0].y) * dy) / (dx * dx + dy * dy);
+    return c.t < tX ? l.points[0] : l.points[1];
+  };
+  draw.chain = [c1.id, c2.id];
+  draw.ix = { l1: c1.id, l2: c2.id, keep1: keepOf(c1, P1), keep2: keepOf(c2, P2), x: X.x, y: X.y };
+  showBanner(drawBanner()); render();
+  openIntersectChoice();
+}
+// หน้าต่างเล็กตรงจุดตัด: ปุ่ม ตัด / ไม่ตัด (กด T / N ได้) — ไม่มีปุ่มที่ Enter เลือกให้
+function openIntersectChoice(){
+  const box = $("dyn"), ix = draw.ix, r = drawRes[editItem().id];
+  draw.typing = true;
+  box.innerHTML = `<div class="dyn-h">Intersect ${esc(ix.l1)} กับ ${esc(ix.l2)} · Esc = ยกเลิก</div>
+    <div class="ix-choice"><button type="button" data-k="t"><b>[T]</b> ตัด / ยืดเส้นให้จบที่จุดตัด</button>
+    <button type="button" data-k="n"><b>[N]</b> ไม่ตัด (ได้แค่จุดตัด)</button></div>`;
+  box.tabIndex = -1;
+  box.onkeydown = e => {
+    const k = e.key.toLowerCase();
+    if (k === "t" || k === "n"){ e.preventDefault(); intersectCommit(k === "t"); }
+    else if (e.key === "Escape"){ e.preventDefault(); intersectCancel(); }
+    else if (e.key === "Enter") e.preventDefault();          // ไม่มีค่า default
+    e.stopPropagation();
+  };
+  for (const b of box.querySelectorAll("[data-k]")) b.onclick = () => intersectCommit(b.dataset.k === "t");
+  const mr = main.getBoundingClientRect();
+  box.style.left = Math.max(4, Math.min(mr.width - 330, sx(r.ox + ix.x) + 14)) + "px";
+  box.style.top = Math.max(4, Math.min(mr.height - 120, sy(r.oy + ix.y) + 14)) + "px";
+  box.hidden = false; tip.style.display = "none";
+  box.focus();
+}
+const closeIntersectChoice = () => closeTyping();
+function intersectCancel(){
+  closeIntersectChoice(); draw.ix = null; draw.chain = [];
+  showBanner(drawBanner()); render();
+}
+function intersectCommit(trim){
+  const ix = draw.ix; if (!ix) return;
+  closeIntersectChoice(); draw.ix = null; draw.chain = [];
+  // ตัด: จุดตัดเป็นปลายของ link จริง จึงเป็น auxiliary ไม่ได้ (link ทั้งสองเป็น auxiliary = จุดตัด auxiliary เอง)
+  const aux = auxDrawing() && !trim, opt = trim ? { trim: true, keep1: ix.keep1, keep2: ix.keep2 } : { aux };
+  let res = null;
+  specEdit(spec => { res = Spec.addIntersect(spec, ix.l1, ix.l2, opt); if (res.point) state.sel = { type:"dpt", item: state.editing, id: res.point }; },
+           null, `Intersect ${ix.l1} กับ ${ix.l2}${trim ? " (ตัด / ยืด)" : ""}${aux ? " (Auxiliary)" : ""}`);
+  showBanner(drawBanner());
+  if (res && res.error) return flashBanner(res.error);
+  if (res && res.kept.length) flashBanner(`ปลายเดิม ${res.kept.join(", ")} มี point code จึงยังเพิ่มลง Civil 3D (ติ๊ก "Auxiliary (ช่วยสร้าง)" ใน Properties ถ้าไม่ต้องการ)`);
+  else if (trim && auxDrawing()) flashBanner("ตัด / ยืด: จุดตัดเป็นปลายของ link จริง จึงเป็นของจริง (Auxiliary ใช้กับ ไม่ตัด)");
+}
+
+// ---------------- Offset (รอบ 4c) ----------------
+// ตั้งระยะ (Tab / พิมพ์ — นิพจน์ / ชื่อ parameter ได้) → คลิก link เส้นตรง → คลิกด้าน = 2 จุด offset + link ใหม่ (ทำซ้ำได้จน Esc แบบ OFFSET ของ AutoCAD)
+// ด้านเก็บในกรอบ Side = Right (side 1 = ซ้ายของทิศ a→b) · X = Auxiliary (ต้องติ๊กเอง ไม่ตามเส้นเดิม)
+function offsetPreview(){
+  const it = editItem(), r = drawRes[it.id], id = draw.chain[0], l = Spec.byId(it.spec.links, id), q = r.links[id];
+  if (!l || !q || q.err || !draw.mouse) return null;
+  const [A, B] = q.path, dx = B.x - A.x, dy = B.y - A.y, n = Math.hypot(dx, dy);
+  let d;
+  try{ d = Expr.value(offsetOpt().d, r.env, {}); }catch{ return null; }
+  if (!(n > 1e-9) || !isFinite(d) || Math.abs(d) < 1e-12) return null;
+  const cross = dx * (draw.mouse.y - A.y) - dy * (draw.mouse.x - A.x), left = cross >= 0 ? 1 : -1;
+  // ระยะติดลบ = กลับด้าน · side ในกรอบ Side = Right = ด้านบนจอ × F
+  const side = left * Math.sign(d) * r.flip, k = left * Math.abs(d) / n;
+  const off = p => ({ x: p.x - dy * k, y: p.y + dx * k });
+  return { side, F: r.flip, a: l.points[0], b: l.points[1], A: off(A), B: off(B) };
+}
+function offsetClick(){
+  const it = editItem(), id = draw.chain.length ? null : filletLinkAt(draw.mouse);
+  if (!draw.chain.length){
+    if (!id) return flashBanner("Offset ได้เฉพาะ link เส้นตรง — คลิกบนเส้น");
+    draw.chain = [id]; showBanner(drawBanner()); return render();
+  }
+  const g = offsetPreview(), src = draw.chain[0], D = offsetOpt().d;
+  if (!g) return flashBanner(`ระยะ ${D} ใช้ไม่ได้ (ต้องไม่เป็น 0) — Tab = เปลี่ยนระยะ`);
+  const aux = auxDrawing();
+  const test = Spec.addOffset(JSON.parse(JSON.stringify(it.spec)), src, D, g.side, { aux });
+  draw.chain = [];
+  if (test.error){ showBanner(drawBanner()); render(); return flashBanner(test.error); }
+  specEdit(spec => { const o = Spec.addOffset(spec, src, D, g.side, { aux }); state.sel = { type:"dlink", item: state.editing, id: o.link }; },
+           null, `Offset ${src} ระยะ ${D}${aux ? " (Auxiliary)" : ""}`);
+  showBanner(drawBanner());
 }
 
 // ---------------- Polygon ด้านเท่า ----------------
@@ -798,11 +925,12 @@ function commitNgonTyping(){
 // ---------------- พิมพ์รัศมี (Fillet / Arc เริ่ม-ปลาย-รัศมี) ----------------
 // R เป็นนิพจน์ / ชื่อ parameter ได้ · ปุ่ม + = สร้าง parameter ใหม่จากค่าในช่อง · Arc: ติ๊กตามเข็ม / ทางยาว (กรอบ Side = Right)
 function openRadiusTyping(first){
-  const it = editItem(), box = $("dyn"), fil = draw.tool === "fillet";
+  // Offset ใช้ช่องเดียวกัน (ระยะ แทน รัศมี)
+  const it = editItem(), box = $("dyn"), ofs = draw.tool === "offset", fil = draw.tool === "fillet" || ofs;
   const g = fil ? null : arcFromMouse(draw.cand);
   draw.typing = true;
-  box.innerHTML = `<div class="dyn-h">${fil ? "Fillet: รัศมีที่ใช้กับมุมถัดไป" : "Arc เริ่ม-ปลาย-รัศมี · เว้นว่าง = ค่าจากเมาส์ · ทิศในกรอบ Side = Right"} · Enter = ตกลง · Esc = ยกเลิก</div>
-    <label>R<input data-f="r" placeholder="${fil ? esc(filletOpt().r) : g ? f3(g.R) : ""}"><button type="button" class="dyn-par" data-p="r" title="สร้าง parameter ใหม่จากช่องนี้">+</button></label>`
+  box.innerHTML = `<div class="dyn-h">${ofs ? "Offset: ระยะของเส้นขนาน (ด้าน = ตามเมาส์)" : fil ? "Fillet: รัศมีที่ใช้กับมุมถัดไป" : "Arc เริ่ม-ปลาย-รัศมี · เว้นว่าง = ค่าจากเมาส์ · ทิศในกรอบ Side = Right"} · Enter = ตกลง · Esc = ยกเลิก</div>
+    <label>${ofs ? "ระยะ" : "R"}<input data-f="r" placeholder="${ofs ? esc(offsetOpt().d) : fil ? esc(filletOpt().r) : g ? f3(g.R) : ""}"><button type="button" class="dyn-par" data-p="r" title="สร้าง parameter ใหม่จากช่องนี้">+</button></label>`
     + (fil ? "" : `<label class="dyn-chk"><input type="checkbox" data-f="cw"${g && g.sweep === "cw" ? " checked" : ""}> ตามเข็ม</label>
                    <label class="dyn-chk"><input type="checkbox" data-f="large"${g && g.large ? " checked" : ""}> ทางยาว (&gt; 180°)</label>`);
   const inp = box.querySelector("[data-f=r]"), names = () => specNames(it);
@@ -814,7 +942,7 @@ function openRadiusTyping(first){
     e.stopPropagation();
   });
   box.querySelector(".dyn-par").onclick = () => {
-    const name = newParamFromValue(it, inp.value.trim() || inp.placeholder, "R");
+    const name = newParamFromValue(it, inp.value.trim() || inp.placeholder, ofs ? "OffsetDist" : "R");
     if (name){ inp.value = name; check(); }
     inp.focus();
   };
@@ -829,7 +957,11 @@ function commitRadiusTyping(){
   const box = $("dyn"), inp = box.querySelector("[data-f=r]");
   if (inp.classList.contains("bad")) return inp.focus();
   const v = inp.value.trim();
-  if (/^-?[\d.]+$/.test(v) && +v <= 0){ inp.classList.add("bad"); inp.title = "รัศมีต้องมากกว่า 0"; return inp.focus(); }
+  if (/^-?[\d.]+$/.test(v) && +v <= 0){ inp.classList.add("bad"); inp.title = draw.tool === "offset" ? "ระยะต้องมากกว่า 0 (ด้านเลือกด้วยเมาส์)" : "รัศมีต้องมากกว่า 0"; return inp.focus(); }
+  if (draw.tool === "offset"){
+    if (v){ offsetOpt().d = v; persist(); }
+    closeTyping(); showBanner(drawBanner()); return render();
+  }
   if (draw.tool === "fillet"){
     if (v){ filletOpt().r = v; persist(); }
     closeTyping(); showBanner(drawBanner()); return;
@@ -857,8 +989,8 @@ function checkTyped(field, v, names){
 }
 function openTyping(first){
   if (draw.tool === "ngon" && draw.mouse) return openNgonTyping(first);
-  if (draw.tool === "fillet" || (arcSerStage() && draw.mouse)) return openRadiusTyping(first);
-  if (!draw.tool || draw.tool === "shape" || draw.tool === "follow" || draw.tool === "cutfill" || !draw.mouse) return;
+  if (draw.tool === "fillet" || draw.tool === "offset" || (arcSerStage() && draw.mouse)) return openRadiusTyping(first);
+  if (!draw.tool || ["shape", "follow", "cutfill", "intersect"].includes(draw.tool) || !draw.mouse) return;
   const it = editItem(), box = $("dyn");
   draw.typing = true;
   const A = prevPoint(), R = typingRef(), B = R || A;
@@ -889,7 +1021,7 @@ function openTyping(first){
   inp.focus();
   if (first){ inp.value = first; inp.dispatchEvent(new Event("input")); }
 }
-function closeTyping(){ draw.typing = false; const b = $("dyn"); if (b){ b.hidden = true; b.innerHTML = ""; } }
+function closeTyping(){ draw.typing = false; const b = $("dyn"); if (b){ b.hidden = true; b.innerHTML = ""; b.onkeydown = null; b.removeAttribute("tabindex"); } }
 function commitTyping(){
   const box = $("dyn"), it = editItem(), r = drawRes[it.id], F = r.flip, A = prevPoint(), R = typingRef();
   const val = k => { const i = box.querySelector(`[data-f=${k}]`); return i && !i.parentElement.hidden ? i.value.trim() : ""; };
@@ -936,6 +1068,30 @@ function renderDrawOverlay(){
       const q = r.links[id];
       if (q && !q.err) el("path", { d: poly(q.path), class: "fillet-pick" + (draw.chain.includes(id) ? " on" : "") }, svg);
     }
+    return;
+  }
+  // Intersect: link ที่เลือก / ที่ชี้ · รอเลือก = จุดตัด + เส้นประของผลถ้าตัด / ยืด (ปลายที่เก็บ → จุดตัด)
+  if (draw.tool === "intersect"){
+    const ids = draw.chain.map(c => typeof c === "string" ? c : c.id);
+    for (const id of new Set([...ids, draw.ix ? null : draw.hover].filter(Boolean))){
+      const q = r.links[id];
+      if (q && !q.err) el("path", { d: poly(q.path), class: "fillet-pick" + (ids.includes(id) ? " on" : "") }, svg);
+    }
+    const ix = draw.ix;
+    if (ix){
+      for (const k of [ix.keep1, ix.keep2]){ const p = r.pts[k]; if (p && !p.err) el("line", { x1: X(p), y1: Y(p), x2: X(ix), y2: Y(ix), class: "rubber" }, svg); }
+      el("circle", { cx: X(ix), cy: Y(ix), r: 5, class: "ix-mark" }, svg);
+    }
+    return;
+  }
+  // Offset: link ที่ชี้ / ที่เลือก + เงาเส้นขนานตามด้านของเมาส์
+  if (draw.tool === "offset"){
+    for (const id of new Set([...draw.chain, draw.hover].filter(Boolean))){
+      const q = r.links[id];
+      if (q && !q.err) el("path", { d: poly(q.path), class: "fillet-pick" + (draw.chain.includes(id) ? " on" : "") }, svg);
+    }
+    const g = draw.chain.length ? offsetPreview() : null;
+    if (g) el("line", { x1: X(g.A), y1: Y(g.A), x2: X(g.B), y2: Y(g.B), class: "rubber" }, svg);
     return;
   }
   if (!c) return;

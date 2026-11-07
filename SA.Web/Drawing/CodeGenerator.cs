@@ -38,7 +38,7 @@ public static class CodeGenerator
     {
         "cs", "F", "Deg", "Pt", "Measure", "Source", "surface",
         // ชื่อตัวช่วยในโค้ดที่สร้าง (ตัวแปรชื่อเดียวกันจะบังเมธอด / ชนิด)
-        "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Tangent", "Rotate",
+        "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Offset", "Tangent", "Rotate",
         "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
         "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "FirstOf", "Severe",
         // คำในนิพจน์ (and or not true false — ไม่สนตัวพิมพ์ ตรวจใน IsReservedName)
@@ -451,6 +451,8 @@ public static class CodeGenerator
                 "onSurface" => ($"OnSurface(cs, {Q}, {SurfVar(d.Target)}, {From(d.From)}, F * {Ex(d.Dx, "dx", 1)})", $"{id} บนผิวดิน"),
                 "between" => ($"Between(cs, {Q}, {From(d.A)}, {From(d.B)}, {Ex(d.T, "t")})", $"{id} บนเส้น {d.A}-{d.B}"),
                 "intersect" => ($"Intersect(cs, {Q}, {From(d.A1)}, {From(d.A2)}, {From(d.B1)}, {From(d.B2)})", $"{id} จุดตัด {d.A1}-{d.A2} กับ {d.B1}-{d.B2}"),
+                "offset" => ($"Offset(cs, {Q}, {From(d.A)}, {From(d.B)}, {(d.End == "b" ? From(d.B) : From(d.A))}, F * {(d.Side == -1 ? "-1.0" : "1.0")} * {Ex(d.Dist, "dist")})",
+                             $"{id} offset ปลาย {(d.End == "b" ? d.B : d.A)} ของเส้น {d.A}-{d.B} ไปทาง{(d.Side == -1 ? "ขวา" : "ซ้าย")}ของทิศ {d.A}→{d.B}"),
                 "tangent" => ($"Tangent(cs, {Q}, {From(d.Corner)}, {From(d.Toward)}, {From(d.Other)}, {Ex(d.Radius, "radius")})", $"{id} จุดสัมผัสของ Fillet ที่มุม {d.Corner}"),
                 "firstOf" => ($"FirstOf(cs, {Q}{string.Concat((d.Points ?? new()).Select(x => ", " + From(x)))})", $"{id} จุดแรกที่เกิดใน {string.Join(", ", d.Points ?? new())}"),
                 "external" => throw new FormatException($"{id}: จุดจากโค้ดเดิม (external) ใช้ได้กับไฟล์ที่เขียนเองเท่านั้น — รองรับใน Milestone 4"),
@@ -726,6 +728,15 @@ public static class CodeGenerator
         if (Math.Abs(d) < 1e-12) { Warn(cs, CorridorError.Failure, id + ": เส้นทั้งสองขนานกัน ไม่มีจุดตัด"); return null; }
         double t = ((r.X - p.X) * (s.Y - r.Y) - (r.Y - p.Y) * (s.X - r.X)) / d;
         return Check(cs, id, new Pt(p.X + t * (q.X - p.X), p.Y + t * (q.Y - p.Y)));
+    }
+
+    // Offset: จุด e (ปลายของเส้น a→b) เลื่อนตั้งฉากไป k (+ = ซ้ายของทิศ a→b บนจอจริง — ตัวเรียกคูณ F ให้แล้ว) — เส้นขนาน
+    private static Pt? Offset(CorridorState cs, string id, Pt? a, Pt? b, Pt? e, double k)
+    {
+        if (a == null || b == null || e == null) return null;
+        double dx = b.Value.X - a.Value.X, dy = b.Value.Y - a.Value.Y, n = Math.Sqrt(dx * dx + dy * dy);
+        if (n < 1e-9) { Warn(cs, CorridorError.Failure, id + ": เส้นยาวเป็นศูนย์ หาทิศ offset ไม่ได้"); return null; }
+        return Check(cs, id, new Pt(e.Value.X - dy * k / n, e.Value.Y + dx * k / n));
     }
 
     // หมุนจุด p รอบ pivot ด้วยมุม angle (องศา ทวนเข็ม +) — สมาชิกกลุ่มหมุน

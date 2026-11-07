@@ -1487,5 +1487,66 @@
       "shapes": [], "side": { "param": "Side", "mirror": true } }
   },
   { "name": "Parameter ต้องมากกว่า 0: ค่าปกติ ไม่เตือน", "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }], "values": { "Depth": 3, "Width": 2 }, "copySpecFrom": 55 },
-  { "name": "Parameter ต้องมากกว่า 0: Depth = 0 Side = Left (error + default)", "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }], "values": { "Depth": 0, "Side": 1 }, "copySpecFrom": 55 }
+  { "name": "Parameter ต้องมากกว่า 0: Depth = 0 Side = Left (error + default)", "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }], "values": { "Depth": 0, "Side": 1 }, "copySpecFrom": 55 },
+  {
+    "name": "Offset + Intersect (ตัด) แบบ body rock-pitching: ผิวหิน → ใต้ชั้นหินขนาน RockThickness ตัดกับเส้นปิดปลาย (Right)",
+    "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": -8 }],
+    "values": { "RockThickness": 0.35 },
+    "spec": {
+      "className": "OffsetRock", "namespace": "TestSubassembly",
+      "params": [
+        { "name": "Side", "kind": "long", "default": 0 },
+        { "name": "Height", "kind": "double", "default": 3, "positive": true },
+        { "name": "FaceSlope", "kind": "double", "default": 2.5, "positive": true },
+        { "name": "RockThickness", "kind": "double", "default": 0.3, "positive": true }
+      ],
+      "targets": [],
+      "points": [
+        { "id": "P1", "codes": ["Top"], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["Toe"], "def": { "type": "delta", "from": "P1", "dx": "FaceSlope * Height", "dy": "-Height" } },
+        { "id": "P3", "codes": ["RockTop"], "def": { "type": "offset", "a": "P1", "b": "P2", "end": "a", "dist": "RockThickness", "side": -1 } },
+        { "id": "P4", "codes": [], "def": { "type": "offset", "a": "P1", "b": "P2", "end": "b", "dist": "RockThickness", "side": -1 }, "auxiliary": true },
+        { "id": "P5", "codes": [], "def": { "type": "delta", "from": "P2", "dx": "-2", "dy": "-3" }, "auxiliary": true },
+        { "id": "P6", "codes": ["RockToe"], "def": { "type": "intersect", "a1": "P3", "a2": "P4", "b1": "P2", "b2": "P5" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Rock"] },
+        { "id": "L2", "points": ["P3", "P6"], "codes": ["RockBottom"] },
+        { "id": "L3", "points": ["P2", "P6"], "codes": [] },
+        { "id": "L4", "points": ["P3", "P1"], "codes": [] }
+      ],
+      "shapes": [{ "id": "S1", "links": ["L1", "L3", "L2", "L4"], "codes": ["RockPitching"] }],
+      "side": { "param": "Side", "mirror": true }
+    }
+  },
+  {
+    "name": "Offset + Intersect (ตัด) แบบ body rock-pitching (Left = ภาพกระจก)",
+    "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": -8 }],
+    "values": { "Side": 1 },
+    "copySpecFrom": 58
+  },
+  {
+    "name": "Offset ของเส้นยาวเป็นศูนย์ = หาทิศไม่ได้ + เตือน · Intersect เส้นขนาน = เตือน",
+    "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }],
+    "spec": {
+      "className": "OffsetBad", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }],
+      "targets": [],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "0", "dy": "0" } },
+        { "id": "P3", "codes": [], "def": { "type": "offset", "a": "P1", "b": "P2", "end": "a", "dist": "1", "side": 1 } },
+        { "id": "P4", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "3", "dy": "-1" } },
+        { "id": "P5", "codes": [], "def": { "type": "offset", "a": "P1", "b": "P4", "end": "a", "dist": "0.5", "side": 1 } },
+        { "id": "P6", "codes": [], "def": { "type": "offset", "a": "P1", "b": "P4", "end": "b", "dist": "0.5", "side": 1 } },
+        { "id": "P7", "codes": [], "def": { "type": "intersect", "a1": "P1", "a2": "P4", "b1": "P5", "b2": "P6" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P4"], "codes": [] },
+        { "id": "L2", "points": ["P5", "P6"], "codes": [] }
+      ],
+      "shapes": [],
+      "side": { "param": "Side", "mirror": true }
+    }
+  }
 ]

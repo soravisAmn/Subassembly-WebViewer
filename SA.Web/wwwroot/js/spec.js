@@ -16,6 +16,8 @@
 //   onSurface      from, dx, target            บนผิวดินที่ระยะ dx จากจุด from
 //   between        a, b, t                     บนเส้น a-b ที่สัดส่วน t (0.5 = กึ่งกลาง)
 //   intersect      a1, a2, b1, b2              จุดตัดของเส้น a1-a2 กับเส้น b1-b2 (ต่อเส้นออกไปได้)
+//   offset         a, b, end, dist, side       ปลาย end ("a" | "b") ของเส้น a-b เลื่อนตั้งฉากไป dist (side 1 = ซ้ายของทิศ a→b ในกรอบ Side = Right, -1 = ขวา)
+//                                              (2 จุด offset ของปลายทั้งสอง = เส้นขนาน แบบ OFFSET ของ AutoCAD)
 //   external       code                        จุดจากโค้ดเดิมของผู้ใช้ หาด้วย point code
 //   tangent        corner, toward, other, radius   จุดสัมผัสของ Fillet: บนเส้น corner→toward ห่าง radius / tan(α/2)
 //                                              (α = มุมระหว่างเส้น corner→toward กับ corner→other · ขนานกัน / รัศมีใหญ่เกินเส้น = เตือน + ใช้มุมแหลมเดิม)
@@ -44,7 +46,7 @@
 const Spec = (() => {
   const POINT_TYPES = {
     origin: "Origin", delta: "ห่างจากจุด (dx, dy)", polar: "ระยะ + มุม (polar)", slopeLength: "ลาด + ความยาว", slopeToSurface: "ลาดจนชนดิน",
-    onSurface: "บนผิวดิน", between: "บนเส้นระหว่าง 2 จุด", intersect: "จุดตัดของ 2 เส้น", external: "จุดจากโค้ดเดิม (point code)",
+    onSurface: "บนผิวดิน", between: "บนเส้นระหว่าง 2 จุด", intersect: "จุดตัดของ 2 เส้น", offset: "Offset (เส้นขนาน)", external: "จุดจากโค้ดเดิม (point code)",
     tangent: "จุดสัมผัส (Fillet)", firstOf: "จุดแรกที่เกิด (หลังกิ่ง)"
   };
   const LINK_TYPES = { straight: "เส้นตรง", followSurface: "วิ่งตามผิวดิน", arc3: "โค้งผ่าน 3 จุด", arcR: "โค้ง เริ่ม-ปลาย-รัศมี", fillet: "โค้ง Fillet" };
@@ -172,7 +174,7 @@ const Spec = (() => {
   }
   // ช่องนิพจน์ของ def แต่ละชนิด
   const EXPR_FIELDS = { delta: ["dx", "dy"], polar: ["length", "angle"], slopeLength: ["slope", "length"], slopeToSurface: ["slope", "maxDistance", "layoutLength"],
-                        onSurface: ["dx"], between: ["t"], tangent: ["radius"] };
+                        onSurface: ["dx"], between: ["t"], tangent: ["radius"], offset: ["dist"] };
   // ช่องนิพจน์ของ link (seg.value แยกต่างหาก)
   const LINK_EXPR_FIELDS = { arcR: ["radius"], fillet: ["radius"] };
 
@@ -370,6 +372,13 @@ const Spec = (() => {
           const r = lineX(a1, a2, b1, b2);
           if (!r) throw new Error("เส้นทั้งสองขนานกัน ไม่มีจุดตัด");
           return r;
+        }
+        case "offset": {
+          // ตั้งฉากกับเส้น a→b: side 1 = ซ้ายของทิศ a→b ในกรอบ Side = Right (ฝั่ง Left ภาพกระจก = คูณ F) — ตรงกับ Offset ใน CodeGenerator.cs
+          const a = need(d.a), b = need(d.b), dist = X(d.dist, "dist"), dx = b.x - a.x, dy = b.y - a.y, n = Math.hypot(dx, dy);
+          if (n < 1e-9) throw new Error(`เส้น ${d.a}-${d.b} ยาวเป็นศูนย์ หาทิศ offset ไม่ได้`);
+          const e = d.end === "b" ? b : a, k = F * (d.side === -1 ? -1 : 1) * dist / n;
+          return { x: e.x - dy * k, y: e.y + dx * k };
         }
         case "tangent": {
           const c = need(d.corner), t = need(d.toward), o = need(d.other), R = X(d.radius, "radius");
@@ -938,6 +947,58 @@ const Spec = (() => {
     return { t1, t2, link: fl.id, corner: P, kept: !!(cp && free && cp.codes.length) };
   }
 
+  // ---------- Intersect / Offset (รอบ 4c) ----------
+  const straightEnds = l => l && l.points && !l.type ? l.points : null;
+  // จุดตัดของ link เส้นตรง id1 กับ id2 (ต่อเส้นออกไปได้) -> จุด intersect ใหม่
+  //   opt.trim = ตัด / ยืดเส้นให้จบที่จุดตัด: keep1 / keep2 = ปลายที่เก็บไว้ของแต่ละเส้น (อีกปลายถูกแทนด้วยจุดตัด)
+  //     ปลายที่ถูกแทนยังอยู่ (จุดตัดอ้างมัน) · ไม่มี link อื่นต่อและไม่มี point code = เป็นจุดช่วยสร้าง (แบบ Fillet)
+  //   opt.aux = จุดตัดเป็น auxiliary (link ทั้งสองเป็น auxiliary = จุดตัด auxiliary เอง)
+  //   คืน { point, dropped: [ปลายที่ถูกแทน], kept: [ปลายที่ถูกแทนแต่มี code เลยคงเป็นจุดจริง] } หรือ { error }
+  function addIntersect(spec, id1, id2, opt){
+    opt = opt || {};
+    const l1 = byId(spec.links, id1), l2 = byId(spec.links, id2);
+    if (!l1 || !l2 || id1 === id2) return { error: "เลือก link 2 เส้นที่ต่างกัน" };
+    const e1 = straightEnds(l1), e2 = straightEnds(l2);
+    if (!e1 || !e2) return { error: "Intersect ได้เฉพาะ link เส้นตรง" };
+    const common = e1.find(p => e2.includes(p));
+    if (common) return { error: `${id1} กับ ${id2} ต่อกันที่ ${common} อยู่แล้ว` };
+    if (opt.trim && (!e1.includes(opt.keep1) || !e2.includes(opt.keep2))) return { error: "ไม่รู้ว่าจะเก็บปลายไหนของเส้น" };
+    const aux = !!opt.aux || (isAux(l1) && isAux(l2));
+    const P = addPoint(spec, { type: "intersect", a1: e1[0], a2: e1[1], b1: e2[0], b2: e2[1] }, [], aux);
+    const br = l1.branch && l1.branch === l2.branch ? l1.branch : null;
+    if (br) byId(spec.points, P).branch = br;
+    const dropped = [], kept = [];
+    if (opt.trim){
+      for (const [l, keep] of [[l1, opt.keep1], [l2, opt.keep2]]){
+        const drop = l.points.find(p => p !== keep);
+        l.points = l.points.map(p => p === drop ? P : p);          // ทิศของเส้นคงเดิม
+        dropped.push(drop);
+      }
+      if (spec.polygons) spec.polygons = spec.polygons.filter(g => !g.links.includes(id1) && !g.links.includes(id2));
+      for (const id of dropped){
+        const p = byId(spec.points, id), free = !spec.links.some(l => linkEnds(l).includes(id));
+        if (p && free){ if (p.codes.length) kept.push(id); else p.auxiliary = true; }
+      }
+    }
+    return { point: P, dropped, kept };
+  }
+  // เส้นขนานของ link เส้นตรง id: 2 จุด offset (ปลาย a / b) + link ใหม่ระหว่างกัน
+  //   dist = นิพจน์ (เช่น "RockThickness"), side 1 = ซ้ายของทิศ a→b ในกรอบ Side = Right / -1 = ขวา
+  //   opt.aux = จุด + link เป็น auxiliary (ต้องติ๊กเอง — ไม่ตามเส้นเดิม) · คืน { a, b, link } หรือ { error }
+  function addOffset(spec, id, dist, side, opt){
+    opt = opt || {};
+    const l = byId(spec.links, id), e = straightEnds(l);
+    if (!e) return { error: "Offset ได้เฉพาะ link เส้นตรง" };
+    const D = String(dist ?? "").trim();
+    if (!D) return { error: "ใส่ระยะ offset" };
+    const s = side === -1 ? -1 : 1, aux = !!opt.aux;
+    const a = addPoint(spec, { type: "offset", a: e[0], b: e[1], end: "a", dist: D, side: s }, [], aux);
+    const b = addPoint(spec, { type: "offset", a: e[0], b: e[1], end: "b", dist: D, side: s }, [], aux);
+    const nl = byId(spec.links, addLink(spec, a, b, { points: [a, b], ...(aux ? { auxiliary: true } : {}) }));
+    if (l.branch) for (const o of [byId(spec.points, a), byId(spec.points, b), nl]) o.branch = l.branch;
+    return { a, b, link: nl.id };
+  }
+
   // ---------- สลับ Auxiliary ----------
   // แผนสลับ point / link: { points, links (รวม link จริงที่ต้องเป็น aux ด้วยเพราะปลายเป็นจุดที่จะเป็น aux), hitLinks, shapes (ที่ต้องเอา link ออก) }
   function auxPlan(spec, objs, on){
@@ -974,6 +1035,6 @@ const Spec = (() => {
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
            isAux, isAuxPoint, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
-           tangentPoint, arcGeom, segCount, arcPoints, addFillet, exprSlots, rotatePt, rotationOf, addRotation };
+           tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();
 if (typeof module !== "undefined") module.exports = Spec;

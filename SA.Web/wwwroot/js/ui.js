@@ -771,6 +771,23 @@ function propsDrawnPoint(box, it, p, r){
     case "between": refRow("a", "จุด a"); refRow("b", "จุด b"); ex("t", "t", "0 = a, 1 = b, 0.5 = กึ่งกลาง"); break;
     case "firstOf": firstOfRow(g, it, p, others); break;
     case "intersect": refRow("a1", "เส้น A จาก"); refRow("a2", "เส้น A ถึง"); refRow("b1", "เส้น B จาก"); refRow("b2", "เส้น B ถึง"); break;
+    case "offset": {
+      // คู่ที่สร้างพร้อมกัน (ปลายอีกข้างของเส้นขนาน): แก้ระยะ / ด้านที่ไหนก็แก้ทั้งคู่ ให้ยังขนานกัน
+      const mate = sp.points.find(o => o !== p && o.def.type === "offset" && o.def.a === d.a && o.def.b === d.b && o.def.end !== d.end && o.def.dist === d.dist && o.def.side === d.side);
+      const both = fn => { fn(d); if (mate) fn(mate.def); };
+      refRow("a", "เส้นจาก"); refRow("b", "เส้นถึง");
+      selectRow(g, it, "ปลาย", [["a", `ปลาย ${d.a || "a"}`], ["b", `ปลาย ${d.b || "b"}`]], d.end === "b" ? "b" : "a", v => { d.end = v; });
+      const inp = exprRow(g, it, "ระยะ", mate ? `ใช้ร่วมกับ ${mate.id}` : "ตั้งฉากกับเส้น", d.dist, v => both(o => { o.dist = v; }));
+      if (canEdit(it)){
+        const b = btn("+", () => {
+          const name = newParamFromValue(it, inp.value.trim() || d.dist, "OffsetDist");
+          if (name){ specEdit(() => both(o => { o.dist = name; }), it, `${p.id} ใช้ parameter ${name}`); renderProps(true); }
+        }, false, "สร้าง parameter ใหม่จากช่องนี้ (default = ค่าตอนนี้)");
+        b.classList.add("par-btn"); inp.parentElement.appendChild(b);
+      }
+      selectRow(g, it, "ด้าน", [["1", `ซ้ายของทิศ ${d.a}→${d.b}`], ["-1", `ขวาของทิศ ${d.a}→${d.b}`]], String(d.side === -1 ? -1 : 1), v => both(o => { o.side = +v; }), "ในกรอบ Side = Right");
+      break;
+    }
     case "tangent": {
       refRow("corner", "มุม"); refRow("toward", "บนเส้นไปทาง"); refRow("other", "อีกเส้นไปทาง");
       // รัศมีของจุดสัมผัสคู่นี้กับ link Fillet ต้องเท่ากัน -> แก้ที่ไหนก็แก้ทั้งสาม
@@ -817,6 +834,7 @@ function convertPoint(it, p, type, r){
     onSurface: () => ({ type, ...fr, dx: Expr.num(dx * F), target: "TargetSurface" }),
     between: () => ({ type, a: others[0] || "", b: others[1] || others[0] || "", t: "0.5" }),
     intersect: () => ({ type, a1: others[0] || "", a2: others[1] || "", b1: others[2] || "", b2: others[3] || "" }),
+    offset: () => ({ type, a: others[0] || "", b: others[1] || others[0] || "", end: "a", dist: "1", side: 1 }),
     external: () => { const rr = asmRes[it.id], c = rr && rr.result ? rr.result.points.find(x => x.codes.length) : null; return { type, code: c ? c.codes[0] : "" }; },
     firstOf: () => ({ type, points: others.slice(0, 2) }),
     tangent: () => d
@@ -1138,7 +1156,7 @@ function propsParamTable(box, it){
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
 const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
-  "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
+  "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Offset Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
   "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf Severe abstract as base bool break byte case catch char checked class const continue " +
   "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
   "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +

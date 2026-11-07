@@ -75,14 +75,17 @@ document.addEventListener("keydown", e => {
   if (editing && draw.tool && e.key === "Enter"){ e.preventDefault(); finishChain(); return; }
   if (e.key === "F3" || e.key === "F8" || e.key === "F9"){ e.preventDefault(); toggleBar({ F3: "osOn", F8: "ortho", F9: "snap" }[e.key]); }
   else if (e.key === "Escape"){
-    if (draw.tool && draw.chain.length){ draw.chain = []; showBanner(drawBanner()); render(); }
+    if (draw.ix) intersectCancel();
+    else if (draw.tool && draw.chain.length){ draw.chain = []; showBanner(drawBanner()); render(); }
     else if (draw.tool) setTool(null);
     else if (addMode) setAddMode(false);
     else if (drag && drag.type === "box"){ drag = null; render(); }
     else setSelList([]);                                    // ยกเลิกการเลือก
   }
   else if (mod || e.altKey) return;
-  else if (editing && (k === "p" || k === "l" || k === "s")) setTool({ p: "point", l: "link", s: "shape" }[k]);
+  // Intersect ที่รอเลือก: T = ตัด / ยืด · N = ไม่ตัด (ตัวเลือกระหว่างคำสั่งชนะ shortcut ทั่วไป)
+  else if (editing && draw.ix && (k === "t" || k === "n")) intersectCommit(k === "t");
+  else if (editing && (k === "p" || k === "l" || k === "s" || k === "i" || k === "o")) setTool({ p: "point", l: "link", s: "shape", i: "intersect", o: "offset" }[k]);
   // Arc: T = 3 จุด · E = เริ่ม-ปลาย-รัศมี (สลับระหว่างวาดได้ แบบตัวเลือกใน banner ของ AutoCAD)
   else if (editing && draw.tool === "arc" && (k === "t" || k === "e")) setArcMode(k === "t" ? "3p" : "ser");
   // C ระหว่างวาด Polygon อิสระ = ปิดรูป (แบบ Close ของ AutoCAD) · นอกนั้น C = Copy

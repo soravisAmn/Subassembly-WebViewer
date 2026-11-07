@@ -70,8 +70,11 @@
     (rewire เส้นที่ต่อที่ปลายไปปลายจริง + แทรกใน shape), ปุ่มกลุ่ม Surface + หน้าต่าง, Properties (test: `extend.test.js`, drawing-cases 61–67)
   รอบ 4c M4 เสร็จ (2026-11-07): Clipped Surface Link — link `followClipped` (`refLink` | `refLevel` แบบ flat ไม่ใช่ `ref: {}` ตามร่าง, side below/above,
     codes / codesGround / codesLine) = `Spec.clipPath` + C# `FollowClipped()` (Link[]), `Spec.addFollowClipped`, ปุ่ม + หน้าต่าง + Properties
-    · DrawingTests เทียบ code ของ link แล้ว (test: `clip.test.js` เทียบ BuildBottom, drawing-cases 68–74) · ถัดไป M5 (Array)
-  ถัดไป: **`prompt-4c.md`** (เอา Max / Min ออก, ขอบเขตค่า → ตาราง Parameter, เปลี่ยนชื่อปุ่มตัด/ถม, ปุ่มใหม่: ต่อลงถึงดิน / ตามดินไม่เกินเส้น / Intersect / Offset / Array — เป้าหมาย: วาด rock-pitching ใหม่ในเว็บโดยไม่เขียนโค้ด) — กำลังทำ (M1–M4 เสร็จ) · จากนั้น **`prompt-5.md` ฉบับย่อ** (Logic API ที่ต้องรวมฟังก์ชันของ 4c + มุมมองข้อความ + Switch ในแท็บ Logic) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+    · DrawingTests เทียบ code ของ link แล้ว (test: `clip.test.js` เทียบ BuildBottom, drawing-cases 68–74)
+  รอบ 4c M5 เสร็จ (2026-11-07): Array — `spec.arrays` + `Spec.addArray` / `updateArray` / `rebuildArray` / `arrayOf` (ชุดที่ k = delta จากจุดเดียวกันของชุดก่อน,
+    n = ชุดทั้งหมดรวมต้นฉบับ, join share (จุดร่วม — ขั้นบันได) | link), ปุ่ม Geometry + หน้าต่าง + Properties "Array A1", ลบสมาชิก = ถามแล้วเลิกเป็น Array
+    · ไม่แตะ C# (test: `array.test.js`, drawing-cases 75–76) · ถัดไป M6 (วาด base / body rock-pitching ใหม่ + test เทียบไฟล์จริง + tests-civil3d/round4c-*)
+  ถัดไป: **`prompt-4c.md`** (เอา Max / Min ออก, ขอบเขตค่า → ตาราง Parameter, เปลี่ยนชื่อปุ่มตัด/ถม, ปุ่มใหม่: ต่อลงถึงดิน / ตามดินไม่เกินเส้น / Intersect / Offset / Array — เป้าหมาย: วาด rock-pitching ใหม่ในเว็บโดยไม่เขียนโค้ด) — กำลังทำ (M1–M5 เสร็จ) · จากนั้น **`prompt-5.md` ฉบับย่อ** (Logic API ที่ต้องรวมฟังก์ชันของ 4c + มุมมองข้อความ + Switch ในแท็บ Logic) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

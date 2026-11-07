@@ -1651,5 +1651,47 @@
       "shapes": [],
       "side": { "param": "Side", "mirror": true }
     }
-  }
+  },
+  {
+    "name": "Array ขั้นบันไดแบบ pavement (ขั้นละ Tread × Rise, จุดร่วม) 4 ขั้น (Right)",
+    "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }],
+    "values": { "Tread": 0.3, "Rise": 0.1 },
+    "spec": {
+      "className": "ArrayStair", "namespace": "TestSubassembly",
+      "params": [
+        { "name": "Side", "kind": "long", "default": 0 },
+        { "name": "Tread", "kind": "double", "default": 0.3, "positive": true },
+        { "name": "Rise", "kind": "double", "default": 0.1, "positive": true }
+      ],
+      "targets": [],
+      "points": [
+        { "id": "P1", "codes": ["Start"], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["StepTop"], "def": { "type": "delta", "from": "P1", "dx": "Tread", "dy": "0" } },
+        { "id": "P3", "codes": [], "def": { "type": "delta", "from": "P2", "dx": "0", "dy": "-Rise" } },
+        { "id": "P4", "codes": ["StepTop"], "def": { "type": "delta", "from": "P2", "dx": "Tread", "dy": "-Rise" } },
+        { "id": "P5", "codes": [], "def": { "type": "delta", "from": "P3", "dx": "Tread", "dy": "-Rise" } },
+        { "id": "P6", "codes": ["StepTop"], "def": { "type": "delta", "from": "P4", "dx": "Tread", "dy": "-Rise" } },
+        { "id": "P7", "codes": [], "def": { "type": "delta", "from": "P5", "dx": "Tread", "dy": "-Rise" } },
+        { "id": "P8", "codes": ["StepTop"], "def": { "type": "delta", "from": "P6", "dx": "Tread", "dy": "-Rise" } },
+        { "id": "P9", "codes": [], "def": { "type": "delta", "from": "P7", "dx": "Tread", "dy": "-Rise" } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Tread"] },
+        { "id": "L2", "points": ["P2", "P3"], "codes": ["Riser"] },
+        { "id": "L3", "points": ["P3", "P4"], "codes": ["Tread"] },
+        { "id": "L4", "points": ["P4", "P5"], "codes": ["Riser"] },
+        { "id": "L5", "points": ["P5", "P6"], "codes": ["Tread"] },
+        { "id": "L6", "points": ["P6", "P7"], "codes": ["Riser"] },
+        { "id": "L7", "points": ["P7", "P8"], "codes": ["Tread"] },
+        { "id": "L8", "points": ["P8", "P9"], "codes": ["Riser"] }
+      ],
+      "shapes": [],
+      "arrays": [{ "id": "A1", "source": { "points": ["P1", "P2", "P3"], "links": ["L1", "L2"], "shapes": [] }, "n": 4, "dx": "Tread", "dy": "-Rise",
+                   "join": { "mode": "share", "from": "P3", "to": "P1" },
+                   "members": [{ "points": ["P4", "P5"], "links": ["L3", "L4"], "shapes": [] }, { "points": ["P6", "P7"], "links": ["L5", "L6"], "shapes": [] },
+                               { "points": ["P8", "P9"], "links": ["L7", "L8"], "shapes": [] }] }],
+      "side": { "param": "Side", "mirror": true }
+    }
+  },
+  { "name": "Array ขั้นบันได Side = Left · Tread = 0.5, Rise = 0.2", "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }], "values": { "Side": 1, "Tread": 0.5, "Rise": 0.2 }, "copySpecFrom": 75 }
 ]

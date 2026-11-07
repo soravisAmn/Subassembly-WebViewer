@@ -206,6 +206,9 @@ function deleteDrawnSet(it, list){
   const what = objs.length === 1 ? objs[0].id : `${objs.length} objects ที่เลือก`;
   const list_ = extra.length > 15 ? extra.slice(0, 15).join(", ") + ` … และอีก ${extra.length - 15} ชิ้น` : extra.join(", ");
   if (extra.length && !confirm(`ลบ ${what} จะลบ ${list_} ที่พึ่งอยู่ไปด้วย (รวม ${extra.length} ชิ้น) ตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
+  // Array ที่เสียชิ้นส่วน = เลิกเป็นกลุ่ม (ถามก่อน)
+  const lostArr = (it.spec.arrays || []).filter(g => !(trial.arrays || []).some(x => x.id === g.id)).map(g => g.id);
+  if (lostArr.length && !confirm(`${what} เป็นส่วนของ Array ${lostArr.join(", ")} — ลบแล้วจะเลิกเป็น Array (ที่เหลือเป็นจุด / link ธรรมดา แก้ N / dx / dy รวมไม่ได้อีก) ตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
   const n = picked.size + extra.length;
   specEdit(s => { for (const o of objs) Spec.removeCascade(s, DRAWN_KIND[o.type], o.id); }, it, n === 1 ? `ลบ ${objs[0].id}` : `ลบ ${n} objects`);
   setSel({ type:"item", item: it.id });
@@ -269,6 +272,8 @@ document.getElementById("drawer").addEventListener("click", e => {
   const t = b.dataset.tool;
   // ถ้าตัด / ถม: เลือกจุดไว้จุดเดียว = ใช้เป็นจุดบานพับเลย ไม่งั้นให้คลิกจุด
   if (t === "cutfill"){ const it = editItem(), s = pickedList().filter(o => o.item === it.id); if (s.length === 1 && s[0].type === "dpt"){ setTool(null); return openCutFill(it, s[0].id); } }
+  // Array: คำสั่งกับชุดที่เลือก (ไม่ใช่เครื่องมือวาด)
+  if (t === "array"){ setTool(null); return openArray(editItem()); }
   setTool(draw.tool === t ? null : t);
 });
 function renderDrawer(){

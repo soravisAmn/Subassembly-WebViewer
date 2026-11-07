@@ -911,6 +911,11 @@ const Spec = (() => {
     // polygon ที่เสียชิ้นส่วนไป = เหลือเป็นจุด / link / shape ธรรมดา (เลิกแก้ N / R / θ ได้)
     if (spec.polygons) spec.polygons = spec.polygons.filter(g => !gone.points.has(g.center) && !g.points.some(p => gone.points.has(p))
                                                               && !g.links.some(l => gone.links.has(l)) && !(g.shape && gone.shapes.has(g.shape)));
+    // Array ที่เสียชิ้นส่วน (ต้นฉบับ / สมาชิก) = เลิกเป็น array (ที่เหลือเป็นจุด / link / shape ธรรมดา)
+    if (spec.arrays){
+      const hit = o => o.points.some(p => gone.points.has(p)) || o.links.some(l => gone.links.has(l)) || o.shapes.some(s => gone.shapes.has(s));
+      spec.arrays = spec.arrays.filter(g => !hit(g.source) && !g.members.some(hit));
+    }
     // กลุ่มหมุน: สมาชิกที่ลบออกจากกลุ่ม · ลบจุดหมุน / ไม่เหลือสมาชิก = เลิกหมุน (สมาชิกกลับที่เดิม)
     if (spec.rotations){
       for (const g of spec.rotations) g.points = g.points.filter(p => !gone.points.has(p));
@@ -1002,6 +1007,7 @@ const Spec = (() => {
     }
     for (const g of spec.polygons || []) for (const k of ["radius", "angle"]) out.push({ obj: g, key: k, id: g.id });
     for (const g of spec.rotations || []) out.push({ obj: g, key: "angle", id: g.id });
+    for (const g of spec.arrays || []) for (const k of ["dx", "dy"]) out.push({ obj: g, key: k, id: g.id });
     // เงื่อนไข / decision (เปลี่ยนชื่อ parameter แล้วนิพจน์ในเงื่อนไขเปลี่ยนตาม)
     const lg = spec.logic || {};
     for (const c of lg.conditions || []) if (c.expr != null) out.push({ obj: c, key: "expr", id: c.name });
@@ -1105,6 +1111,108 @@ const Spec = (() => {
     return { a, b, link: nl.id };
   }
 
+  // ---------- Array (รอบ 4c) ----------
+  // spec.arrays = [{ id: "A1", source: { points, links, shapes }, n (ชุดทั้งหมดรวมต้นฉบับ), dx, dy (นิพจน์ · dx ไปทางนอก + ในกรอบ Side = Right),
+  //                  join: null | { mode: "share" | "link", from, to }, members: [{ points, links, shapes }] (ชุดที่ 2..n) }]
+  //   จุดของชุดที่ k = delta { from: จุดเดียวกันของชุด k−1, dx, dy } → แก้ dx / dy ทีเดียวขยับทั้งแถว (evaluate / C# ไม่ต้องรู้จัก array)
+  //   join share = จุด to ของชุดถัดไป "คือ" จุด from ของชุดก่อน (ขั้นบันไดต่อกัน ไม่สร้างจุดซ้ำ) · link = ต่อชุดด้วย link from (ชุดก่อน) → to (ชุดถัดไป)
+  //   link / shape ในชุดคัดลอกด้วย (ปลายแทนด้วยจุดของชุดนั้น) · code / Auxiliary / กิ่ง ตามต้นฉบับ
+  //   sel ต้องครบแล้ว (ปลาย link / link ของ shape — ดู Ops.expand) · คืน array หรือ { error }
+  function addArray(spec, sel, o){
+    const g = { id: null, source: { points: (sel.points || []).slice(), links: (sel.links || []).slice(), shapes: (sel.shapes || []).slice() },
+                n: Math.round(+o.n), dx: String(o.dx ?? "0").trim() || "0", dy: String(o.dy ?? "0").trim() || "0", join: o.join || null, members: [] };
+    const err = arrayIssue(spec, g);
+    if (err) return { error: err };
+    spec.arrays = spec.arrays || [];
+    let k = 0; for (const x of spec.arrays){ const m = /^A(\d+)$/.exec(x.id); if (m) k = Math.max(k, +m[1]); }
+    g.id = "A" + (k + 1);
+    buildArray(spec, g);
+    spec.arrays.push(g);
+    return g;
+  }
+  function arrayIssue(spec, g){
+    if (!(g.n >= 2 && g.n <= 200)) return "จำนวนชุดต้อง 2–200 (รวมชุดต้นฉบับ)";
+    if (!g.source.points.length) return "เลือก object ก่อน (จุด / link / shape ที่วาด)";
+    if (g.source.points.some(id => !byId(spec.points, id))) return "มีจุดในชุดที่ไม่มีอยู่";
+    for (const id of g.source.links){ const l = byId(spec.links, id); if (!l) return `ไม่มี link ${id}`; if (!linkRefs(l).every(p => g.source.points.includes(p))) return `ปลายของ ${id} ไม่อยู่ในชุด`; }
+    for (const id of g.source.shapes){ const s = byId(spec.shapes, id); if (!s || !s.links.every(l => g.source.links.includes(l))) return `link ของ ${id} ไม่อยู่ในชุด`; }
+    const j = g.join;
+    if (j){
+      if (!["share", "link"].includes(j.mode)) return "วิธีต่อชุดไม่ถูกต้อง";
+      if (!g.source.points.includes(j.from) || !g.source.points.includes(j.to)) return "จุดที่ใช้ต่อชุดต้องอยู่ในชุด";
+      if (j.from === j.to) return "จุดต่อชุดต้องเป็นคนละจุด";
+    }
+    return null;
+  }
+  // สร้างสมาชิกชุดที่ 2..n (ต่อท้าย spec)
+  function buildArray(spec, g){
+    const src = g.source, j = g.join, share = j && j.mode === "share";
+    const P = spec.points.filter(p => src.points.includes(p.id)), Lk = spec.links.filter(l => src.links.includes(l.id)), S = spec.shapes.filter(s => src.shapes.includes(s.id));
+    let prev = Object.fromEntries(src.points.map(id => [id, id]));
+    g.members = [];
+    for (let k = 1; k < g.n; k++){
+      const map = {}, lmap = {}, mem = { points: [], links: [], shapes: [] };
+      if (share) map[j.to] = prev[j.from];
+      for (const p of P){
+        if (share && p.id === j.to) continue;
+        const id = addPoint(spec, { type: "delta", from: prev[p.id], dx: g.dx, dy: g.dy }, p.codes.slice(), isAux(p));
+        if (p.branch) byId(spec.points, id).branch = p.branch;
+        map[p.id] = id; mem.points.push(id);
+      }
+      const m = id => map[id] || id;
+      for (const l of Lk){
+        const c = JSON.parse(JSON.stringify(l));
+        if (c.points) c.points = c.points.map(m);
+        for (const key of ["from", "to", "via", "corner"]) if (c[key]) c[key] = m(c[key]);
+        c.id = nextId(spec, "L");
+        spec.links.push(c); lmap[l.id] = c.id; mem.links.push(c.id);
+      }
+      // เส้นอ้างอิงของ Clipped Surface Link ในชุด = ของชุดนั้น
+      for (const id of mem.links){ const c = byId(spec.links, id); if (c.refLink && lmap[c.refLink]) c.refLink = lmap[c.refLink]; }
+      for (const s of S){
+        const id = addShape(spec, s.links.map(l => lmap[l] || l)), ns = byId(spec.shapes, id);
+        ns.codes = s.codes.slice(); if (s.branch) ns.branch = s.branch;
+        mem.shapes.push(id);
+      }
+      if (j && j.mode === "link"){
+        const id = nextId(spec, "L");
+        spec.links.push({ id, points: [prev[j.from], map[j.to]], codes: [] });
+        mem.links.push(id);
+      }
+      g.members.push(mem);
+      prev = { ...prev, ...map };
+    }
+    return g;
+  }
+  // แก้ dx / dy: แก้นิยามจุดของสมาชิกทุกชุด (id เดิม — ของที่อ้างสมาชิกไม่หลุด)
+  function updateArray(spec, g, o){
+    if ("dx" in o) g.dx = String(o.dx).trim() || "0";
+    if ("dy" in o) g.dy = String(o.dy).trim() || "0";
+    for (const mem of g.members) for (const id of mem.points){ const p = byId(spec.points, id); if (p && p.def.type === "delta"){ p.def.dx = g.dx; p.def.dy = g.dy; } }
+  }
+  // เปลี่ยน N / วิธีต่อชุด: ลบสมาชิกแล้วสร้างใหม่ — มีของนอก array อ้างสมาชิกอยู่ = ไม่ทำ คืนรายการที่ขวาง
+  function rebuildArray(spec, g, o){
+    const P = new Set(g.members.flatMap(m => m.points)), L = new Set(g.members.flatMap(m => m.links)), S = new Set(g.members.flatMap(m => m.shapes));
+    const block = spec.points.filter(p => !P.has(p.id) && refs(p.def).some(r => P.has(r))).map(p => p.id)
+      .concat(spec.links.filter(l => !L.has(l.id) && (linkRefs(l).some(r => P.has(r)) || L.has(l.refLink))).map(l => l.id))
+      .concat(spec.shapes.filter(s => !S.has(s.id) && s.links.some(l => L.has(l))).map(s => s.id));
+    if (block.length) return { block };
+    const next = { ...g, n: "n" in o ? Math.round(+o.n) : g.n, join: "join" in o ? o.join : g.join };
+    const err = arrayIssue(spec, next);
+    if (err) return { error: err };
+    spec.points = spec.points.filter(p => !P.has(p.id));
+    spec.links = spec.links.filter(l => !L.has(l.id));
+    spec.shapes = spec.shapes.filter(s => !S.has(s.id));
+    g.n = next.n; g.join = next.join;
+    buildArray(spec, g);
+    return { block: [] };
+  }
+  // array ที่ object นี้เป็นส่วนหนึ่ง (ต้นฉบับหรือสมาชิก)
+  function arrayOf(spec, type, id){
+    const key = type === "point" ? "points" : type === "link" ? "links" : "shapes";
+    return (spec.arrays || []).find(g => g.source[key].includes(id) || g.members.some(m => m[key].includes(id))) || null;
+  }
+
   // ---------- Clipped Surface Link (รอบ 4c) ----------
   // link ตามผิวดินจาก from ถึง to ไม่เกินเส้นอ้างอิง — o = { refLink | refLevel, side: "below" | "above", codes, codesGround, codesLine, target, aux }
   //   คืน { link } หรือ { error }
@@ -1196,7 +1304,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
+           isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();

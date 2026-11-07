@@ -687,6 +687,8 @@ function propsDrawn(box, it, s){
   else propsDrawnShape(box, it, Spec.byId(sp.shapes, s.id), r);
   const pg = Spec.polygonOf(sp, DRAWN_KIND[s.type], s.id, true);
   if (pg) propsPolygon(box, it, pg);
+  const ag = Spec.arrayOf(sp, DRAWN_KIND[s.type], s.id);
+  if (ag) propsArray(box, it, ag);
   for (const rg of rotationsFor(sp, s)) propsRotation(box, it, rg);
   propsCode(box, it, s);
 }
@@ -1070,6 +1072,104 @@ function cutFillCommit(it, opts){
   state.sel = { type:"dpt", item: it.id, id: r.cut.point }; renderAll();
   const cn = Spec.byId(it.spec.logic.conditions, r.cond).name;
   flashBanner(`Daylight Cut/Fill: ${cn} · ตัด = ${r.cut.point} · ถม = ${r.fill.point} · Daylight = ${r.daylight} — ลากจุดผิวดินขึ้นลงดูรูปสลับ (Ctrl+Z ย้อนได้)`);
+}
+// Array (รอบ 4c): ชุดที่เลือก → ทำซ้ำ N ชุด ห่างชุดละ dx, dy · ต่อชุดด้วยจุดร่วม / link
+//   ค่าเริ่มต้น: ชุดที่เป็นเส้นเปิด (ไม่มี shape) = ระยะจากจุดแรกถึงจุดสุดท้ายของชุด + จุดร่วม (ขั้นบันได) · มี shape = กว้างเท่ากรอบของชุด ไม่ต่อ
+function openArray(it){
+  if (!it || !it.spec) return;
+  const sp = it.spec, r = drawRes[it.id], F = r ? r.flip : 1;
+  const picked = pickedList().filter(o => o.item === it.id && DRAWN_KIND[o.type]);
+  const sel = Ops.expand(sp, { points: picked.filter(o => o.type === "dpt").map(o => o.id), links: picked.filter(o => o.type === "dlink").map(o => o.id),
+                               shapes: picked.filter(o => o.type === "dshape").map(o => o.id) });
+  if (!sel.points.length) return flashBanner("Array: เลือก object ที่วาดก่อน (คลิก / คลุมเลือก) แล้วกดปุ่ม Array");
+  const pos = id => r && r.pts[id] && !r.pts[id].err ? r.pts[id] : null;
+  const ps = sel.points.map(pos).filter(Boolean);
+  const first = sel.points[0], last = sel.points[sel.points.length - 1];
+  const o = { n: "5", dx: "1", dy: "0", mode: "", from: last, to: first };
+  if (ps.length){
+    const xs = ps.map(p => p.x), ys = ps.map(p => p.y);
+    if (!sel.shapes.length && pos(first) && pos(last) && first !== last){
+      o.dx = Expr.num((pos(last).x - pos(first).x) * F); o.dy = Expr.num(pos(last).y - pos(first).y); o.mode = "share";
+    } else { o.dx = Expr.num((Math.max(...xs) - Math.min(...xs)) || 1); o.dy = "0"; }
+  }
+  const ptOpts = sel.points.map(id => { const p = Spec.byId(sp.points, id); return [id, id + (p.codes.length ? " " + p.codes.join(",") : "")]; });
+  openDialog(`Array: ${sel.points.length} จุด · ${sel.links.length} link · ${sel.shapes.length} shape`, b => {
+    div("cf-explain", `<p>ทำซ้ำชุดที่เลือก — ชุดที่ k = ชุด k−1 เลื่อนไป dx, dy (แก้ dx / dy ทีหลังได้ใน Properties แล้วขยับทั้งแถว)</p>`, b);
+    const row = (label, small) => div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, b);
+    const names = specNames(it), xo = Spec.exprOpts(sp);
+    const field = (label, small, key, expr) => {
+      const rr = row(label, small), inp = document.createElement("input"); inp.value = o[key];
+      inp.oninput = () => { o[key] = inp.value.trim(); if (expr){ const c = Expr.check(o[key] || "0", names, xo); inp.classList.toggle("bad", !c.ok); inp.title = c.ok ? "" : c.error; } };
+      rr.appendChild(inp); return inp;
+    };
+    field("จำนวนชุด", "ทั้งหมด รวมชุดต้นฉบับ (2–200)", "n");
+    field("dx", "ไปทางนอก + (ฝั่ง Right = ขวา) · นิพจน์ / parameter ได้", "dx", true);
+    field("dy", "ขึ้น + · นิพจน์ / parameter ได้", "dy", true);
+    const sel_ = (label, small, key, opts) => {
+      const s = document.createElement("select"); s.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(""); s.value = o[key];
+      s.onchange = () => { o[key] = s.value; sync(); }; row(label, small).appendChild(s); return s;
+    };
+    sel_("ต่อชุด", "", "mode", [["", "ไม่ต่อ"], ["share", "ใช้จุดร่วม (ขั้นบันได — ไม่มีจุดซ้ำ)"], ["link", "ต่อด้วย link"]]);
+    const fromS = sel_("จุดของชุดก่อน", "", "from", ptOpts), toS = sel_("จุดของชุดถัดไป", "", "to", ptOpts);
+    const note = div("hint", "", b);
+    function sync(){
+      fromS.parentElement.hidden = toS.parentElement.hidden = !o.mode;
+      note.innerHTML = o.mode === "share" ? `จุด <b>${esc(o.to)}</b> ของชุดถัดไป = จุด <b>${esc(o.from)}</b> ของชุดก่อน (ใช้จุดเดียวกัน)`
+                     : o.mode === "link" ? `link จาก <b>${esc(o.from)}</b> ของชุดก่อน ไป <b>${esc(o.to)}</b> ของชุดถัดไป` : "แต่ละชุดแยกกัน";
+    }
+    sync();
+    const err = div("expr-err", "", b);
+    div("btns", null, b).append(
+      btn("สร้าง", () => {
+        for (const k of ["dx", "dy"]){ const c = Expr.check(o[k] || "0", names, xo); if (!c.ok){ err.textContent = `${k}: ${c.error}`; return; } }
+        const opt = { n: +o.n, dx: o.dx || "0", dy: o.dy || "0", join: o.mode ? { mode: o.mode, from: o.from, to: o.to } : null };
+        const test = Spec.addArray(JSON.parse(JSON.stringify(sp)), sel, opt);
+        if (test.error){ err.textContent = test.error; return; }
+        closeDialog();
+        let g = null;
+        specEdit(s => { g = Spec.addArray(s, sel, opt); }, it, `Array ${opt.n} ชุด`);
+        if (g && g.id){
+          setSelList(g.members.flatMap(m => m.points.map(id => ({ type: "dpt", item: it.id, id }))).concat(g.members.flatMap(m => m.links.map(id => ({ type: "dlink", item: it.id, id })))));
+          flashBanner(`Array ${g.id}: เพิ่ม ${g.n - 1} ชุด — แก้ N / dx / dy ได้ใน Properties ของสมาชิก (Ctrl+Z ย้อนได้)`);
+        }
+      }),
+      btn("ยกเลิก", closeDialog));
+  });
+}
+// Properties: กลุ่ม Array ของ object ที่เลือก — แก้ dx / dy (ขยับทั้งแถว) / N / วิธีต่อชุด (สร้างใหม่) / เลิกเป็น array
+function propsArray(box, it, g){
+  const sp = it.spec;
+  const gr = group(box, `Array ${g.id}`, canEdit(it) ? { label: "เลิกเป็น Array", title: "เลิกจับกลุ่ม — ทุกชิ้นยังอยู่ (เป็นจุด / link ธรรมดา)",
+    cmd: () => { specEdit(s => { s.arrays = s.arrays.filter(x => x.id !== g.id); }, it, `เลิกเป็น Array ${g.id}`); renderProps(true); } } : null);
+  const src = g.source;
+  kv(gr, [["ต้นฉบับ", [src.points.join(", "), src.links.join(", "), src.shapes.join(", ")].filter(Boolean).join(" · ")],
+          ["ต่อชุด", !g.join ? "ไม่ต่อ" : g.join.mode === "share" ? `จุดร่วม: ${g.join.to} ของชุดถัดไป = ${g.join.from} ของชุดก่อน` : `link ${g.join.from} → ${g.join.to}`]]);
+  const row = div("row", `<label>จำนวนชุด<small>รวมต้นฉบับ (สร้างใหม่ทั้งชุด)</small></label>`, gr);
+  const n = document.createElement("input"); n.type = "number"; n.min = 2; n.max = 200; n.step = 1; n.value = g.n; n.disabled = !canEdit(it);
+  n.onchange = () => {
+    const v = Math.round(+n.value);
+    if (!(v >= 2 && v <= 200)){ n.value = g.n; return flashBanner("จำนวนชุดต้อง 2–200"); }
+    const test = Spec.rebuildArray(JSON.parse(JSON.stringify(sp)), JSON.parse(JSON.stringify(g)), { n: v });
+    if (test.block.length){ n.value = g.n; return alert(`เปลี่ยนจำนวนชุดไม่ได้ — มีของอื่นอ้างสมาชิกของ ${g.id} อยู่: ${test.block.join(", ")}\n(แก้ dx / dy ได้เสมอ)`); }
+    specEdit(s => Spec.rebuildArray(s, Spec.arrayOf(s, "point", g.source.points[0]) || g, { n: v }), it, `${g.id} จำนวนชุด = ${v}`);
+    renderProps(true);
+  };
+  row.appendChild(n);
+  for (const k of ["dx", "dy"]){
+    const inp = exprRow(gr, it, k, k === "dx" ? "ไปทางนอก + · ทุกชุด" : "ขึ้น + · ทุกชุด", g[k], v => Spec.updateArray(sp, g, { [k]: v }));
+    if (canEdit(it)){
+      const b = btn("+", () => {
+        const name = newParamFromValue(it, inp.value.trim() || g[k], k === "dx" ? "StepX" : "StepY");
+        if (name){ specEdit(s => Spec.updateArray(s, Spec.arrayOf(s, "point", g.source.points[0]) || g, { [k]: name }), it, `${g.id} ใช้ parameter ${name}`); renderProps(true); }
+      }, false, "สร้าง parameter ใหม่จากช่องนี้ (default = ค่าตอนนี้)");
+      b.classList.add("par-btn"); inp.parentElement.appendChild(b);
+    }
+  }
+  if (canEdit(it)) div("btns", null, gr).append(btn("เลือกทั้ง Array", () => {
+    const all = [src, ...g.members];
+    setSelList(all.flatMap(m => m.points.map(id => ({ type: "dpt", item: it.id, id })).concat(m.links.map(id => ({ type: "dlink", item: it.id, id })), m.shapes.map(id => ({ type: "dshape", item: it.id, id })))));
+  }));
+  div("hint", "จุดของชุดที่ k = ห่างจากจุดเดียวกันของชุดก่อน dx, dy · ลบสมาชิกเอง = เลิกเป็น Array", gr);
 }
 // Clipped Surface Link (รอบ 4c): หน้าต่างหลังคลิกจุดเริ่ม / จุดปลาย / เส้นอ้างอิง (refLink = null = ใช้ระดับคงที่)
 function openClip(it, from, to, refLink){

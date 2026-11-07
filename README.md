@@ -17,9 +17,10 @@
 | object → โค้ด | เลือก object แล้วเห็นบรรทัดในไฟล์ + ปุ่มไปที่โค้ด, เคอร์เซอร์ในโค้ด → เน้น object | **object → บรรทัดโค้ด** |
 | Shortcut | กด `?` / `F1` บนหน้าเว็บ | **Shortcut** |
 
-**รอบ 4c (`prompt-4c.md`)** — กำลังทำ (M1–M4 เสร็จ): จัดปุ่มใหม่ตามงานจริง — ข้อตกลงอยู่ใน `prompt-4c-design.md`
+**รอบ 4c (`prompt-4c.md`)** — กำลังทำ (M1–M5 เสร็จ): จัดปุ่มใหม่ตามงานจริง — ข้อตกลงอยู่ใน `prompt-4c-design.md`
 - **ปุ่มใหม่ Intersect (`I`) / Offset (`O`)** ในกลุ่ม Geometry — หัวข้อ **Intersect / Offset** · ชนิดจุดใหม่ **Offset (เส้นขนาน)**
 - **ปุ่มใหม่ Extend to Surface** ในกลุ่ม Surface — หัวข้อ **Extend to Surface** · ชนิดจุดใหม่ **ต่อลงถึงดิน** · link **optional** ใน shape · **ปลายจริง** เป็นปลาย link ได้
+- **ปุ่มใหม่ Array** ในกลุ่ม Geometry — หัวข้อ **Array** (ทำซ้ำชุดที่เลือก N ชุด ห่าง dx, dy · ขั้นบันไดแบบ pavement)
 - **ปุ่มใหม่ Clipped Surface Link** ในกลุ่ม Surface — หัวข้อ **Clipped Surface Link** · ชนิด link ใหม่ **ตามดิน ไม่เกินเส้น** (code แยกช่วงตามดิน / บนเส้น)
 - test เทียบผล JS กับ C# (`dotnet run --project SA.Tests`) เทียบ **code ของ link** ด้วยแล้ว (เดิมเทียบแค่พิกัด)
 - **เอา Max / Min (รอบ 4b) ออกแล้ว** — project / ไฟล์ .cs เก่าที่มี Max / Min เปิดได้: ตัดทิ้งตอนโหลด แล้วแจ้งครั้งเดียว "Max / Min ถูกเอาออกแล้ว — จุด … ใช้ตำแหน่งตามนิยามเดิม"
@@ -82,6 +83,7 @@
 | Arc | (`T` / `E` ระหว่างวาด) | 3 จุด: เริ่ม → ผ่าน → ปลาย · เริ่ม-ปลาย-รัศมี: เริ่ม → ปลาย → ลากเลือกความโค้ง — ดูหัวข้อ **Arc / Fillet** |
 | Fillet | | ตั้งรัศมี (`Tab` / พิมพ์ตัวเลข) แล้วคลิก link 2 เส้นที่ต่อกันที่มุม |
 | Intersect | `I` | คลิก link เส้นตรง 2 เส้น → เลือก `T` ตัด / ยืดเส้นให้จบที่จุดตัด หรือ `N` ไม่ตัด (ได้แค่จุดตัด) — หัวข้อ **Intersect / Offset** |
+| Array | | เลือก object ก่อน (คลิก / คลุมเลือก) แล้วกดปุ่ม → หน้าต่าง: จำนวนชุด, dx, dy, ต่อชุด (จุดร่วม / link) — หัวข้อ **Array** |
 | Offset | `O` | ตั้งระยะ (`Tab` / พิมพ์ตัวเลข) → คลิก link เส้นตรง → คลิกด้าน = เส้นขนาน (2 จุด + link) — หัวข้อ **Intersect / Offset** |
 | Slope to Surface | | คลิกจุดเริ่ม แล้วเลื่อนเมาส์เลือกทิศ คลิก = จุด daylight (slope ตามปุ่มที่ล็อกในแถบล่าง ไม่ล็อก = 1:2) |
 | Clipped Surface Link | | คลิกจุดเริ่ม → จุดปลาย → เส้นอ้างอิง (link เส้นตรง · `Tab` = ระดับคงที่) → หน้าต่าง (ไม่สูงกว่า / ไม่ต่ำกว่า, code 3 ชุด) — หัวข้อ **Clipped Surface Link** |
@@ -192,6 +194,22 @@ link ใน Civil 3D เป็น**เส้นตรงเท่านั้น
   - เส้นเดิมยาวเป็นศูนย์ = หาทิศไม่ได้ + เตือน · Move: ตามไปเองเมื่อปลายเส้นเดิมย้ายทั้งคู่
   - ผลตรงกับ `ParallelY` ของ `body_rock-pitching.cs` (เส้นขนานผิวหินลึกตั้งฉาก RockThickness — test `offset.test.js`)
 - โค้ด C# ที่สร้าง: `Pt? P3 = Offset(cs, "P3", P1, P2, P1, F * -1.0 * RockThickness);` · จุดตัดใช้ `Intersect(...)` เดิม
+
+### Array (รอบ 4c)
+
+ทำซ้ำชุด object แบบ ARRAY ของ AutoCAD (เส้นตรงเดียว) — เช่น ขั้นบันไดของ `pavement-assembly.cs` ที่เดิมวาดทีละจุด
+
+- **เลือก** จุด / link / shape ที่วาด (link ได้ปลายไปด้วย · shape ได้ link ของมันไปด้วย) → ปุ่ม **Array** (กลุ่ม Geometry) → หน้าต่าง:
+  - **จำนวนชุด** ทั้งหมดรวมชุดต้นฉบับ (2–200 · ตัวเลขคงที่ — N เป็น parameter = Loop ทีหลัง)
+  - **dx / dy** ห่างชุดละ (นิพจน์ / parameter ได้ เช่น `Tread` / `-Rise` · dx ไปทางนอก + ในกรอบ Side = Right)
+  - **ต่อชุด**: ไม่ต่อ · **ใช้จุดร่วม** = จุด *to* ของชุดถัดไปคือจุด *from* ของชุดก่อน (ขั้นบันไดต่อกันโดยไม่มีจุดซ้ำ) · **ต่อด้วย link** from (ชุดก่อน) → to (ชุดถัดไป)
+  - ค่าเริ่มต้น: ชุดที่เป็นเส้นเปิด = dx / dy จากจุดแรกถึงจุดสุดท้ายของชุด + จุดร่วม (ขั้นบันได) · มี shape = กว้างเท่ากรอบ ไม่ต่อ
+- จุดของชุดที่ k = **ห่างจากจุดเดียวกันของชุดก่อน dx, dy** (ชนิด "ห่างจากจุด") — link / shape / code / Auxiliary / กิ่งคัดลอกตามต้นฉบับ
+  → ย้ายต้นฉบับ = ทุกชุดตาม · เปลี่ยน parameter ใน dx / dy = ทุกขั้นเปลี่ยน · โค้ด C# เป็นจุด / link ธรรมดา (Civil 3D ไม่ต้องรู้จัก Array)
+- **Properties** ของชิ้นไหนก็ได้ในกลุ่ม → กลุ่ม **Array A1**: แก้ **dx / dy** (ขยับทั้งแถว · ปุ่ม `+` สร้าง parameter), **จำนวนชุด** (สร้างใหม่ — มีของอื่นอ้างสมาชิกอยู่ = ไม่ยอม + บอกรายการ),
+  **เลือกทั้ง Array**, **เลิกเป็น Array** (ทุกชิ้นยังอยู่)
+- ลบสมาชิก / ต้นฉบับเอง = ถามก่อน แล้วเลิกเป็น Array · Undo ได้ทุกขั้น
+- spec: `arrays: [{ id, source: { points, links, shapes }, n, dx, dy, join: { mode: "share" | "link", from, to } | null, members: [...] }]`
 
 ### Extend to Surface (รอบ 4c)
 
@@ -533,6 +551,7 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 | `node SA.Tests/js/evaluator.test.js` | นิพจน์ + DrawingSpec (เพิ่มกรณีได้ใน `SA.Tests/js/drawing-cases.json`) |
 | `node SA.Tests/js/cond.test.js` | นิพจน์เงื่อนไข / ค่าจากเรขาคณิต (รอบ 4) |
 | `node SA.Tests/js/logic.test.js` | กิ่ง if / switch / ซ้อน, firstOf, ไม่รู้ค่า, clone กิ่ง, ถ้าตัด / ถม, แสดงทุกกรณี, เปลี่ยนชื่อ / ลบเงื่อนไข (รอบ 4) |
+| `node SA.Tests/js/array.test.js` | Array: ขั้นบันได (จุดร่วม), แก้ dx / dy / parameter, Left, ต่อด้วย link, shape / aux / กิ่ง, เปลี่ยน N (ถูกขวาง), ลบ = เลิกเป็น Array, Move (รอบ 4c) |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |

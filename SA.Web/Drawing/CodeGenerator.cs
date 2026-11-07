@@ -502,7 +502,7 @@ public static class CodeGenerator
                 "onSurface" => ($"OnSurface(cs, {Q}, {SurfVar(d.Target)}, {From(d.From)}, F * {Ex(d.Dx, "dx", 1)})", $"{id} บนผิวดิน"),
                 "between" => ($"Between(cs, {Q}, {From(d.A)}, {From(d.B)}, {Ex(d.T, "t")})", $"{id} บนเส้น {d.A}-{d.B}"),
                 "intersect" => ($"Intersect(cs, {Q}, {From(d.A1)}, {From(d.A2)}, {From(d.B1)}, {From(d.B2)})", $"{id} จุดตัด {d.A1}-{d.A2} กับ {d.B1}-{d.B2}"),
-                "offset" => ($"Offset(cs, {Q}, {From(d.A)}, {From(d.B)}, {(d.End == "b" ? From(d.B) : From(d.A))}, F * {(d.Side == -1 ? "-1.0" : "1.0")} * {Ex(d.Dist, "dist")})",
+                "offset" => ($"Offset(cs, {Q}, {From(d.A)}, {From(d.B)}, {(d.End == "b" ? From(d.B) : From(d.A))}, F * {(d.Side == -1 ? "-1.0" : "1.0")} * {Ex(d.Dist, "dist", 1)})",
                              $"{id} offset ปลาย {(d.End == "b" ? d.B : d.A)} ของเส้น {d.A}-{d.B} ไปทาง{(d.Side == -1 ? "ขวา" : "ซ้าย")}ของทิศ {d.A}→{d.B}"),
                 "extendToGround" => ($"ExtendToGround(cs, {Q}, {SurfVar(d.Target)}, {From(d.From)}, {From(d.Along)}, {Ex(d.MaxDistance ?? "50", "maxDistance")})",
                                      $"{id} ต่อเส้น {d.Along}→{d.From} ลงถึงดิน (ไม่ลอย / ไม่มีดิน = ไม่เกิด)"),

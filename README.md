@@ -17,7 +17,9 @@
 | object → โค้ด | เลือก object แล้วเห็นบรรทัดในไฟล์ + ปุ่มไปที่โค้ด, เคอร์เซอร์ในโค้ด → เน้น object | **object → บรรทัดโค้ด** |
 | Shortcut | กด `?` / `F1` บนหน้าเว็บ | **Shortcut** |
 
-**รอบ 4c (`prompt-4c.md`)** — กำลังทำ (M1–M5 เสร็จ): จัดปุ่มใหม่ตามงานจริง — ข้อตกลงอยู่ใน `prompt-4c-design.md`
+**รอบ 4c (`prompt-4c.md`)** — ทำครบแล้ว (M0–M6): จัดปุ่มใหม่ตามงานจริง — ข้อตกลงอยู่ใน `prompt-4c-design.md`
+- **วาด `base_rock-pitching.cs` / `body_rock-pitching.cs` ใหม่ในเว็บได้ทั้งตัวโดยไม่เขียนโค้ด** → `tests-civil3d/round4c-base.cs` / `round4c-body.cs`
+  — test รันคู่กับไฟล์จริงผ่านตัวจำลอง: จุด / link / shape / code ตรงกัน (หัวข้อ **ทดสอบใน Civil 3D (รอบ 4c)** + ตาราง **ต่างกันตรงไหน**)
 - **ปุ่มใหม่ Intersect (`I`) / Offset (`O`)** ในกลุ่ม Geometry — หัวข้อ **Intersect / Offset** · ชนิดจุดใหม่ **Offset (เส้นขนาน)**
 - **ปุ่มใหม่ Extend to Surface** ในกลุ่ม Surface — หัวข้อ **Extend to Surface** · ชนิดจุดใหม่ **ต่อลงถึงดิน** · link **optional** ใน shape · **ปลายจริง** เป็นปลาย link ได้
 - **ปุ่มใหม่ Array** ในกลุ่ม Geometry — หัวข้อ **Array** (ทำซ้ำชุดที่เลือก N ชุด ห่าง dx, dy · ขั้นบันไดแบบ pavement)
@@ -543,14 +545,52 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 - ต้องมี target surface ที่ corridor ผ่านทั้งช่วงตัดและถม แล้วทำตาม `tests-civil3d/round4-checklist.md` (10 ข้อ + ตารางพิกัดเมื่อดินราบ)
 - spec เดียวกันอยู่ใน `drawing-cases.json` (เทียบ JS กับ C# 5 กรณี: ตัด, ถมปกติ, ถมสูง + ไม่มีขอบทาง, Left, Layout)
 
+### ทดสอบใน Civil 3D (รอบ 4c) — rock-pitching ที่วาดใหม่
+
+`tests-civil3d/round4c-base.cs` (`Round4cBase`) / `round4c-body.cs` (`Round4cBody`) = `base_rock-pitching.cs` / `body_rock-pitching.cs` ที่วาดใหม่ด้วยเครื่องมือของเว็บเท่านั้น
+(ลำดับการกด = `buildBase()` / `buildBody()` ใน `SA.Tests/js/rockpitching.test.js` — test เช็กว่าสร้างใหม่ได้ spec เดียวกับในไฟล์ทุกตัวอักษร)
+
+- **base**: ตาราง Parameter (TopWidth / SideSlope ต้องมากกว่า 0, Depth ขั้นต่ำ 2) → Point 4 จุด (dx / dy เป็นนิพจน์ เช่น `Depth * SideSlope`) → Link + เส้นฐาน Auxiliary
+  → **Extend to Surface** ที่มุมฐานทั้งสอง (ไม่ย้ายเส้นฐานไปปลายจริง) → **Clipped Surface Link** ปลายจริงนอก → ปลายจริงใน ไม่สูงกว่าเส้นฐาน (`Datum` / `TrapOnSurface` / `TrapBase`) → Shape `Trapezoid`
+- **body**: ตาราง Parameter → ผิวหิน P1 → F → **Offset** `RockThickness` และ `RockThickness + MinSoilThickness` (Auxiliary) → เส้นช่วย: ปิดปลาย 1:EndSlope จาก F, เส้นดิ่งที่ origin
+  → **Intersect** R / B0 (เอา Auxiliary ออก + code) / O / เส้นดินที่ origin → **Extend to Surface** ที่ O ("ไม่ชนดินใน" = `O.x`) → ปลายจริงเอา Auxiliary ออก + code `SoilToe`
+  → Point `dy = min(ground(P1), P12.y)` (`SoilBaseInside`) → **Clipped Surface Link** ไม่สูงกว่าเส้นดิน → Shape `RockPitching` + `CompactedSoil`
+- `SA.Tests/RockPitchingTests.cs`: คอมไพล์ไฟล์จริง (อ่านอย่างเดียว) + ไฟล์ที่วาด แล้วรันกับตัวจำลอง — base 8 ผิวดิน / body 7 ผิวดิน (สูงกว่าทั้งหมด, ต่ำกว่าทั้งหมด, ตัดผ่าน, ลาดเอียง,
+  ต่อข้างเดียว / สองข้าง, ขรุขระ, Layout, ไม่มี target) × Side Right / Left × 4 ชุดค่า (รวม Depth 1.5, MinSoilThickness 0.5, ค่า ≤ 0) → เทียบ **จุด + point code, link + link code,
+  shape + shape code** และว่ามี error / เตือนเหมือนกัน (ไม่เทียบลำดับ)
+- ใน Civil 3D: ทำตาม `tests-civil3d/round4c-checklist.md` (วางไฟล์จริงกับไฟล์ที่วาดคู่กันใน corridor เดียวกัน)
+
+**ต่างกันตรงไหน เพราะอะไร**
+
+| เรื่อง | ไฟล์จริง | ที่วาดในเว็บ | เพราะ |
+|---|---|---|---|
+| ลำดับ Points.Add / Links.Add | ตามเส้นรอบรูป | จุดตามลำดับใน spec แล้วตามด้วยจุดระหว่างทางของ Clipped Surface Link | ตัวสร้างโค้ดเรียงตามนิยาม · ไม่มีผลกับ corridor / code (test ไม่เทียบลำดับ) |
+| จุดแรกของ shape | P1 | ตามลำดับ link ที่คลิก | เหมือนกันเป็นรูปปิดเดียวกัน |
+| body: เส้นปิดปลายต่อลงไปชนดิน**เลย origin เข้าด้านใน** (ดินต่ำมาก + ลาดชัน) | เตือน + ไม่ใช้ผิวดินเลย (ขอบล่าง = เส้นความหนาขั้นต่ำทั้งเส้น) | เตือน + ไม่ต่อ ("ไม่ชนดินใน" = `O.x`) แต่ขอบล่างยังตามดิน | "เลิกใช้ผิวดินทั้งหมดเมื่อ…" ต้องใช้กิ่ง (Logic) — test ตรวจแค่ว่าเตือนทั้งคู่ |
+| base: ต่อลงถึงดินแล้วสองข้างไขว้กันก่อนถึงดิน | เตือน + คางหมูปกติ | ต่อทั้งสองข้าง (รูปแปลก) | กรณีเป็นไปไม่ได้ในงานจริง (ต้อง SideSlope ติดลบ) — ไม่ได้ทำซ้ำ |
+| ต่อลงถึงดินไม่ชนดิน (เช่น ผิวดินสั้นและไม่ต่อปลาย) | เตือน + คางหมูปกติทั้งรูป | เตือน + ไม่ต่อเฉพาะมุมนั้น | ที่วาดคิดทีละมุม |
+| ขอบล่างของ body ตัดจุดกลางที่อยู่บนเส้นตรงเดียวกันบนผิวดินด้วย | ตัด (`cross < 1e-6`) | ตัดเฉพาะจุดกลางของช่วงบนเส้นอ้างอิง (แบบ base) | เกิดเมื่อผิวดินมีจุดหักเรียงเป็นเส้นตรง — พิกัดของรูปเหมือนเดิม จำนวนจุดต่างได้ |
+| ขอบล่าง body: จุดห่างกัน < 0.0001 m | เก็บจุดหลัง | เก็บจุดแรก | ต่างกันไม่เกิน 0.0001 m |
+| ปลายลอยเหนือดินหรือไม่ | ต่ำกว่า > 0.000001 m | ต่ำกว่า > 0.000000001 m | ดินพอดีกับมุมฐาน (ต่างกันน้อยกว่า 0.000001 m) เท่านั้น |
+| ไม่ได้กำหนด Target Surface | เตือน 1 ครั้ง | เตือนที่ทุกชิ้นที่ใช้ดิน | ข้อความเตือนต่างกันได้ — มี / ไม่มีเตือนเหมือนกัน |
+| ชื่อ class | `Trapezoid` / `RockPitchingBody` | `Round4cBase` / `Round4cBody` | วางคู่กันใน Civil 3D ได้ |
+
+**ฟังก์ชันล้วนของรอบ 4c (สำหรับ Logic API ของ prompt-5)** — อยู่ใน `spec.js` (`Spec.*`) ใช้ได้ทั้งเว็บและ node:
+`setParamBounds(spec, name, { positive, min, max })` · `paramBoundsIssue(param)` · `addCutFill(spec, o)` · `addIntersect(spec, l1, l2, { trim, keep1, keep2, aux })` ·
+`addOffset(spec, linkId, dist, side, { aux })` · `addExtendToGround(spec, linkId, end, { codes, pointCodes, maxDistance, rewire, target })` ·
+`addFollowClipped(spec, from, to, { refLink | refLevel, side, codes, codesGround, codesLine, target, aux })` · `clipPath(...)` ·
+`addArray(spec, sel, { n, dx, dy, join })` / `updateArray(spec, g, { dx, dy })` / `rebuildArray(spec, g, { n, join })` / `arrayOf(spec, kind, id)` ·
+`isAlias(spec, id)` / `auxEnd(spec, id)` (ปลายจริง)
+
 ### ทดสอบ
 
 | คำสั่ง | ทดสอบอะไร |
 |---|---|
-| `dotnet run --project SA.Tests` | Trapezoid, ตัวสร้างโค้ด (เทียบผล JS กับผลรันโค้ด C# รวม Side = Left — ส่วนนี้ต้องมี `node`), ช่วง SA-DRAWING, object → บรรทัดโค้ด |
+| `dotnet run --project SA.Tests` | Trapezoid, ตัวสร้างโค้ด (เทียบผล JS กับผลรันโค้ด C# รวม Side = Left และ code ของ link — ส่วนนี้ต้องมี `node`), ช่วง SA-DRAWING, object → บรรทัดโค้ด, rock-pitching ที่วาดใหม่ = ไฟล์จริง (รอบ 4c) |
 | `node SA.Tests/js/evaluator.test.js` | นิพจน์ + DrawingSpec (เพิ่มกรณีได้ใน `SA.Tests/js/drawing-cases.json`) |
 | `node SA.Tests/js/cond.test.js` | นิพจน์เงื่อนไข / ค่าจากเรขาคณิต (รอบ 4) |
 | `node SA.Tests/js/logic.test.js` | กิ่ง if / switch / ซ้อน, firstOf, ไม่รู้ค่า, clone กิ่ง, ถ้าตัด / ถม, แสดงทุกกรณี, เปลี่ยนชื่อ / ลบเงื่อนไข (รอบ 4) |
+| `node SA.Tests/js/rockpitching.test.js` | วาด base / body rock-pitching ใหม่ด้วยเครื่องมือ = sa-spec ใน `tests-civil3d/round4c-*.cs`, คำนวณได้ไม่เตือน / รูปปิด (รอบ 4c) — เทียบกับไฟล์จริงอยู่ใน `dotnet run` |
 | `node SA.Tests/js/array.test.js` | Array: ขั้นบันได (จุดร่วม), แก้ dx / dy / parameter, Left, ต่อด้วย link, shape / aux / กิ่ง, เปลี่ยน N (ถูกขวาง), ลบ = เลิกเป็น Array, Move (รอบ 4c) |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |

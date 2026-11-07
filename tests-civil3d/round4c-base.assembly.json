@@ -1,0 +1,302 @@
+﻿{
+  "version": 1,
+  "name": "Round4c base (rock-pitching \u0E10\u0E32\u0E19)",
+  "baseline": {
+    "x": 0,
+    "y": 0
+  },
+  "originElevation": 100,
+  "surface": [
+    {
+      "x": -20,
+      "y": -1
+    },
+    {
+      "x": -2,
+      "y": -1.5
+    },
+    {
+      "x": 0,
+      "y": -2.6
+    },
+    {
+      "x": 2,
+      "y": -1
+    },
+    {
+      "x": 4.3,
+      "y": -2.4
+    },
+    {
+      "x": 8,
+      "y": -4
+    },
+    {
+      "x": 20,
+      "y": -5
+    }
+  ],
+  "surfaceOn": true,
+  "layout": false,
+  "extendEnds": true,
+  "items": [
+    {
+      "id": "round4cbase",
+      "name": "Round4cBase",
+      "className": null,
+      "params": {},
+      "attach": {
+        "type": "baseline",
+        "x": 0,
+        "y": 0
+      },
+      "fileName": "round4c-base.cs",
+      "spec": {
+        "version": 1,
+        "className": "Round4cBase",
+        "namespace": "TestSubassembly",
+        "params": [
+          {
+            "name": "Side",
+            "kind": "long",
+            "default": 0,
+            "displayName": "Side",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "TopWidth",
+            "kind": "double",
+            "default": 2,
+            "displayName": "Top Width",
+            "min": null,
+            "max": null,
+            "positive": true
+          },
+          {
+            "name": "SideSlope",
+            "kind": "double",
+            "default": 1.5,
+            "displayName": "Side Slope (1:x)",
+            "min": null,
+            "max": null,
+            "positive": true
+          },
+          {
+            "name": "Depth",
+            "kind": "double",
+            "default": 2,
+            "displayName": "Depth",
+            "min": 2,
+            "max": null
+          }
+        ],
+        "targets": [
+          {
+            "name": "TargetSurface",
+            "type": "Surface",
+            "displayName": "Target Surface"
+          }
+        ],
+        "points": [
+          {
+            "id": "P1",
+            "codes": [
+              "TrapTopInside"
+            ],
+            "def": {
+              "type": "origin"
+            }
+          },
+          {
+            "id": "P2",
+            "codes": [
+              "TrapTopOutside"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "TopWidth",
+              "dy": "0"
+            }
+          },
+          {
+            "id": "P3",
+            "codes": [
+              "TrapBaseOutside"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P2",
+              "dx": "Depth * SideSlope",
+              "dy": "-Depth"
+            }
+          },
+          {
+            "id": "P4",
+            "codes": [
+              "TrapBaseInside"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "-Depth * SideSlope",
+              "dy": "-Depth"
+            }
+          },
+          {
+            "id": "P5",
+            "codes": [
+              "TrapToeOutside"
+            ],
+            "def": {
+              "type": "extendToGround",
+              "from": "P3",
+              "along": "P2",
+              "target": "TargetSurface",
+              "maxDistance": "50"
+            }
+          },
+          {
+            "id": "P6",
+            "codes": [],
+            "def": {
+              "type": "firstOf",
+              "points": [
+                "P5",
+                "P3"
+              ]
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P7",
+            "codes": [
+              "TrapToeInside"
+            ],
+            "def": {
+              "type": "extendToGround",
+              "from": "P4",
+              "along": "P1",
+              "target": "TargetSurface",
+              "maxDistance": "50"
+            }
+          },
+          {
+            "id": "P8",
+            "codes": [],
+            "def": {
+              "type": "firstOf",
+              "points": [
+                "P7",
+                "P4"
+              ]
+            },
+            "auxiliary": true
+          }
+        ],
+        "links": [
+          {
+            "id": "L1",
+            "points": [
+              "P1",
+              "P2"
+            ],
+            "codes": [
+              "Top"
+            ]
+          },
+          {
+            "id": "L2",
+            "points": [
+              "P2",
+              "P3"
+            ],
+            "codes": [
+              "TrapSide"
+            ]
+          },
+          {
+            "id": "L5",
+            "points": [
+              "P3",
+              "P5"
+            ],
+            "codes": [
+              "TrapSide"
+            ],
+            "optional": true
+          },
+          {
+            "id": "L3",
+            "points": [
+              "P4",
+              "P1"
+            ],
+            "codes": [
+              "TrapSide"
+            ]
+          },
+          {
+            "id": "L6",
+            "points": [
+              "P4",
+              "P7"
+            ],
+            "codes": [
+              "TrapSide"
+            ],
+            "optional": true
+          },
+          {
+            "id": "L4",
+            "points": [
+              "P3",
+              "P4"
+            ],
+            "auxiliary": true,
+            "codes": []
+          },
+          {
+            "id": "L7",
+            "type": "followClipped",
+            "from": "P6",
+            "to": "P8",
+            "target": "TargetSurface",
+            "refLink": "L4",
+            "side": "below",
+            "codes": [
+              "Datum"
+            ],
+            "codesGround": [
+              "TrapOnSurface"
+            ],
+            "codesLine": [
+              "TrapBase"
+            ]
+          }
+        ],
+        "shapes": [
+          {
+            "id": "S1",
+            "links": [
+              "L1",
+              "L2",
+              "L5",
+              "L7",
+              "L6",
+              "L3"
+            ],
+            "codes": [
+              "Trapezoid"
+            ]
+          }
+        ],
+        "side": {
+          "param": "Side",
+          "mirror": true
+        }
+      }
+    }
+  ]
+}

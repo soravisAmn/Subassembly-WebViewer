@@ -1,0 +1,479 @@
+﻿{
+  "version": 1,
+  "name": "Round4c body (rock-pitching \u0E15\u0E31\u0E27\u0E25\u0E32\u0E14)",
+  "baseline": {
+    "x": 0,
+    "y": 0
+  },
+  "originElevation": 100,
+  "surface": [
+    {
+      "x": -20,
+      "y": 0
+    },
+    {
+      "x": 2,
+      "y": -1
+    },
+    {
+      "x": 4,
+      "y": -3.5
+    },
+    {
+      "x": 6,
+      "y": -2
+    },
+    {
+      "x": 8,
+      "y": -6
+    },
+    {
+      "x": 10,
+      "y": -4.5
+    },
+    {
+      "x": 14,
+      "y": -7
+    },
+    {
+      "x": 25,
+      "y": -8
+    }
+  ],
+  "surfaceOn": true,
+  "layout": false,
+  "extendEnds": true,
+  "items": [
+    {
+      "id": "round4cbody",
+      "name": "Round4cBody",
+      "className": null,
+      "params": {},
+      "attach": {
+        "type": "baseline",
+        "x": 0,
+        "y": 0
+      },
+      "fileName": "round4c-body.cs",
+      "spec": {
+        "version": 1,
+        "className": "Round4cBody",
+        "namespace": "TestSubassembly",
+        "params": [
+          {
+            "name": "Side",
+            "kind": "long",
+            "default": 0,
+            "displayName": "Side",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "Height",
+            "kind": "double",
+            "default": 5,
+            "displayName": "Height",
+            "min": null,
+            "max": null,
+            "positive": true
+          },
+          {
+            "name": "FaceSlope",
+            "kind": "double",
+            "default": 2.5,
+            "displayName": "Face Slope (1:x)",
+            "min": null,
+            "max": null,
+            "positive": true
+          },
+          {
+            "name": "RockThickness",
+            "kind": "double",
+            "default": 0.5,
+            "displayName": "Rock Thickness",
+            "min": null,
+            "max": null,
+            "positive": true
+          },
+          {
+            "name": "MinSoilThickness",
+            "kind": "double",
+            "default": 1,
+            "displayName": "Min Soil Thickness",
+            "min": 1,
+            "max": null
+          },
+          {
+            "name": "EndSlope",
+            "kind": "double",
+            "default": 1.5,
+            "displayName": "End Slope (1:x)",
+            "min": null,
+            "max": null,
+            "positive": true
+          }
+        ],
+        "targets": [
+          {
+            "name": "TargetSurface",
+            "type": "Surface",
+            "displayName": "Target Surface"
+          }
+        ],
+        "points": [
+          {
+            "id": "P1",
+            "codes": [
+              "RockTopInside"
+            ],
+            "def": {
+              "type": "origin"
+            }
+          },
+          {
+            "id": "P2",
+            "codes": [
+              "RockTopOutside"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "FaceSlope * Height",
+              "dy": "-Height"
+            }
+          },
+          {
+            "id": "P3",
+            "codes": [],
+            "def": {
+              "type": "offset",
+              "a": "P1",
+              "b": "P2",
+              "end": "a",
+              "dist": "RockThickness",
+              "side": -1
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P4",
+            "codes": [],
+            "def": {
+              "type": "offset",
+              "a": "P1",
+              "b": "P2",
+              "end": "b",
+              "dist": "RockThickness",
+              "side": -1
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P5",
+            "codes": [],
+            "def": {
+              "type": "offset",
+              "a": "P1",
+              "b": "P2",
+              "end": "a",
+              "dist": "RockThickness \u002B MinSoilThickness",
+              "side": -1
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P6",
+            "codes": [],
+            "def": {
+              "type": "offset",
+              "a": "P1",
+              "b": "P2",
+              "end": "b",
+              "dist": "RockThickness \u002B MinSoilThickness",
+              "side": -1
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P7",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P2",
+              "dx": "-EndSlope",
+              "dy": "-1"
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P8",
+            "codes": [],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "0",
+              "dy": "-1"
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P9",
+            "codes": [
+              "RockBaseOutside"
+            ],
+            "def": {
+              "type": "intersect",
+              "a1": "P3",
+              "a2": "P4",
+              "b1": "P2",
+              "b2": "P7"
+            }
+          },
+          {
+            "id": "P10",
+            "codes": [
+              "RockBaseInside"
+            ],
+            "def": {
+              "type": "intersect",
+              "a1": "P3",
+              "a2": "P4",
+              "b1": "P1",
+              "b2": "P8"
+            }
+          },
+          {
+            "id": "P11",
+            "codes": [],
+            "def": {
+              "type": "intersect",
+              "a1": "P5",
+              "a2": "P6",
+              "b1": "P2",
+              "b2": "P7"
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P12",
+            "codes": [],
+            "def": {
+              "type": "intersect",
+              "a1": "P5",
+              "a2": "P6",
+              "b1": "P1",
+              "b2": "P8"
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P13",
+            "codes": [],
+            "def": {
+              "type": "extendToGround",
+              "from": "P11",
+              "along": "P2",
+              "target": "TargetSurface",
+              "maxDistance": "P11.x"
+            },
+            "auxiliary": true
+          },
+          {
+            "id": "P14",
+            "codes": [
+              "SoilToe"
+            ],
+            "def": {
+              "type": "firstOf",
+              "points": [
+                "P13",
+                "P11"
+              ]
+            }
+          },
+          {
+            "id": "P15",
+            "codes": [
+              "SoilBaseInside"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "0",
+              "dy": "min(ground(P1), P12.y)"
+            }
+          }
+        ],
+        "links": [
+          {
+            "id": "L1",
+            "points": [
+              "P1",
+              "P2"
+            ],
+            "codes": [
+              "Top",
+              "RockFace"
+            ]
+          },
+          {
+            "id": "L2",
+            "points": [
+              "P3",
+              "P4"
+            ],
+            "auxiliary": true,
+            "codes": []
+          },
+          {
+            "id": "L3",
+            "points": [
+              "P5",
+              "P6"
+            ],
+            "auxiliary": true,
+            "codes": []
+          },
+          {
+            "id": "L4",
+            "points": [
+              "P2",
+              "P7"
+            ],
+            "auxiliary": true,
+            "codes": []
+          },
+          {
+            "id": "L5",
+            "points": [
+              "P1",
+              "P8"
+            ],
+            "auxiliary": true,
+            "codes": []
+          },
+          {
+            "id": "L6",
+            "points": [
+              "P2",
+              "P11"
+            ],
+            "auxiliary": true,
+            "codes": []
+          },
+          {
+            "id": "L7",
+            "points": [
+              "P11",
+              "P13"
+            ],
+            "codes": [],
+            "optional": true,
+            "auxiliary": true
+          },
+          {
+            "id": "L8",
+            "points": [
+              "P2",
+              "P9"
+            ],
+            "codes": [
+              "Top",
+              "RockEnd"
+            ]
+          },
+          {
+            "id": "L9",
+            "points": [
+              "P9",
+              "P10"
+            ],
+            "codes": [
+              "RockBase"
+            ]
+          },
+          {
+            "id": "L10",
+            "points": [
+              "P10",
+              "P1"
+            ],
+            "codes": [
+              "RockBack"
+            ]
+          },
+          {
+            "id": "L11",
+            "points": [
+              "P9",
+              "P14"
+            ],
+            "codes": [
+              "Top",
+              "Datum",
+              "SoilEnd"
+            ]
+          },
+          {
+            "id": "L12",
+            "type": "followClipped",
+            "from": "P14",
+            "to": "P15",
+            "target": "TargetSurface",
+            "refLink": "L3",
+            "side": "below",
+            "codes": [
+              "Datum"
+            ],
+            "codesGround": [
+              "SoilOnSurface"
+            ],
+            "codesLine": [
+              "SoilMinThickness"
+            ]
+          },
+          {
+            "id": "L13",
+            "points": [
+              "P15",
+              "P10"
+            ],
+            "codes": [
+              "SoilBack"
+            ]
+          }
+        ],
+        "shapes": [
+          {
+            "id": "S1",
+            "links": [
+              "L1",
+              "L8",
+              "L9",
+              "L10"
+            ],
+            "codes": [
+              "RockPitching"
+            ]
+          },
+          {
+            "id": "S2",
+            "links": [
+              "L9",
+              "L11",
+              "L12",
+              "L13"
+            ],
+            "codes": [
+              "CompactedSoil"
+            ]
+          }
+        ],
+        "side": {
+          "param": "Side",
+          "mirror": true
+        }
+      }
+    }
+  ]
+}

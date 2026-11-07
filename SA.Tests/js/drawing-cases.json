@@ -1693,5 +1693,28 @@
       "side": { "param": "Side", "mirror": true }
     }
   },
-  { "name": "Array ขั้นบันได Side = Left · Tread = 0.5, Rise = 0.2", "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }], "values": { "Side": 1, "Tread": 0.5, "Rise": 0.2 }, "copySpecFrom": 75 }
+  { "name": "Array ขั้นบันได Side = Left · Tread = 0.5, Rise = 0.2", "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }], "values": { "Side": 1, "Tread": 0.5, "Rise": 0.2 }, "copySpecFrom": 75 },
+  {
+    "name": "Offset ระยะเป็นนิพจน์บวก / ลบ (RockThickness + Extra, 2 - RockThickness) — วงเล็บในโค้ด C#",
+    "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": -8 }],
+    "values": { "RockThickness": 0.35, "Extra": 0.4 },
+    "spec": {
+      "className": "OffsetExpr", "namespace": "TestSubassembly",
+      "params": [
+        { "name": "Side", "kind": "long", "default": 0 },
+        { "name": "RockThickness", "kind": "double", "default": 0.3 },
+        { "name": "Extra", "kind": "double", "default": 1 }
+      ],
+      "targets": [],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "origin" } },
+        { "id": "P2", "codes": [], "def": { "type": "delta", "from": "P1", "dx": "7.5", "dy": "-3" } },
+        { "id": "P3", "codes": ["A"], "def": { "type": "offset", "a": "P1", "b": "P2", "end": "a", "dist": "RockThickness + Extra", "side": -1 } },
+        { "id": "P4", "codes": ["B"], "def": { "type": "offset", "a": "P1", "b": "P2", "end": "b", "dist": "2 - RockThickness", "side": 1 } }
+      ],
+      "links": [{ "id": "L1", "points": ["P1", "P2"], "codes": [] }],
+      "shapes": [],
+      "side": { "param": "Side", "mirror": true }
+    }
+  }
 ]

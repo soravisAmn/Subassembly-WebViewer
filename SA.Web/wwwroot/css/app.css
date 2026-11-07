@@ -186,6 +186,12 @@ body.row-resizing #main,body.row-resizing .pane-sec{pointer-events:none}
 .row{display:grid;grid-template-columns:minmax(0,1fr) 110px;align-items:center;gap:8px;margin-bottom:6px}
 .row label{font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
 .row label small{display:block;color:var(--muted);font:11px "IBM Plex Mono",monospace}
+/* ช่อง slope ↗ ↘ + ค่า (ui.js slopeRow) */
+.row.slope-row{grid-template-columns:minmax(0,1fr) 160px}
+.slope-in{display:flex;gap:3px;align-items:center;min-width:0}
+.slope-in input{flex:1;min-width:0;width:auto}
+.slope-dir{padding:0 5px;font-size:12px;line-height:20px;border:1px solid var(--muted);background:var(--panel);color:var(--ink)}
+.slope-dir.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .tgt{font-size:12.5px;display:flex;justify-content:space-between;gap:8px;padding:2px 0}
 .tgt b{font-weight:500}
 .sel{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:6px;align-items:center;font-size:12px;margin-top:4px}

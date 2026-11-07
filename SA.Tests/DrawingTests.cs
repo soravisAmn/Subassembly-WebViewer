@@ -224,6 +224,16 @@ static class DrawingTests
             if (!a.SequenceEqual(b)) throw new Exception($"{js_[i]!["id"]}: จุดของรูปไม่ตรง");
         }
 
+        // ข้อความเตือนของ parameter (ขอบเขต / ต้องมากกว่า 0) ต้องตรงตัวอักษร — ชนิดค่า 1:x / m / % (รอบ 4e)
+        if (js["paramMsgs"] is JsonArray pm)
+        {
+            var jm = pm.Select(m => (string)m!).OrderBy(m => m, StringComparer.Ordinal).ToList();
+            // (ValueTooLarge ใช้กับเตือนอื่นด้วย เช่น จุดสัมผัส Fillet → คัดเฉพาะรูป "ชื่อ = ค่า ...")
+            var cm = o.Issues.Where(i => i.Error is "ValueTooSmall" or "ValueTooLarge" or "ValueShouldNotBeLessThanOrEqualToZero"
+                                         && System.Text.RegularExpressions.Regex.IsMatch(i.Message, @"^[A-Za-z_][A-Za-z0-9_]* = "))
+                             .Select(i => i.Message).OrderBy(m => m, StringComparer.Ordinal).ToList();
+            if (!jm.SequenceEqual(cm)) throw new Exception($"ข้อความเตือน parameter: JS [{string.Join(" | ", jm)}] / C# [{string.Join(" | ", cm)}]");
+        }
         bool jw = (int)js["issues"]! > 0, cw = o.Issues.Count > 0;
         if (jw != cw) throw new Exception($"warning: JS {(int)js["issues"]!} / C# {o.Issues.Count} ({string.Join(" | ", o.Issues.Select(x => x.Message))})");
     }

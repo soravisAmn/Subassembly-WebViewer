@@ -1035,7 +1035,7 @@ const typingRef = () => draw.tool !== "daylight" && trackOn() && trk.list.length
 function checkTyped(field, v, names){
   if (!v) return { ok: true };
   const it = editItem(), o = it && it.spec ? Spec.exprOpts(it.spec) : {};   // อ้างจุดได้ เช่น dy = ground(P2) - P2.y
-  if (field === "slope") return Expr.check(slopeMag(v), names, o);
+  if (field === "slope") return Expr.check(Spec.slopeWrite((it && it.spec) || {}, false, v).expr, names, o);   // 1:x · parameter Slope · 2% · นิพจน์
   const pol = field === "dx" ? Track.polarText(v) : null;
   if (pol){ const a = Expr.check(pol.length, names, o); return a.ok ? Expr.check(pol.angle, names, o) : a; }
   return Expr.check(v, names, o);
@@ -1055,7 +1055,7 @@ function openTyping(first){
   box.innerHTML = `<div class="dyn-h">${R ? `<b>อ้างจาก ${esc(R.label || OSNAP_LABEL[R.kind])}</b> (Tracking)` : A ? "จาก " + A.id : "จาก origin"} · เว้นว่าง = ใช้ค่าจากเมาส์ · dx พิมพ์ ระยะ&lt;มุม ได้ · Enter = ตกลง · Esc = ยกเลิก</div>
     <label>dx<input data-f="dx" placeholder="${f3((draw.cand ? draw.cand.x : 0) - (B ? B.x : 0))}"></label>
     <label>dy<input data-f="dy" placeholder="${f3((draw.cand ? draw.cand.y : 0) - (B ? B.y : 0))}"></label>
-    <label>slope<input data-f="slope" placeholder="เช่น 1:2"></label>
+    <label>slope<input data-f="slope" placeholder="1:2 · SideSlope · 2%"></label>
     <label>ยาว<input data-f="length" placeholder="ตามแนวลาด"></label>`;
   if (draw.tool === "daylight") for (const k of ["dx", "dy", "length"]) box.querySelector(`[data-f=${k}]`).parentElement.hidden = true;
   if (R) showBanner(`อ้างจาก ${R.label || OSNAP_LABEL[R.kind]} (Tracking) — ค่าที่พิมพ์คิดจากจุดนี้`);
@@ -1089,7 +1089,8 @@ function commitTyping(){
   const mdx = p.x - (B ? B.x : 0), mdy = p.y - (B ? B.y : 0);
   const dirA = Math.sign(mdx) || 1;
   let slope = val("slope");
-  if (/^1:/.test(slope)) slope = (mdy < 0 ? "-" : "") + slopeMag(slope);
+  // 1:x / parameter ชนิด Slope / 2% = ทิศขึ้น-ลงตามเมาส์ · นิพจน์ = ตามที่พิมพ์ (เครื่องหมายในนิพจน์)
+  if (slope) slope = Spec.slopeWrite(it.spec, mdy >= 0, slope).expr;
   const L = val("length"), dx = val("dx"), dy = val("dy");
   const fromOf = () => R ? { from: trackFrom(R, it.spec, F) } : A ? { from: A.id } : {};
   const pol = Track.polarText(dx);

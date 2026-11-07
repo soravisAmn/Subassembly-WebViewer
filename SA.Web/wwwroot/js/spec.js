@@ -228,11 +228,11 @@ const Spec = (() => {
       // ต้องมากกว่า 0 (แบบ base / body_rock-pitching.cs): ≤ 0 = error (Severe) + ใช้ default แทน
       if (p.positive && v <= 0){
         const d = p.kind === "long" ? Math.round(+p.default || 0) : +p.default || 0;
-        issues.push({ level: "e", obj: p.name, msg: `${p.name} = ${v} ต้องมากกว่า 0, ใช้ค่า default ${d} แทน` });
+        issues.push({ level: "e", obj: p.name, msg: `${p.name} = ${fmtParam(p, v)} ต้องมากกว่า 0, ใช้ค่า default ${fmtParam(p, d)} แทน` });
         v = d;
       }
-      if (p.min != null && v < p.min){ warn(p.name, `${p.name} = ${v} < ${p.min}, ใช้ ${p.min} แทน`); v = p.min; }
-      if (p.max != null && v > p.max){ warn(p.name, `${p.name} = ${v} > ${p.max}, ใช้ ${p.max} แทน`); v = p.max; }
+      if (p.min != null && v < p.min){ warn(p.name, `${p.name} = ${fmtParam(p, v)} < ${fmtParam(p, p.min)}, ใช้ ${fmtParam(p, p.min)} แทน`); v = p.min; }
+      if (p.max != null && v > p.max){ warn(p.name, `${p.name} = ${fmtParam(p, v)} > ${fmtParam(p, p.max)}, ใช้ ${fmtParam(p, p.max)} แทน`); v = p.max; }
       env[p.name] = v;
     }
     const F = spec.side && spec.side.mirror && env[spec.side.param] === 1 ? -1 : 1;
@@ -768,12 +768,72 @@ const Spec = (() => {
   }
   // default ขัดกับขอบเขตไหม (เตือนในตาราง) — null = ไม่ขัด
   function paramBoundsIssue(p){
-    const d = +p.default;
-    if (p.min != null && p.max != null && p.min > p.max) return `ขั้นต่ำ ${p.min} มากกว่า ขั้นสูง ${p.max}`;
-    if (p.positive && d <= 0) return `default ${d} ไม่มากกว่า 0 — Civil 3D จะขึ้น error ทุกครั้งที่ใช้ค่า default`;
-    if (p.min != null && d < p.min) return `default ${d} ต่ำกว่าขั้นต่ำ ${p.min} — Civil 3D จะเตือนทุกครั้งที่ใช้ค่า default`;
-    if (p.max != null && d > p.max) return `default ${d} สูงกว่าขั้นสูง ${p.max} — Civil 3D จะเตือนทุกครั้งที่ใช้ค่า default`;
+    const d = +p.default, f = v => fmtParam(p, v);
+    if (p.min != null && p.max != null && p.min > p.max) return `ขั้นต่ำ ${f(p.min)} มากกว่า ขั้นสูง ${f(p.max)}`;
+    if (p.positive && d <= 0) return `default ${f(d)} ไม่มากกว่า 0 — Civil 3D จะขึ้น error ทุกครั้งที่ใช้ค่า default`;
+    if (p.min != null && d < p.min) return `default ${f(d)} ต่ำกว่าขั้นต่ำ ${f(p.min)} — Civil 3D จะเตือนทุกครั้งที่ใช้ค่า default`;
+    if (p.max != null && d > p.max) return `default ${f(d)} สูงกว่าขั้นสูง ${f(p.max)} — Civil 3D จะเตือนทุกครั้งที่ใช้ค่า default`;
     return null;
+  }
+
+  // ---------- ชนิดค่าของ parameter (รอบ 4e) ----------
+  // p.unit: ไม่มี = number (spec เก่า) · ค่าที่เก็บ / ใช้ในนิพจน์ / C# = ตัวเลขเดิมเสมอ — ชนิดค่ามีผลแค่การแสดง / ข้อความเตือน
+  //   slope = x ของ 1:x (ดิ่ง:ราบ) แบบไฟล์ของผู้ใช้ (SideSlope = 1.5) · percent = เลขเปอร์เซ็นต์ (2 = 2%) · length = เมตร
+  const UNITS = { number: "Number", slope: "Slope (1:x)", length: "Length (m)", percent: "Percent (%)" };
+  const unitOf = p => p && UNITS[p.unit] ? p.unit : "number";
+  // รูปแบบเดียวกับข้อความเตือนใน CodeGenerator.cs (UnitPre / UnitSuf)
+  const fmtUnit = (unit, v) => unit === "slope" ? `1:${v}` : unit === "length" ? `${v} m` : unit === "percent" ? `${v}%` : `${v}`;
+  const fmtParam = (p, v) => fmtUnit(unitOf(p), v);
+  // ค่าที่พิมพ์ในตาราง (default / ขั้นต่ำ / ขั้นสูง): slope "1:1.5" | "1.5" · percent "2%" · length "2 m" → ตัวเลข · ว่าง = null · ผิด = NaN
+  function parseUnitValue(unit, text){
+    let t = String(text ?? "").trim();
+    if (t === "") return null;
+    if (unit === "slope"){ const m = /^1\s*:\s*(.+)$/.exec(t); if (m) t = m[1].trim(); }
+    else if (unit === "percent") t = t.replace(/\s*%$/, "");
+    else if (unit === "length") t = t.replace(/\s*m$/i, "");
+    return t === "" ? NaN : Number(t);
+  }
+  // เปลี่ยนชนิดค่า: Slope = ติ๊ก "ต้องมากกว่า 0" ให้ (x ≤ 0 ใช้ไม่ได้ — เอาออกเองได้)
+  function setParamUnit(spec, name, unit){
+    const p = spec.params.find(x => x.name === name);
+    if (!p) throw new Error(`ไม่มี parameter ${name}`);
+    if (!UNITS[unit]) throw new Error(`ไม่มีชนิดค่า ${unit}`);
+    if (unit === "number") delete p.unit; else p.unit = unit;
+    if (unit === "slope") p.positive = true;
+    return p;
+  }
+
+  // ---------- ช่อง slope (ลาด + ความยาว, ลาดจนชนดิน) ----------
+  // เก็บแบบเดิมเสมอ = นิพจน์ดิ่งต่อราบมีเครื่องหมาย (ลง = ลบ) เช่น "-1/SideSlope" → evaluator / C# / spec เก่าไม่เปลี่ยน
+  // หน้าตาในเว็บ = ทิศ ↗ / ↘ + ข้อความ: 1:1.5 · ชื่อ parameter ชนิด Slope · 2% · ชื่อ parameter ชนิด Percent · นิพจน์ (เครื่องหมายอยู่ในนิพจน์เอง)
+  const SLOPE_NUM = "\\d+(?:\\.\\d+)?|\\.\\d+", SLOPE_ID = "[A-Za-z_][A-Za-z0-9_]*";
+  const paramUnit = (spec, name) => { const p = (spec.params || []).find(x => x.name === name); return p ? unitOf(p) : null; };
+  // นิพจน์ที่เก็บ → { up, text, mode: "ratio" | "param" | "percent" | "expr" } (ไม่เข้ารูปแบบ = expr แสดงตามเดิม)
+  function slopeRead(spec, expr){
+    const raw = String(expr ?? "").trim(), s = raw.replace(/\s+/g, "");
+    let m = new RegExp(`^(-?)1(?:\\.0*)?/(${SLOPE_NUM})$`).exec(s);
+    if (m) return { up: !m[1], text: `1:${m[2]}`, mode: "ratio" };
+    m = new RegExp(`^(-?)1(?:\\.0*)?/(${SLOPE_ID})$`).exec(s);
+    if (m && paramUnit(spec, m[2]) === "slope") return { up: !m[1], text: m[2], mode: "param" };
+    m = new RegExp(`^(-?)(${SLOPE_NUM})/100(?:\\.0*)?$`).exec(s);
+    if (m) return { up: !m[1], text: `${m[2]}%`, mode: "percent" };
+    m = new RegExp(`^(-?)(${SLOPE_ID})/100(?:\\.0*)?$`).exec(s);
+    if (m && paramUnit(spec, m[2]) === "percent") return { up: !m[1], text: m[2], mode: "percent" };
+    return { up: null, text: raw, mode: "expr" };
+  }
+  // ข้อความ + ทิศ → นิพจน์ที่เก็บ (up = true ขึ้น / false ลง) · -1:2 แบบเดิม = เครื่องหมายตามที่พิมพ์ · อื่นๆ = นิพจน์ตามที่พิมพ์
+  function slopeWrite(spec, up, text){
+    const t = String(text ?? "").trim(), sg = up ? "" : "-";
+    let m = new RegExp(`^(-?)1\\s*:\\s*(${SLOPE_NUM})$`).exec(t);
+    if (m) return { expr: `${m[1] ? "-" : sg}1/${m[2]}`, mode: "ratio" };
+    m = new RegExp(`^(${SLOPE_NUM})\\s*%$`).exec(t);
+    if (m) return { expr: `${sg}${m[1]}/100`, mode: "percent" };
+    if (new RegExp(`^${SLOPE_ID}$`).test(t)){
+      const u = paramUnit(spec, t);
+      if (u === "slope") return { expr: `${sg}1/${t}`, mode: "param" };
+      if (u === "percent") return { expr: `${sg}${t}/100`, mode: "percent" };
+    }
+    return { expr: t, mode: "expr" };
   }
 
   // ---------- Logic: สร้างเงื่อนไข / กิ่ง ----------
@@ -863,12 +923,16 @@ const Spec = (() => {
     const h = byId(spec.points, o.hinge);
     if (!h) throw new Error(`ไม่มีจุด ${o.hinge}`);
     const target = o.target || (spec.targets[0] || {}).name || "TargetSurface";
-    let cutS = `1/${Expr.num(o.cut)}`, fillS = `-1/${Expr.num(o.fill)}`;
-    if (o.params){
-      const cn = freeName(spec, "CutSlope"); spec.params.push({ name: cn, kind: "double", default: o.cut, displayName: "Cut Slope (1:x)", min: null, max: null });
-      const fn = freeName(spec, "FillSlope"); spec.params.push({ name: fn, kind: "double", default: o.fill, displayName: "Fill Slope (1:x)", min: null, max: null });
-      cutS = `1/${cn}`; fillS = `-1/${fn}`;
-    }
+    // o.cut / o.fill = ตัวเลข x (1:x) หรือชื่อ parameter ชนิด Slope ที่มีอยู่ (ใช้เลย ไม่สร้างใหม่)
+    const isName = v => typeof v === "string" && paramUnit(spec, v) === "slope";
+    const mk = (v, base, label) => {
+      if (isName(v)) return v;
+      if (!o.params) return Expr.num(v);
+      const n = freeName(spec, base);
+      spec.params.push({ name: n, kind: "double", default: +v, displayName: label, min: null, max: null, unit: "slope", positive: true });
+      return n;
+    };
+    const cutS = `1/${mk(o.cut, "CutSlope", "Cut Slope (1:x)")}`, fillS = `-1/${mk(o.fill, "FillSlope", "Fill Slope (1:x)")}`;
     const first = !spec.targets.length || spec.targets[0].name === target;
     const g = first ? `ground(${h.id})` : `ground(${h.id}, "${target}")`;
     const lab = (spec.logic && (spec.logic.branches || []).some(b => b.label === "ตัด")) ? ` ${h.id}` : "";
@@ -1304,7 +1368,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
+           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();

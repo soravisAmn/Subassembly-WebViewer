@@ -68,7 +68,7 @@ public static class CodeGenerator
         {
             sb.AppendLine("//");
             sb.AppendLine("// Parameter:");
-            foreach (var p in s.Params) sb.AppendLine($"//   {p.Name} ({p.Kind}, default {Num(p.Default)}{Bounds(p)}){(string.IsNullOrEmpty(p.DisplayName) || p.DisplayName == p.Name ? "" : " — " + p.DisplayName)}");
+            foreach (var p in s.Params) sb.AppendLine($"//   {p.Name} ({p.Kind}, default {UnitNum(p, p.Default)}{Bounds(p)}){(string.IsNullOrEmpty(p.DisplayName) || p.DisplayName == p.Name ? "" : " — " + p.DisplayName)}");
         }
         sb.AppendLine();
         sb.AppendLine("using System;");
@@ -179,9 +179,13 @@ public static class CodeGenerator
 
     private static string Crlf(string s) => s.Replace("\r\n", "\n").Replace("\n", "\r\n");
     private static string Num(double v) => v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    // ชนิดค่าของ parameter ในข้อความเตือน: slope = 1:x · length = x m · percent = x% (ตรงกับ fmtUnit ใน spec.js)
+    private static string UnitPre(string? unit) => unit == "slope" ? "1:" : "";
+    private static string UnitSuf(string? unit) => unit switch { "length" => " m", "percent" => "%", _ => "" };
+    private static string UnitNum(SpecParam p, double v) => UnitPre(p.Unit) + Num(v) + UnitSuf(p.Unit);
     private static string Bounds(SpecParam p) =>
-        p.Min != null && p.Max != null ? $", {Num(p.Min.Value)}–{Num(p.Max.Value)}" :
-        p.Min != null ? $", ไม่น้อยกว่า {Num(p.Min.Value)}" : p.Max != null ? $", ไม่เกิน {Num(p.Max.Value)}" : "";
+        p.Min != null && p.Max != null ? $", {UnitNum(p, p.Min.Value)}–{UnitNum(p, p.Max.Value)}" :
+        p.Min != null ? $", ไม่น้อยกว่า {UnitNum(p, p.Min.Value)}" : p.Max != null ? $", ไม่เกิน {UnitNum(p, p.Max.Value)}" : "";
 
     // ---------------- ตัวสร้างเนื้อหา class ----------------
 
@@ -298,12 +302,16 @@ public static class CodeGenerator
                 L(lng ? $"        long {p.Name} = GetLong(cs, \"{p.Name}\", {Math.Round(p.Default):0});"
                       : $"        double {p.Name} = GetDouble(cs, \"{p.Name}\", {SpecExpr.Lit(p.Default)});");
                 string def = lng ? $"{Math.Round(p.Default):0}" : SpecExpr.Lit(p.Default);
+                // ชนิดค่า (รอบ 4e): ข้อความเตือนแสดงแบบ 1:x / m / % ตรงกับ fmtParam ใน spec.js
+                string pre = UnitPre(p.Unit), suf = UnitSuf(p.Unit);
+                string U(double v) => pre + Num(v) + suf;
+                string cur = $"\"{p.Name} = {pre}\" + {p.Name} + \"{suf}";
                 if (p.Positive)
-                    L($"        if ({p.Name} <= 0) {{ Severe(cs, CorridorError.ValueShouldNotBeLessThanOrEqualToZero, \"{p.Name} = \" + {p.Name} + \" ต้องมากกว่า 0, ใช้ค่า default {Num(p.Default)} แทน\"); {p.Name} = {def}; }}");
+                    L($"        if ({p.Name} <= 0) {{ Severe(cs, CorridorError.ValueShouldNotBeLessThanOrEqualToZero, {cur} ต้องมากกว่า 0, ใช้ค่า default {U(p.Default)} แทน\"); {p.Name} = {def}; }}");
                 if (p.Min != null)
-                    L($"        if ({p.Name} < {SpecExpr.Lit(p.Min.Value)}) {{ Warn(cs, CorridorError.ValueTooSmall, \"{p.Name} = \" + {p.Name} + \" < {Num(p.Min.Value)}, ใช้ {Num(p.Min.Value)} แทน\"); {p.Name} = {(lng ? $"(long){SpecExpr.Lit(p.Min.Value)}" : SpecExpr.Lit(p.Min.Value))}; }}");
+                    L($"        if ({p.Name} < {SpecExpr.Lit(p.Min.Value)}) {{ Warn(cs, CorridorError.ValueTooSmall, {cur} < {U(p.Min.Value)}, ใช้ {U(p.Min.Value)} แทน\"); {p.Name} = {(lng ? $"(long){SpecExpr.Lit(p.Min.Value)}" : SpecExpr.Lit(p.Min.Value))}; }}");
                 if (p.Max != null)
-                    L($"        if ({p.Name} > {SpecExpr.Lit(p.Max.Value)}) {{ Warn(cs, CorridorError.ValueTooLarge, \"{p.Name} = \" + {p.Name} + \" > {Num(p.Max.Value)}, ใช้ {Num(p.Max.Value)} แทน\"); {p.Name} = {(lng ? $"(long){SpecExpr.Lit(p.Max.Value)}" : SpecExpr.Lit(p.Max.Value))}; }}");
+                    L($"        if ({p.Name} > {SpecExpr.Lit(p.Max.Value)}) {{ Warn(cs, CorridorError.ValueTooLarge, {cur} > {U(p.Max.Value)}, ใช้ {U(p.Max.Value)} แทน\"); {p.Name} = {(lng ? $"(long){SpecExpr.Lit(p.Max.Value)}" : SpecExpr.Lit(p.Max.Value))}; }}");
             }
             if (_s.Side is { Mirror: true } sd && _s.Params.Any(p => p.Name == sd.Param))
                 L($"        double F = {sd.Param} == 1 ? -1.0 : 1.0;   // {sd.Param} = 1 (Left) -> กลับด้านแนวราบทั้งหมด");

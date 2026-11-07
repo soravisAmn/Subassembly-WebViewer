@@ -1381,8 +1381,8 @@
     "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": 8 }],
     "spec": { "className": "CutFillButton", "namespace": "TestSubassembly",
       "params": [{ "name": "Side", "kind": "long", "default": 0, "displayName": "Side", "min": null, "max": null },
-                 { "name": "CutSlope", "kind": "double", "default": 1.5, "displayName": "Cut Slope (1:x)", "min": null, "max": null },
-                 { "name": "FillSlope", "kind": "double", "default": 2, "displayName": "Fill Slope (1:x)", "min": null, "max": null }],
+                 { "name": "CutSlope", "kind": "double", "default": 1.5, "displayName": "Cut Slope (1:x)", "min": null, "max": null, "unit": "slope", "positive": true },
+                 { "name": "FillSlope", "kind": "double", "default": 2, "displayName": "Fill Slope (1:x)", "min": null, "max": null, "unit": "slope", "positive": true }],
       "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
       "points": [
         { "id": "P1", "codes": [], "def": { "type": "origin" } },
@@ -1716,5 +1716,226 @@
       "shapes": [],
       "side": { "param": "Side", "mirror": true }
     }
+  },
+  {
+    "name": "Slope (1:x) 3 แบบ: -1/1.5 · -1/SideSlope (parameter Slope) · -Grade/100 (Percent) · ↗ 1/SideSlope (Right)",
+    "surface": [
+      {
+        "x": -30,
+        "y": -3
+      },
+      {
+        "x": 30,
+        "y": -3
+      }
+    ],
+    "spec": {
+      "className": "SlopeForms",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0
+        },
+        {
+          "name": "SideSlope",
+          "kind": "double",
+          "default": 1.5,
+          "unit": "slope",
+          "positive": true,
+          "min": 1
+        },
+        {
+          "name": "Grade",
+          "kind": "double",
+          "default": 2,
+          "unit": "percent",
+          "max": 10
+        },
+        {
+          "name": "Depth",
+          "kind": "double",
+          "default": 2,
+          "unit": "length",
+          "min": 1
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "Ratio"
+          ],
+          "def": {
+            "type": "slopeToSurface",
+            "from": "P1",
+            "slope": "-1/1.5",
+            "dir": 1,
+            "target": "TargetSurface",
+            "maxDistance": "50",
+            "layoutLength": "3"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "Param"
+          ],
+          "def": {
+            "type": "slopeLength",
+            "from": "P1",
+            "slope": "-1/SideSlope",
+            "length": "Depth",
+            "dir": -1,
+            "measure": "dy"
+          }
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "Pct"
+          ],
+          "def": {
+            "type": "slopeLength",
+            "from": "P3",
+            "slope": "-Grade/100",
+            "length": "5",
+            "dir": -1,
+            "measure": "dx"
+          }
+        },
+        {
+          "id": "P5",
+          "codes": [
+            "Up"
+          ],
+          "def": {
+            "type": "slopeLength",
+            "from": "P2",
+            "slope": "1/SideSlope",
+            "length": "1",
+            "dir": 1,
+            "measure": "dx"
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P1",
+            "P2"
+          ],
+          "codes": [
+            "Fill"
+          ]
+        },
+        {
+          "id": "L2",
+          "points": [
+            "P1",
+            "P3"
+          ],
+          "codes": [
+            "Side"
+          ]
+        },
+        {
+          "id": "L3",
+          "points": [
+            "P3",
+            "P4"
+          ],
+          "codes": [
+            "Bottom"
+          ]
+        },
+        {
+          "id": "L4",
+          "points": [
+            "P2",
+            "P5"
+          ],
+          "codes": [
+            "Up"
+          ]
+        }
+      ],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      }
+    }
+  },
+  {
+    "name": "Slope (1:x) 3 แบบ Side = Left · SideSlope = 1:2, Grade = 5%",
+    "surface": [
+      {
+        "x": -30,
+        "y": -3
+      },
+      {
+        "x": 30,
+        "y": -3
+      }
+    ],
+    "values": {
+      "Side": 1,
+      "SideSlope": 2,
+      "Grade": 5
+    },
+    "copySpecFrom": 78
+  },
+  {
+    "name": "ข้อความเตือนตามชนิดค่า: SideSlope = 1:0.5 < 1:1 · Grade = 12% > 10% · Depth = 0.5 m < 1 m",
+    "surface": [
+      {
+        "x": -30,
+        "y": -3
+      },
+      {
+        "x": 30,
+        "y": -3
+      }
+    ],
+    "values": {
+      "SideSlope": 0.5,
+      "Grade": 12,
+      "Depth": 0.5
+    },
+    "copySpecFrom": 78
+  },
+  {
+    "name": "ข้อความเตือนตามชนิดค่า: SideSlope = 1:-1 ต้องมากกว่า 0 (ใช้ default 1:1.5) · Side = Left",
+    "surface": [
+      {
+        "x": -30,
+        "y": -3
+      },
+      {
+        "x": 30,
+        "y": -3
+      }
+    ],
+    "values": {
+      "Side": 1,
+      "SideSlope": -1
+    },
+    "copySpecFrom": 78
   }
 ]

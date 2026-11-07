@@ -30,7 +30,9 @@ const out = cases.map(c => {
                    : [{ id: l.id, path, codes: l.codes || [] }];
     }),
     shapes: c.spec.shapes.map(s => r.shapes[s.id] && !r.shapes[s.id].err ? { id: s.id, poly: r.shapes[s.id].poly ? r.shapes[s.id].poly.map(p => [p.x, p.y]) : null } : { id: s.id, err: true }),
-    issues: r.issues.length
+    issues: r.issues.length,
+    // ข้อความเตือนของ parameter (ขอบเขต / ต้องมากกว่า 0) — DrawingTests เทียบข้อความตรงตัวกับ C# (ชนิดค่า 1:x / m / % รอบ 4e)
+    paramMsgs: r.issues.filter(i => c.spec.params.some(p => p.name === i.obj)).map(i => i.msg)
   };
 });
 process.stdout.write(JSON.stringify(out));

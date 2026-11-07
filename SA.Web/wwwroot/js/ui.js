@@ -627,6 +627,41 @@ function exprRow(parent, it, label, small, value, onValid, opts = {}){
   row.appendChild(inp); check();
   return inp;
 }
+// ช่อง slope (ลาด + ความยาว / ลาดจนชนดิน — รอบ 4e): ทิศ ↗ ขึ้น / ↘ ลง แยกจากค่า · ค่า = 1:1.5 · ชื่อ parameter ชนิด Slope · 2% · ชื่อ parameter ชนิด Percent
+//   หรือนิพจน์ดิ่งต่อราบแบบเดิม (เครื่องหมายอยู่ในนิพจน์ → ปุ่มทิศปิด) · เก็บเป็นนิพจน์เดิมเสมอ (Spec.slopeWrite) — ไม่แก้ช่อง = ค่าเดิมไม่ถูกเขียนทับ
+function slopeRow(parent, it, d, key){
+  const sp = it.spec, rd = Spec.slopeRead(sp, d[key]), on = canEdit(it);
+  let up = rd.up == null ? !(String(d[key]).trim().startsWith("-")) : rd.up;
+  const row = div("row", `<label>Slope<small>↗ ขึ้น / ↘ ลง · 1:1.5 · parameter Slope · 2% · หรือนิพจน์ dy/dx</small></label>`, parent);
+  row.classList.add("slope-row");
+  const wrap = document.createElement("span"); wrap.className = "slope-in";
+  const bu = btn("↗", () => setDir(true), !on, "ขึ้น"), bd = btn("↘", () => setDir(false), !on, "ลง");
+  bu.classList.add("slope-dir"); bd.classList.add("slope-dir");
+  const inp = document.createElement("input"); inp.type = "text"; inp.className = "expr"; inp.value = rd.text; inp.disabled = !on;
+  const opts = sp.params.filter(p => ["slope", "percent"].includes(Spec.unitOf(p))).map(p => p.name);
+  if (opts.length){ const dl = document.createElement("datalist"); dl.id = "slope-pars-" + key; dl.innerHTML = opts.map(n => `<option value="${esc(n)}">`).join(""); wrap.appendChild(dl); inp.setAttribute("list", dl.id); }
+  const err = div("expr-err", "", parent);
+  const names = specNames(it), xo = Spec.exprOpts(sp);
+  const write = () => Spec.slopeWrite(sp, up, inp.value);
+  const paint = mode => {
+    const ex = mode === "expr";
+    bu.classList.toggle("on", !ex && up); bd.classList.toggle("on", !ex && !up);
+    bu.disabled = bd.disabled = !on || ex;
+    bu.title = ex ? "นิพจน์: เครื่องหมายอยู่ในนิพจน์เอง (ลง = ลบ)" : "ขึ้น"; bd.title = ex ? bu.title : "ลง";
+  };
+  const check = () => {
+    const w = write(), r = Expr.check(w.expr, names, xo);
+    inp.classList.toggle("bad", !r.ok); err.textContent = r.ok ? "" : r.error;
+    paint(w.mode);
+    return r.ok ? w : null;
+  };
+  function setDir(v){ up = v; const w = check(); if (w){ specEdit(() => { d[key] = w.expr; }, it, `${up ? "ขึ้น" : "ลง"} ${inp.value.trim()}`); renderProps(true); } }
+  inp.addEventListener("input", () => { const w = check(); if (w) liveEdit(it, () => { d[key] = w.expr; }); });
+  wrap.append(bu, bd, inp); row.appendChild(wrap);
+  inp.classList.toggle("bad", false); paint(rd.mode);
+  const r0 = Expr.check(String(d[key] ?? ""), names, xo); if (!r0.ok){ inp.classList.add("bad"); err.textContent = r0.error; }
+  return inp;
+}
 function selectRow(parent, it, label, options, value, onChange, small){
   const row = div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, parent);
   const sel = document.createElement("select"); sel.disabled = !canEdit(it);
@@ -767,9 +802,9 @@ function propsDrawnPoint(box, it, p, r){
   switch (d.type){
     case "delta": refRow("from", "จาก", "", true); ex("dx", "dx", "ไปทางนอก +"); ex("dy", "dy", "ขึ้น +"); break;
     case "polar": refRow("from", "จาก", "", true); ex("length", "ระยะ", ""); ex("angle", "มุม (องศา)", "ทวนเข็มจาก +x · ฝั่ง Right"); break;
-    case "slopeLength": refRow("from", "จาก", "", true); ex("slope", "Slope", "dy/dx ลง = ลบ (หรือ -1:2)", { slope: true }); dirRow();
+    case "slopeLength": refRow("from", "จาก", "", true); slopeRow(g, it, d, "slope"); dirRow();
       ex("length", "ยาว", ""); selectRow(g, it, "วัดความยาว", Object.entries(Spec.MEASURES), d.measure || "along", v => { d.measure = v; }); break;
-    case "slopeToSurface": refRow("from", "จาก", "", true); ex("slope", "Slope", "dy/dx ลง = ลบ (หรือ -1:2)", { slope: true }); dirRow();
+    case "slopeToSurface": refRow("from", "จาก", "", true); slopeRow(g, it, d, "slope"); dirRow();
       ex("maxDistance", "ไม่ชนดินใน", "ระยะราบสูงสุด (m) แล้วหยุด + เตือน"); ex("layoutLength", "Layout / ไม่มีดิน", "ระยะราบที่วาดแทน (m)"); break;
     case "onSurface": refRow("from", "จาก", "", true); ex("dx", "dx", "ไปทางนอก +"); break;
     case "between": refRow("a", "จุด a"); refRow("b", "จุด b"); ex("t", "t", "0 = a, 1 = b, 0.5 = กึ่งกลาง"); break;
@@ -1045,10 +1080,13 @@ function openCutFill(it, hinge){
     };
     kv(b, [["จุดบานพับ", hinge + (h.codes.length ? " " + h.codes.join(",") : "") + (h.branch ? ` · อยู่ในกิ่ง ${Spec.branchLabel(sp, h.branch)} (กิ่งใหม่ซ้อนใต้กิ่งนี้)` : "")]]);
     if (sp.targets.length > 1) select("Target surface", "", "target", sp.targets.map(t => [t.name, t.displayName || t.name]));
-    field("ลาดตัด", "1:x ขึ้นไปหาผิวดิน", "cut");
-    field("ลาดถม", "1:x ลงไปหาผิวดิน", "fill");
+    // ช่องลาดรับ 1:x หรือชื่อ parameter ชนิด Slope ที่มีอยู่ (รายการให้เลือก — ใช้ตัวนั้นเลย ไม่สร้างใหม่)
+    const slp = sp.params.filter(p => Spec.unitOf(p) === "slope").map(p => p.name);
+    const dl = document.createElement("datalist"); dl.id = "cf-slopes"; dl.innerHTML = slp.map(n => `<option value="${esc(n)}">`).join(""); b.appendChild(dl);
+    field("ลาดตัด", "1:x หรือ parameter Slope · ขึ้นไปหาผิวดิน", "cut").setAttribute("list", "cf-slopes");
+    field("ลาดถม", "1:x หรือ parameter Slope · ลงไปหาผิวดิน", "fill").setAttribute("list", "cf-slopes");
     const pc = document.createElement("label"); pc.className = "check";
-    pc.innerHTML = `<input type="checkbox" checked data-k="params"> สร้าง parameter <b>CutSlope</b> / <b>FillSlope</b> <small>(แก้ใน Civil 3D ได้)</small>`;
+    pc.innerHTML = `<input type="checkbox" checked data-k="params"> สร้าง parameter <b>CutSlope</b> / <b>FillSlope</b> ชนิด Slope (1:x) <small>(แก้ใน Civil 3D ได้ · ช่องที่ใส่ชื่อ parameter ไม่สร้างใหม่)</small>`;
     pc.querySelector("input").onchange = e => { o.params = e.target.checked; };
     b.appendChild(pc);
     select("ทิศ", "ฝั่ง Right = ไปทางขวา", "dir", [["1", "ออกด้านนอก (+)"], ["-1", "เข้าด้านใน (−)"]]);
@@ -1059,8 +1097,8 @@ function openCutFill(it, hinge){
               + `ได้: เงื่อนไข IsCut, กิ่ง ตัด / ถม, จุดลาดจนชนดินกิ่งละจุด + link, จุด Daylight (จุดแรกที่เกิด ไว้ต่อเรขาคณิต)`, b);
     div("btns", null, b).append(
       btn("สร้าง", () => {
-        const cut = slopeH(o.cut), fill = slopeH(o.fill);
-        if (!cut || !fill){ err.textContent = "ลาดต้องเป็นแบบ 1:1.5 หรือตัวเลขมากกว่า 0"; return; }
+        const par = t => slp.includes(t) ? t : null, cut = par(o.cut) || slopeH(o.cut), fill = par(o.fill) || slopeH(o.fill);
+        if (!cut || !fill){ err.textContent = "ลาดต้องเป็นแบบ 1:1.5, ตัวเลขมากกว่า 0 หรือชื่อ parameter ชนิด Slope"; return; }
         closeDialog();
         cutFillCommit(it, { hinge, target: o.target, cut, fill, params: o.params, dir: +o.dir, cutCode: o.cutCode, fillCode: o.fillCode });
       }),
@@ -1366,16 +1404,26 @@ function propsParamTable(box, it){
       specEdit(() => { sp.params = sp.params.filter(o => o !== p); }, it);
     };
     r1.appendChild(x);
-    const num = (label, v, on) => txt(r2, label, v == null ? "" : String(v), (s, i) => {
-      if (s === "") return on(null);
-      const n = Number(s);
-      if (isNaN(n)){ alert("ใส่ตัวเลข"); i.value = v ?? ""; return; }
+    // ชนิดค่า (รอบ 4e): Number / Slope (1:x) / Length (m) / Percent (%) — ค่าที่เก็บเป็นตัวเลขเดิม แค่แสดง / เตือนต่างกัน
+    const ul = document.createElement("label"); ul.textContent = "ชนิดค่า";
+    const us = document.createElement("select"); us.disabled = !ed_ || isSide;
+    us.innerHTML = Object.entries(Spec.UNITS).map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(""); us.value = Spec.unitOf(p);
+    us.onchange = () => specEdit(s => Spec.setParamUnit(s, p.name, us.value), it, `${p.name} ชนิดค่า ${Spec.UNITS[us.value]}`);
+    ul.appendChild(us);
+    const r0 = div("pc1", null, card); r0.appendChild(ul);
+    card.insertBefore(r0, r2);
+    const unit = Spec.unitOf(p), show = v => v == null ? "" : Spec.fmtUnit(unit, v);
+    const num = (label, v, on) => txt(r2, label, show(v), (s, i) => {
+      const n = Spec.parseUnitValue(unit, s);
+      if (n === null) return on(null);
+      if (isNaN(n)){ alert(unit === "slope" ? "ใส่แบบ 1:1.5 หรือ 1.5" : "ใส่ตัวเลข"); i.value = show(v); return; }
       on(n);
     }, "mono");
     num("default", p.default, n => specEdit(() => { p.default = n ?? 0; }, it));
     const bound = (k, label) => num(label, p[k], n => { try{ specEdit(s => Spec.setParamBounds(s, p.name, { [k]: n }), it); }catch(e){ alert(e.message); renderProps(true); } });
     bound("min", "ขั้นต่ำ").placeholder = "ไม่จำกัด";
     bound("max", "ขั้นสูง").placeholder = "ไม่จำกัด";
+    if (unit === "slope") card.insertBefore(div("hint","1:x = ดิ่ง 1 ราบ x · x น้อย = ชัน → ขั้นต่ำ = ชันสุดที่ยอม · ขั้นสูง = ลาดสุดที่ยอม · ช่อง slope ของเครื่องมือใส่ชื่อนี้ได้เลย", card), r3);
     txt(r3, "display name", p.displayName, v => specEdit(() => { p.displayName = v || p.name; }, it));
     // ต้องมากกว่า 0: ≤ 0 = error + ใช้ default (แบบ base / body_rock-pitching.cs) — Side ใช้ 0 = Right จึงตั้งไม่ได้
     const r4 = div("pc1", null, card), cl = document.createElement("label"); cl.className = "check";

@@ -143,6 +143,19 @@ static class DrawingTests
                 }
             }
         });
+        test("Parameter ต้องมากกว่า 0: โค้ดที่สร้างขึ้น error ระดับ Severe (ValueShouldNotBeLessThanOrEqualToZero) + ใช้ default แบบ rock-pitching", () =>
+        {
+            var c = cases.First(x => x!["spec"] is JsonNode s && (string?)s["className"] == "ParamPositive")!;
+            var json = c["spec"]!.ToJsonString();
+            var compiled = compiler.Compile(CodeGenerator.GenerateFile(DrawingSpec.Parse(json), json, "ParamPositive.cs"), "ParamPositive.cs");
+            if (!compiled.Success) throw new Exception("คอมไพล์ไม่ผ่าน");
+            var values = new Dictionary<string, JsonElement> { ["Depth"] = JsonDocument.Parse("-1").RootElement };
+            var o = runner.Run(compiled.Classes[0], values, new WorldInput { LayoutMode = true, OriginElevation = 100 });
+            var e = o.Issues.FirstOrDefault(i => i.Error == "ValueShouldNotBeLessThanOrEqualToZero")
+                ?? throw new Exception("ไม่มี error: " + string.Join(" | ", o.Issues.Select(i => i.Error + " " + i.Message)));
+            if (e.Level != "Severe") throw new Exception("ต้องเป็น Severe ได้ " + e.Level);
+            if (Math.Abs(o.Points[2].Y - (-2)) > 1e-9) throw new Exception($"Depth ต้องใช้ default 2 ได้ {-o.Points[2].Y}");
+        });
         test("ชื่อ parameter ที่โค้ดใช้เอง (เช่น F, P1, cs) ใช้ไม่ได้", () =>
         {
             var spec = JsonNode.Parse(cases[0]!["spec"]!.ToJsonString())!;

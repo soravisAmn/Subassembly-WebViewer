@@ -40,7 +40,7 @@ public static class CodeGenerator
         // ชื่อตัวช่วยในโค้ดที่สร้าง (ตัวแปรชื่อเดียวกันจะบังเมธอด / ชนิด)
         "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Tangent", "Rotate",
         "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
-        "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "FirstOf",
+        "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "FirstOf", "Severe",
         // คำในนิพจน์ (and or not true false — ไม่สนตัวพิมพ์ ตรวจใน IsReservedName)
         "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue","decimal","default",
         "delegate","do","double","else","enum","event","explicit","extern","false","finally","fixed","float","for","foreach","goto",
@@ -291,12 +291,15 @@ public static class CodeGenerator
             L("    internal static void Draw(CorridorState cs)");
             L("    {");
             // parameter
-            if (_s.Params.Count > 0) L("        // ---- parameter (นอกขอบเขต = ใช้ค่าขอบแทน + เตือน) ----");
+            if (_s.Params.Count > 0) L("        // ---- parameter (≤ 0 ที่ต้องมากกว่า 0 = error + ใช้ default · นอกขอบเขต = ใช้ค่าขอบแทน + เตือน) ----");
             foreach (var p in _s.Params)
             {
                 bool lng = p.Kind == "long";
                 L(lng ? $"        long {p.Name} = GetLong(cs, \"{p.Name}\", {Math.Round(p.Default):0});"
                       : $"        double {p.Name} = GetDouble(cs, \"{p.Name}\", {SpecExpr.Lit(p.Default)});");
+                string def = lng ? $"{Math.Round(p.Default):0}" : SpecExpr.Lit(p.Default);
+                if (p.Positive)
+                    L($"        if ({p.Name} <= 0) {{ Severe(cs, CorridorError.ValueShouldNotBeLessThanOrEqualToZero, \"{p.Name} = \" + {p.Name} + \" ต้องมากกว่า 0, ใช้ค่า default {Num(p.Default)} แทน\"); {p.Name} = {def}; }}");
                 if (p.Min != null)
                     L($"        if ({p.Name} < {SpecExpr.Lit(p.Min.Value)}) {{ Warn(cs, CorridorError.ValueTooSmall, \"{p.Name} = \" + {p.Name} + \" < {Num(p.Min.Value)}, ใช้ {Num(p.Min.Value)} แทน\"); {p.Name} = {(lng ? $"(long){SpecExpr.Lit(p.Min.Value)}" : SpecExpr.Lit(p.Min.Value))}; }}");
                 if (p.Max != null)
@@ -1123,6 +1126,12 @@ public static class CodeGenerator
     private static void Warn(CorridorState cs, CorridorError error, string message)
     {
         cs.RecordError(error, CorridorErrorLevel.AsWarning, message, Source, true);
+    }
+
+    // error ระดับ Severe (parameter ≤ 0 ที่ต้องมากกว่า 0 — แบบ RecordError ใน base_rock-pitching.cs)
+    private static void Severe(CorridorState cs, CorridorError error, string message)
+    {
+        cs.RecordError(error, CorridorErrorLevel.Severe, message, Source, true);
     }
 
 """);

@@ -195,6 +195,12 @@ const Spec = (() => {
       let v = (ctx.values || {})[p.name];
       v = typeof v === "number" && isFinite(v) ? v : +p.default || 0;
       if (p.kind === "long") v = Math.round(v);
+      // ต้องมากกว่า 0 (แบบ base / body_rock-pitching.cs): ≤ 0 = error (Severe) + ใช้ default แทน
+      if (p.positive && v <= 0){
+        const d = p.kind === "long" ? Math.round(+p.default || 0) : +p.default || 0;
+        issues.push({ level: "e", obj: p.name, msg: `${p.name} = ${v} ต้องมากกว่า 0, ใช้ค่า default ${d} แทน` });
+        v = d;
+      }
       if (p.min != null && v < p.min){ warn(p.name, `${p.name} = ${v} < ${p.min}, ใช้ ${p.min} แทน`); v = p.min; }
       if (p.max != null && v > p.max){ warn(p.name, `${p.name} = ${v} > ${p.max}, ใช้ ${p.max} แทน`); v = p.max; }
       env[p.name] = v;
@@ -637,6 +643,29 @@ const Spec = (() => {
     spec.shapes.push({ id, links: linkIds, codes: [] });
     return id;
   }
+  // ---------- parameter: ขอบเขตค่า (ตาราง Parameter / Logic API) ----------
+  // { positive, min, max } — null / false = ไม่คุม · ผิด = throw Error ข้อความไทย
+  function setParamBounds(spec, name, b){
+    const p = spec.params.find(x => x.name === name);
+    if (!p) throw new Error(`ไม่มี parameter ${name}`);
+    const num = v => v == null || v === "" ? null : +v;
+    const mn = "min" in b ? num(b.min) : p.min, mx = "max" in b ? num(b.max) : p.max;
+    if ((mn != null && !isFinite(mn)) || (mx != null && !isFinite(mx))) throw new Error("ขั้นต่ำ / ขั้นสูง ต้องเป็นตัวเลข");
+    if (mn != null && mx != null && mn > mx) throw new Error(`ขั้นต่ำ (${mn}) มากกว่า ขั้นสูง (${mx})`);
+    p.min = mn; p.max = mx;
+    if ("positive" in b){ if (b.positive) p.positive = true; else delete p.positive; }
+    return p;
+  }
+  // default ขัดกับขอบเขตไหม (เตือนในตาราง) — null = ไม่ขัด
+  function paramBoundsIssue(p){
+    const d = +p.default;
+    if (p.min != null && p.max != null && p.min > p.max) return `ขั้นต่ำ ${p.min} มากกว่า ขั้นสูง ${p.max}`;
+    if (p.positive && d <= 0) return `default ${d} ไม่มากกว่า 0 — Civil 3D จะขึ้น error ทุกครั้งที่ใช้ค่า default`;
+    if (p.min != null && d < p.min) return `default ${d} ต่ำกว่าขั้นต่ำ ${p.min} — Civil 3D จะเตือนทุกครั้งที่ใช้ค่า default`;
+    if (p.max != null && d > p.max) return `default ${d} สูงกว่าขั้นสูง ${p.max} — Civil 3D จะเตือนทุกครั้งที่ใช้ค่า default`;
+    return null;
+  }
+
   // ---------- Logic: สร้างเงื่อนไข / กิ่ง ----------
   // ชื่อที่ยังไม่มีใน parameter / เงื่อนไข / จุด: base, base2, base3, ...
   function freeName(spec, base){
@@ -941,7 +970,7 @@ const Spec = (() => {
     return g;
   }
 
-  return { exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
+  return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
            isAux, isAuxPoint, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,

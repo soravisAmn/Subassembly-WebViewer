@@ -1471,5 +1471,21 @@
   { "name": "round4-demo: ผิวดินราบ -1 = ถมปกติ", "surface": [{ "x": -30, "y": -1 }, { "x": 30, "y": -1 }], "copySpecFrom": 50 },
   { "name": "round4-demo: ผิวดินราบ -3 = ถมสูง (ราวกันตก) · Curb = 0 (ไม่มีขอบทาง)", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "values": { "Curb": 0 }, "copySpecFrom": 50 },
   { "name": "round4-demo: Side = Left ผิวดินลาด (ซ้ายต่ำ = ถมสูง)", "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": 8 }], "values": { "Side": 1 }, "copySpecFrom": 50 },
-  { "name": "round4-demo: Layout mode (ไม่มีดิน = ถม ยาว 3 m)", "surface": [{ "x": -30, "y": 2 }, { "x": 30, "y": 2 }], "layout": true, "copySpecFrom": 50 }
+  { "name": "round4-demo: Layout mode (ไม่มีดิน = ถม ยาว 3 m)", "surface": [{ "x": -30, "y": 2 }, { "x": 30, "y": 2 }], "layout": true, "copySpecFrom": 50 },
+  {
+    "name": "Parameter ต้องมากกว่า 0 + ขั้นต่ำ (แบบ rock-pitching): Depth = -1 -> error + default 2 · Width = 0.5 < 1 -> เตือน",
+    "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }],
+    "values": { "Depth": -1, "Width": 0.5 },
+    "spec": { "className": "ParamPositive", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }, { "name": "Depth", "kind": "double", "default": 2, "positive": true, "min": 1.5 },
+                 { "name": "Width", "kind": "double", "default": 3, "positive": true, "min": 1 }],
+      "targets": [],
+      "points": [{ "id": "P1", "codes": [], "def": { "type": "origin" } },
+                 { "id": "P2", "codes": ["Top"], "def": { "type": "delta", "from": "P1", "dx": "Width", "dy": "0" } },
+                 { "id": "P3", "codes": ["Base"], "def": { "type": "delta", "from": "P2", "dx": "0", "dy": "-Depth" } }],
+      "links": [{ "id": "L1", "points": ["P1", "P2"], "codes": [] }, { "id": "L2", "points": ["P2", "P3"], "codes": [] }],
+      "shapes": [], "side": { "param": "Side", "mirror": true } }
+  },
+  { "name": "Parameter ต้องมากกว่า 0: ค่าปกติ ไม่เตือน", "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }], "values": { "Depth": 3, "Width": 2 }, "copySpecFrom": 55 },
+  { "name": "Parameter ต้องมากกว่า 0: Depth = 0 Side = Left (error + default)", "surface": [{ "x": -30, "y": -5 }, { "x": 30, "y": -5 }], "values": { "Depth": 0, "Side": 1 }, "copySpecFrom": 55 }
 ]

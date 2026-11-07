@@ -57,7 +57,7 @@ function drawBranch(){
 function chooseDrawBranch(){
   const it = editItem(); if (!it || !it.spec) return;
   const sp = it.spec, brs = (sp.logic || {}).branches || [];
-  if (!brs.length) return flashBanner("ยังไม่มีกิ่ง — สร้างเงื่อนไขก่อน (Properties → เกิดเมื่อ → + เงื่อนไขใหม่ / ปุ่ม ถ้าตัด / ถม)");
+  if (!brs.length) return flashBanner("ยังไม่มีกิ่ง — สร้างเงื่อนไขก่อน (Properties → เกิดเมื่อ → + เงื่อนไขใหม่ / ปุ่ม Daylight Cut/Fill)");
   openDialog("วาดลงกิ่ง (B)", b => {
     div("hint", "object ที่สร้างด้วยเครื่องมือวาดหลังจากนี้จะเข้ากิ่งที่เลือก (Copy / Paste คงกิ่งเดิมของต้นฉบับ)", b);
     const list = div("flist", null, b);
@@ -73,8 +73,8 @@ function chooseDrawBranch(){
 // ชื่อกิ่งเต็ม (กิ่งแม่ › กิ่งนี้)
 const branchPath = (sp, id) => Spec.branchChain(sp, id).reverse().map(b => Spec.branchLabel(sp, b)).join(" › ");
 let drawRes = {};                  // item id -> ผล Spec.evaluate (เทียบ origin) จาก render ล่าสุด
-const TOOL_NAMES = { point: "Point", link: "Link", shape: "Shape", daylight: "ลาดจนชนดิน", follow: "วิ่งตามผิวดิน", polygon: "Polygon", ngon: "Polygon ด้านเท่า",
-                     arc: "Arc", fillet: "Fillet", cutfill: "ถ้าตัด / ถม" };
+const TOOL_NAMES = { point: "Point", link: "Link", shape: "Shape", daylight: "Slope to Surface", follow: "Follow Surface", polygon: "Polygon", ngon: "Regular Polygon",
+                     arc: "Arc", fillet: "Fillet", cutfill: "Daylight Cut/Fill" };
 // Polygon ด้านเท่า: จำนวนด้าน / โหมดที่ใช้ล่าสุด (inscribed = รัศมีถึงมุม · circumscribed = รัศมีถึงกึ่งกลางด้าน)
 const ngonOpt = () => (state.ngon ||= { n: 5, mode: "inscribed" });
 // Arc: โหมด 3p = ผ่าน 3 จุด · ser = เริ่ม-ปลาย-รัศมี (สลับระหว่างวาดด้วย T / E แบบตัวเลือกใน banner ของ AutoCAD)
@@ -220,15 +220,15 @@ function drawBanner(){
     point: "Point: คลิกเพื่อวางจุด (อ้างจากจุดที่เลือกอยู่)",
     link: draw.chain.length ? "Link: คลิกจุดถัดไป · คลิกขวา/Enter = จบเส้นนี้" : "Link: คลิกจุดเริ่ม",
     shape: draw.chain.length ? `Shape: คลิกจุดรอบรูปต่อ (${draw.chain.length} จุด) · คลิกจุดแรก/Enter = ปิดรูป` : "Shape: คลิกจุดรอบรูปตามลำดับ",
-    daylight: draw.chain.length ? "ลาดจนชนดิน: เลื่อนเมาส์เลือกทิศ แล้วคลิก (slope ตามปุ่มที่ล็อกในแถบล่าง ไม่ล็อก = 1:2)" : "ลาดจนชนดิน: คลิกจุดเริ่ม",
-    follow: draw.chain.length ? "วิ่งตามผิวดิน: คลิกจุดปลาย" : "วิ่งตามผิวดิน: คลิกจุดเริ่ม",
+    daylight: draw.chain.length ? "Slope to Surface: เลื่อนเมาส์เลือกทิศ แล้วคลิก (slope ตามปุ่มที่ล็อกในแถบล่าง ไม่ล็อก = 1:2)" : "Slope to Surface: คลิกจุดเริ่ม",
+    follow: draw.chain.length ? "Follow Surface: คลิกจุดปลาย" : "Follow Surface: คลิกจุดเริ่ม",
     polygon: draw.chain.length ? `Polygon: คลิกจุดถัดไป (${draw.chain.length} จุด) · คลิกจุดแรก / Enter / C = ปิดรูป` : "Polygon: คลิกจุดแรก",
-    ngon: draw.chain.length ? `Polygon ${ngonOpt().n} ด้าน (${ngonOpt().mode === "circumscribed" ? "รัศมีถึงกึ่งกลางด้าน" : "รัศมีถึงมุม"}): ลากรัศมี / มุม แล้วคลิก · Tab = พิมพ์ N, R, θ`
-                            : `Polygon ${ngonOpt().n} ด้าน: คลิกจุดศูนย์กลาง (เกาะจุดเดิมได้) · Tab = ตั้ง N / โหมด`,
+    ngon: draw.chain.length ? `Regular Polygon ${ngonOpt().n} ด้าน (${ngonOpt().mode === "circumscribed" ? "รัศมีถึงกึ่งกลางด้าน" : "รัศมีถึงมุม"}): ลากรัศมี / มุม แล้วคลิก · Tab = พิมพ์ N, R, θ`
+                            : `Regular Polygon ${ngonOpt().n} ด้าน: คลิกจุดศูนย์กลาง (เกาะจุดเดิมได้) · Tab = ตั้ง N / โหมด`,
     arc: arcBanner(),
     fillet: `Fillet R = ${filletOpt().r}: ` + (draw.chain.length ? `คลิก link ที่ 2 (ต่อกับ ${draw.chain[0]} ที่มุม)` : "คลิก link ที่ 1") + " · Tab / พิมพ์ = เปลี่ยน R"
             + (auxDrawing() ? " · Auxiliary = โค้งช่วยสร้างทับมุมเดิม (เส้นเดิมไม่เปลี่ยน)" : ""),
-    cutfill: "ถ้าตัด / ถม: คลิกจุดบานพับ (ไหล่คันดิน / ขอบไหล่ทาง — จุดที่วาดแล้ว)"
+    cutfill: "Daylight Cut/Fill: คลิกจุดไหล่ (ไหล่คันดิน / ขอบไหล่ทาง — จุดที่วาดแล้ว)"
   }[draw.tool];
   document.body.classList.toggle("aux-mode", auxDrawing());
   // โหมด Auxiliary: ป้ายชัดๆ หน้าข้อความ (X = สลับ)
@@ -252,7 +252,6 @@ function setArcMode(m){
 document.getElementById("drawer").addEventListener("click", e => {
   const b = e.target.closest("[data-tool]"); if (!b || b.disabled) return;
   const t = b.dataset.tool;
-  if (t === "bounds"){ const it = editItem(); if (it){ state.open["i:" + it.id] = true; setSel({ type:"params", item: it.id }); } return; }
   // ถ้าตัด / ถม: เลือกจุดไว้จุดเดียว = ใช้เป็นจุดบานพับเลย ไม่งั้นให้คลิกจุด
   if (t === "cutfill"){ const it = editItem(), s = pickedList().filter(o => o.item === it.id); if (s.length === 1 && s[0].type === "dpt"){ setTool(null); return openCutFill(it, s[0].id); } }
   setTool(draw.tool === t ? null : t);
@@ -543,7 +542,7 @@ function drawClick(px, py){
   if (c.kind === "end" && c.point.ref && c.point.ref.type === "pt" && draw.tool !== "point" && draw.tool !== "ngon" && !viaStage && !auxDrawing() && Spec.isAuxPoint(it.spec, c.point.ref.id))
     return flashBanner(`${c.point.ref.id} เป็นจุด auxiliary ต่อ link จริงไม่ได้ — ปิด "Auxiliary (ช่วยสร้าง)" ใน Properties ของ ${c.point.ref.id} ก่อน`);
   if (draw.tool === "cutfill"){
-    if (c.kind !== "end" || !c.point.ref || c.point.ref.type !== "pt") return flashBanner("ถ้าตัด / ถม: คลิกบนจุดที่วาดแล้ว (จุดบานพับ) — วาดจุดก่อนถ้ายังไม่มี");
+    if (c.kind !== "end" || !c.point.ref || c.point.ref.type !== "pt") return flashBanner("Daylight Cut/Fill: คลิกบนจุดที่วาดแล้ว (จุดไหล่) — วาดจุดก่อนถ้ายังไม่มี");
     return openCutFill(it, c.point.ref.id);
   }
   commitPoint(c.make, c.kind);
@@ -737,7 +736,7 @@ function openNgonTyping(first){
   const g = stage2 ? ngonFromMouse(draw.cand) : null;
   const A = prevPoint(), R = typingRef(), B = R || A;
   draw.typing = true;
-  box.innerHTML = `<div class="dyn-h">Polygon ด้านเท่า · ${stage2 ? "รัศมี / มุม (θ ในกรอบ Side = Right, 0 = จุดแรกอยู่บนสุด)" : `จุดศูนย์กลาง ${R ? "อ้างจาก " + esc(R.label) : A ? "จาก " + A.id : "จาก origin"}`} · เว้นว่าง = ใช้ค่าจากเมาส์ · Enter = ตกลง</div>
+  box.innerHTML = `<div class="dyn-h">Regular Polygon · ${stage2 ? "รัศมี / มุม (θ ในกรอบ Side = Right, 0 = จุดแรกอยู่บนสุด)" : `จุดศูนย์กลาง ${R ? "อ้างจาก " + esc(R.label) : A ? "จาก " + A.id : "จาก origin"}`} · เว้นว่าง = ใช้ค่าจากเมาส์ · Enter = ตกลง</div>
     <label>N<input data-f="n" placeholder="${o.n}" style="width:44px"></label>
     <label class="dyn-chk"><input type="checkbox" data-f="circ"${o.mode === "circumscribed" ? " checked" : ""}> ถึงกึ่งกลางด้าน</label>`
     + (stage2 ? `<label>R<input data-f="r" placeholder="${g ? f3(g.R) : ""}"><button type="button" class="dyn-par" data-p="r" title="สร้าง parameter ใหม่จากช่องนี้">+</button></label>

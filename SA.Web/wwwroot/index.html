@@ -118,25 +118,24 @@
       <button class="tool" data-tool="link" disabled><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M5 17L23 5"/><circle cx="5" cy="17" r="2.2" class="hollow"/><circle cx="23" cy="5" r="2.2" class="hollow"/></svg>Link</button>
       <button class="tool" data-tool="shape" disabled><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M4 6H24L20 17H8Z" class="tint"/></svg>Shape</button>
       <button class="tool" data-tool="polygon" disabled title="คลิกจุดไปเรื่อยๆ แล้วปิดรูป (คลิกจุดแรก / Enter / C) = ได้จุด + link + shape"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M5 17L4 7L13 3L24 8L20 18Z" class="tint"/><circle cx="5" cy="17" r="1.6" class="hollow"/><circle cx="4" cy="7" r="1.6" class="hollow"/><circle cx="13" cy="3" r="1.6" class="hollow"/><circle cx="24" cy="8" r="1.6" class="hollow"/><circle cx="20" cy="18" r="1.6" class="hollow"/></svg>Polygon</button>
-      <button class="tool" data-tool="ngon" disabled title="Polygon ด้านเท่า: คลิกจุดศูนย์กลาง แล้วลากรัศมี / มุม (Tab = พิมพ์ N, R, θ)"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M14 2L23 8.5L19.6 19H8.4L5 8.5Z" class="tint"/><path d="M12.5 11H15.5M14 9.5V12.5"/></svg>ด้านเท่า</button>
+      <button class="tool" data-tool="ngon" disabled title="Regular Polygon: คลิกจุดศูนย์กลาง แล้วลากรัศมี / มุม (Tab = พิมพ์ N, R, θ)"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M14 2L23 8.5L19.6 19H8.4L5 8.5Z" class="tint"/><path d="M12.5 11H15.5M14 9.5V12.5"/></svg>Regular Polygon</button>
       <button class="tool" data-tool="arc" disabled title="Arc: 3 จุด (T) หรือ เริ่ม-ปลาย-รัศมี (E) · Tab = พิมพ์ค่า"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M4 18C6 8 22 8 24 18"/><circle cx="4" cy="18" r="1.8" class="hollow"/><circle cx="14" cy="10.5" r="1.6" class="hollow"/><circle cx="24" cy="18" r="1.8" class="hollow"/></svg>Arc</button>
       <button class="tool" data-tool="fillet" disabled title="Fillet: ตั้งรัศมี (Tab) แล้วคลิก link 2 เส้นที่ต่อกันที่มุม"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M4 4V12" /><path d="M12 19H24"/><path d="M4 12C4 16 8 19 12 19" class="warm"/><path d="M4 12V19H12" stroke-dasharray="2 2"/></svg>Fillet</button>
       <button class="tool" data-tool="marked" disabled data-later="ระยะสอง"><svg viewBox="0 0 28 22" aria-hidden="true"><circle cx="14" cy="11" r="3"/><path d="M14 2v3M14 17v3M5 11h3M20 11h3"/><path d="M19 3h6v4" class="warm"/></svg>Marked point</button>
     </div>
     <div class="dgroup">Surface</div>
     <div class="dgrid">
-      <button class="tool" data-tool="daylight" disabled><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M2 18H26" class="ground"/><path d="M5 4L17 18" stroke-dasharray="3 2"/><circle cx="5" cy="4" r="2" class="hollow"/><circle cx="17" cy="18" r="2.4" class="good"/></svg>ลาดจนชนดิน</button>
-      <button class="tool" data-tool="follow" disabled><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M2 12L8 15L14 10L20 16L26 13" class="ground"/><path d="M8 15L14 10L20 16" class="goodline"/></svg>วิ่งตามผิวดิน</button>
-      <button class="tool" data-tool="level" disabled data-later="Milestone 4"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M2 8L9 16L16 12L26 18" class="ground"/><path d="M2 12H26" stroke-dasharray="3 2"/></svg>ตัดที่ระดับ</button>
+      <button class="tool" data-tool="daylight" disabled title="Slope to Surface: ลาดจากจุดจนชนผิวดิน"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M2 18H26" class="ground"/><path d="M5 4L17 18" stroke-dasharray="3 2"/><circle cx="5" cy="4" r="2" class="hollow"/><circle cx="17" cy="18" r="2.4" class="good"/></svg>Slope to Surface</button>
+      <button class="tool" data-tool="follow" disabled title="Follow Surface: link ที่วิ่งตามผิวดินระหว่างสองจุด"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M2 12L8 15L14 10L20 16L26 13" class="ground"/><path d="M8 15L14 10L20 16" class="goodline"/></svg>Follow Surface</button>
+      <button class="tool" data-tool="level" disabled data-later="Milestone 4"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M2 8L9 16L16 12L26 18" class="ground"/><path d="M2 12H26" stroke-dasharray="3 2"/></svg>Cut at Level</button>
     </div>
     <div class="dgroup">Logic</div>
     <div class="dgrid">
-      <button class="tool" data-tool="cutfill" disabled title="ถ้าตัด / ถม: คลิกจุดบานพับ → ได้เงื่อนไข IsCut + กิ่ง ตัด / ถม + ลาดจนชนดินกิ่งละเส้น"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M14 2L24 11L14 20L4 11Z"/><text x="14" y="14" text-anchor="middle">?</text></svg>ถ้าตัด / ถม</button>
-      <button class="tool" data-tool="bounds" disabled><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M7 4H4V18H7M21 4H24V18H21M9 11H19"/><circle cx="14" cy="11" r="1.8" class="fill"/></svg>ขอบเขตค่า</button>
+      <button class="tool" data-tool="cutfill" disabled title="Daylight Cut/Fill: คลิกจุดไหล่ → ดินสูงกว่า = ลาดตัด (เชิดขึ้น) · ดินต่ำกว่า = ลาดถม (ลงล่าง) — เลือกเองทุกสถานี"><svg viewBox="0 0 28 22" aria-hidden="true"><path d="M14 2L24 11L14 20L4 11Z"/><text x="14" y="14" text-anchor="middle">?</text></svg>Daylight Cut/Fill</button>
     </div>
-    <div class="dgroup">รูปทรงของฉัน <small>(ระยะสอง: คลิกขวาที่ subassembly → เพิ่ม)</small></div>
+    <div class="dgroup">My Shapes <small>(ระยะสอง: คลิกขวาที่ subassembly → เพิ่ม)</small></div>
     <div class="dgrid">
-      <button class="tool mine" disabled data-later="ระยะสอง"><svg viewBox="0 0 28 22" aria-hidden="true"><rect x="5" y="4" width="18" height="14" rx="2" stroke-dasharray="3 2"/><path d="M14 8V14M11 11H17"/></svg>บันทึกรูปทรงนี้</button>
+      <button class="tool mine" disabled data-later="ระยะสอง"><svg viewBox="0 0 28 22" aria-hidden="true"><rect x="5" y="4" width="18" height="14" rx="2" stroke-dasharray="3 2"/><path d="M14 8V14M11 11H17"/></svg>Save to My Shapes</button>
     </div>
   </div>
   <div class="pane-h props-h">Properties <span class="sub" id="props-of"></span></div>

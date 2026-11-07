@@ -40,6 +40,7 @@ public class SpecParam
     public string? DisplayName { get; set; }
     public double? Min { get; set; }
     public double? Max { get; set; }
+    public bool Positive { get; set; }                // ต้องมากกว่า 0: ≤ 0 = error (Severe) + ใช้ default (แบบ base_rock-pitching.cs)
 }
 
 public class SpecTarget

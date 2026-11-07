@@ -58,7 +58,9 @@
   รอบ 4b M3 เสร็จ (2026-11-02): ไอคอน ↕ + เส้นขอบตอนเลือกจุด, Properties ประโยคสรุป, แท็บ Logic → Max / Min (สถานะสด + scenario), Delete ถาม, Rotate ไม่ให้หมุนจุดที่มี Max / Min,
     branchRisks นับจุดที่ Max / Min อ้าง, README ตาราง "ใช้อันไหนเมื่อไร", `tests-civil3d/round4b-demo.cs` + `round4b-checklist.md` (drawing-cases 61–66) → **รอบ 4b จบ** รอทดสอบใน Civil 3D
   รอบ 4c M0 เสร็จ (2026-11-07): ข้อเสนอ + คำตอบใน `prompt-4c-design.md` (ชื่อปุ่มเป็นอังกฤษ: Daylight Cut/Fill, Extend to Surface, Clipped Surface Link, Intersect, Offset, Array + เปลี่ยนชื่อปุ่มเดิม · ข้อความอื่นยังไทย · Offset ติ๊ก Aux เอง · Intersect ถามตัด/ไม่ตัดทุกครั้ง)
-  รอบ 4c M1 (กำลังทำ): เอา Max / Min ออกแล้ว (commit แยก) — ของเก่าที่มี `limit` ตัดทิ้งตอนโหลด (`Spec.normalize`) + แจ้งครั้งเดียว · `limited()` = "ไม่มีฟังก์ชัน"
+  รอบ 4c M1 เสร็จ (2026-11-07): เอา Max / Min ออก (commit แยก `ea9dd1a` — ของเก่าตัดทิ้งตอนโหลด + แจ้งครั้งเดียว · `limited()` = "ไม่มีฟังก์ชัน"),
+    ตาราง Parameter: `positive` (ต้องมากกว่า 0 → Severe + default) + ขั้นต่ำ / ขั้นสูง + เตือน default ขัดขอบเขต + ปุ่ม Parameter บนหัว Properties (`Spec.setParamBounds` / `paramBoundsIssue`),
+    ชื่อปุ่มอังกฤษ (Daylight Cut/Fill, Slope to Surface, Follow Surface, Regular Polygon, Cut at Level, My Shapes) + คำอธิบาย / ภาพในหน้าต่าง Daylight Cut/Fill · ถัดไป M2 (Intersect + Offset)
   ถัดไป: **`prompt-4c.md`** (เอา Max / Min ออก, ขอบเขตค่า → ตาราง Parameter, เปลี่ยนชื่อปุ่มตัด/ถม, ปุ่มใหม่: ต่อลงถึงดิน / ตามดินไม่เกินเส้น / Intersect / Offset / Array — เป้าหมาย: วาด rock-pitching ใหม่ในเว็บโดยไม่เขียนโค้ด) — ยังไม่เริ่ม · จากนั้น **`prompt-5.md` ฉบับย่อ** (Logic API ที่ต้องรวมฟังก์ชันของ 4c + มุมมองข้อความ + Switch ในแท็บ Logic) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)

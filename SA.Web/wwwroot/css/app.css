@@ -342,6 +342,16 @@ input.expr{font-family:"IBM Plex Mono",monospace}
 .lg-br.off .lbl{opacity:.6}
 .lg-br small,.lg-row small{color:var(--muted)}
 .lg-miss{color:#9b2c2c}
+/* Daylight Cut/Fill (รอบ 4c): คำอธิบาย + ภาพ 2 ช่อง */
+.cf-explain p{margin:0 0 6px;font-size:12px;line-height:1.5}
+.cf-pics{display:flex;gap:10px;margin-bottom:8px}
+.cf-pics figure{margin:0;flex:1;text-align:center;font-size:11px;color:var(--muted)}
+.cf-pics svg{width:100%;height:56px;background:var(--paper);border-radius:6px}
+.cf-gnd{fill:color-mix(in srgb,var(--ground,#8a6d3b) 25%,transparent);stroke:var(--ground,#8a6d3b);stroke-width:1.5}
+.cf-road{stroke:var(--ink);stroke-width:3;fill:none}
+.cf-cut,.cf-fill{stroke:#e0892b;stroke-width:2.5;fill:none}
+.cf-pt{fill:var(--paper);stroke:var(--ink);stroke-width:1.5}
+.props-top{margin-bottom:6px}
 .trk-acq{stroke:#4fd2e0;stroke-width:2;fill:none;pointer-events:none}
 .trk-acq.main{stroke-width:3}
 .trk-line{stroke:#4fd2e0;stroke-width:1;stroke-dasharray:3 4;opacity:.8;pointer-events:none}

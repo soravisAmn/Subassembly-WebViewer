@@ -198,7 +198,7 @@ function ctxItems(kind, id, extra){
       { label:"Move", cmd: () => { if (!selHas("item", id)) setSel({ type:"item", item:id }); startCmd("move"); }, disabled: !!state.editing, note: "M" },
       { label:"Copy", cmd: () => { if (!selHas("item", id)) setSel({ type:"item", item:id }); startCmd("copy"); }, disabled: !!state.editing, note: "C" },
       { label:"Mirror", cmd: () => mirrorItem(id), disabled: !!state.editing },
-      { label:"เพิ่มเข้า \"รูปทรงของฉัน\"", disabled: true, note:"ระยะสอง" },
+      { label:"เพิ่มเข้า \"My Shapes\"", disabled: true, note:"ระยะสอง" },
       { sep: true },
       { label:"เอาออกจาก assembly", cmd: () => removeItem(id), disabled: !!state.editing && !editingThis }
     ];
@@ -376,6 +376,10 @@ function renderProps(force){
   propsSig = JSON.stringify(state.sel);
   const s = state.sel;
   box.innerHTML = "";
+  // ทางเข้าตาราง Parameter ที่หาง่าย (ตอนแก้ส่วนที่วาด)
+  if (state.editing && s.type !== "params" && editItem() && editItem().spec)
+    div("btns props-top", null, box).append(btn("Parameter", () => { const e = editItem(); state.open["i:" + e.id] = true; setSel({ type:"params", item: e.id }); }, false,
+                                                  "ตาราง Parameter ของตัวที่แก้ (ต้องมากกว่า 0 / ขั้นต่ำ / ขั้นสูง)"));
   const it = selItem(), rr = it ? asmRes[it.id] : null, res = rr && rr.result;
   let of = "";
   if (s.type === "ws"){ of = "Workspace"; propsWorkspace(box); }
@@ -714,7 +718,7 @@ function propsRotation(box, it, g){
 // Polygon ด้านเท่า: แก้ N / R / θ / โหมด ทีหลังได้ (จุดยอดเป็น polar จากจุดศูนย์กลาง — id เดิม ของที่อ้างจุดยอดไม่หลุด)
 function propsPolygon(box, it, g){
   const sp = it.spec;
-  const gr = group(box, `Polygon ด้านเท่า ${g.id}`);
+  const gr = group(box, `Regular Polygon ${g.id}`);
   kv(gr, [["ศูนย์กลาง", g.center], ["จุดยอด", g.points.join(", ")], ["Shape", g.shape || "—"]]);
   const row = div("row", `<label>N<small>จำนวนด้าน 3–24</small></label>`, gr);
   const n = document.createElement("input"); n.type = "number"; n.min = 3; n.max = 24; n.step = 1; n.value = g.n; n.disabled = !canEdit(it);
@@ -958,7 +962,13 @@ function openCutFill(it, hinge){
   const sl = state.bar.slopes || [];
   const o = { cut: sl[0] || "1:1.5", fill: sl[1] || "1:2", params: true, dir: "1", cutCode: "Daylight_Cut", fillCode: "Daylight_Fill",
               target: (sp.targets[0] || {}).name || "TargetSurface" };
-  openDialog(`ถ้าตัด / ถม ที่ ${hinge}`, b => {
+  openDialog(`Daylight Cut/Fill ที่ ${hinge}`, b => {
+    // อธิบายสั้นๆ + ภาพ 2 ช่อง (ช่วงเนิน / ช่วงที่ลุ่ม)
+    div("cf-explain", `<p>ดินสูงกว่าจุดไหล่ → ใช้<b>ลาดตัด</b> (เชิดขึ้น) · ดินต่ำกว่า → ใช้<b>ลาดถม</b> (ลงล่าง) — subassembly เลือกเองทุกสถานี</p>
+      <div class="cf-pics">
+        <figure><svg viewBox="0 0 120 56" aria-hidden="true"><path class="cf-gnd" d="M0 22L50 14L120 4V56H0Z"/><path class="cf-road" d="M6 34H48"/><path class="cf-cut" d="M48 34L66 15"/><circle class="cf-pt" cx="48" cy="34" r="3"/></svg><figcaption>ช่วงเนิน → ลาดตัด</figcaption></figure>
+        <figure><svg viewBox="0 0 120 56" aria-hidden="true"><path class="cf-gnd" d="M0 46L60 50L120 44V56H0Z"/><path class="cf-road" d="M6 24H48"/><path class="cf-fill" d="M48 24L80 47"/><circle class="cf-pt" cx="48" cy="24" r="3"/></svg><figcaption>ช่วงที่ลุ่ม → ลาดถม</figcaption></figure>
+      </div>`, b);
     const field = (label, small, key, type) => {
       const row = div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, b);
       const inp = document.createElement("input"); inp.type = type || "text"; inp.value = o[key]; inp.dataset.k = key;
@@ -997,12 +1007,12 @@ function openCutFill(it, hinge){
   });
 }
 function cutFillCommit(it, opts){
-  const r = specEdit(sp => Spec.addCutFill(sp, opts), it, `ถ้าตัด / ถม ที่ ${opts.hinge}`);
+  const r = specEdit(sp => Spec.addCutFill(sp, opts), it, `Daylight Cut/Fill ที่ ${opts.hinge}`);
   if (!r) return;
   if (draw.tool === "cutfill") setTool(null);
   state.sel = { type:"dpt", item: it.id, id: r.cut.point }; renderAll();
   const cn = Spec.byId(it.spec.logic.conditions, r.cond).name;
-  flashBanner(`ถ้าตัด / ถม: ${cn} · ตัด = ${r.cut.point} · ถม = ${r.fill.point} · Daylight = ${r.daylight} — ลากจุดผิวดินขึ้นลงดูรูปสลับ (Ctrl+Z ย้อนได้)`);
+  flashBanner(`Daylight Cut/Fill: ${cn} · ตัด = ${r.cut.point} · ถม = ${r.fill.point} · Daylight = ${r.daylight} — ลากจุดผิวดินขึ้นลงดูรูปสลับ (Ctrl+Z ย้อนได้)`);
 }
 // firstOf: จุดแรกในรายการที่เกิด (ต่อเรขาคณิตหลังกิ่ง เช่น ปลายลาดตัด / ปลายลาดถม)
 function firstOfRow(g, it, p, others){
@@ -1074,7 +1084,7 @@ function setAux(it, objs, on){
 }
 
 // ---------------- ตาราง Parameter แบบ SAC ----------------
-// ชื่อ, ชนิด, default, display name, ขอบเขตค่า (นอกขอบเขต = ใช้ค่าขอบแทน + เตือน)
+// ชื่อ, ชนิด, default, display name, ต้องมากกว่า 0 / ขั้นต่ำ / ขั้นสูง (≤ 0 = error + default · นอกขอบเขต = ใช้ค่าขอบแทน + เตือน)
 function propsParamTable(box, it){
   const sp = it.spec, ed_ = canEdit(it);
   const g = group(box, "Parameter ของส่วนที่วาด (แบบ SAC)", ed_ ? { label:"+ parameter", cmd: () => addSpecParam(it) } : null);
@@ -1110,9 +1120,18 @@ function propsParamTable(box, it){
       on(n);
     }, "mono");
     num("default", p.default, n => specEdit(() => { p.default = n ?? 0; }, it));
-    num("min", p.min, n => specEdit(() => { p.min = n; }, it)).placeholder = "ไม่จำกัด";
-    num("max", p.max, n => specEdit(() => { p.max = n; }, it)).placeholder = "ไม่จำกัด";
+    const bound = (k, label) => num(label, p[k], n => { try{ specEdit(s => Spec.setParamBounds(s, p.name, { [k]: n }), it); }catch(e){ alert(e.message); renderProps(true); } });
+    bound("min", "ขั้นต่ำ").placeholder = "ไม่จำกัด";
+    bound("max", "ขั้นสูง").placeholder = "ไม่จำกัด";
     txt(r3, "display name", p.displayName, v => specEdit(() => { p.displayName = v || p.name; }, it));
+    // ต้องมากกว่า 0: ≤ 0 = error + ใช้ default (แบบ base / body_rock-pitching.cs) — Side ใช้ 0 = Right จึงตั้งไม่ได้
+    const r4 = div("pc1", null, card), cl = document.createElement("label"); cl.className = "check";
+    cl.innerHTML = `<input type="checkbox"${p.positive ? " checked" : ""}> ต้องมากกว่า 0 <small>(≤ 0 = error + ใช้ default)</small>`;
+    const cb = cl.querySelector("input"); cb.disabled = !ed_ || isSide;
+    cb.onchange = () => specEdit(s => Spec.setParamBounds(s, p.name, { positive: cb.checked }), it);
+    r4.appendChild(cl);
+    const bad = Spec.paramBoundsIssue(p);
+    if (bad) div("expr-err", "⚠ " + esc(bad), card);
   }
   if (sp.side) div("hint", `${sp.side.param} = 1 (Left) กลับด้านแนวราบทั้งหมด`, g);
 }
@@ -1120,7 +1139,7 @@ const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
 const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
   "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
-  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf abstract as base bool break byte case catch char checked class const continue " +
+  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf Severe abstract as base bool break byte case catch char checked class const continue " +
   "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
   "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +
   "static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while var").split(" "));
@@ -1186,7 +1205,7 @@ function renderDock(){
       if (result.exception) add("e", `${result.exception.type} — ${result.exception.message}`);
     }
     // ส่วนที่วาด: มีผลรันโค้ดที่สร้างแล้ว ข้อความเตือนมาจากโค้ด C# (result.issues) ไม่ต้องซ้ำจาก JS
-    if (drawRes[it.id] && !(rr && rr.generated && rr.result)) for (const i of drawRes[it.id].issues) add("w", "วาด · " + i.msg);
+    if (drawRes[it.id] && !(rr && rr.generated && rr.result)) for (const i of drawRes[it.id].issues) add(i.level === "e" ? "e" : "w", "วาด · " + i.msg);
     const mis = it.spec ? csharpMismatch(it) : null;
     if (mis) add("e", "รูปที่วาด (JS) ไม่ตรงกับผลรันโค้ด C# ที่สร้าง — " + mis);
     if (it.specEdited) add("w", "ช่วง SA-DRAWING ในไฟล์ถูกแก้ด้วยมือ (ไม่ตรงกับ sa-spec) — Save (.cs) จะถามก่อนเขียนทับด้วยส่วนที่วาด");
@@ -1275,7 +1294,7 @@ function renderLogic(){
   // ---- เงื่อนไข ----
   const s1 = div("lg-sec", "<h4>เงื่อนไข <small>ค่าตอนนี้อัปเดตตามผิวดิน / parameter</small></h4>", box);
   if (ed_) s1.querySelector("h4").appendChild(btn("+ เงื่อนไขใหม่", () => specEdit(s => newCondition(s, null), it, "เพิ่มเงื่อนไข"), false, "เงื่อนไข + กิ่ง ใช่ / ไม่ใช่ (ยังไม่มี object) — ใส่ object เข้ากิ่งที่ Properties → เกิดเมื่อ หรือ B ตอนวาด"));
-  if (!conds.length) div("empty", "ยังไม่มีเงื่อนไข — ปุ่ม ถ้าตัด / ถม ใน Drawer หรือ Properties → เกิดเมื่อ → + เงื่อนไขใหม่", s1);
+  if (!conds.length) div("empty", "ยังไม่มีเงื่อนไข — ปุ่ม Daylight Cut/Fill ใน Drawer หรือ Properties → เกิดเมื่อ → + เงื่อนไขใหม่", s1);
   const names = specNames(it), xo = { ...Spec.exprOpts(sp), want: "bool" };
   for (const c of conds){
     const row = div("lg-row", `<span class="nm">${esc(c.name)}</span>`, s1);

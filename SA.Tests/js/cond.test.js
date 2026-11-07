@@ -129,6 +129,31 @@ test("การพึ่งพา: refs นับจุดในนิพจน�
   ok(r.pts.P2.err && r.pts.P3.err, "วน = error");
 });
 
+console.log("ตาราง Parameter: ต้องมากกว่า 0 / ขั้นต่ำ / ขั้นสูง (รอบ 4c — แบบ rock-pitching)");
+test("≤ 0 = error + ใช้ default (ก่อนขั้นต่ำ) · ต่ำกว่าขั้นต่ำ = เตือน + ใช้ขั้นต่ำ · ค่าปกติไม่เตือน", () => {
+  const s = spec([["P2", { type: "delta", from: "P1", dx: "Width", dy: "0" }]]);
+  Spec.setParamBounds(s, "Width", { positive: true, min: 2 });
+  const a = run(s, { values: { Width: -1 } });
+  near(3, P(a, "P2").x, "≤ 0 ใช้ default 3"); eq("e", a.issues[0].level, "ระดับ error"); ok(a.issues[0].msg.includes("ต้องมากกว่า 0, ใช้ค่า default 3"), a.issues[0].msg);
+  const b = run(s, { values: { Width: 1.5 } });
+  near(2, P(b, "P2").x, "ต่ำกว่าขั้นต่ำ ใช้ 2"); eq("w", b.issues[0].level, "เตือน"); eq("Width = 1.5 < 2, ใช้ 2 แทน", b.issues[0].msg, "ข้อความ");
+  s.params[1].default = 1;
+  const c = run(s, { values: { Width: 0 } });
+  near(2, P(c, "P2").x, "≤ 0 -> default 1 -> ต่ำกว่าขั้นต่ำ -> 2"); eq(2, c.issues.length, "error + เตือน");
+  eq(0, run(s, { values: { Width: 4 } }).issues.length, "ค่าปกติ");
+});
+test("setParamBounds ตรวจค่า · paramBoundsIssue เตือน default ที่ขัดกับขอบเขต", () => {
+  const s = spec([]);
+  let err = null; try{ Spec.setParamBounds(s, "Width", { min: 3, max: 2 }); }catch(e){ err = e.message; }
+  ok(err && err.includes("มากกว่า ขั้นสูง"), String(err));
+  Spec.setParamBounds(s, "Width", { min: 4 });
+  ok(Spec.paramBoundsIssue(s.params[1]).includes("ต่ำกว่าขั้นต่ำ 4"), "default 3 < 4");
+  Spec.setParamBounds(s, "Width", { min: null, positive: true }); s.params[1].default = 0;
+  ok(Spec.paramBoundsIssue(s.params[1]).includes("ไม่มากกว่า 0"), "default 0");
+  Spec.setParamBounds(s, "Width", { positive: false });
+  ok(!("positive" in s.params[1]) && Spec.paramBoundsIssue(s.params[1]) === null, "เลิกติ๊ก");
+});
+
 console.log("ของเก่าจากรอบ 4b (Max / Min ถูกเอาออกในรอบ 4c)");
 test("normalize ตัด limit ทิ้ง + คืนรายการจุด · จุดใช้ตำแหน่งตามนิยามเดิม · limited() = ไม่มีฟังก์ชัน (บอกตำแหน่ง)", () => {
   const s = spec([["P2", { type: "delta", from: "P1", dx: "1", dy: "-1" }]]);

@@ -59,6 +59,9 @@ static class RockPitchingTests
         {
             ("base", "base_rock-pitching.cs", Path.Combine("tests-civil3d", "round4c-base.cs"), baseCases, baseParams),
             ("body", "body_rock-pitching.cs", Path.Combine("tests-civil3d", "round4c-body.cs"), bodyCases, bodyParams),
+            // รอบ 4e: ไฟล์ที่ Save จากเว็บไว้ข้างไฟล์จริง — parameter ชนิด Slope / Length · body จุดล่างในด้วย Extend to Surface (ไม่ใช่ min())
+            ("base-web", "base_rock-pitching.cs", "base_rock-pitching-web.cs", baseCases, baseParams),
+            ("body-web", "body_rock-pitching.cs", "body_rock-pitching-web.cs", bodyCases, bodyParams),
         })
         {
             CompiledSubassembly? a = null, b = null;
@@ -95,7 +98,7 @@ static class RockPitchingTests
                             if (ra.Exception != null || rb.Exception != null) throw new Exception($"{where}: exception {JsonSerializer.Serialize(ra.Exception ?? rb.Exception)}");
                             // ต่างกันที่รู้แล้ว (ตาราง "ต่างกันตรงไหน" ใน README): เส้นปิดปลายต่อลงไปชนดินเลย origin เข้าด้านใน
                             //   ไฟล์จริง = เตือน + เลิกใช้ผิวดิน (ขอบล่างเป็นเส้นความหนาขั้นต่ำ) · ที่วาด = เตือน + ไม่ต่อ แต่ขอบล่างยังตามดิน → ตรวจแค่ว่าเตือนทั้งคู่
-                            if (name == "body" && ra.Issues.Any(i => i.Message.Contains("เลย origin")))
+                            if (name.StartsWith("body") && ra.Issues.Any(i => i.Message.Contains("เลย origin")))
                             {
                                 if (!rb.Issues.Any(i => i.Message.Contains("ต่อลงถึงดิน"))) throw new Exception($"{where}: ไฟล์จริงเตือนเส้นปิดปลายเลย origin แต่ที่วาดไม่เตือน");
                                 continue;

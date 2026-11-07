@@ -604,16 +604,56 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 `addArray(spec, sel, { n, dx, dy, join })` / `updateArray(spec, g, { dx, dy })` / `rebuildArray(spec, g, { n, join })` / `arrayOf(spec, kind, id)` ·
 `isAlias(spec, id)` / `auxEnd(spec, id)` (ปลายจริง)
 
+### rock-pitching จากเว็บ (รอบ 4e) — `base_rock-pitching-web.cs` / `body_rock-pitching-web.cs`
+
+สองไฟล์ที่ root (ข้างไฟล์จริง) = วาดด้วยเครื่องมือของเว็บแล้ว **Save ผ่านเส้นทางเดียวกับปุ่ม Save (.cs)** (`/api/drawing/save`) — มี sa-spec ฝังอยู่ import กลับมาแก้ต่อได้
+ลำดับการกด = `buildBase()` / `buildBody()` ใน `SA.Tests/js/rockpitching.test.js` (รุ่นรอบ 4c ยังอยู่ที่ `tests-civil3d/round4c-*.cs`)
+
+- ต่างจากรุ่นรอบ 4c: parameter มี **ชนิดค่า** (`SideSlope` / `FaceSlope` / `EndSlope` = Slope 1:x · ความกว้าง / ลึก / สูง / หนา = Length m) ·
+  body **จุดล่างใน (`SoilBaseInside`) ใช้ Extend to Surface บนเส้นดิ่ง** แทนนิพจน์ `min(ground(P1), S0.y)` — link Auxiliary P1 → S0 แล้ว Extend ที่ S0
+  (ดินต่ำกว่า S0 = ต่อลงถึงดิน · ไม่ต่ำกว่า = ใช้ S0 → ตำแหน่งเท่ากับ min() ทุกกรณี) → ปลายจริงเอา Auxiliary ออก + code แบบ `SoilToe`
+- ชื่อ class `RockPitchingBaseWeb` / `RockPitchingBodyWeb` (namespace `TestSubassembly` เหมือนไฟล์จริง — ชื่อไม่ชนกับ `Trapezoid` / `RockPitchingBody` จึง build รวมกันลง Civil 3D ได้)
+- `SA.Tests/RockPitchingTests.cs` เทียบสองไฟล์นี้กับไฟล์จริงชุดเดียวกับรอบ 4c (base 8 / body 7 ผิวดิน × Right / Left × 4 ชุดค่า) — ตรงกันทุกกรณี (ต่างที่รู้แล้ว = ตาราง "ต่างกันตรงไหน" ข้างบน)
+- **เปิดดูในเว็บ**: ไฟล์ ▾ → Open project → `rock-pitching-compare.assembly.json` = 2 assembly ผิวดินเดียวกัน
+  "วาดจากเว็บ (-web.cs)" ที่ x = 0 กับ "ไฟล์จริง (เขียนเอง)" ที่ x = 50 · base บนแกน + body เกาะที่ `TrapTopOutside` ของ base · คลิกขวา -web → Edit แก้ต่อได้เลย
+  (หรือ ไฟล์ ▾ → Import .cs → เลือก `*-web.cs` = อ่าน sa-spec กลับมาครบ)
+- **build ลง Civil 3D**: ใส่ `base_rock-pitching-web.cs` / `body_rock-pitching-web.cs` ในโปรเจกต์ .NET เดียวกับไฟล์จริง แล้ว build ตามปกติ —
+  ทดสอบตาม `tests-civil3d/round4c-checklist.md` (อ้างตามบทบาท / code — ใช้ class `…Web` แทน `Round4c…`)
+
+| base: บทบาท | จุด | จริง / aux | code |
+|---|---|---|---|
+| ขอบบนใน (origin) | P1 | จริง | `TrapTopInside` |
+| ขอบบนนอก | P2 | จริง | `TrapTopOutside` |
+| มุมฐานนอก / ใน | P3 / P4 | จริง | `TrapBaseOutside` / `TrapBaseInside` |
+| ต่อลงถึงดินนอก / ใน (เกิดเมื่อมุมฐานลอย) | P5 / P7 | จริง | `TrapToeOutside` / `TrapToeInside` |
+| ปลายจริงนอก / ใน (จุดแรกที่เกิดใน [ต่อ, มุมฐาน]) | P6 / P8 | aux (ปลาย link จริงได้) | — |
+| link: บน L1 · ข้าง L2, L3 · ต่อลงดิน L5, L6 (optional) · ฐาน L4 (aux) · ขอบล่าง L7 Clipped | | | `Top` · `TrapSide` · `TrapSide` · — · `Datum` + `TrapOnSurface` / `TrapBase` |
+| shape S1 | | | `Trapezoid` |
+
+| body: บทบาท | จุด | จริง / aux | code |
+|---|---|---|---|
+| หินบนใน (origin) / หินบนนอก F | P1 / P2 | จริง | `RockTopInside` / `RockTopOutside` |
+| ปลายเส้น Offset ใต้หิน / เส้นดินขั้นต่ำ | P3–P6 | aux | — |
+| ทิศเส้นปิดปลาย 1:EndSlope / เส้นดิ่งที่ origin | P7 / P8 | aux | — |
+| ฐานหินนอก R / ใน B0 (Intersect) | P9 / P10 | จริง | `RockBaseOutside` / `RockBaseInside` |
+| O (เส้นดิน × ปิดปลาย) / S0 (เส้นดิน × ดิ่ง) | P11 / P12 | aux | — |
+| ต่อลงถึงดินที่ O / ที่ S0 | P13 / P15 | aux | — |
+| ปลายดินนอก (ปลายจริง [P13, O]) | P14 | จริง | `SoilToe` |
+| ปลายดินล่างใน (ปลายจริง [P15, S0]) | P16 | จริง | `SoilBaseInside` |
+| link จริง: ผิวหิน L1 · ปลายหิน L10 · ฐานหิน L11 · หลังหิน L12 · ปลายดิน L13 · ขอบล่าง L14 Clipped · หลังดิน L15 | | | `Top,RockFace` · `Top,RockEnd` · `RockBase` · `RockBack` · `Top,Datum,SoilEnd` · `Datum` + `SoilOnSurface` / `SoilMinThickness` · `SoilBack` |
+| shape S1 / S2 | | | `RockPitching` / `CompactedSoil` |
+
 ### ทดสอบ
 
 | คำสั่ง | ทดสอบอะไร |
 |---|---|
-| `dotnet run --project SA.Tests` | Trapezoid, ตัวสร้างโค้ด (เทียบผล JS กับผลรันโค้ด C# รวม Side = Left และ code ของ link — ส่วนนี้ต้องมี `node`), ช่วง SA-DRAWING, object → บรรทัดโค้ด, rock-pitching ที่วาดใหม่ = ไฟล์จริง (รอบ 4c) |
+| `dotnet run --project SA.Tests` | Trapezoid, ตัวสร้างโค้ด (เทียบผล JS กับผลรันโค้ด C# รวม Side = Left และ code ของ link — ส่วนนี้ต้องมี `node`), ช่วง SA-DRAWING, object → บรรทัดโค้ด, rock-pitching ที่วาดใหม่ = ไฟล์จริง (รอบ 4c + -web.cs รอบ 4e), ข้อความเตือน parameter ตรงตัว (ชนิดค่า) |
 | `node SA.Tests/js/evaluator.test.js` | นิพจน์ + DrawingSpec (เพิ่มกรณีได้ใน `SA.Tests/js/drawing-cases.json`) |
 | `node SA.Tests/js/cond.test.js` | นิพจน์เงื่อนไข / ค่าจากเรขาคณิต (รอบ 4) |
 | `node SA.Tests/js/logic.test.js` | กิ่ง if / switch / ซ้อน, firstOf, ไม่รู้ค่า, clone กิ่ง, ถ้าตัด / ถม, แสดงทุกกรณี, เปลี่ยนชื่อ / ลบเงื่อนไข (รอบ 4) |
-| `node SA.Tests/js/rockpitching.test.js` | วาด base / body rock-pitching ใหม่ด้วยเครื่องมือ = sa-spec ใน `tests-civil3d/round4c-*.cs`, คำนวณได้ไม่เตือน / รูปปิด (รอบ 4c) — เทียบกับไฟล์จริงอยู่ใน `dotnet run` |
+| `node SA.Tests/js/rockpitching.test.js` | วาด base / body rock-pitching ใหม่ด้วยเครื่องมือ = sa-spec ใน `base_rock-pitching-web.cs` / `body_rock-pitching-web.cs`, คำนวณได้ไม่เตือน / รูปปิด (รอบ 4c / 4e) — เทียบกับไฟล์จริงอยู่ใน `dotnet run` |
 | `node SA.Tests/js/array.test.js` | Array: ขั้นบันได (จุดร่วม), แก้ dx / dy / parameter, Left, ต่อด้วย link, shape / aux / กิ่ง, เปลี่ยน N (ถูกขวาง), ลบ = เลิกเป็น Array, Move (รอบ 4c) |
+| `node SA.Tests/js/slope.test.js` | ชนิดค่า parameter (Number / Slope 1:x / Length / Percent): แสดง / พิมพ์ / ข้อความเตือน, ช่อง slope ↗ ↘ อ่าน / เขียน (spec เก่าไม่เปลี่ยน), Daylight Cut/Fill ใช้ parameter Slope (รอบ 4e) |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |

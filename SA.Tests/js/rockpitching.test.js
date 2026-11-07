@@ -1,5 +1,5 @@
 // รอบ 4c M6: วาด base_rock-pitching.cs / body_rock-pitching.cs ใหม่ด้วยเครื่องมือของเว็บเท่านั้น (ไม่เขียนโค้ด)
-//   build*() = ลำดับการกดเครื่องมือ (ฟังก์ชันเดียวกับที่ปุ่มเรียก) + การแก้ใน Properties — ผลคือ spec ใน tests-civil3d/round4c-*.cs
+//   build*() = ลำดับการกดเครื่องมือ (ฟังก์ชันเดียวกับที่ปุ่มเรียก) + การแก้ใน Properties — ผลคือ spec ใน base_rock-pitching-web.cs / body_rock-pitching-web.cs (รอบ 4e — tests-civil3d/round4c-*.cs = รุ่นรอบ 4c)
 //   test นี้: (1) spec ที่สร้างใหม่ = sa-spec ในไฟล์ (ทำซ้ำได้) (2) คำนวณได้ไม่มีเตือน / รูปปิด หลายผิวดิน
 //   การเทียบกับไฟล์จริง (พิกัด shape / code) อยู่ใน SA.Tests/RockPitchingTests.cs (รันไฟล์จริงกับตัวจำลอง)
 // รัน: node SA.Tests/js/rockpitching.test.js
@@ -23,7 +23,7 @@ const eq = (exp, act, what) => { if (exp !== act) throw new Error(`${what}: ค�
 
 // ---------- base_rock-pitching.cs (class Trapezoid) ----------
 function buildBase(){
-  const s = Spec.newSpec("Round4cBase");
+  const s = Spec.newSpec("RockPitchingBaseWeb");
   // ตาราง Parameter (ปุ่ม Parameter บนหัว Properties): ชุดเดียวกับไฟล์จริง
   s.params.push({ name: "TopWidth", kind: "double", default: 2, displayName: "Top Width", min: null, max: null },
                 { name: "SideSlope", kind: "double", default: 1.5, displayName: "Side Slope (1:x)", min: null, max: null },
@@ -31,6 +31,8 @@ function buildBase(){
   Spec.setParamBounds(s, "TopWidth", { positive: true });
   Spec.setParamBounds(s, "SideSlope", { positive: true });
   Spec.setParamBounds(s, "Depth", { min: 2 });
+  // ชนิดค่า (รอบ 4e): SideSlope = Slope (1:x) · ความกว้าง / ความลึก = Length (m)
+  Spec.setParamUnit(s, "SideSlope", "slope"); Spec.setParamUnit(s, "TopWidth", "length"); Spec.setParamUnit(s, "Depth", "length");
   // Point (พิมพ์ dx / dy เป็นนิพจน์) + Codes ใน Properties
   const P = id => Spec.byId(s.points, id);
   P("P1").codes = ["TrapTopInside"];
@@ -54,7 +56,7 @@ function buildBase(){
 
 // ---------- body_rock-pitching.cs (class RockPitchingBody) ----------
 function buildBody(){
-  const s = Spec.newSpec("Round4cBody");
+  const s = Spec.newSpec("RockPitchingBodyWeb");
   s.params.push({ name: "Height", kind: "double", default: 5, displayName: "Height", min: null, max: null },
                 { name: "FaceSlope", kind: "double", default: 2.5, displayName: "Face Slope (1:x)", min: null, max: null },
                 { name: "RockThickness", kind: "double", default: 0.5, displayName: "Rock Thickness", min: null, max: null },
@@ -62,6 +64,9 @@ function buildBody(){
                 { name: "EndSlope", kind: "double", default: 1.5, displayName: "End Slope (1:x)", min: null, max: null });
   for (const n of ["Height", "FaceSlope", "RockThickness", "EndSlope"]) Spec.setParamBounds(s, n, { positive: true });
   Spec.setParamBounds(s, "MinSoilThickness", { min: 1 });
+  // ชนิดค่า (รอบ 4e): FaceSlope / EndSlope = Slope (1:x) · ความสูง / ความหนา = Length (m)
+  for (const n of ["FaceSlope", "EndSlope"]) Spec.setParamUnit(s, n, "slope");
+  for (const n of ["Height", "RockThickness", "MinSoilThickness"]) Spec.setParamUnit(s, n, "length");
   const P = id => Spec.byId(s.points, id);
   const L = (a, b, codes, aux) => { const id = Spec.addLink(s, a, b, { points: [a, b], ...(aux ? { auxiliary: true } : {}) }); Spec.byId(s.links, id).codes = codes; return id; };
   P("P1").codes = ["RockTopInside"];
@@ -85,8 +90,12 @@ function buildBody(){
   const fo = L(f, o, [], true);
   const e = Spec.addExtendToGround(s, fo, o, { rewire: false, maxDistance: `${o}.x` });
   delete P(e.tip).auxiliary; P(e.tip).codes = ["SoilToe"];
-  // จุดล่างสุดที่ origin: Point dy = min(ผิวดิน, เส้นดิน) (นิพจน์ใน Properties)
-  const l0 = Spec.addPoint(s, { type: "delta", from: "P1", dx: "0", dy: `min(ground(P1), ${s0}.y)` }, ["SoilBaseInside"]);
+  // จุดล่างสุดที่ origin = min(ผิวดิน, เส้นดิน) — รอบ 4e: ไม่พิมพ์นิพจน์ ใช้ Extend to Surface บนเส้นดิ่งแทน
+  //   Link (Auxiliary) P1 → S0 แล้ว Extend to Surface ที่ S0: ดินต่ำกว่า S0 = ต่อลงถึงดิน · ไม่ต่ำกว่า = ใช้ S0
+  //   → ปลายจริง: ใน Properties เอา Auxiliary ออก + code SoilBaseInside (แบบ SoilToe)
+  const ps0 = L("P1", s0, [], true);
+  const e0 = Spec.addExtendToGround(s, ps0, s0, { rewire: false });
+  const l0 = e0.tip; delete P(l0).auxiliary; P(l0).codes = ["SoilBaseInside"];
   // ชั้นหิน
   const rockEnd = L(f, r, ["Top", "RockEnd"]), rockBase = L(r, b0, ["RockBase"]), rockBack = L(b0, "P1", ["RockBack"]);
   const rock = Spec.addShape(s, [face, rockEnd, rockBase, rockBack]); Spec.byId(s.shapes, rock).codes = ["RockPitching"];
@@ -114,7 +123,7 @@ function fileSpec(f){
   return b ? JSON.parse(decodeURIComponent(escape(atob(b[1].trim())))) : null;
 }
 
-for (const [name, build, file] of [["base", buildBase, "tests-civil3d/round4c-base.cs"], ["body", buildBody, "tests-civil3d/round4c-body.cs"]]){
+for (const [name, build, file] of [["base", buildBase, "base_rock-pitching-web.cs"], ["body", buildBody, "body_rock-pitching-web.cs"]]){
   test(`${name}: คำนวณได้ไม่เตือน รูปปิดทุก shape — ดินสูง / ดินต่ำ / ขรุขระ / Layout · Right / Left`, () => {
     const s = build();
     for (const [k, sf] of Object.entries(SURF)) for (const values of [{}, { Side: 1 }]){

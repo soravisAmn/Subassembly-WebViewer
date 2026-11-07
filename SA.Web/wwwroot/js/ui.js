@@ -62,9 +62,11 @@ const isOpen = key => key in state.open ? state.open[key] : (OPEN_DEFAULT[key] ?
 function renderTree(){
   const box = $("tree");
   const h = [];
+  // ชื่อ / meta ยาวถูกตัด … (CSS) → tooltip ข้อความเต็ม (name / meta เป็น HTML ที่ escape แล้ว: ตัดแท็กออกก็ใช้ใน attribute ได้)
+  const tip = html => String(html).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").replace(/"/g, "&quot;").trim();
   const node = (o) => {
     const car = o.key ? `<span class="car" data-tog="${o.key}">${isOpen(o.key) ? "▾" : "▸"}</span>` : `<span class="car"></span>`;
-    h.push(`<div class="tn${o.cls ? " " + o.cls : ""}${o.sel ? " sel" : ""}" style="padding-left:${6 + o.depth * 14}px" data-sel='${JSON.stringify(o.s)}'${o.ctx ? ` data-ctx='${JSON.stringify(o.ctx)}'` : ""}${o.title ? ` title="${esc(o.title)}"` : ""}>${car}${o.icon || ""}<span class="nm">${o.name}</span>${o.meta ? `<span class="meta${o.metaCls ? " " + o.metaCls : ""}">${o.meta}</span>` : ""}</div>`);
+    h.push(`<div class="tn${o.cls ? " " + o.cls : ""}${o.sel ? " sel" : ""}" style="padding-left:${6 + o.depth * 14}px" data-sel='${JSON.stringify(o.s)}'${o.ctx ? ` data-ctx='${JSON.stringify(o.ctx)}'` : ""}${o.title ? ` title="${esc(o.title)}"` : ""}>${car}${o.icon || ""}<span class="nm"${o.title ? "" : ` title="${tip(o.name)}"`}>${o.name}</span>${o.meta ? `<span class="meta${o.metaCls ? " " + o.metaCls : ""}" title="${tip(o.meta)}">${o.meta}</span>` : ""}</div>`);
     if (o.after) h.push(o.after);
   };
   const editing = state.editing;

@@ -135,6 +135,7 @@ async function openEditor(){
   if (state.file === OPENED && opened && opened.handle) await askWrite(opened.handle);
   ed.open = true; state.editorOpen = true; persist();
   document.body.classList.add("editing"); $("b-edit").classList.add("on");
+  if (typeof applyPaneWidths === "function") applyPaneWidths();   // แถบโค้ดกินที่ → บีบแถบซ้าย / ขวาถ้าจอไม่พอ
   renderEditorBar();
   E = await loadEditor();
   if (!ed.hooked){ ed.hooked = true; E.onChange(onEdit); E.onCursor(codeCursor); }
@@ -148,7 +149,8 @@ function closeEditor(){
   flushSave();
   ed.open = false; state.editorOpen = false; persist();
   document.body.classList.remove("editing"); $("b-edit").classList.remove("on");
-  renderProblem(); run();            // กลับไปแสดงจากไฟล์บนดิสก์
+  if (typeof applyPaneWidths === "function") applyPaneWidths();
+  renderProblem(); run();           // กลับไปแสดงจากไฟล์บนดิสก์
 }
 function toggleEditor(){ ed.open ? closeEditor() : openEditor(); }
 
@@ -376,7 +378,9 @@ $("problem").addEventListener("click", e => {
 $("ed-resize").addEventListener("pointerdown", e => {
   const x0 = e.clientX, w0 = $("ed").getBoundingClientRect().width;
   const move = ev => {
-    state.edWidth = Math.round(Math.max(280, Math.min(innerWidth - 280 - 300 - 240, w0 + ev.clientX - x0)));
+    // ที่เหลือ = จอ − แถบซ้าย − แถบขวา − workspace ขั้นต่ำ (แถบซ้าย / ขวาลากปรับได้ — panes.js)
+    const side = $("left").getBoundingClientRect().width + $("right").getBoundingClientRect().width;
+    state.edWidth = Math.round(Math.max(280, Math.min(innerWidth - side - 320, w0 + ev.clientX - x0)));
     document.body.style.setProperty("--edw", state.edWidth + "px");
   };
   const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); persist(); };

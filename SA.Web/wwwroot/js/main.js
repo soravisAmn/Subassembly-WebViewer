@@ -108,6 +108,7 @@ window.addEventListener("blur", () => setSpace(false));
 // ---------------- start ----------------
 if (state.file === OPENED) state.file = null;   // ไฟล์ที่เปิดจากเครื่องไม่ถูกจำข้ามการรีเฟรช (subassembly ใช้โค้ดที่เก็บไว้แทน)
 if (state.edWidth) document.body.style.setProperty("--edw", state.edWidth + "px");
+applyPaneWidths();          // ความกว้างแถบซ้าย / ขวาที่จำไว้ (panes.js)
 allItems().forEach(normItem);   // spec รุ่นก่อน (construction) -> auxiliary
 renderBar(); renderScenarios(); renderEditorBar(); renderAll();
 History.reset();          // Undo เริ่มจากสภาพตอนเปิดหน้า (ไม่ข้ามการรีเฟรช)

@@ -78,7 +78,8 @@
     ลำดับการกด = `buildBase()` / `buildBody()` ใน `SA.Tests/js/rockpitching.test.js` · `SA.Tests/RockPitchingTests.cs` รันคู่กับไฟล์จริง: 15 ผิวดิน × Right / Left × 4 ชุดค่า
     = จุด / link / shape / code ตรงกัน (ต่างที่รู้แล้ว: body เส้นปิดปลายชนดินเลย origin — ตาราง "ต่างกันตรงไหน" ใน README)
     · แก้บั๊ก M2: Offset ระยะเป็นนิพจน์บวก / ลบ ใน C# ขาดวงเล็บ (drawing-case 77) → **รอบ 4c จบ** รอทดสอบใน Civil 3D (`round4c-checklist.md`)
-  ถัดไป: **`prompt-5.md` ฉบับย่อ** (Logic API ที่ต้องรวมฟังก์ชันของ 4c + มุมมองข้อความ + Switch ในแท็บ Logic) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+  รอบ 4d เสร็จ (2026-11-07): ลากปรับความกว้างแถบซ้าย / ขวา (`js/panes.js` · `--lw` / `--rw` · `state.leftW` / `rightW` · ดับเบิลคลิก = 280 / 300 · workspace ≥ 320) + tooltip ชื่อเต็มในต้นไม้
+  ถัดไป: **`prompt-5.md`** (Logic API + มุมมองข้อความ + ต้นไม้ Conditions ในแถบซ้ายแทน flowchart + Variables) — ยังไม่เริ่ม · แล้ว prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

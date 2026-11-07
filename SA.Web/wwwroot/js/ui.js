@@ -264,6 +264,13 @@ function renameItem(id){
 // ไฟล์ที่เขียนเอง: ส่วนที่วาดเก็บแยกใน it.spec (Milestone 4 จะเขียนลงไฟล์ในช่วงที่มีป้ายกำกับ)
 function enterEdit(id){
   const it = itemById(id); if (!it) return;
+  // ไฟล์ที่สร้างจากเว็บ แต่ item ยังไม่มี spec (เช่น project ที่เก็บแค่ชื่อไฟล์): อ่าน sa-spec ในไฟล์ก่อน
+  //   ไม่งั้นได้ spec ว่างแบบไฟล์ที่เขียนเอง แล้ว Save จะเขียนทับส่วนที่วาดในไฟล์ · ไฟล์ที่เขียนเอง (ไม่มี sa-spec) = แบบเดิม
+  if (!it.spec && it.file) return loadSpecFromFile(it).catch(() => {}).then(() => { if (itemById(id)) enterEditNow(id); });
+  enterEditNow(id);
+}
+function enterEditNow(id){
+  const it = itemById(id); if (!it) return;
   if (cmd.name) endCmd();
   // spec ว่างที่สร้างตอนเข้า Edit ไม่นับเป็นการกระทำ
   if (!it.spec){ it.spec = Spec.specForImported((asmRes[id] && asmRes[id].className || "").split(".").pop() || "Imported", codeParamsOf(it)); History.rebase(); }

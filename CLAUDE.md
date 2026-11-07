@@ -89,7 +89,7 @@
     M3 เสร็จ (2026-11-08): `base_rock-pitching-web.cs` (`RockPitchingBaseWeb`) / `body_rock-pitching-web.cs` (`RockPitchingBodyWeb`) ที่ root — Save ผ่าน `/api/drawing/save`,
       parameter ชนิด Slope / Length, body จุดล่างใน = Extend to Surface บนเส้นดิ่ง (แทน min()) · RockPitchingTests เทียบกับไฟล์จริงผ่านทุกกรณี (143 test)
       + `rock-pitching-compare.assembly.json` (2 assembly เว็บ / ไฟล์จริง · item -web มี spec ฝังไว้) → **รอบ 4e จบ** รอ build / ทดสอบ -web.cs ใน Civil 3D
-      เจอระหว่างทำ (ยังไม่แก้): item ใน project ที่มีแค่ `file` ของไฟล์ที่สร้างจากเว็บ → Edit ได้ spec ว่างแบบ imported (ไม่อ่าน sa-spec) — Import .cs อ่านได้ปกติ
+      แก้แล้ว (2026-11-08): item ใน project ที่มีแค่ `file` ของไฟล์ที่สร้างจากเว็บ → Edit อ่าน sa-spec ในไฟล์ก่อน (`enterEdit` → `loadSpecFromFile` → `enterEditNow`) เดิมได้ spec ว่าง Save ทับได้
   ถัดไป: **`prompt-5.md`** (Logic API + มุมมองข้อความ + ต้นไม้ Conditions ในแถบซ้ายแทน flowchart + Variables) — ยังไม่เริ่ม · แล้ว prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)

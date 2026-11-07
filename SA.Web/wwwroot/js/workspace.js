@@ -222,7 +222,7 @@ function renderSpec(it, r, grp, isSel){
     }
     const aux = Spec.isAux(l);
     const d = q.path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" ");
-    el("path", {d, class:"link dlink" + (l.type === "followSurface" ? " follow" : "") + (aux ? " aux" : "") + (q.bad ? " bad" : "") + (q.ghost ? " ghost" : ""),
+    el("path", {d, class:"link dlink" + (l.type === "followSurface" || l.type === "followClipped" ? " follow" : "") + (aux ? " aux" : "") + (q.bad ? " bad" : "") + (q.ghost ? " ghost" : ""),
                 stroke: q.ghost ? branchColor(spec, q.ghost) : colorFor(primaryCode(l.codes))}, grp);
     el("path", {d, class:"link-hit", "data-kind":"dlink", "data-id":it.id, "data-sid":l.id}, grp);
     // ป้าย: กึ่งกลางเส้นตรง / จุดกลางของโค้ง · ไม่เกิดตอนนี้ = ต่อท้ายด้วยชื่อกิ่ง

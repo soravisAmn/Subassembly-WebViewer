@@ -23,8 +23,11 @@ const out = cases.map(c => {
       if (!q || q.err) return [{ id: l.id, err: true }];
       const path = q.path.map(p => [p.x, p.y]);
       // ท่อนแรกพกจุดระหว่างทางของทั้งโค้ง (mids) ไว้ให้นับจุดที่ C# Points.Add ตามลำดับ
-      return ctx.Spec.isArc(l) ? path.slice(1).map((p, k) => ({ id: `${l.id} ท่อน ${k + 1}`, path: [path[k], p], ...(k ? {} : { mids: path.slice(1, -1) }) }))
-                               : [{ id: l.id, path }];
+      //   Clipped Surface Link = หลาย link แบบเดียวกัน (code แยกตามท่อน) · codes = ไว้เทียบกับ code ของ link ใน C#
+      const multi = ctx.Spec.isArc(l) || l.type === "followClipped";
+      const codesOf = k => q.segCodes ? q.segCodes[k] : (l.codes || []);
+      return multi ? path.slice(1).map((p, k) => ({ id: `${l.id} ท่อน ${k + 1}`, path: [path[k], p], codes: codesOf(k), ...(k ? {} : { mids: path.slice(1, -1) }) }))
+                   : [{ id: l.id, path, codes: l.codes || [] }];
     }),
     shapes: c.spec.shapes.map(s => r.shapes[s.id] && !r.shapes[s.id].err ? { id: s.id, poly: r.shapes[s.id].poly ? r.shapes[s.id].poly.map(p => [p.x, p.y]) : null } : { id: s.id, err: true }),
     issues: r.issues.length

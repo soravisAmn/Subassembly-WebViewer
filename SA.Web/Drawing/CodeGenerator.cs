@@ -38,7 +38,7 @@ public static class CodeGenerator
     {
         "cs", "F", "Deg", "Pt", "Measure", "Source", "surface",
         // ชื่อตัวช่วยในโค้ดที่สร้าง (ตัวแปรชื่อเดียวกันจะบังเมธอด / ชนิด)
-        "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Offset", "ExtendToGround", "Opt", "Tangent", "Rotate",
+        "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Offset", "ExtendToGround", "Opt", "FollowClipped", "Tangent", "Rotate",
         "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
         "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "FirstOf", "Severe",
         // คำในนิพจน์ (and or not true false — ไม่สนตัวพิมพ์ ตรวจใน IsReservedName)
@@ -313,7 +313,7 @@ public static class CodeGenerator
 
             // surface ที่ต้องใช้
             var usesSurface = _s.Points.Where(p => p.Def.Type is "slopeToSurface" or "onSurface" or "extendToGround").Select(p => p.Def.Target)
-                .Concat(_s.Links.Where(l => l.Follow).Select(l => l.Target))
+                .Concat(_s.Links.Where(l => l.Follow || l.IsClipped).Select(l => l.Target))
                 // ground() / hasGround() ในนิพจน์
                 .Concat(_s.Points.SelectMany(p => p.Def.Exprs()).Concat(_s.Links.SelectMany(LinkExprs)).Concat(_s.Rotations.Select(g => g.Angle))
                     .SelectMany(SpecExpr.GroundTargets)).ToList();
@@ -373,7 +373,7 @@ public static class CodeGenerator
                 // link auxiliary: ไม่มีตัวแปร Link / ไม่ Links.Add (และโค้งไม่ Points.Add จุดระหว่างทาง) — บรรทัดนี้ไว้ให้ codelink กระโดดมา
                 if (l.Auxiliary) { L($"        // {l.Id} auxiliary: ใช้อ้างอิงอย่างเดียว ไม่เพิ่มลง Civil 3D"); continue; }
                 // เส้นโค้ง = หลายท่อน: ตัวแปรเป็น Link[]
-                string lt = l.IsArc ? "Link[]" : "Link";
+                string lt = l.IsMulti ? "Link[]" : "Link";
                 var need = new[] { a, b }.Concat(l.Type == "arc3" ? new[] { l.Via ?? "" } : l.Type == "fillet" ? new[] { l.Corner ?? "" } : Array.Empty<string>());
                 var missing = need.FirstOrDefault(id => !Exists(id));
                 // link ที่ข้าม: ประกาศตัวแปร null เฉพาะเมื่อ shape ใช้ (ไม่งั้น compiler เตือน CS0219)
@@ -405,6 +405,26 @@ public static class CodeGenerator
                         L($"        Link[] {Lc(l.Id)} = {W($"Fillet(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Corner}, {b}, {Lc(b)}, {X(l.Radius, "radius", l.Id)}, {seg}{cc})")};   // {l.Id} Fillet ที่มุม {l.Corner}{BrTag(l.Branch)}");
                     continue;
                 }
+                if (l.IsClipped)
+                {
+                    // เส้นอ้างอิง: link เส้นตรง (ปลายทั้งสอง) หรือระดับคงที่ (2 จุดสมมติบนระดับนั้น)
+                    var rl = l.RefLink != null ? _s.Links.FirstOrDefault(x => x.Id == l.RefLink) : null;
+                    if (l.RefLink != null && (rl == null || rl.Points is not { Count: >= 2 } || rl.Type != null))
+                    {
+                        L($"{skip}{l.Id}: เส้นอ้างอิง {l.RefLink} ต้องเป็น link เส้นตรง");
+                        L($"        {whenOn}Warn(cs, CorridorError.Failure, \"{l.Id}: เส้นอ้างอิง {l.RefLink} ต้องเป็น link เส้นตรง\");");
+                        continue;
+                    }
+                    string r1, r2;
+                    if (rl != null) { var (rp, rq) = rl.Ends; r1 = Exists(rp) ? rp : "null"; r2 = Exists(rq) ? rq : "null"; }
+                    else { string lv = X(l.RefLevel ?? "0", "ระดับอ้างอิง", l.Id); r1 = $"new Pt(0.0, {lv})"; r2 = $"new Pt(1.0, {lv})"; }
+                    string Arr(List<string> c) => c.Count == 0 ? "new string[0]" : $"new[] {{ {string.Join(", ", c.Select(Str))} }}";
+                    bool above = l.Side == "above";
+                    string call = $"FollowClipped(cs, \"{l.Id}\", {SurfVar(l.Target)}, {a}, {Lc(a)}, {b}, {Lc(b)}, {r1}, {r2}, {(above ? "false" : "true")}, {Arr(l.Codes)}, {Arr(l.CodesGround)}, {Arr(l.CodesLine)})";
+                    bool wrap = UsesRuntime(LinkExprs(l));
+                    L($"        Link[] {Lc(l.Id)} = {InBranch(l.Branch, wrap ? $"Try(cs, \"{l.Id}\", () => {call})" : call)};   // {l.Id} ตามดิน ไม่{(above ? "ต่ำ" : "สูง")}กว่า{(rl != null ? $"เส้น {l.RefLink}" : $"ระดับ {l.RefLevel}")}{BrTag(l.Branch)}");
+                    continue;
+                }
                 if (l.Follow)
                     L($"        Link {Lc(l.Id)} = {InBranch(l.Branch, $"FollowSurface(cs, \"{l.Id}\", {SurfVar(l.Target)}, {a}, {Lc(a)}, {b}, {Lc(b)}{Codes(l.Codes)})")};   // {l.Id} วิ่งตามผิวดิน{BrTag(l.Branch)}");
                 else
@@ -425,8 +445,8 @@ public static class CodeGenerator
                 // มีเส้นโค้ง (Link[]) = ต่อ array ตามลำดับด้วย Join
                 // link optional (ต่อลงถึงดิน) = Opt(...) ข้ามเมื่อ null
                 bool Opt(string id) => _s.Links.Any(l => l.Id == id && l.Optional && !l.Auxiliary);
-                bool arcs = sh.Links.Any(id => _s.Links.Any(l => l.Id == id && l.IsArc) || Opt(id));
-                string list = arcs ? $"Join({string.Join(", ", sh.Links.Select(id => Opt(id) ? $"Opt({Lc(id)})" : _s.Links.First(l => l.Id == id).IsArc ? Lc(id) : $"new[] {{ {Lc(id)} }}"))})"
+                bool arcs = sh.Links.Any(id => _s.Links.Any(l => l.Id == id && l.IsMulti) || Opt(id));
+                string list = arcs ? $"Join({string.Join(", ", sh.Links.Select(id => Opt(id) ? $"Opt({Lc(id)})" : _s.Links.First(l => l.Id == id).IsMulti ? Lc(id) : $"new[] {{ {Lc(id)} }}"))})"
                                    : $"new[] {{ {string.Join(", ", sh.Links.Select(Lc))} }}";
                 L(ok ? $"        {shOn}AddShape(cs, \"{sh.Id}\", {list}{Codes(sh.Codes)});{BrNote(sh.Branch)}"
                      : $"        // {sh.Id}: มี link ที่ไม่มีอยู่จริง ข้าม");
@@ -460,7 +480,7 @@ public static class CodeGenerator
             }
             return $"{id} == null ? null : ({chain})";
         }
-        private static IEnumerable<string?> LinkExprs(SpecLink l) => new[] { l.Radius, l.Seg?.Value };
+        private static IEnumerable<string?> LinkExprs(SpecLink l) => new[] { l.Radius, l.Seg?.Value, l.RefLevel };
 
         private void PointLine(SpecPoint p)
         {
@@ -814,6 +834,101 @@ public static class CodeGenerator
             return null;
         }
         return Check(cs, id, hit.Value);
+    }
+
+    // Clipped Surface Link: ตามผิวดินจาก a ถึง b แต่ไม่สูงกว่า (below) / ไม่ต่ำกว่า เส้นอ้างอิง r1–r2 (ต่อออกไปได้)
+    //   แบบ BuildBottom ของ base_rock-pitching.cs — ตรงกับ clipPath ใน wwwroot/js/spec.js
+    //   ช่วงที่ปลายทั้งสองอยู่บนเส้น = codes + codesLine · นอกนั้น = codes + codesGround · ไม่มีดิน / เส้นอ้างอิงแนวดิ่ง = เส้นตรง + codesLine
+    private static Link[] FollowClipped(CorridorState cs, string id, ObjectId surface, Pt? pa, Point a, Pt? pb, Point b, Pt? r1, Pt? r2, bool below,
+                                        string[] codes, string[] codesGround, string[] codesLine)
+    {
+        if (a == null || b == null || r1 == null || r2 == null) return null;
+        Pt A = pa.Value, B = pb.Value, R1 = r1.Value, R2 = r2.Value;
+        var lineCodes = new List<string>(codes); lineCodes.AddRange(codesLine);
+        var gndCodes = new List<string>(codes); gndCodes.AddRange(codesGround);
+        var path = new List<Pt> { A, B };
+        bool clipped = false;
+        Func<double, double> line = x => R1.Y + (R2.Y - R1.Y) * (x - R1.X) / (R2.X - R1.X);
+        string fail = null;
+        if (Math.Abs(R2.X - R1.X) < 1e-9) fail = "เส้นอ้างอิงเป็นแนวดิ่ง";
+        else if (surface.IsNull)
+        {
+            if (cs.Mode != CorridorMode.Layout) fail = "ไม่ได้กำหนด Target Surface";
+        }
+        else
+        {
+            try
+            {
+                // ผิวดิน: ปลายทั้งสอง + จุดหักระหว่างทาง (แบบ FollowSurface)
+                var prof = new List<(double X, double Y)> { (A.X, Elevation(cs, surface, cs.CurrentOffset + A.X) - cs.CurrentElevation) };
+                double lo = Math.Min(A.X, B.X), hi = Math.Max(A.X, B.X);
+                var mids = new List<(double X, double Y)>();
+                SampledSectionLinkCollection sampled = cs.SampleSection(surface, cs.CurrentAlignmentId, Abs(cs, A), Abs(cs, B));
+                foreach (SampledSectionLink s in sampled)
+                {
+                    double x = s.EndPointOffset - cs.CurrentOffset;
+                    if (x > lo + 1e-9 && x < hi - 1e-9)
+                        mids.Add((x, s.EndPointElevation - cs.CurrentElevation));
+                }
+                mids.Sort((p, q) => p.X.CompareTo(q.X));
+                if (A.X > B.X) mids.Reverse();
+                prof.AddRange(mids);
+                prof.Add((B.X, Elevation(cs, surface, cs.CurrentOffset + B.X) - cs.CurrentElevation));
+
+                Func<double, double, double> clip = (x, y) => below ? Math.Min(y, line(x)) : Math.Max(y, line(x));
+                var raw = new List<Pt> { new Pt(prof[0].X, clip(prof[0].X, prof[0].Y)) };
+                for (int i = 0; i < prof.Count - 1; i++)
+                {
+                    var p = prof[i];
+                    var q = prof[i + 1];
+                    double da = p.Y - line(p.X), db = q.Y - line(q.X);
+                    if (da * db < 0)
+                    {
+                        double t = da / (da - db), x = p.X + t * (q.X - p.X);
+                        raw.Add(new Pt(x, line(x)));
+                    }
+                    raw.Add(new Pt(q.X, clip(q.X, q.Y)));
+                }
+                // ตัดจุดซ้ำ (ระยะราบ < 0.0001) และจุดกลางของช่วงที่อยู่บนเส้น
+                var c = new List<Pt>();
+                foreach (Pt p in raw)
+                {
+                    if (c.Count > 0 && Math.Abs(p.X - c[c.Count - 1].X) < 1e-4) continue;
+                    if (c.Count >= 2 && Math.Abs(p.Y - line(p.X)) < 1e-4 && Math.Abs(c[c.Count - 1].Y - line(c[c.Count - 1].X)) < 1e-4
+                        && Math.Abs(c[c.Count - 2].Y - line(c[c.Count - 2].X)) < 1e-4)
+                    {
+                        c[c.Count - 1] = p;
+                        continue;
+                    }
+                    c.Add(p);
+                }
+                if (c.Count >= 2)
+                {
+                    path = new List<Pt> { A };
+                    for (int i = 1; i < c.Count - 1; i++) path.Add(c[i]);
+                    path.Add(B);
+                }
+                clipped = true;
+            }
+            catch (Exception e)
+            {
+                fail = e.Message;
+            }
+        }
+        if (fail != null) Warn(cs, CorridorError.Failure, id + " ตามดิน ไม่เกินเส้น: " + fail + " — ใช้เส้นตรงแทน");
+        var pts = new Point[path.Count];
+        pts[0] = a;
+        pts[path.Count - 1] = b;
+        for (int i = 1; i < path.Count - 1; i++) pts[i] = cs.Points.Add(path[i].X, path[i].Y, "");
+        var links = new Link[path.Count - 1];
+        for (int i = 0; i < links.Length; i++)
+        {
+            links[i] = cs.Links.Add(new[] { pts[i], pts[i + 1] }, "");
+            bool on = clipped && Math.Abs(path[i].Y - line(path[i].X)) < 1e-4 && Math.Abs(path[i + 1].Y - line(path[i + 1].X)) < 1e-4;
+            foreach (string code in (on || !clipped ? lineCodes : gndCodes))
+                links[i].Codes.TryAdd(code);
+        }
+        return links;
     }
 
     // link optional ใน shape (ต่อลงถึงดิน): ไม่เกิด / วาดไม่ได้ (null) = ข้ามไป
@@ -1280,7 +1395,7 @@ public static class CodeGenerator
         new(@"^\s*Pt\? (\w+) = (?!null;)"),
         new(@"^\s*Point \w+ = (?:\w+ \? )?AddPoint\(cs, (\w+)"),
         new(@"^\s*Link \w+ = (?:\w+ \? )?(?:AddLink|FollowSurface)\(cs, ""([^""]+)"""),
-        new(@"^\s*Link\[\] \w+ = (?:\w+ \? )?(?:Try\(cs, ""[^""]+"", \(\) => )?(?:Arc3|ArcR|Fillet)\(cs, ""([^""]+)"""),
+        new(@"^\s*Link\[\] \w+ = (?:\w+ \? )?(?:Try\(cs, ""[^""]+"", \(\) => )?(?:Arc3|ArcR|Fillet|FollowClipped)\(cs, ""([^""]+)"""),
         new(@"^\s*bool\?? (\w+) = "),                         // เงื่อนไข (ชื่อ) / decision (D1) / กิ่ง (B1)
         new(@"^\s*double\? (\w+) = "),                        // switch
         new(@"^\s*\w+ = (?:Try\(cs, ""[^""]+"", \(\) => )?Rotate\(cs, ""([^""]+)"""),

@@ -17,9 +17,11 @@
 | object → โค้ด | เลือก object แล้วเห็นบรรทัดในไฟล์ + ปุ่มไปที่โค้ด, เคอร์เซอร์ในโค้ด → เน้น object | **object → บรรทัดโค้ด** |
 | Shortcut | กด `?` / `F1` บนหน้าเว็บ | **Shortcut** |
 
-**รอบ 4c (`prompt-4c.md`)** — กำลังทำ (M1–M3 เสร็จ): จัดปุ่มใหม่ตามงานจริง — ข้อตกลงอยู่ใน `prompt-4c-design.md`
+**รอบ 4c (`prompt-4c.md`)** — กำลังทำ (M1–M4 เสร็จ): จัดปุ่มใหม่ตามงานจริง — ข้อตกลงอยู่ใน `prompt-4c-design.md`
 - **ปุ่มใหม่ Intersect (`I`) / Offset (`O`)** ในกลุ่ม Geometry — หัวข้อ **Intersect / Offset** · ชนิดจุดใหม่ **Offset (เส้นขนาน)**
 - **ปุ่มใหม่ Extend to Surface** ในกลุ่ม Surface — หัวข้อ **Extend to Surface** · ชนิดจุดใหม่ **ต่อลงถึงดิน** · link **optional** ใน shape · **ปลายจริง** เป็นปลาย link ได้
+- **ปุ่มใหม่ Clipped Surface Link** ในกลุ่ม Surface — หัวข้อ **Clipped Surface Link** · ชนิด link ใหม่ **ตามดิน ไม่เกินเส้น** (code แยกช่วงตามดิน / บนเส้น)
+- test เทียบผล JS กับ C# (`dotnet run --project SA.Tests`) เทียบ **code ของ link** ด้วยแล้ว (เดิมเทียบแค่พิกัด)
 - **เอา Max / Min (รอบ 4b) ออกแล้ว** — project / ไฟล์ .cs เก่าที่มี Max / Min เปิดได้: ตัดทิ้งตอนโหลด แล้วแจ้งครั้งเดียว "Max / Min ถูกเอาออกแล้ว — จุด … ใช้ตำแหน่งตามนิยามเดิม"
   · นิพจน์ที่ใช้ `limited()` ขึ้น "ไม่มีฟังก์ชัน limited()"
 - ปุ่ม "ขอบเขตค่า" ย้ายเข้า **ตาราง Parameter** (ช่อง **ต้องมากกว่า 0** / ขั้นต่ำ / ขั้นสูง — หัวข้อ **ตาราง Parameter**) · ปุ่ม **Parameter** บนหัว Properties ตอน Edit
@@ -82,6 +84,7 @@
 | Intersect | `I` | คลิก link เส้นตรง 2 เส้น → เลือก `T` ตัด / ยืดเส้นให้จบที่จุดตัด หรือ `N` ไม่ตัด (ได้แค่จุดตัด) — หัวข้อ **Intersect / Offset** |
 | Offset | `O` | ตั้งระยะ (`Tab` / พิมพ์ตัวเลข) → คลิก link เส้นตรง → คลิกด้าน = เส้นขนาน (2 จุด + link) — หัวข้อ **Intersect / Offset** |
 | Slope to Surface | | คลิกจุดเริ่ม แล้วเลื่อนเมาส์เลือกทิศ คลิก = จุด daylight (slope ตามปุ่มที่ล็อกในแถบล่าง ไม่ล็อก = 1:2) |
+| Clipped Surface Link | | คลิกจุดเริ่ม → จุดปลาย → เส้นอ้างอิง (link เส้นตรง · `Tab` = ระดับคงที่) → หน้าต่าง (ไม่สูงกว่า / ไม่ต่ำกว่า, code 3 ชุด) — หัวข้อ **Clipped Surface Link** |
 | Extend to Surface | | คลิก link เส้นตรงใกล้ปลายที่จะต่อ → หน้าต่างยืนยัน (code เส้นต่อ / จุด, ระยะสูงสุด, ย้ายเส้นที่ต่ออยู่ไปที่ปลายจริง) — หัวข้อ **Extend to Surface** |
 | Follow Surface | | คลิกจุดเริ่ม แล้วคลิกจุดปลาย = link ที่วิ่งตามผิวดิน (ได้จุดหักของดินระหว่างทาง) |
 | Daylight Cut/Fill | | คลิกจุดไหล่ (หรือเลือกจุดไว้จุดเดียวแล้วกดปุ่ม) → หน้าต่าง (มีคำอธิบาย + ภาพ ช่วงเนิน / ช่วงที่ลุ่ม) ตั้งลาดตัด / ลาดถม / code → ได้ทั้งชุด — ดูหัวข้อ **กิ่ง** |
@@ -206,6 +209,22 @@ link ใน Civil 3D เป็น**เส้นตรงเท่านั้น
 - shape ที่ใช้เส้นเดิม: link ต่อถูกแทรกถัดจากเส้นเดิม + ขอบถัดไปเริ่มที่ปลายจริง → **shape เดียวปิดได้ทั้งตอนต่อ / ไม่ต่อ** (ไม่ต้องมี 2 กิ่ง)
 - กิ่งตามเส้นเดิม (ไม่ใช้ "วาดลงกิ่ง") · เส้นเดิมเป็น auxiliary = ของใหม่เป็น auxiliary และไม่ย้าย link จริง · Move: จุดต่อไม่ย้าย (ขึ้นกับผิวดิน)
 - โค้ด C#: `Pt? P5 = ExtendToGround(cs, "P5", surface, P3, P2, MaxExt);` · shape ใช้ `Join(..., Opt(l5), ...)` (`Opt` = ข้ามเมื่อ null)
+
+### Clipped Surface Link (รอบ 4c)
+
+link **ตามผิวดินแต่ไม่เกินเส้นอ้างอิง** = ขอบล่างแบบ `BuildBottom` ของ `base_rock-pitching.cs` (`min(ดิน, ระดับฐาน)`) — test เทียบกับสูตรของไฟล์นั้นตรงๆ (`clip.test.js`)
+
+- ปุ่ม **Clipped Surface Link** (กลุ่ม Surface) → คลิก**จุดเริ่ม** → **จุดปลาย** (จุดที่วาดแล้ว — ปลายจริงของ Extend to Surface ได้) →
+  คลิก**เส้นอ้างอิง** (link เส้นตรง — ปกติเป็นเส้นฐาน auxiliary ระหว่างมุมฐาน · ต่อออกไปได้ทั้งสองทาง) หรือกด `Tab` = ใช้**ระดับคงที่** (นิพจน์ เทียบ origin เช่น `-Depth`)
+  → หน้าต่าง: **ไม่สูงกว่า** (ขอบล่าง) / **ไม่ต่ำกว่า**, Code ทุกช่วง / ช่วงตามดิน / ช่วงบนเส้น (เช่น `Datum` / `TrapOnSurface` / `TrapBase`)
+- เส้นทาง: ผิวดินจากจุดเริ่มถึงจุดปลาย (จุดหักของดิน) → ตัดด้วยเส้นอ้างอิง (`min` / `max`) + **จุดที่ดินตัดเส้น** → ตัดจุดซ้ำ (< 0.0001 m) และจุดกลางของช่วงบนเส้น
+  → ปลายทั้งสอง = จุดเริ่ม / จุดปลายตัวจริง
+- ใน Civil 3D = **หลาย link** (แบบเส้นโค้ง) + จุดระหว่างทาง (ไม่มี code) · ท่อนที่ปลายทั้งสองอยู่บนเส้น = Code ทุกช่วง + ช่วงบนเส้น · นอกนั้น = Code ทุกช่วง + ช่วงตามดิน
+- ไม่มีดิน: Layout = เส้นตรง (ไม่เตือน) · ไม่ได้กำหนด Target Surface = เส้นตรง + เตือน · เส้นอ้างอิงแนวดิ่ง / ดินนอกขอบเขต = เส้นตรง + เตือน (code ช่วงบนเส้น)
+- Properties ของ link: เปลี่ยนเส้นอ้างอิง / ระดับ, ด้าน, code แยกช่วง + บอกว่าใน Civil 3D ได้กี่ link (ตามดิน / บนเส้น)
+- ลบเส้นอ้างอิง = link นี้หายด้วย (ถามก่อน) · Copy พร้อมเส้นอ้างอิง = ใช้ตัวสำเนา · Extend to Surface ย้ายจุดเริ่ม / ปลายไปที่ปลายจริงให้ได้
+- spec: `{ type: "followClipped", from, to, target, refLink | refLevel, side: "below" | "above", codes, codesGround, codesLine }`
+- โค้ด C#: `Link[] l3 = FollowClipped(cs, "L3", surface, P6, p6, P8, p8, P3, P4, true, new[] { "Datum" }, new[] { "TrapOnSurface" }, new[] { "TrapBase" });`
 
 **ทุกอย่างที่วาดเก็บเป็น "ความหมาย"** ไม่ใช่แค่พิกัด เช่น จุดที่วาดด้วย slope 1:2 จาก P2 เก็บเป็น `ลาด -1/2 จาก P2 ยาว 2.236`
 เปลี่ยน parameter หรือเส้น surface แล้วรูปเปลี่ยนตามทันที · ดู/แก้ความหมายได้ใน Properties ของจุดนั้น:
@@ -514,6 +533,7 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 | `node SA.Tests/js/evaluator.test.js` | นิพจน์ + DrawingSpec (เพิ่มกรณีได้ใน `SA.Tests/js/drawing-cases.json`) |
 | `node SA.Tests/js/cond.test.js` | นิพจน์เงื่อนไข / ค่าจากเรขาคณิต (รอบ 4) |
 | `node SA.Tests/js/logic.test.js` | กิ่ง if / switch / ซ้อน, firstOf, ไม่รู้ค่า, clone กิ่ง, ถ้าตัด / ถม, แสดงทุกกรณี, เปลี่ยนชื่อ / ลบเงื่อนไข (รอบ 4) |
+| `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |
 | `node SA.Tests/js/snap.test.js` | เลือก OSNAP (รวม Center) |

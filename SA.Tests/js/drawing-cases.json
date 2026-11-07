@@ -1588,5 +1588,68 @@
   { "name": "Extend to Surface ดินสูง 0 = ไม่ต่อเลย (ไม่เตือน)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "copySpecFrom": 61 },
   { "name": "Extend to Surface Layout mode = ไม่ต่อ (ไม่เตือน)", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "layout": true, "copySpecFrom": 61 },
   { "name": "Extend to Surface ไม่ได้กำหนด Target Surface = ไม่ต่อ (ไม่เตือน)", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "surfaceAssigned": false, "copySpecFrom": 61 },
-  { "name": "Extend to Surface ไม่ชนดินภายใน MaxExt = 0.2 -> เตือน + shape ข้ามเส้นต่อ", "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": -8 }], "values": { "MaxExt": 0.2 }, "copySpecFrom": 61 }
+  { "name": "Extend to Surface ไม่ชนดินภายใน MaxExt = 0.2 -> เตือน + shape ข้ามเส้นต่อ", "surface": [{ "x": -30, "y": -8 }, { "x": 30, "y": -8 }], "values": { "MaxExt": 0.2 }, "copySpecFrom": 61 },
+  {
+    "name": "Clipped Surface Link แบบ base rock-pitching: ต่อลงถึงดินสองมุม + ขอบล่าง min(ดิน, เส้นฐาน) code แยกช่วง (Right)",
+    "surface": [{ "x": -30, "y": -1 }, { "x": -2, "y": -1.5 }, { "x": 0, "y": -2.6 }, { "x": 2, "y": -1 }, { "x": 4.3, "y": -2.4 }, { "x": 30, "y": -6 }],
+    "spec": {
+      "className": "ClipTrap", "namespace": "TestSubassembly",
+      "params": [
+        { "name": "Side", "kind": "long", "default": 0 },
+        { "name": "Width", "kind": "double", "default": 3 },
+        { "name": "Depth", "kind": "double", "default": 2, "positive": true, "min": 2 }
+      ],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": ["TrapTopInside"], "def": { "type": "origin" } },
+        { "id": "P2", "codes": ["TrapTopOutside"], "def": { "type": "delta", "from": "P1", "dx": "Width", "dy": "0" } },
+        { "id": "P3", "codes": ["TrapBaseOutside"], "def": { "type": "delta", "from": "P2", "dx": "1", "dy": "-Depth" } },
+        { "id": "P4", "codes": ["TrapBaseInside"], "def": { "type": "delta", "from": "P1", "dx": "-1", "dy": "-Depth" } },
+        { "id": "P5", "codes": ["TrapToeOutside"], "def": { "type": "extendToGround", "from": "P3", "along": "P2", "target": "TargetSurface", "maxDistance": "50" } },
+        { "id": "P6", "codes": [], "auxiliary": true, "def": { "type": "firstOf", "points": ["P5", "P3"] } },
+        { "id": "P7", "codes": ["TrapToeInside"], "def": { "type": "extendToGround", "from": "P4", "along": "P1", "target": "TargetSurface", "maxDistance": "50" } },
+        { "id": "P8", "codes": [], "auxiliary": true, "def": { "type": "firstOf", "points": ["P7", "P4"] } }
+      ],
+      "links": [
+        { "id": "L1", "points": ["P1", "P2"], "codes": ["Top"] },
+        { "id": "L2", "points": ["P2", "P3"], "codes": ["TrapSide"] },
+        { "id": "L5", "points": ["P3", "P5"], "codes": ["TrapSide"], "optional": true },
+        { "id": "L3", "type": "followClipped", "from": "P6", "to": "P8", "target": "TargetSurface", "refLink": "L7", "side": "below",
+          "codes": ["Datum"], "codesGround": ["TrapOnSurface"], "codesLine": ["TrapBase"] },
+        { "id": "L4", "points": ["P4", "P1"], "codes": ["TrapSide"] },
+        { "id": "L6", "points": ["P4", "P7"], "codes": ["TrapSide"], "optional": true },
+        { "id": "L7", "points": ["P3", "P4"], "codes": [], "auxiliary": true }
+      ],
+      "shapes": [{ "id": "S1", "links": ["L1", "L2", "L5", "L3", "L6", "L4"], "codes": ["Trapezoid"] }],
+      "side": { "param": "Side", "mirror": true }
+    }
+  },
+  { "name": "Clipped Surface Link Side = Left (ผิวดินภาพกระจก)", "surface": [{ "x": 30, "y": -1 }, { "x": 2, "y": -1.5 }, { "x": 0, "y": -2.6 }, { "x": -2, "y": -1 }, { "x": -4.3, "y": -2.4 }, { "x": -30, "y": -6 }], "values": { "Side": 1 }, "copySpecFrom": 68 },
+  { "name": "Clipped Surface Link ดินสูง 0 = ขอบล่างบนเส้นฐานทั้งเส้น (TrapBase)", "surface": [{ "x": -30, "y": 0 }, { "x": 30, "y": 0 }], "copySpecFrom": 68 },
+  { "name": "Clipped Surface Link ดินต่ำ -3 = ต่อทั้งสองมุม ขอบล่างตามดิน (TrapOnSurface)", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "copySpecFrom": 68 },
+  { "name": "Clipped Surface Link Layout mode = เส้นตรง code ช่วงบนเส้น (ไม่เตือน)", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "layout": true, "copySpecFrom": 68 },
+  { "name": "Clipped Surface Link ไม่ได้กำหนด Target Surface = เส้นตรง + เตือน", "surface": [{ "x": -30, "y": -3 }, { "x": 30, "y": -3 }], "surfaceAssigned": false, "copySpecFrom": 68 },
+  {
+    "name": "Clipped Surface Link ระดับคงที่ (นิพจน์) ไม่ต่ำกว่า · เส้นอ้างอิงแนวดิ่ง = เส้นตรง + เตือน",
+    "surface": [{ "x": -30, "y": -3 }, { "x": -2, "y": -3 }, { "x": 0, "y": 0.5 }, { "x": 1, "y": -3 }, { "x": 2, "y": -3 }, { "x": 30, "y": 15 }],
+    "spec": {
+      "className": "ClipLevel", "namespace": "TestSubassembly",
+      "params": [{ "name": "Side", "kind": "long", "default": 0 }, { "name": "Floor", "kind": "double", "default": 1 }],
+      "targets": [{ "name": "TargetSurface", "type": "Surface", "displayName": "Target Surface" }],
+      "points": [
+        { "id": "P1", "codes": [], "def": { "type": "delta", "dx": "-5", "dy": "-Floor" } },
+        { "id": "P2", "codes": [], "def": { "type": "delta", "dx": "5", "dy": "-Floor" } },
+        { "id": "P3", "codes": [], "def": { "type": "delta", "dx": "0", "dy": "-4" } },
+        { "id": "P4", "codes": [], "def": { "type": "delta", "dx": "0", "dy": "-6" } }
+      ],
+      "links": [
+        { "id": "L1", "type": "followClipped", "from": "P1", "to": "P2", "target": "TargetSurface", "refLevel": "-Floor", "side": "above",
+          "codes": ["Top"], "codesGround": ["Ground"], "codesLine": ["Level"] },
+        { "id": "L2", "points": ["P3", "P4"], "codes": [] },
+        { "id": "L3", "type": "followClipped", "from": "P1", "to": "P2", "target": "TargetSurface", "refLink": "L2", "side": "below", "codes": ["X"] }
+      ],
+      "shapes": [],
+      "side": { "param": "Side", "mirror": true }
+    }
+  }
 ]

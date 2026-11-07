@@ -25,6 +25,12 @@
 //   tangent        corner, toward, other, radius   จุดสัมผัสของ Fillet: บนเส้น corner→toward ห่าง radius / tan(α/2)
 //                                              (α = มุมระหว่างเส้น corner→toward กับ corner→other · ขนานกัน / รัศมีใหญ่เกินเส้น = เตือน + ใช้มุมแหลมเดิม)
 // ชนิด link: เส้นตรง { points: [a, b] } / วิ่งตามผิวดิน { type: "followSurface", from, to, target }
+//   Clipped Surface Link { type: "followClipped", from, to, target, refLink | refLevel, side, codes, codesGround, codesLine }
+//     ตามผิวดินจาก from ถึง to แต่ไม่สูงกว่า (side "below") / ไม่ต่ำกว่า ("above") เส้นอ้างอิง: link เส้นตรง refLink (ต่อออกไปได้)
+//     หรือระดับคงที่ refLevel (นิพจน์ เทียบ origin) · แบบ BuildBottom ของ base_rock-pitching.cs: เพิ่มจุดที่ดินตัดเส้น, ตัดจุดซ้ำ (< 0.0001 m)
+//     และจุดกลางของช่วงบนเส้น · ช่วงที่ปลายทั้งสองอยู่บนเส้น = codes + codesLine · นอกนั้น = codes + codesGround
+//     ไม่มีดิน (Layout / ไม่มี target = เตือนแบบวิ่งตามผิวดิน) / เส้นอ้างอิงแนวดิ่ง / ดินผิดพลาด = เส้นตรง from→to + codes + codesLine
+//     ใน C# = หลาย link (Link[] แบบเส้นโค้ง) — ผล evaluate: { path, segCodes }
 //   optional: true = ใน shape ถ้า link นี้วาดไม่ได้ / ไม่เกิด ให้ข้ามไป (link ต่อของ Extend to Surface — shape เดียวปิดได้ทั้งตอนต่อ / ไม่ต่อ)
 //   ปลายเป็น "ปลายจริง" (จุด firstOf ที่เป็น auxiliary) = ใช้จุดแรกในรายการที่เกิด (C#: ตัวแปร Point ของจุดนั้น)
 //     ต่อได้เมื่อจุดในรายการเป็นจุดจริงทั้งหมด (มีจุด auxiliary = ข้าม + เตือน แบบปลาย auxiliary)
@@ -56,7 +62,7 @@ const Spec = (() => {
     extendToGround: "ต่อลงถึงดิน (Extend to Surface)", external: "จุดจากโค้ดเดิม (point code)",
     tangent: "จุดสัมผัส (Fillet)", firstOf: "จุดแรกที่เกิด (หลังกิ่ง)"
   };
-  const LINK_TYPES = { straight: "เส้นตรง", followSurface: "วิ่งตามผิวดิน", arc3: "โค้งผ่าน 3 จุด", arcR: "โค้ง เริ่ม-ปลาย-รัศมี", fillet: "โค้ง Fillet" };
+  const LINK_TYPES = { straight: "เส้นตรง", followSurface: "วิ่งตามผิวดิน", followClipped: "ตามดิน ไม่เกินเส้น (Clipped Surface Link)", arc3: "โค้งผ่าน 3 จุด", arcR: "โค้ง เริ่ม-ปลาย-รัศมี", fillet: "โค้ง Fillet" };
   const ARC_TYPES = ["arc3", "arcR", "fillet"];
   const isArc = l => ARC_TYPES.includes(l.type);
   const SEG_DEFAULT = { by: "chord", value: "0.05" };
@@ -198,7 +204,7 @@ const Spec = (() => {
   const EXPR_FIELDS = { delta: ["dx", "dy"], polar: ["length", "angle"], slopeLength: ["slope", "length"], slopeToSurface: ["slope", "maxDistance", "layoutLength"],
                         onSurface: ["dx"], between: ["t"], tangent: ["radius"], offset: ["dist"], extendToGround: ["maxDistance"] };
   // ช่องนิพจน์ของ link (seg.value แยกต่างหาก)
-  const LINK_EXPR_FIELDS = { arcR: ["radius"], fillet: ["radius"] };
+  const LINK_EXPR_FIELDS = { arcR: ["radius"], fillet: ["radius"], followClipped: ["refLevel"] };
 
   // ---------- คำนวณ ----------
   // ctx = { values: {ชื่อ: ค่า}, codeParams: [...], codePoints: [{x, y, codes}] (เทียบ origin),
@@ -464,6 +470,25 @@ const Spec = (() => {
         if (ground) path = [A, ...ground.between(A.x, B.x), B];
         else if (!ctx.layout) warn(l.id, `${l.id} วิ่งตามผิวดิน: ${noTargetMsg} — ใช้เส้นตรงแทน`);
       }
+      else if (l.type === "followClipped"){
+        // เส้นอ้างอิง: ปลายของ link เส้นตรง / ระดับคงที่ — หาไม่ได้ = link นี้หาไม่ได้ (ไม่เกิดเพราะกิ่ง = เงียบ)
+        let R1, R2;
+        try{
+          if (l.refLink){
+            const rl = byId(spec.links, l.refLink);
+            if (!rl || !rl.points || rl.type) throw new Error(`เส้นอ้างอิง ${l.refLink} ต้องเป็น link เส้นตรง`);
+            R1 = need(rl.points[0]); R2 = need(rl.points[1]);
+          } else { const lv = X(l.refLevel ?? "0", "ระดับอ้างอิง"); R1 = { x: 0, y: lv }; R2 = { x: 1, y: lv }; }
+        }catch(e){
+          links[l.id] = e.off ? { err: e.message, off: e.off } : { err: e.message };
+          if (!e.off) warn(l.id, `${l.id}: ${e.message}`);
+          continue;
+        }
+        const r = clipPath(l, A, B, R1, R2, ground, ctx.layout, msg => warn(l.id, `${l.id} ตามดิน ไม่เกินเส้น: ${msg} — ใช้เส้นตรงแทน`), noTargetMsg);
+        links[l.id] = { path: r.path, segCodes: r.segCodes, segOn: r.segOn };
+        if (aux) links[l.id].aux = true;
+        continue;
+      }
       else if (isArc(l)){
         try{
           const extra = l.type === "arc3" ? need(l.via) : l.type === "fillet" ? need(l.corner) : null;
@@ -602,6 +627,40 @@ const Spec = (() => {
     return out.length >= 3 ? out : null;
   }
 
+  // Clipped Surface Link: เส้นทางจาก A ถึง B ตามผิวดิน แต่ไม่เกินเส้นอ้างอิง R1–R2 (ต่อออกไปได้) — ตรงกับ FollowClipped ใน CodeGenerator.cs
+  //   และ BuildBottom ของ base_rock-pitching.cs · คืน { path, segCodes (code ของแต่ละท่อน), segOn (ท่อนอยู่บนเส้นอ้างอิง) } · fail(msg) = เตือน (ใช้เส้นตรงแทน)
+  function clipPath(l, A, B, R1, R2, ground, layout, fail, noTargetMsg){
+    const base = l.codes || [], uniq = a => [...new Set(a)];
+    const lineCodes = uniq(base.concat(l.codesLine || [])), gndCodes = uniq(base.concat(l.codesGround || []));
+    const straight = { path: [A, B], segCodes: [lineCodes], segOn: [true] };
+    if (Math.abs(R2.x - R1.x) < 1e-9){ fail("เส้นอ้างอิงเป็นแนวดิ่ง"); return straight; }
+    if (!ground){ if (!layout) fail(noTargetMsg); return straight; }
+    const Lf = x => R1.y + (R2.y - R1.y) * (x - R1.x) / (R2.x - R1.x);
+    let prof;
+    try{ prof = [{ x: A.x, y: ground.elev(A.x) }, ...ground.between(A.x, B.x), { x: B.x, y: ground.elev(B.x) }]; }
+    catch(e){ fail(e.message); return straight; }
+    const below = l.side !== "above";
+    const clip = (x, y) => below ? Math.min(y, Lf(x)) : Math.max(y, Lf(x));
+    const raw = [{ x: prof[0].x, y: clip(prof[0].x, prof[0].y) }];
+    for (let i = 0; i < prof.length - 1; i++){
+      const a = prof[i], b = prof[i + 1], da = a.y - Lf(a.x), db = b.y - Lf(b.x);
+      if (da * db < 0){ const t = da / (da - db), x = a.x + t * (b.x - a.x); raw.push({ x, y: Lf(x) }); }   // ดินตัดเส้น
+      raw.push({ x: b.x, y: clip(b.x, b.y) });
+    }
+    const on = p => Math.abs(p.y - Lf(p.x)) < 1e-4;
+    // ตัดจุดซ้ำ (ระยะราบ < 0.0001) และจุดกลางของช่วงที่อยู่บนเส้น (แบบ cleaned)
+    const c = [];
+    for (const p of raw){
+      if (c.length && Math.abs(p.x - c[c.length - 1].x) < 1e-4) continue;
+      if (c.length >= 2 && on(p) && on(c[c.length - 1]) && on(c[c.length - 2])){ c[c.length - 1] = p; continue; }
+      c.push(p);
+    }
+    // ปลายทั้งสอง = from / to ตัวจริง
+    const path = c.length < 2 ? [A, B] : [A, ...c.slice(1, -1), B];
+    const segOn = [];
+    for (let i = 0; i < path.length - 1; i++) segOn.push(on(path[i]) && on(path[i + 1]));
+    return { path, segCodes: segOn.map(o => o ? lineCodes : gndCodes), segOn };
+  }
   function lineX(a1, a2, b1, b2){
     const d = (a2.x - a1.x) * (b2.y - b1.y) - (a2.y - a1.y) * (b2.x - b1.x);
     if (Math.abs(d) < 1e-12) return null;
@@ -840,6 +899,11 @@ const Spec = (() => {
       for (const p of spec.points) if (!gone.points.has(p.id) && refs(p.def).some(r => gone.points.has(r))){ gone.points.add(p.id); more = true; }
     }
     for (const l of spec.links) if (linkRefs(l).some(r => gone.points.has(r))) gone.links.add(l.id);
+    // Clipped Surface Link ที่เส้นอ้างอิงหายไป = หายด้วย (วนเผื่อเส้นอ้างอิงเป็นของที่เพิ่งหาย)
+    for (let more = true; more; ){
+      more = false;
+      for (const l of spec.links) if (l.refLink && !gone.links.has(l.id) && gone.links.has(l.refLink)){ gone.links.add(l.id); more = true; }
+    }
     for (const s of spec.shapes) if (s.links.some(r => gone.links.has(r))) gone.shapes.add(s.id);
     spec.points = spec.points.filter(p => !gone.points.has(p.id));
     spec.links = spec.links.filter(l => !gone.links.has(l.id));
@@ -1041,6 +1105,23 @@ const Spec = (() => {
     return { a, b, link: nl.id };
   }
 
+  // ---------- Clipped Surface Link (รอบ 4c) ----------
+  // link ตามผิวดินจาก from ถึง to ไม่เกินเส้นอ้างอิง — o = { refLink | refLevel, side: "below" | "above", codes, codesGround, codesLine, target, aux }
+  //   คืน { link } หรือ { error }
+  function addFollowClipped(spec, from, to, o){
+    o = o || {};
+    if (!byId(spec.points, from) || !byId(spec.points, to) || from === to) return { error: "เลือกจุดเริ่มกับจุดปลายที่ต่างกัน" };
+    if (o.refLink){
+      const rl = byId(spec.links, o.refLink);
+      if (!rl || !rl.points || rl.type) return { error: "เส้นอ้างอิงต้องเป็น link เส้นตรง" };
+    } else if (o.refLevel == null || String(o.refLevel).trim() === "") return { error: "เลือกเส้นอ้างอิง หรือใส่ระดับ" };
+    const l = { id: nextId(spec, "L"), type: "followClipped", from, to, target: o.target || (spec.targets[0] || {}).name || "TargetSurface",
+                ...(o.refLink ? { refLink: o.refLink } : { refLevel: String(o.refLevel).trim() }), side: o.side === "above" ? "above" : "below",
+                codes: (o.codes || []).slice(), codesGround: (o.codesGround || []).slice(), codesLine: (o.codesLine || []).slice(), ...(o.aux ? { auxiliary: true } : {}) };
+    spec.links.push(l);
+    return { link: l.id };
+  }
+
   // ---------- Extend to Surface (รอบ 4c) ----------
   // ต่อ link เส้นตรง id ที่ปลาย end ลงถึงดิน (เมื่อปลายลอย): จุด extendToGround + link ต่อ (optional ใน shape, code = code ของเส้นเดิม)
   //   + จุด "ปลายจริง" (firstOf [จุดต่อ, end] auxiliary) · opt.rewire (ปกติ true) = link อื่นที่ต่อที่ end ย้ายไปต่อที่ปลายจริง
@@ -1115,7 +1196,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
+           isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();

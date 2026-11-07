@@ -121,9 +121,17 @@ public class SpecLink
     public List<string> Codes { get; set; } = new();
     public string? Branch { get; set; }
     public bool Optional { get; set; }                // ใน shape: วาดไม่ได้ / ไม่เกิด = ข้ามไป (link ต่อของ Extend to Surface)
+    // followClipped (Clipped Surface Link): เส้นอ้างอิง = link เส้นตรง RefLink หรือระดับ RefLevel (นิพจน์) · Side below | above
+    public string? RefLink { get; set; }
+    public string? RefLevel { get; set; }
+    public string? Side { get; set; }
+    public List<string> CodesGround { get; set; } = new();
+    public List<string> CodesLine { get; set; } = new();
 
     public bool Follow => Type == "followSurface";
     public bool IsArc => Type is "arc3" or "arcR" or "fillet";
+    public bool IsClipped => Type == "followClipped";
+    public bool IsMulti => IsArc || IsClipped;        // ในโค้ด C# = หลาย link (ตัวแปร Link[])
     public (string A, string B) Ends => Points is { Count: >= 2 } ? (Points[0], Points[^1]) : (From ?? "", To ?? "");
 }
 

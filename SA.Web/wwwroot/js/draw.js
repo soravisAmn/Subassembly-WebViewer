@@ -78,7 +78,8 @@ function chooseDrawBranch(){
 const branchPath = (sp, id) => Spec.branchChain(sp, id).reverse().map(b => Spec.branchLabel(sp, b)).join(" › ");
 let drawRes = {};                  // item id -> ผล Spec.evaluate (เทียบ origin) จาก render ล่าสุด
 const TOOL_NAMES = { point: "Point", link: "Link", shape: "Shape", daylight: "Slope to Surface", follow: "Follow Surface", polygon: "Polygon", ngon: "Regular Polygon",
-                     arc: "Arc", fillet: "Fillet", intersect: "Intersect", offset: "Offset", extend: "Extend to Surface", cutfill: "Daylight Cut/Fill" };
+                     arc: "Arc", fillet: "Fillet", intersect: "Intersect", offset: "Offset", extend: "Extend to Surface", clip: "Clipped Surface Link",
+                     cutfill: "Daylight Cut/Fill" };
 // Polygon ด้านเท่า: จำนวนด้าน / โหมดที่ใช้ล่าสุด (inscribed = รัศมีถึงมุม · circumscribed = รัศมีถึงกึ่งกลางด้าน)
 const ngonOpt = () => (state.ngon ||= { n: 5, mode: "inscribed" });
 // Arc: โหมด 3p = ผ่าน 3 จุด · ser = เริ่ม-ปลาย-รัศมี (สลับระหว่างวาดด้วย T / E แบบตัวเลือกใน banner ของ AutoCAD)
@@ -240,12 +241,14 @@ function drawBanner(){
                + (auxDrawing() ? " · Auxiliary = จุดตัดช่วยสร้าง (ใช้กับ ไม่ตัด)" : ""),
     offset: `Offset ระยะ = ${offsetOpt().d}: ` + (draw.chain.length ? `คลิกด้านที่จะวางเส้นขนานของ ${draw.chain[0]}` : "คลิก link เส้นตรง") + " · Tab / พิมพ์ = เปลี่ยนระยะ",
     extend: "Extend to Surface: คลิก link เส้นตรงใกล้ปลายที่จะต่อ (ปลายลอยเหนือดิน = ต่อแนวเดิมลงไปชนดิน · ไม่ลอย = ไม่ต่อ)",
+    clip: "Clipped Surface Link: " + ["คลิกจุดเริ่ม (จุดที่วาดแล้ว)", `คลิกจุดปลาย (เริ่มที่ ${draw.chain[0]})`,
+                                      `คลิกเส้นอ้างอิง (link เส้นตรง — ไม่เกินเส้นนี้) · Tab = ใช้ระดับคงที่แทน`][Math.min(draw.chain.length, 2)],
     cutfill: "Daylight Cut/Fill: คลิกจุดไหล่ (ไหล่คันดิน / ขอบไหล่ทาง — จุดที่วาดแล้ว)"
   }[draw.tool];
   document.body.classList.toggle("aux-mode", auxDrawing());
   // โหมด Auxiliary: ป้ายชัดๆ หน้าข้อความ (X = สลับ)
   const br = draw.tool !== "cutfill" && draw.tool !== "extend" && drawBranch() ? `▶ กิ่ง ${branchPath(editItem().spec, draw.branch)} · ` : "";
-  return br + (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (["cutfill", "intersect", "offset", "fillet", "extend"].includes(draw.tool) ? "" : " · Tab = พิมพ์ค่า")
+  return br + (auxDrawing() ? "◇ AUXILIARY (ช่วยสร้าง — ไม่ลง Civil 3D) · " : "") + t + (["cutfill", "intersect", "offset", "fillet", "extend", "clip"].includes(draw.tool) ? "" : " · Tab = พิมพ์ค่า")
        + (AUX_TOOLS.includes(draw.tool) ? ` · X = ${draw.aux ? "กลับเป็นของจริง" : "Auxiliary"}` : "") + " · Esc = ยกเลิก";
 }
 function arcBanner(){
@@ -508,6 +511,11 @@ function drawMove(px, py){
     render();
     return showTip(px, py, draw.hover || "ชี้ที่ link เส้นตรง");
   }
+  if (draw.tool === "clip" && draw.chain.length >= 2){
+    draw.hover = filletLinkAt(draw.mouse);
+    render();
+    return showTip(px, py, draw.hover ? `เส้นอ้างอิง ${draw.hover}` : "ชี้ที่ link เส้นตรง (เส้นอ้างอิง) · Tab = ใช้ระดับคงที่");
+  }
   if (draw.tool === "extend"){
     draw.hover = filletLinkAt(draw.mouse);
     render();
@@ -556,6 +564,13 @@ function drawClick(px, py){
     if (!id) return flashBanner("Extend to Surface ได้เฉพาะ link เส้นตรง — คลิกบนเส้นใกล้ปลายที่จะต่อ");
     return openExtend(it, id, extendEnd(id));
   }
+  // Clipped Surface Link ขั้นที่ 3: คลิกเส้นอ้างอิง
+  if (draw.tool === "clip" && draw.chain.length >= 2){
+    const id = filletLinkAt(draw.mouse);
+    if (!id) return flashBanner("เส้นอ้างอิงต้องเป็น link เส้นตรง — คลิกบนเส้น หรือกด Tab เพื่อใช้ระดับคงที่");
+    const [a, b] = draw.chain; draw.chain = []; draw.hover = null; showBanner(drawBanner()); render();
+    return openClip(it, a, b, id);
+  }
   const c = snapAt(draw.mouse);
   if (!c) return;
   // Arc เริ่ม-ปลาย-รัศมี คลิกที่สาม = รัศมี / ทิศจากตำแหน่งเมาส์ (โค้งผ่านจุดนั้น)
@@ -581,6 +596,15 @@ function drawClick(px, py){
   if (c.kind === "end" && c.point.ref && c.point.ref.type === "pt" && draw.tool !== "point" && draw.tool !== "ngon" && !viaStage && !auxDrawing() && Spec.auxEnd(it.spec, c.point.ref.id))
     return flashBanner(Spec.isAlias(it.spec, c.point.ref.id) ? `${c.point.ref.id} (ปลายจริง) มีจุด auxiliary ในรายการ — ต่อ link จริงไม่ได้`
                                                              : `${c.point.ref.id} เป็นจุด auxiliary ต่อ link จริงไม่ได้ — ปิด "Auxiliary (ช่วยสร้าง)" ใน Properties ของ ${c.point.ref.id} ก่อน`);
+  // Clipped Surface Link ขั้นที่ 1–2: จุดเริ่ม / จุดปลาย (จุดที่วาดแล้ว — ปลายจริงของ Extend to Surface ได้)
+  if (draw.tool === "clip"){
+    if (c.kind !== "end" || !c.point.ref || c.point.ref.type !== "pt") return flashBanner("Clipped Surface Link: คลิกบนจุดที่วาดแล้ว (เช่น ปลายจริงของ Extend to Surface)");
+    const id = c.point.ref.id;
+    if (draw.chain.includes(id)) return;
+    draw.chain.push(id);
+    if (draw.chain.length >= 2){ draw.list = []; draw.cand = null; }      // ขั้นเลือกเส้นอ้างอิง: Tab = ระดับคงที่ (ไม่วน snap)
+    showBanner(drawBanner()); return render();
+  }
   if (draw.tool === "cutfill"){
     if (c.kind !== "end" || !c.point.ref || c.point.ref.type !== "pt") return flashBanner("Daylight Cut/Fill: คลิกบนจุดที่วาดแล้ว (จุดไหล่) — วาดจุดก่อนถ้ายังไม่มี");
     return openCutFill(it, c.point.ref.id);
@@ -1014,6 +1038,11 @@ function checkTyped(field, v, names){
 function openTyping(first){
   if (draw.tool === "ngon" && draw.mouse) return openNgonTyping(first);
   if (draw.tool === "fillet" || draw.tool === "offset" || (arcSerStage() && draw.mouse)) return openRadiusTyping(first);
+  // Clipped Surface Link: Tab ตอนเลือกเส้นอ้างอิง = ใช้ระดับคงที่ (หน้าต่าง)
+  if (draw.tool === "clip"){
+    if (draw.chain.length >= 2){ const [a, b] = draw.chain; draw.chain = []; showBanner(drawBanner()); render(); openClip(editItem(), a, b, null); }
+    return;
+  }
   if (!draw.tool || ["shape", "follow", "cutfill", "intersect", "extend"].includes(draw.tool) || !draw.mouse) return;
   const it = editItem(), box = $("dyn");
   draw.typing = true;
@@ -1106,6 +1135,13 @@ function renderDrawOverlay(){
       for (const k of [ix.keep1, ix.keep2]){ const p = r.pts[k]; if (p && !p.err) el("line", { x1: X(p), y1: Y(p), x2: X(ix), y2: Y(ix), class: "rubber" }, svg); }
       el("circle", { cx: X(ix), cy: Y(ix), r: 5, class: "ix-mark" }, svg);
     }
+    return;
+  }
+  // Clipped Surface Link ขั้นเลือกเส้นอ้างอิง: จุดเริ่ม / ปลาย + link ที่ชี้
+  if (draw.tool === "clip" && draw.chain.length >= 2){
+    const q = draw.hover && r.links[draw.hover];
+    if (q && !q.err) el("path", { d: poly(q.path), class: "fillet-pick" }, svg);
+    for (const id of draw.chain){ const p = r.pts[id]; if (p && !p.err) el("circle", { cx: X(p), cy: Y(p), r: 6, class: "ix-mark" }, svg); }
     return;
   }
   // Extend to Surface: link ที่ชี้ + วงที่ปลายที่จะต่อ + เงาแนวต่อ (เส้นประ ยาวเท่าเส้นเดิม)

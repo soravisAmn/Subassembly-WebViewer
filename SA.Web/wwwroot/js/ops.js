@@ -209,6 +209,8 @@ const Ops = (() => {
       c.id = Spec.nextId(dst, "L");
       dst.links.push(c); lmap[l.id] = c.id; links.push(c.id);
     }
+    // Clipped Surface Link: เส้นอ้างอิงที่สำเนามาด้วย = ใช้ตัวสำเนา
+    for (const id of links){ const c = Spec.byId(dst.links, id); if (c.refLink && lmap[c.refLink]) c.refLink = lmap[c.refLink]; }
     const smap = {};
     for (const s of src.shapes.filter(s => S.has(s.id))){
       const id = Spec.addShape(dst, s.links.map(l => lmap[l] || l));

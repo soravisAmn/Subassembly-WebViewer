@@ -136,7 +136,7 @@ function treeItem(node, h, a, it, depth, editing){
   });
   grp(ik + ":links", "Links", dl.length + cl.length, () => {
     dl.forEach(l => node({ depth: d2 + 1, cls:"leaf drawn" + (Spec.isAux(l) ? " aux" : ""), s:{type:"dlink", item:it.id, id:l.id}, sel: isSel("dlink", it.id, l.id),
-                           name: brTag(l) + dname(l, dupL), meta: errMeta(dr && dr.links[l.id]) || (Spec.isAux(l) ? "aux · " : "") + Spec.linkEnds(l).join("→") + (l.type === "followSurface" ? " ตามดิน" : Spec.isArc(l) ? " " + Spec.LINK_TYPES[l.type] : "") }));
+                           name: brTag(l) + dname(l, dupL), meta: errMeta(dr && dr.links[l.id]) || (Spec.isAux(l) ? "aux · " : "") + Spec.linkEnds(l).join("→") + (l.type === "followSurface" ? " ตามดิน" : l.type === "followClipped" ? " ตามดิน ไม่เกินเส้น" : Spec.isArc(l) ? " " + Spec.LINK_TYPES[l.type] : "") }));
     cl.forEach((l, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"link", item:it.id, i}, sel: isSel("link", it.id, i), name: `L${i} ${esc(l.codes.join(", ") || "—")}`, meta: "#" + l.pts.join("→#") }));
   });
   grp(ik + ":shapes", "Shapes", ds.length + cs.length, () => {
@@ -856,7 +856,7 @@ function propsDrawnLink(box, it, l, r){
   codesRow(g, it, l);
   const [a, b] = Spec.linkEnds(l), cur = l.type || "straight";
   // เปลี่ยนชนิด: เส้นตรง / ตามดิน / โค้งรัศมี สลับกันได้ · โค้ง 3 จุด / Fillet เปลี่ยนเป็นชนิดอื่นได้แต่สร้างจากตรงนี้ไม่ได้ (ใช้เครื่องมือ Arc / Fillet)
-  const types = Object.entries(Spec.LINK_TYPES).filter(([k]) => !["arc3", "fillet"].includes(k) || k === cur);
+  const types = Object.entries(Spec.LINK_TYPES).filter(([k]) => !["arc3", "fillet", "followClipped"].includes(k) || k === cur);
   selectRow(g, it, "ชนิด", types, cur, v => {
     const keep = { id: l.id, codes: l.codes, ...(l.seg && Spec.ARC_TYPES.includes(v) ? { seg: l.seg } : {}) };
     for (const k of Object.keys(l)) delete l[k];
@@ -887,6 +887,7 @@ function propsDrawnLink(box, it, l, r){
     selectRow(g, it, "ทาง", [["", "ทางสั้น (≤ 180°)"], ["1", "ทางยาว (> 180°)"]], l.large ? "1" : "", v => { l.large = !!v; });
   }
   if (l.type === "fillet") exprRow(g, it, "รัศมี", "ใหญ่เกินเส้น / ขนาน = มุมแหลมเดิม + เตือน", l.radius, v => setFilletRadius(sp, l, v));
+  if (l.type === "followClipped") propsClipped(g, it, l, q);
   if (Spec.isArc(l)){
     // ความละเอียด: ท่อนยาวไม่เกิน (m) หรือจำนวนท่อน · จำกัด 2–180 ท่อน
     const sg = l.seg || Spec.SEG_DEFAULT;
@@ -919,6 +920,27 @@ function propsDrawnLink(box, it, l, r){
     if (q.arc) rows.push(["ใน Civil 3D", `${q.path.length - 1} link ตรง (+ ${q.path.length - 2} จุดระหว่างทาง)`], ["รัศมีจริง", f3(q.arc.r) + " m"],
                          ["มุมกวาด", `${f3(Math.abs(q.arc.sw) * 180 / Math.PI)}° ${q.arc.sw > 0 ? "ทวนเข็ม" : "ตามเข็ม"} (บนจอ)`]);
     kv(g, rows);
+  }
+}
+// Clipped Surface Link (รอบ 4c): เส้นอ้างอิง (link เส้นตรง / ระดับ), ด้าน, code แยกช่วง
+function propsClipped(g, it, l, q){
+  const sp = it.spec;
+  const refs = sp.links.filter(o => o !== l && o.points && !o.type).map(o => [o.id, o.id + (Spec.isAux(o) ? " (aux)" : "") + ` (${o.points.join("–")})`]);
+  selectRow(g, it, "ไม่เกิน", [["", "ระดับคงที่"], ...refs], l.refLink || "", v => { if (v){ l.refLink = v; delete l.refLevel; } else { delete l.refLink; l.refLevel = l.refLevel || "0"; } },
+            "เส้นอ้างอิง (ต่อออกไปได้ทั้งสองทาง)");
+  if (!l.refLink) exprRow(g, it, "ระดับ", "เทียบ origin เช่น -Depth", l.refLevel, v => { l.refLevel = v; });
+  selectRow(g, it, "ด้าน", [["below", "ไม่สูงกว่าเส้น (ขอบล่าง)"], ["above", "ไม่ต่ำกว่าเส้น"]], l.side === "above" ? "above" : "below", v => { l.side = v; });
+  const codeRow = (label, small, key) => {
+    const row = div("row", `<label>${esc(label)}<small>${esc(small)}</small></label>`, g);
+    const inp = document.createElement("input"); inp.type = "text"; inp.value = (l[key] || []).join(", "); inp.disabled = !canEdit(it) || Spec.isAux(l);
+    inp.onchange = () => specEdit(() => { l[key] = inp.value.split(",").map(c => c.trim()).filter(Boolean); }, it);
+    row.appendChild(inp);
+  };
+  codeRow("Codes ช่วงตามดิน", "เพิ่มจาก Codes (ทุกช่วง)", "codesGround");
+  codeRow("Codes ช่วงบนเส้น", "เพิ่มจาก Codes (ทุกช่วง)", "codesLine");
+  if (q && q.segOn){
+    const nLine = q.segOn.filter(Boolean).length;
+    kv(g, [["ใน Civil 3D", `${q.path.length - 1} link (+ ${q.path.length - 2} จุดระหว่างทาง) · ตามดิน ${q.segOn.length - nLine} · บนเส้น ${nLine}`]]);
   }
 }
 // รัศมีของ Fillet ใช้ 3 ที่ (link + จุดสัมผัส 2 จุด) ให้เท่ากันเสมอ
@@ -1048,6 +1070,49 @@ function cutFillCommit(it, opts){
   state.sel = { type:"dpt", item: it.id, id: r.cut.point }; renderAll();
   const cn = Spec.byId(it.spec.logic.conditions, r.cond).name;
   flashBanner(`Daylight Cut/Fill: ${cn} · ตัด = ${r.cut.point} · ถม = ${r.fill.point} · Daylight = ${r.daylight} — ลากจุดผิวดินขึ้นลงดูรูปสลับ (Ctrl+Z ย้อนได้)`);
+}
+// Clipped Surface Link (รอบ 4c): หน้าต่างหลังคลิกจุดเริ่ม / จุดปลาย / เส้นอ้างอิง (refLink = null = ใช้ระดับคงที่)
+function openClip(it, from, to, refLink){
+  const sp = it.spec;
+  const refs = sp.links.filter(o => o.points && !o.type).map(o => [o.id, `เส้น ${o.id} (${o.points.join("–")})${Spec.isAux(o) ? " aux" : ""}`]);
+  const o = { ref: refLink || "", level: "0", side: "below", codes: "", codesGround: "", codesLine: "", target: (sp.targets[0] || {}).name || "TargetSurface" };
+  openDialog(`Clipped Surface Link: ${from} → ${to}`, b => {
+    div("cf-explain", `<p>จาก <b>${esc(from)}</b> ถึง <b>${esc(to)}</b> ตามผิวดิน แต่ไม่เกินเส้นอ้างอิง (แบบขอบล่างของ base_rock-pitching) · ไม่มีดิน = เส้นตรง</p>
+      <div class="cf-pics">
+        <figure><svg viewBox="0 0 120 56" aria-hidden="true"><path class="cf-gnd" d="M0 18L35 40L70 22L120 30V56H0Z"/><path d="M6 32H114" stroke-dasharray="3 3" class="cf-road"/><path class="cf-fill" d="M6 28L18 32H56L70 22"/><path class="cf-fill" d="M70 22L120 30"/></svg><figcaption>ไม่สูงกว่าเส้น (ขอบล่าง)</figcaption></figure>
+      </div>`, b);
+    const row = (label, small) => div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, b);
+    const sel = (label, small, key, opts, after) => {
+      const s = document.createElement("select"); s.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(""); s.value = o[key];
+      s.onchange = () => { o[key] = s.value; if (after) after(); }; row(label, small).appendChild(s); return s;
+    };
+    const field = (label, small, key, ph) => {
+      const r = row(label, small), inp = document.createElement("input"); inp.value = o[key]; if (ph) inp.placeholder = ph;
+      inp.oninput = () => { o[key] = inp.value.trim(); }; r.appendChild(inp); return inp;
+    };
+    sel("แต่", "", "side", [["below", "ไม่สูงกว่า"], ["above", "ไม่ต่ำกว่า"]]);
+    let lvRow;
+    sel("เส้นอ้างอิง", "ต่อออกไปได้ทั้งสองทาง", "ref", [["", "ระดับคงที่ …"], ...refs], () => { lvRow.hidden = !!o.ref; });
+    const lv = field("ระดับ", "เทียบ origin เช่น -Depth", "level"); lvRow = lv.parentElement; lvRow.hidden = !!o.ref;
+    if (sp.targets.length > 1) sel("Target surface", "", "target", sp.targets.map(t => [t.name, t.displayName || t.name]));
+    field("Code ทุกช่วง", "คั่นด้วย ,", "codes", "เช่น Datum");
+    field("Code ช่วงตามดิน", "คั่นด้วย ,", "codesGround", "เช่น TrapOnSurface");
+    field("Code ช่วงบนเส้น", "คั่นด้วย ,", "codesLine", "เช่น TrapBase");
+    const err = div("expr-err", "", b);
+    div("hint", "ใน Civil 3D = หลาย link (จุดหักของดิน + จุดที่ดินตัดเส้น) · ช่วงที่ปลายทั้งสองอยู่บนเส้น = code ช่วงบนเส้น · นอกนั้น = code ช่วงตามดิน", b);
+    div("btns", null, b).append(
+      btn("สร้าง", () => {
+        if (!o.ref){ const c = Expr.check(o.level || "", specNames(it), Spec.exprOpts(sp)); if (!o.level || !c.ok){ err.textContent = "ระดับ: " + (c.error || "ใส่ระดับ"); return; } }
+        closeDialog();
+        const list = s => s.split(",").map(x => x.trim()).filter(Boolean);
+        const opt = { ...(o.ref ? { refLink: o.ref } : { refLevel: o.level }), side: o.side, codes: list(o.codes), codesGround: list(o.codesGround), codesLine: list(o.codesLine), target: o.target };
+        let res = null;
+        specEdit(s => { res = Spec.addFollowClipped(s, from, to, opt); if (res.link) state.sel = { type:"dlink", item: it.id, id: res.link }; }, it, `Clipped Surface Link ${from} → ${to}`);
+        if (res && res.error) return flashBanner(res.error);
+        if (res) flashBanner(`Clipped Surface Link: ${res.link} — ลากผิวดินขึ้นลงดู (Ctrl+Z ย้อนได้)`);
+      }),
+      btn("ยกเลิก", closeDialog));
+  });
 }
 // Extend to Surface (รอบ 4c): หน้าต่างเล็กหลังคลิก link ใกล้ปลายที่จะต่อ
 function openExtend(it, id, end){
@@ -1224,7 +1289,7 @@ function propsParamTable(box, it){
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
 const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
-  "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Offset ExtendToGround Opt Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
+  "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Offset ExtendToGround Opt FollowClipped Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
   "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf Severe abstract as base bool break byte case catch char checked class const continue " +
   "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
   "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +

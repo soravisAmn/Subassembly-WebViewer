@@ -202,6 +202,13 @@ static class DrawingTests
             for (int k = 0; k < idx.Length; k++)
                 if (Math.Abs((double)path[k]![0]! - o.Points[idx[k]].X) > tol || Math.Abs((double)path[k]![1]! - o.Points[idx[k]].Y) > tol)
                     throw new Exception($"{jl[i]!["id"]} จุดที่ {k} ไม่ตรง");
+            // code ของ link (Clipped Surface Link = แยกตามท่อน) — เทียบแบบชุด
+            if (jl[i]!["codes"] is JsonArray jc)
+            {
+                var a = jc.Select(c => (string)c!).Distinct().OrderBy(c => c, StringComparer.Ordinal);
+                var b = ((string[])o.Links[i].GetType().GetProperty("codes")!.GetValue(o.Links[i])!).Distinct().OrderBy(c => c, StringComparer.Ordinal);
+                if (!a.SequenceEqual(b)) throw new Exception($"{jl[i]!["id"]}: code JS [{string.Join(",", a)}] / C# [{string.Join(",", b)}]");
+            }
         }
 
         var js_ = js["shapes"]!.AsArray().Where(s => s!["err"] == null).ToList();

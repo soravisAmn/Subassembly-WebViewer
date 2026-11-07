@@ -1064,7 +1064,7 @@ function openCutFill(it, hinge){
         closeDialog();
         cutFillCommit(it, { hinge, target: o.target, cut, fill, params: o.params, dir: +o.dir, cutCode: o.cutCode, fillCode: o.fillCode });
       }),
-      btn("ยกเลิก", closeDialog));
+      btn("ยกเลิก", cancelDialog));
   });
 }
 function cutFillCommit(it, opts){
@@ -1135,7 +1135,7 @@ function openArray(it){
           flashBanner(`Array ${g.id}: เพิ่ม ${g.n - 1} ชุด — แก้ N / dx / dy ได้ใน Properties ของสมาชิก (Ctrl+Z ย้อนได้)`);
         }
       }),
-      btn("ยกเลิก", closeDialog));
+      btn("ยกเลิก", cancelDialog));
   });
 }
 // Properties: กลุ่ม Array ของ object ที่เลือก — แก้ dx / dy (ขยับทั้งแถว) / N / วิธีต่อชุด (สร้างใหม่) / เลิกเป็น array
@@ -1213,7 +1213,7 @@ function openClip(it, from, to, refLink){
         if (res && res.error) return flashBanner(res.error);
         if (res) flashBanner(`Clipped Surface Link: ${res.link} — ลากผิวดินขึ้นลงดู (Ctrl+Z ย้อนได้)`);
       }),
-      btn("ยกเลิก", closeDialog));
+      btn("ยกเลิก", cancelDialog));
   });
 }
 // Extend to Surface (รอบ 4c): หน้าต่างเล็กหลังคลิก link ใกล้ปลายที่จะต่อ
@@ -1264,7 +1264,7 @@ function openExtend(it, id, end){
         if (res && res.error) return flashBanner(res.error);
         if (res) flashBanner(`Extend to Surface: ${res.point} (ต่อ) · ${res.link} (optional) · ปลายจริง ${res.tip}` + (res.rewired.length ? ` · ${res.rewired.join(", ")} ต่อที่ปลายจริงแล้ว` : "") + " — ลากผิวดินขึ้นลงดู (Ctrl+Z ย้อนได้)");
       }),
-      btn("ยกเลิก", closeDialog));
+      btn("ยกเลิก", cancelDialog));
   });
 }
 // firstOf: จุดแรกในรายการที่เกิด (ต่อเรขาคณิตหลังกิ่ง เช่น ปลายลาดตัด / ปลายลาดถม)
@@ -1631,7 +1631,7 @@ function removeDecisionsDialog(it, decs, title){
   openDialog(title, b => {
     kv(b, [["กิ่งที่จะหาย", lose.join(", ")], ["object ในกิ่ง", objs.map(o => o.id).join(", ")]]);
     const to = decs.length === 1 && decs[0].parent ? `กิ่ง ${branchPath(sp, decs[0].parent)}` : "เกิดเสมอ";
-    div("btns", null, b).append(btn(`ย้าย object ไป${to}`, () => go("move")), btn("ลบ object ในกิ่งด้วย", () => go("remove")), btn("ยกเลิก", closeDialog));
+    div("btns", null, b).append(btn(`ย้าย object ไป${to}`, () => go("move")), btn("ลบ object ในกิ่งด้วย", () => go("remove")), btn("ยกเลิก", cancelDialog));
     div("hint", "Ctrl+Z ย้อนได้ทั้งก้อน", b);
   });
 }
@@ -1799,15 +1799,48 @@ function renderProjName(){
 }
 
 // ---------------- หน้าต่าง ----------------
+// dlg.tool = เครื่องมือที่เปิดหน้าต่างนี้ (คลิกเส้น / จุดด้วย Extend, Clipped, Daylight Cut/Fill) · dlg.dirty = มีช่องที่พิมพ์ / แก้ค้าง
+const DIALOG_TOOLS = new Set(["extend", "clip", "cutfill"]);
+const dlg = { tool: null, dirty: false };
 function openDialog(title, build){
   $("dlg-title").textContent = title;
   const b = $("dlg-body"); b.innerHTML = "";
+  dlg.tool = DIALOG_TOOLS.has(draw.tool) ? draw.tool : null; dlg.dirty = false; $("dlg-note").hidden = true;
   build(b);
   $("modal").hidden = false;
 }
-function closeDialog(){ $("modal").hidden = true; }
-$("dlg-x").onclick = closeDialog;
-$("modal").addEventListener("pointerdown", e => { if (e.target === $("modal")) closeDialog(); });
+// ปิดเฉยๆ (หลังกด สร้าง / ตกลง แล้วทำงานต่อ)
+function closeDialog(){ $("modal").hidden = true; $("dlg-note").hidden = true; }
+// ยกเลิก = ผลเดียวกันทุกช่องทาง: × · ปุ่ม ยกเลิก · Esc · คลิกพื้นหลัง → ปิด + จบเครื่องมือที่เปิดหน้าต่างนี้ (ไม่แก้ spec)
+function cancelDialog(){
+  if ($("modal").hidden) return;
+  const t = dlg.tool;
+  closeDialog(); dlg.tool = null;
+  if (t && draw.tool === t) setTool(null);
+}
+$("dlg-x").onclick = cancelDialog;
+$("dlg-body").addEventListener("input", () => { dlg.dirty = true; });
+$("dlg-body").addEventListener("change", () => { dlg.dirty = true; });
+// คลิกพื้นหลังมืด = ยกเลิก — ยกเว้นมีค่าที่แก้ค้าง (บอกในหน้าต่างแทน ไม่ทิ้งค่าให้เอง)
+$("modal").addEventListener("pointerdown", e => {
+  if (e.target !== $("modal")) return;
+  if (!dlg.dirty) return cancelDialog();
+  const n = $("dlg-note"); n.textContent = "มีค่าที่แก้ค้าง — กด ยกเลิก / × / Esc เพื่อทิ้ง"; n.hidden = false;
+});
+// กล่องพิมพ์ค่า (#dyn): ปุ่ม × ที่หัวกล่อง = Esc ของกล่องนั้น (Intersect = ยกเลิกการเลือก · กล่องอื่น = ปิดกล่อง คำสั่งยังอยู่)
+//   กล่องถูกสร้างใหม่หลายที่ (innerHTML) → เติมปุ่มเองเมื่อมี .dyn-h ใหม่
+new MutationObserver(() => {
+  const h = $("dyn").querySelector(".dyn-h");
+  if (!h || h.querySelector(".dyn-x")) return;
+  const x = document.createElement("button"); x.type = "button"; x.className = "dyn-x"; x.textContent = "×"; x.title = "ยกเลิก (Esc)"; x.tabIndex = -1;
+  h.appendChild(x);
+}).observe($("dyn"), { childList: true });
+$("dyn").addEventListener("pointerdown", e => { if (e.target.closest(".dyn-x")) e.preventDefault(); });   // ไม่ให้ช่องพิมพ์เสีย focus ก่อน
+$("dyn").addEventListener("click", e => {
+  if (!e.target.closest(".dyn-x")) return;
+  e.stopPropagation();
+  if (draw.ix) intersectCancel(); else closeTyping();
+});
 
 // Import .cs: ไฟล์ในโฟลเดอร์ / เปิดจากเครื่อง / สร้างใหม่จาก template
 let importTarget = null;

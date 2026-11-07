@@ -45,7 +45,7 @@ document.addEventListener("keydown", e => {
     else if (ed.open) saveNow();
     return;
   }
-  if (e.key === "Escape" && (!$("modal").hidden || !$("ctx").hidden || !$("dd-file").hidden || !$("osmenu").hidden)){ closeDialog(); closeMenus(); return; }
+  if (e.key === "Escape" && (!$("modal").hidden || !$("ctx").hidden || !$("dd-file").hidden || !$("osmenu").hidden)){ cancelDialog(); closeMenus(); return; }
   // F11 = Object snap tracking (แบบ AutoCAD) — กันเบราว์เซอร์เข้าเต็มจอ (ถ้าเบราว์เซอร์ยอม)
   if (e.key === "F11" && !e.target.closest("#ed")){ e.preventDefault(); toggleBar("track"); return; }
   if (["INPUT","SELECT","TEXTAREA"].includes(e.target.tagName) || e.target.closest("#ed") || !$("modal").hidden) return;

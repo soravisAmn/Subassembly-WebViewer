@@ -80,6 +80,9 @@
     · แก้บั๊ก M2: Offset ระยะเป็นนิพจน์บวก / ลบ ใน C# ขาดวงเล็บ (drawing-case 77) → **รอบ 4c จบ** รอทดสอบใน Civil 3D (`round4c-checklist.md`)
   รอบ 4d เสร็จ (2026-11-07): ลากปรับความกว้างแถบซ้าย / ขวา (`js/panes.js` · `--lw` / `--rw` · `state.leftW` / `rightW` · ดับเบิลคลิก = 280 / 300 · workspace ≥ 320) + tooltip ชื่อเต็มในต้นไม้
     + แยกแผง: ซ้าย ต้นไม้ / Scenarios · ขวา Drawer / Properties (เลื่อนแยก, เส้นลากแนวนอน `state.drawerH` / `scH`, คลิกหัว = พับ `drawerFold` / `scFold`)
+  รอบ 4e (`prompt-4e.md`, ข้อเสนอ + คำตอบ "ตามที่เสนอ" ใน `prompt-4e-design.md`): M0 เสร็จ (2026-11-08)
+    M1 เสร็จ (2026-11-08): ปุ่มปิด — ต้นเหตุ CSS `.ghost{pointer-events:none}` (ของเส้นพรีวิว SVG) โดน `button.ghost` (× หน้าต่าง, ออกจาก Edit, ▾ แถบผลลัพธ์) → `:where(svg) .ghost`
+      + `cancelDialog()` (ui.js: × / ยกเลิก / Esc / พื้นหลัง = ปิด + จบเครื่องมือ extend / clip / cutfill · มีค่าค้าง = พื้นหลังไม่ปิด `#dlg-note`) + × ในกล่อง `#dyn` — ถัดไป M2 Slope (1:x)
   ถัดไป: **`prompt-5.md`** (Logic API + มุมมองข้อความ + ต้นไม้ Conditions ในแถบซ้ายแทน flowchart + Variables) — ยังไม่เริ่ม · แล้ว prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)

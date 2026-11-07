@@ -301,7 +301,8 @@ svg#view.space,svg#view.space *{cursor:grab !important}
 .pick-list .pk:hover{background:var(--paper)}
 .pick-list .pk small{color:var(--muted);margin-left:auto}
 .pick-list .pk button{padding:0 6px;font-size:11px}
-.ghost{fill:none;stroke:var(--ok);stroke-width:2;stroke-dasharray:5 3;opacity:.85;pointer-events:none}
+/* เส้นพรีวิว Move / Copy บนรูป — จำกัดเฉพาะใน SVG (ไม่ให้โดนปุ่ม button.ghost: เคยทำให้ × ของหน้าต่าง / ออกจาก Edit กดไม่ได้) · :where = specificity เท่าเดิม */
+:where(svg) .ghost{fill:none;stroke:var(--ok);stroke-width:2;stroke-dasharray:5 3;opacity:.85;pointer-events:none}
 .ghost-pt{fill:none;stroke:var(--ok);stroke-width:1.5;pointer-events:none}
 .mode-banner:has(.banner-warn){border-radius:10px;max-width:calc(100% - 24px)}
 .mode-banner .banner-warn{margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px}
@@ -318,7 +319,9 @@ svg#view.space,svg#view.space *{cursor:grab !important}
 .sa-hl-gutter{background:#a855f7;width:4px !important;margin-left:3px}
 .osnap-lbl{fill:var(--hot);font:11px "IBM Plex Mono",monospace;paint-order:stroke;stroke:var(--paper);stroke-width:3px;pointer-events:none}
 .dyn{position:absolute;z-index:8;background:#fffbe6;color:#3d2f00;border:1px solid #c9a227;border-radius:6px;padding:6px 8px;display:flex;flex-wrap:wrap;gap:6px;width:320px;font-size:12px}
-.dyn-h{width:100%;font-size:11px;color:#6b5a1f}
+.dyn-h{width:100%;font-size:11px;color:#6b5a1f;padding-right:20px;position:relative}
+.dyn-x{position:absolute;top:-3px;right:-4px;border:0;background:transparent;color:#6b5a1f;font-size:14px;line-height:1;padding:1px 4px;cursor:pointer}
+.dyn-x:hover{color:var(--err)}
 .dyn label{display:flex;align-items:center;gap:4px;font-family:"IBM Plex Mono",monospace}
 .dyn input{width:90px;font:12px "IBM Plex Mono",monospace;padding:2px 4px;border:1px solid #c9a227;border-radius:3px;background:#fff;color:#1d2025}
 .dyn .dyn-chk input{width:auto}
@@ -437,6 +440,7 @@ body.editing #ed{display:flex}
 .dlg{background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.25);width:min(560px,100%);max-height:85vh;display:flex;flex-direction:column}
 .dlg-h{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);font-weight:600;font-size:15px}
 .dlg-b{padding:12px 16px;overflow:auto;font-size:13px}
+.dlg-note{margin:10px 16px 0;padding:6px 10px;border:1px solid #c9a227;background:#fffbe6;color:#3d2f00;border-radius:4px;font-size:12px}
 .flist{display:flex;flex-direction:column;gap:2px;margin:6px 0 12px;max-height:46vh;overflow:auto}
 .flist button{text-align:left;border:1px solid transparent;background:transparent;display:flex;gap:8px;font-weight:400}
 .flist button:hover{background:var(--accent-soft)}

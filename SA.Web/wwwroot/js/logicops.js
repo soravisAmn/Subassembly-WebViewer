@@ -630,7 +630,415 @@ const Logic = (() => {
     return out.length ? out.join("\n") : "(ไม่มีอะไรเปลี่ยน)";
   }
 
-  return { RESERVED, nameError, freeCondName, toText, diffText,
+  // ---------- Drawing from scratch (round 6) ----------
+  // Same result shape as the rest of this file. Errors are in English: these functions are used by the AI through MCP.
+  const ALL_OBJECTS = s => [...s.points.map(o => ["point", o]), ...s.links.map(o => ["link", o]), ...s.shapes.map(o => ["shape", o])];
+  const needObj = (s, id) => ALL_OBJECTS(s).find(x => x[1].id === id) || fail(`No object ${id}. Use sa_describe to list ids.`);
+  const needPoint = (s, id) => byId(s.points, id) || fail(`No point ${id}.`);
+  const needLink = (s, id) => byId(s.links, id) || fail(`No link ${id}.`);
+  const asList = v => Array.isArray(v) ? v : v == null ? [] : [v];
+  const selection = (s, ids) => {
+    const sel = { points: [], links: [], shapes: [] };
+    for (const id of asList(ids)){ const [k] = needObj(s, id); sel[k + "s"].push(id); }
+    return Ops.expand(s, sel);
+  };
+  // Positions for Ops (Right side, no ground = Layout)
+  const layoutPos = s => Spec.evaluate(s, { values: {}, codeParams: [], codePoints: [], surface: null, extendEnds: true, layout: true });
+  // Required fields per point type (optional fields are in POINT_DEFS for the catalog)
+  const POINT_DEFS = {
+    delta: { need: [], doc: "from? (point id, default origin), dx, dy (outward +, up +)" },
+    polar: { need: [], doc: "from?, length, angle (degrees, counter-clockwise from +x, Side = Right frame)" },
+    slopeLength: { need: ["from"], doc: "from, slope (rise / run expression, down = negative, e.g. -1/SideSlope), length, dir (1 outward, -1 inward), measure (along | dx | dy)" },
+    slopeToSurface: { need: ["from"], doc: "from, slope, dir, target, maxDistance, layoutLength" },
+    onSurface: { need: [], doc: "from?, dx, target" },
+    between: { need: ["a", "b"], doc: "a, b, t (0 = a, 1 = b)" },
+    intersect: { need: ["a1", "a2", "b1", "b2"], doc: "a1, a2, b1, b2" },
+    offset: { need: ["a", "b"], doc: "a, b, end (a | b), dist, side (1 | -1). Prefer addOffset, which creates the pair" },
+    extendToGround: { need: ["from", "along"], doc: "from, along, target, maxDistance. Prefer addExtendToGround" },
+    firstOf: { need: [], doc: "points (list; first that occurs is used)" },
+    external: { need: [], doc: "code (point code in the file's existing code)" }
+  };
+  function checkPointDef(s, def, self, opts){
+    if (!def || !POINT_DEFS[def.type]) fail(`Unknown point type ${def && def.type}. Valid: ${Object.keys(POINT_DEFS).join(", ")}.`);
+    for (const k of POINT_DEFS[def.type].need) if (!def[k]) fail(`Point type ${def.type} needs "${k}".`);
+    if (def.type === "firstOf" && !asList(def.points).length) fail("firstOf needs at least one point in \"points\".");
+    for (const k of Spec.EXPR_FIELDS[def.type] || []) if (def[k] != null) def[k] = checkExpr(s, def[k], "num", opts, k);
+    for (const r of Spec.refs(def)){
+      needPoint(s, r);
+      if (self && (r === self || Spec.dependsOn(s, r, self))) fail(`${self} cannot reference ${r}: circular reference.`);
+    }
+  }
+  const setBranchOf = (s, o, branch) => { if (branch != null){ needBr(s, branch); o.branch = branch; } };
+
+  function newSubassembly(name, o){
+    o = o || {};
+    if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return { ok: false, error: `Class name "${name}" is not valid in C#. Use English letters, digits, _.` };
+    const s = Spec.newSpec(name);
+    if (o.namespace) s.namespace = o.namespace;
+    if (o.sideParam && o.sideParam !== "Side"){ s.params[0].name = o.sideParam; s.params[0].displayName = o.sideParam; s.side.param = o.sideParam; }
+    if (o.targets) s.targets = asList(o.targets).map(t => typeof t === "string" ? { name: t, type: "Surface", displayName: t } : { type: "Surface", displayName: t.name, ...t });
+    return { ok: true, result: s };
+  }
+  function addParam(spec, p, opts){
+    return tx(spec, s => {
+      p = p || {};
+      const err = nameError(s, p.name, opts); if (err) fail(err);
+      const kind = p.kind || "double";
+      if (!["double", "long"].includes(kind)) fail(`Parameter kind must be double or long, got ${kind}.`);
+      if (typeof p.default !== "number" || !isFinite(p.default)) fail(`Parameter ${p.name} needs a numeric default.`);
+      s.params.push({ name: p.name, kind, default: p.default, displayName: p.displayName || p.name, min: null, max: null });
+      Spec.setParamBounds(s, p.name, { ...("min" in p ? { min: p.min } : {}), ...("max" in p ? { max: p.max } : {}), ...("positive" in p ? { positive: p.positive } : {}) });
+      if (p.unit) Spec.setParamUnit(s, p.name, p.unit);
+      return { result: p.name };
+    });
+  }
+  // Names used by expressions: one list for editParam (rename) and removeParam
+  const paramUsers = (s, name) => {
+    const out = [];
+    for (const x of Spec.exprSlots(s)){
+      const r = Expr.check(String(x.obj[x.key]).replace(/^(-?)1:/, "$11/"), []);
+      if (r.ast && Expr.vars(r.ast).has(name) && !out.includes(x.id)) out.push(x.id);
+    }
+    return out;
+  };
+  function editParam(spec, name, c, opts){
+    return tx(spec, s => {
+      const p = s.params.find(x => x.name === name) || fail(`No parameter ${name}.`);
+      c = c || {};
+      if ("default" in c){ if (typeof c.default !== "number" || !isFinite(c.default)) fail("default must be a number."); p.default = c.default; }
+      if ("displayName" in c) p.displayName = String(c.displayName);
+      if ("kind" in c){ if (!["double", "long"].includes(c.kind)) fail(`Parameter kind must be double or long, got ${c.kind}.`); p.kind = c.kind; }
+      const b = {}; for (const k of ["min", "max", "positive"]) if (k in c) b[k] = c[k];
+      if (Object.keys(b).length) Spec.setParamBounds(s, name, b);
+      if ("unit" in c) Spec.setParamUnit(s, name, c.unit);
+      if (c.name && c.name !== name){
+        const err = nameError(s, c.name, opts, name); if (err) fail(err);
+        const re = new RegExp(`\\b${name}\\b`, "g");
+        if (p.displayName === name) p.displayName = c.name;
+        p.name = c.name;
+        if (s.side && s.side.param === name) s.side.param = c.name;
+        for (const x of Spec.exprSlots(s)) if (typeof x.obj[x.key] === "string") x.obj[x.key] = x.obj[x.key].replace(re, c.name);
+      }
+      return { result: p.name };
+    });
+  }
+  function removeParam(spec, name){
+    return tx(spec, s => {
+      s.params.find(x => x.name === name) || fail(`No parameter ${name}.`);
+      if (s.side && s.side.param === name) fail(`${name} is the Side parameter and cannot be removed.`);
+      const used = paramUsers(s, name);
+      if (used.length) fail(`Parameter ${name} is still used by: ${used.join(", ")}.`);
+      s.params = s.params.filter(x => x.name !== name);
+      return { result: name };
+    });
+  }
+  function addPointOp(spec, def, codes, o, opts){
+    return tx(spec, s => {
+      o = o || {};
+      def = JSON.parse(JSON.stringify(def || {}));
+      checkPointDef(s, def, null, opts);
+      const id = Spec.addPoint(s, def, asList(codes), !!o.aux);
+      setBranchOf(s, byId(s.points, id), o.branch);
+      return { result: id };
+    });
+  }
+  function editPoint(spec, id, patch, opts){
+    return tx(spec, s => {
+      const p = needPoint(s, id);
+      if (["origin", "tangent", "lastOf"].includes(p.def.type)) fail(`Point ${id} (${p.def.type}) cannot be edited directly.`);
+      const def = patch && patch.type && patch.type !== p.def.type ? JSON.parse(JSON.stringify(patch)) : { ...p.def, ...JSON.parse(JSON.stringify(patch || {})) };
+      checkPointDef(s, def, id, opts);
+      p.def = def;
+      return { result: id };
+    });
+  }
+  function setCodes(spec, ids, codes){
+    return tx(spec, s => {
+      for (const id of asList(ids)) needObj(s, id)[1].codes = asList(codes).slice();
+      return { result: asList(ids) };
+    });
+  }
+  // o.cascade: also apply the changes the UI asks about (links ending on the points, removal from shapes, real ends)
+  function setAuxiliary(spec, ids, on, o){
+    return tx(spec, s => {
+      const objs = asList(ids).map(id => { const [k] = needObj(s, id); if (k === "shape") fail(`${id} is a shape; only points and links can be auxiliary.`); return { type: k === "point" ? "dpt" : "dlink", id }; });
+      if (!on){
+        const P = new Set(objs.filter(x => x.type === "dpt").map(x => x.id));
+        const ends = [...new Set(objs.filter(x => x.type === "dlink").flatMap(x => Spec.linkEnds(byId(s.links, x.id))))].filter(e => !P.has(e) && Spec.auxEnd(s, e));
+        if (ends.length){
+          if (!(o && o.cascade)) fail(`Link ends are auxiliary: ${ends.join(", ")}. Pass { cascade: true } to make them real too.`);
+          objs.push(...ends.map(e => ({ type: "dpt", id: e })));
+        }
+      }
+      const pl = Spec.auxPlan(s, objs, !!on);
+      if ((pl.hitLinks.length || pl.shapes.length) && !(o && o.cascade)) fail(`This also affects links ${pl.hitLinks.join(", ") || "-"} and shapes ${pl.shapes.join(", ") || "-"}. Pass { cascade: true } to accept.`);
+      Spec.applyAux(s, pl, !!on);
+      return { result: [...pl.points, ...pl.links] };
+    });
+  }
+  function removeObjects(spec, ids){
+    return tx(spec, s => {
+      const gone = new Set(), want = asList(ids);
+      for (const id of want){
+        if (gone.has(id)) continue;
+        const [k, x] = needObj(s, id);
+        if (k === "point" && x.def.type === "origin") fail("The origin point cannot be removed.");
+        for (const g of Spec.removeCascade(s, k, id)) gone.add(g);
+      }
+      const extra = [...gone].filter(g => !want.includes(g));
+      return { result: [...gone], warnings: extra.length ? [`Also removed because they depended on it: ${extra.join(", ")}`] : [] };
+    });
+  }
+  // o.type: straight (default) | followSurface | arc3 (o.via) | arcR (o.radius, o.sweep, o.large)
+  function addLinkOp(spec, a, b, o, opts){
+    return tx(spec, s => {
+      o = o || {};
+      if (a === b) fail("A link needs two different points.");
+      needPoint(s, a); needPoint(s, b);
+      const type = o.type || "straight";
+      if (!o.aux) for (const e of [a, b]) if (Spec.auxEnd(s, e)) fail(`${e} is auxiliary, so a real link cannot end on it (Civil 3D has no such point). Make the point real, or pass { aux: true }.`);
+      const flags = { ...(o.aux ? { auxiliary: true } : {}), ...(o.optional ? { optional: true } : {}), ...(o.seg ? { seg: o.seg } : {}) };
+      let extra;
+      if (type === "straight") extra = { points: [a, b], ...flags };
+      else if (type === "followSurface") extra = { type, from: a, to: b, target: o.target || "TargetSurface", ...flags };
+      else if (type === "arc3"){ needPoint(s, o.via); extra = { type, from: a, via: o.via, to: b, ...flags }; }
+      else if (type === "arcR") extra = { type, from: a, to: b, radius: checkExpr(s, o.radius, "num", opts, "radius"), sweep: o.sweep === "cw" ? "cw" : "ccw", large: !!o.large, ...flags };
+      else fail(`Unknown link type ${type}. Valid: straight, followSurface, arc3, arcR. Fillet and Clipped have their own functions.`);
+      const id = Spec.addLink(s, a, b, extra);
+      const l = byId(s.links, id);
+      l.codes = asList(o.codes).slice();
+      setBranchOf(s, l, o.branch);
+      return { result: id };
+    });
+  }
+  function editLink(spec, id, patch, opts){
+    return tx(spec, s => {
+      const l = needLink(s, id);
+      for (const k of Object.keys(patch || {})){
+        if (!["codes", "codesGround", "codesLine", "optional", "target", "radius", "sweep", "large", "seg", "side", "refLink", "refLevel"].includes(k)) fail(`Link field ${k} cannot be edited here.`);
+        if (k === "radius" || k === "refLevel") l[k] = checkExpr(s, patch[k], "num", opts, k);
+        else if (k === "refLink"){ needLink(s, patch[k]); l[k] = patch[k]; }
+        else if (k === "optional"){ if (patch[k]) l.optional = true; else delete l.optional; }
+        else l[k] = patch[k];
+      }
+      return { result: id };
+    });
+  }
+  function addFillet(spec, l1, l2, radius, o, opts){
+    return tx(spec, s => {
+      const r = Spec.addFillet(s, l1, l2, checkExpr(s, radius, "num", opts, "radius"), o);
+      if (r && r.error) fail(r.error);
+      return r && typeof r === "object" ? r : { result: r };
+    });
+  }
+  function addShapeOp(spec, linkIds, codes, o){
+    return tx(spec, s => {
+      const ids = asList(linkIds);
+      if (ids.length < 3) fail("A shape needs at least 3 links.");
+      for (const id of ids) if (Spec.isAux(needLink(s, id))) fail(`Link ${id} is auxiliary; a shape cannot use it.`);
+      const sid = Spec.addShape(s, ids.slice());
+      const x = byId(s.shapes, sid);
+      x.codes = asList(codes).slice();
+      setBranchOf(s, x, o && o.branch);
+      return { result: sid };
+    });
+  }
+  // Free polygon: a link between consecutive points (closing back to the first) + a shape
+  function addPolygon(spec, pointIds, o){
+    return tx(spec, s => {
+      o = o || {};
+      const pts = asList(pointIds);
+      if (pts.length < 3) fail("A polygon needs at least 3 points.");
+      const links = pts.map((p, i) => {
+        const q = pts[(i + 1) % pts.length];
+        needPoint(s, p);
+        for (const e of [p, q]) if (Spec.auxEnd(s, e)) fail(`${e} is auxiliary, so a real link cannot end on it.`);
+        const id = Spec.addLink(s, p, q);
+        if (id == null) fail("A polygon cannot use the same point twice in a row.");
+        if (o.linkCodes) byId(s.links, id).codes = asList(o.linkCodes).slice();
+        return id;
+      });
+      const sid = Spec.addShape(s, links);
+      byId(s.shapes, sid).codes = asList(o.codes).slice();
+      return { links, shape: sid };
+    });
+  }
+  function addRegularPolygon(spec, o, opts){
+    return tx(spec, s => {
+      o = o || {};
+      needPoint(s, o.center);
+      if (!(Number.isInteger(o.n) && o.n >= 3 && o.n <= 24)) fail("n must be an integer from 3 to 24.");
+      const g = Spec.addPolygon(s, { center: o.center, n: o.n, radius: checkExpr(s, o.radius, "num", opts, "radius"), angle: checkExpr(s, o.angle ?? "0", "num", opts, "angle"), mode: o.mode, aux: !!o.aux });
+      if (o.codes && g.shape) byId(s.shapes, g.shape).codes = asList(o.codes).slice();
+      return { result: g.id, points: g.points, links: g.links, shape: g.shape };
+    });
+  }
+  function addRotateGroup(spec, ids, pivot, angle, opts){
+    return tx(spec, s => {
+      needPoint(s, pivot);
+      const a = checkExpr(s, angle, "num", opts, "angle");
+      const r = Ops.rotate(s, selection(s, ids).points, pivot, a);
+      if (!r.group && !r.merge.length && !r.compose.length) fail("Nothing can rotate: " + (r.blocked.map(b => `${b.id} (${b.why})`).join(", ") || "empty selection"));
+      return { result: r.group || r.merge[0] || r.compose[0], warnings: r.blocked.map(b => `Not rotated: ${b.id} (${b.why})`) };
+    });
+  }
+  function moveFrag(s, points, dx, dy, convert){
+    const pl = Ops.plan(s, points, !!convert);
+    if (pl.blocked.length) fail("Cannot move: " + pl.blocked.map(b => `${b.id} (${b.why})`).join(", ") + ". Pass { convert: true } to convert them to fixed distances.");
+    const r = layoutPos(s);
+    const failed = Ops.apply(s, pl, { x: +dx || 0, y: +dy || 0 }, 1, r.pts, r.raw);
+    if (failed.length) fail(`Could not compute the position of: ${failed.join(", ")}.`);
+  }
+  function moveObjects(spec, ids, o){
+    return tx(spec, s => {
+      o = o || {};
+      const fr = selection(s, ids);
+      moveFrag(s, fr.points, o.dx, o.dy, o.convert);
+      return { result: fr.points };
+    });
+  }
+  function copyObjects(spec, ids, o){
+    return tx(spec, s => {
+      o = o || {};
+      const c = Ops.clone(s, selection(s, ids), s, { pos: layoutPos(s).pts });
+      moveFrag(s, c.points, o.dx, o.dy, o.convert);
+      return { result: c.points, links: c.links, shapes: c.shapes, map: c.map };
+    });
+  }
+
+  // ---------- applyBatch ----------
+  // ops = [{ fn, args, as? }]. "${name.path}" in any string reads the result of an earlier op named by "as".
+  // A string that is exactly one reference keeps the value's type. All or nothing.
+  const REF = /\$\{([A-Za-z_]\w*)((?:\.\w+)*)\}/g;
+  function readRef(results, name, path){
+    if (!(name in results)) fail(`Unknown reference \${${name}}. Name an earlier op with "as".`);
+    let v = results[name];
+    for (const k of path.split(".").filter(Boolean)){
+      if (v == null || !(k in Object(v))) fail(`Reference \${${name}${path}}: no field ${k}.`);
+      v = v[k];
+    }
+    return v;
+  }
+  function resolveRefs(v, results){
+    if (typeof v === "string"){
+      const m = /^\$\{([A-Za-z_]\w*)((?:\.\w+)*)\}$/.exec(v);
+      if (m) return readRef(results, m[1], m[2]);
+      return v.replace(REF, (_, n, p) => {
+        const x = readRef(results, n, p);
+        if (typeof x !== "string" && typeof x !== "number") fail(`Reference \${${n}${p}} is not text, so it cannot be used inside a string.`);
+        return String(x);
+      });
+    }
+    if (Array.isArray(v)) return v.map(x => resolveRefs(x, results));
+    if (v && typeof v === "object"){ const o = {}; for (const k of Object.keys(v)) o[k] = resolveRefs(v[k], results); return o; }
+    return v;
+  }
+  function applyBatch(spec, ops, opts){
+    if (!Array.isArray(ops)) return { ok: false, error: "ops must be a list of { fn, args, as? }." };
+    const named = {}, results = [], warnings = [];
+    let at = -1;
+    const r = tx(spec, s => {
+      for (at = 0; at < ops.length; at++){
+        const op = ops[at] || {};
+        const meta = META.find(m => m.fn === op.fn && m.batch);
+        if (!meta) fail(`Unknown function ${op.fn}. See sa_catalog.`);
+        if (op.as != null && !/^[A-Za-z_]\w*$/.test(op.as)) fail(`Bad "as" name ${op.as}.`);
+        if (op.as != null && op.as in named) fail(`"as" name ${op.as} is already used.`);
+        const args = resolveRefs(asList(op.args), named);
+        while (args.length < meta.argc) args.push(undefined);
+        const res = API[op.fn](s, ...args, opts);
+        if (!res || res.ok === false) fail((res && res.error) || "failed");
+        if (op.as != null) named[op.as] = res;
+        results.push({ fn: op.fn, ...(op.as != null ? { as: op.as } : {}), result: res.result !== undefined ? res.result : res });
+        if (res.warnings) warnings.push(...res.warnings.map(w => typeof w === "string" ? w : JSON.stringify(w)));
+      }
+      return { results, warnings };
+    });
+    if (r.ok) return r;
+    return { ok: false, error: at >= 0 && at < ops.length ? `op ${at} (${(ops[at] || {}).fn}): ${r.error}` : r.error, failedOp: at };
+  }
+
+  // ---------- catalog ----------
+  // The one source for catalog() and the function table in docs/logic-api.md (SA.Tests/gen-logic-doc.js).
+  // sig = signature without the spec argument · argc = positional args before opts · err = possible errors.
+  const M = (group, fn, sig, argc, desc, err, batch = true) => ({ group, fn, sig, argc, desc, err: err || "", batch });
+  const META = [
+    M("Conditions", "addCondition", "{ name?, expr, note?, parentBranch?, decision?, label?, yes?, no? }", 1, "Condition + if decision + yes / no branches (names start at Cond1). parentBranch = the \"no\" branch of another decision = elif. decision: false = condition only.", "Duplicate / reserved name, not true/false, missing point, missing branch"),
+    M("Conditions", "editCondition", "name, { expr?, note? }", 2, "Edit expression / note.", "Wrong type, circular reference"),
+    M("Conditions", "renameCondition", "old, name", 2, "Tests / expressions / labels using the old name follow.", "Duplicate name"),
+    M("Conditions", "removeCondition", "name, { how }", 2, "Decisions using it are deleted too (how).", "Still used by another expression (lists them)"),
+    M("Decisions", "addDecision", "{ parentBranch?, kind, test, label?, cases?, elseLabel? }", 1, "if (true/false expression) or switch (numeric expression + cases: [{ value, label }] + else always last).", "Test type, duplicate / non-numeric case"),
+    M("Decisions", "editDecision", "id, { test?, label?, kind? }", 2, "Change if / switch (yes = case 1, no = else).", "A switch with several cases cannot become if"),
+    M("Decisions", "removeDecision", "id, { how }", 2, "how: parent (default) | always | remove (deletes objects too). Nested decisions go too."),
+    M("Decisions", "moveDecision", "id, parentBranch | null", 2, "Moves the whole block to nest in another branch (make / undo elif).", "Moving into its own branch"),
+    M("Decisions", "addCase", "decisionId, { value, label? }", 2, "Add a switch case (inserted before else).", "Duplicate value"),
+    M("Decisions", "editCase", "branchId, { value?, label? }", 2, "Edit a switch case.", "Duplicate value, editing else"),
+    M("Decisions", "removeCase", "branchId, { how }", 2, "Delete a switch case.", "Deleting else"),
+    M("Decisions", "moveCase", "branchId, index", 2, "Reorder a switch case.", "Moving else"),
+    M("Decisions", "renameBranch", "id, label", 2, "Branch name.", "Empty"),
+    M("Decisions", "setBranch", "ids, branchId | null", 2, "Moves points / links / shapes. R# rotation group / A# Array = the whole group. null = always occurs. Returns warnings (branchRisks).", "Missing id / branch"),
+    M("Variables", "addVariable", "{ name, kind?, unit?, expr, rules?: [{ when, value, warn?, error? }], note?, index? }", 1, "Variable (rules = if / elif, first true wins). kind: \"bool\" = condition only.", "Duplicate / reserved name, expression type, cycles, unknown {name} in text, missing CorridorError"),
+    M("Variables", "editVariable", "name, { … }", 2, "Edit a variable (same fields).", "As addVariable"),
+    M("Variables", "renameVariable", "old, name", 2, "Expressions and warning text follow.", "Duplicate name"),
+    M("Variables", "removeVariable", "name", 1, "Delete a variable.", "Still in use"),
+    M("Variables", "moveVariable", "name, index", 2, "Reorder a variable."),
+    M("Variables", "variableUses", "name", 1, "Where a variable is used.", "", false),
+    M("Parameters", "addParam", "{ name, kind?, default, displayName?, unit?, positive?, min?, max? }", 1, "Add a parameter. kind: double (default) | long. unit: number | slope | length | percent.", "Bad / duplicate name, non-numeric default, min > max, unknown unit"),
+    M("Parameters", "editParam", "name, { name?, kind?, default?, displayName?, unit?, positive?, min?, max? }", 2, "Edit a parameter. Renaming updates every expression.", "As addParam"),
+    M("Parameters", "removeParam", "name", 1, "Delete a parameter.", "Still used by expressions (lists them), Side parameter"),
+    M("Parameters", "setParamBounds", "name, { positive, min, max }", 2, "Parameter limits."),
+    M("Parameters", "setParamUnit", "name, unit", 2, "Parameter value type."),
+    M("Objects", "addPoint", "def, codes?, { aux?, branch? }", 3, "Add a point. def.type: delta, polar, slopeLength, slopeToSurface, onSurface, between, intersect, offset, extendToGround, firstOf, external (fields: catalog pointTypes). Returns the id in result.", "Unknown type, missing field / point, bad expression"),
+    M("Objects", "editPoint", "id, patch", 2, "Merge fields into a point definition (a different type replaces it).", "As addPoint, circular reference, origin / tangent / lastOf"),
+    M("Objects", "setCodes", "ids, codes", 2, "Replace the codes of points / links / shapes.", "Missing id"),
+    M("Objects", "setAuxiliary", "ids, on, { cascade? }", 3, "Make points / links auxiliary or real. cascade accepts the side effects the UI asks about.", "Side effects without cascade, shape id"),
+    M("Objects", "removeObjects", "ids", 1, "Delete objects and what depends on them (listed in warnings).", "Missing id, origin"),
+    M("Objects", "addLink", "a, b, { type?, codes?, aux?, optional?, branch?, target?, via?, radius?, sweep?, large?, seg? }", 3, "Add a link. type: straight (default) | followSurface | arc3 (via) | arcR (radius, sweep cw | ccw, large).", "Same point twice, missing point, real link on an auxiliary point"),
+    M("Objects", "editLink", "id, patch", 2, "Edit link fields: codes, codesGround, codesLine, optional, target, radius, sweep, large, seg, side, refLink, refLevel.", "Other fields, bad expression"),
+    M("Objects", "addFillet", "link1, link2, radius, { aux? }", 4, "Fillet at the corner of 2 straight links.", "Not straight / not joined"),
+    M("Objects", "addShape", "linkIds, codes?, { branch? }", 3, "Add a shape from links in order around it.", "Fewer than 3 links, auxiliary link"),
+    M("Objects", "addPolygon", "pointIds, { codes?, linkCodes? }", 2, "Free polygon: links around the points + a shape. Returns links, shape.", "Fewer than 3 points, auxiliary point"),
+    M("Objects", "addRegularPolygon", "{ center, n, radius, angle?, mode?, aux?, codes? }", 1, "Regular polygon, n 3–24. mode: inscribed | to edge midpoint.", "Bad n, missing centre"),
+    M("Objects", "addRotateGroup", "ids, pivot, angle", 3, "Rotation group (angle may be an expression). Points that cannot rotate are listed in warnings.", "Nothing can rotate"),
+    M("Objects", "moveObjects", "ids, { dx, dy, convert? }", 2, "Move by dx, dy (right +, up +, Side = Right frame), keeping point meanings.", "Blocked points without convert"),
+    M("Objects", "copyObjects", "ids, { dx, dy, convert? }", 2, "Copy, then move the copy. Returns the new points, links, shapes, map.", "Blocked points without convert"),
+    M("Tools", "addCutFill", "{ hinge, cut, fill, params, dir, … }", 1, "Daylight Cut/Fill. cut / fill = number x of 1:x, or text like a slope field: 1:1.5, 0.667, 2%, parameter name, expression.", "As the tool"),
+    M("Tools", "addIntersect", "link1, link2, { trim, keep1, keep2, aux }", 3, "Intersect two straight links.", "Parallel, not straight"),
+    M("Tools", "addOffset", "linkId, dist, side, { aux }", 4, "Parallel line: 2 points + link.", "Not straight, bad expression"),
+    M("Tools", "addExtendToGround", "linkId, end, { codes, pointCodes, maxDistance, rewire, target }", 3, "Extend to Surface. Returns tip (real end), link.", "Not straight"),
+    M("Tools", "addFollowClipped", "from, to, { refLink | refLevel, side, codes, codesGround, codesLine, target, aux }", 3, "Clipped Surface Link. Returns link.", "Missing reference"),
+    M("Arrays", "addArray", "sel, { n, dx, dy, join, loop? }", 2, "Array or Loop (loop: { n, nMax, nRound }). Returns id.", "See array-loop.md"),
+    M("Arrays", "updateArray", "id, { dx, dy, n, nMax, nRound }", 2, "Edit an Array / Loop; n or nMax may rebuild.", "Members referenced from outside"),
+    M("Arrays", "rebuildArray", "id, { n, join }", 2, "Rebuild an Array.", "Members referenced from outside"),
+    M("Arrays", "setArrayLoop", "id, loop | null", 2, "Loop on / off.", "Invalid N / max / rounding"),
+    M("Arrays", "removeArray", "id", 1, "Dissolve an Array (objects stay).", "Missing Array"),
+    M("Arrays", "addLastOf", "arrayId, pointId, opts?", 3, "Create a \"last set\" point. Returns the id in result.", "Point not in the original set, missing Array"),
+    M("Batch", "applyBatch", "ops", 1, "Run [{ fn, args, as? }] in order, all or nothing. \"${name.path}\" in a string reads an earlier op's result. Failure returns failedOp and the reason.", "Any op's error, unknown fn or reference", false),
+    M("Batch", "newSubassembly", "name, { namespace?, sideParam?, targets? }", 2, "New spec. Takes no spec argument; the result is the spec.", "Invalid class name", false),
+    M("Reading", "catalog", "", 0, "Functions, point types, link types and key rules.", "", false),
+    M("Reading", "describe", "evalResult?", 1, "Short JSON: parameters, conditions (+ current values), decision → branch → object (+ occurs?), always-occurring objects, arrays, risks.", "", false),
+    M("Reading", "toText", "evalResult?", 1, "Text view (variables / conditions / arrays / always occurs / if · elif · switch, any depth). With results, appends \"← ตอนนี้\".", "", false),
+    M("Reading", "diffText", "before, after", 2, "What changed between two specs, as lines (+ added, - removed, ~ edited).", "", false),
+    M("Reading", "nameError", "name", 1, "Check a name.", "", false),
+    M("Reading", "freeCondName", "", 0, "Next free condition name.", "", false),
+    M("Reading", "guessError", "when", 1, "Guess the CorridorError for a rule condition.", "", false)
+  ];
+  const catalog = () => ({
+    functions: META.filter(m => m.batch).map(m => ({ fn: m.fn, args: m.sig, does: m.desc })),
+    pointTypes: Object.fromEntries(Object.entries(POINT_DEFS).map(([k, v]) => [k, v.doc])),
+    linkTypes: ["straight", "followSurface", "arc3", "arcR", "fillet (addFillet)", "followClipped (addFollowClipped)"],
+    units: Object.keys(Spec.UNITS),
+    opFormat: "[{ fn, args, as? }]; \"${name.result}\" in any string reads the result of an earlier op named by as",
+    rules: ["Coordinates are in the Side = Right frame; Left is mirrored automatically.", "x outward +, y up +, relative to the origin point P1.", "slope fields are rise / run expressions, down = negative, e.g. -1/SideSlope.", "A real link cannot end on an auxiliary point, except a real end (firstOf / lastOf).", "Define points from parameters and other points, not fixed coordinates."]
+  });
+
+  const API = { addCondition, editCondition, renameCondition, removeCondition, addDecision, editDecision, removeDecision, moveDecision,
+                addCase, editCase, removeCase, moveCase, renameBranch, setBranch, addVariable, editVariable, renameVariable, removeVariable, moveVariable,
+                addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setArrayLoop, removeArray, addLastOf, setParamBounds, setParamUnit,
+                addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects };
+
+  return { META, catalog, applyBatch, newSubassembly, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects,
+           RESERVED, nameError, freeCondName, toText, diffText,
            addCondition, editCondition, renameCondition, removeCondition,
            addDecision, editDecision, removeDecision, moveDecision,
            addCase, editCase, removeCase, moveCase, renameBranch, setBranch,

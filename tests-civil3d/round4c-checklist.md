@@ -48,7 +48,7 @@
 - [ ] Soil: `SoilToe`, `SoilBaseInside` · link `Top`+`Datum`+`SoilEnd`, ขอบล่าง `Datum`+`SoilOnSurface` / `Datum`+`SoilMinThickness`, `SoilBack` · shape `CompactedSoil`
 - [ ] ดินที่ O ต่ำกว่า O → เส้นปิดปลายต่อลงถึงดิน (SoilToe อยู่บนดิน) · ดินสูงกว่า → SoilToe = O
 
-## 5. ต่างกันที่รู้แล้ว (ตาราง "ต่างกันตรงไหน" ใน README)
+## 5. ต่างกันที่รู้แล้ว (ตาราง "ต่างกันตรงไหน" ใน docs/civil3d-testing.md)
 
 - [ ] body: ดินต่ำมากจนเส้นปิดปลายต่อลงไปชนดิน **เลย origin เข้าด้านใน** (เช่น Height 4, FaceSlope 2, EndSlope 2, MinSoilThickness 1.5 บนดินต่ำ -9)
   — ไฟล์จริง: เตือน + ขอบล่างเป็นเส้นความหนาขั้นต่ำทั้งเส้น · ที่วาด: เตือน + ไม่ต่อ แต่ขอบล่างยังตามดิน → **รูปต่างกัน** (ทั้งคู่เตือน)

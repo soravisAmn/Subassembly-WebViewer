@@ -2,7 +2,7 @@
 //   base_rock-pitching.cs / body_rock-pitching.cs (อ่านอย่างเดียว — คอมไพล์จากข้อความในหน่วยความจำ ไม่แตะไฟล์)
 //   รันทั้งคู่กับตัวจำลองบนผิวดินหลายแบบ × Side Right / Left × ชุดค่า parameter (รวมค่าต่ำกว่าขั้นต่ำ / ≤ 0)
 //   เทียบ: จุด (พิกัด + point code) · link (ปลาย + link code) · shape (จุดของรูป + shape code) · มี error / เตือนเหมือนกัน
-//   ไม่เทียบลำดับ (ลำดับ Points.Add / link ในไฟล์ที่วาดต่างจากไฟล์จริงได้ — ดูตาราง "ต่างกันตรงไหน" ใน README)
+//   ไม่เทียบลำดับ (ลำดับ Points.Add / link ในไฟล์ที่วาดต่างจากไฟล์จริงได้ — ดูตาราง "ต่างกันตรงไหน" ใน docs/civil3d-testing.md)
 
 using System.Text.Json;
 using SA.Drawing;
@@ -96,7 +96,7 @@ static class RockPitchingTests
                             var rb = runner.Run(b!.Classes[0], values, world);
                             string where = $"Side = {side} {string.Join(" ", p.Select(kv => $"{kv.Key} = {kv.Value}"))}";
                             if (ra.Exception != null || rb.Exception != null) throw new Exception($"{where}: exception {JsonSerializer.Serialize(ra.Exception ?? rb.Exception)}");
-                            // ต่างกันที่รู้แล้ว (ตาราง "ต่างกันตรงไหน" ใน README): เส้นปิดปลายต่อลงไปชนดินเลย origin เข้าด้านใน
+                            // ต่างกันที่รู้แล้ว (ตาราง "ต่างกันตรงไหน" ใน docs/civil3d-testing.md): เส้นปิดปลายต่อลงไปชนดินเลย origin เข้าด้านใน
                             //   ไฟล์จริง = เตือน + เลิกใช้ผิวดิน (ขอบล่างเป็นเส้นความหนาขั้นต่ำ) · ที่วาด = เตือน + ไม่ต่อ แต่ขอบล่างยังตามดิน → ตรวจแค่ว่าเตือนทั้งคู่
                             if (name.StartsWith("body") && ra.Issues.Any(i => i.Message.Contains("เลย origin")))
                             {

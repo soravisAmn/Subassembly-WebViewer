@@ -47,3 +47,47 @@ The Auxiliary heading covers 170 lines / about 36 KB and mostly holds logic and 
 ## Proposed CLAUDE.md outline (target <= 6 KB, English)
 
 Project · User · Machines and git sync · Rules (current rules, language policy, finished-round prompts move to `docs/prompts/`) · Token rules · Tests (`test-all.bat`) · Current status (last round, next, pointer to `docs/history.md`) · Plan (3-5 lines, Trello board "SA Drawing Studio").
+
+## M2: old README heading → new file
+
+| Old heading | New file |
+|---|---|
+| SA Drawing Studio (Subassembly Viewer) | `docs/overview.md` |
+| หน้าจอ | `docs/screen.md` |
+| วาด (Edit mode) | `docs/drawing-tools.md` |
+| Object snap tracking (F11) | `docs/drawing-tools.md` |
+| Polygon | `docs/drawing-tools.md` |
+| Arc / Fillet (เส้นโค้ง) | `docs/drawing-tools.md` |
+| Intersect / Offset (รอบ 4c) | `docs/drawing-tools.md` |
+| Array (รอบ 4c) | `docs/array-loop.md` |
+| Loop — Array ที่จำนวนชุดคำนวณตอนรัน (รอบ 5b) | `docs/array-loop.md` |
+| Extend to Surface (รอบ 4c) | `docs/drawing-tools.md` |
+| Clipped Surface Link (รอบ 4c) | `docs/drawing-tools.md` |
+| Auxiliary (ช่วยสร้าง) — แบบ SAC | `docs/drawing-tools.md (Auxiliary, point types)`, `docs/logic.md (expressions, branches, Variables)`, `docs/parameters.md (table, value types, slope fields)` |
+| เลือก (Window / Crossing) | `docs/screen.md` |
+| Move / Copy / Paste | `docs/drawing-tools.md` |
+| Rotate (R) — Edit mode | `docs/drawing-tools.md` |
+| Shortcut (กด `?` หรือ `F1` บนหน้าเว็บเพื่อดูตารางนี้) | `docs/screen.md` |
+| มุมมอง / ซูม | `docs/screen.md` |
+| object → บรรทัดโค้ด | `docs/code-generation.md` |
+| Undo / Redo และ Delete | `docs/screen.md` |
+| Save (.cs) และโค้ดที่สร้าง | `docs/code-generation.md` |
+| ทดสอบใน Civil 3D (รอบ 3) | `docs/civil3d-testing.md` |
+| ทดสอบใน Civil 3D (รอบ 4) | `docs/civil3d-testing.md` |
+| ทดสอบใน Civil 3D (รอบ 5b) — round5b-demo คันดินถม ชานพักทุก BermInterval (Loop) | `docs/civil3d-testing.md` |
+| ทดสอบใน Civil 3D (รอบ 5) — round5-demo คันดิน | `docs/civil3d-testing.md` |
+| ทดสอบใน Civil 3D (รอบ 4c) — rock-pitching ที่วาดใหม่ | `docs/civil3d-testing.md` |
+| Logic API (รอบ 5) — `js/logicops.js` | `docs/logic-api.md` |
+| rock-pitching จากเว็บ (รอบ 4e) — `base_rock-pitching-web.cs` / `body_rock-pitching-web.cs` | `docs/code-generation.md` |
+| ทดสอบ | `docs/testing.md` |
+| เปิดเว็บ | `docs/overview.md` |
+| เปิดไฟล์ .cs (Import) | `docs/viewer.md` |
+| แก้โค้ดในเว็บ | `docs/viewer.md` |
+| โค้ดค้าง (loop / recursion ไม่จบ) | `docs/viewer.md` |
+| Assembly (ประกอบหลาย subassembly) | `docs/viewer.md` |
+| เว็บทำอะไรกับไฟล์ .cs | `docs/overview.md` |
+| เส้น surface | `docs/viewer.md` |
+| ระบบพิกัดจำลอง | `docs/overview.md` |
+| ตัวจำลอง Civil 3D API (SA.Civil3DShim) | `docs/viewer.md` |
+| ข้อควรรู้ | `docs/overview.md` |
+| ต่างจาก AutoCAD | `docs/screen.md` |

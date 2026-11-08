@@ -184,10 +184,11 @@ function specEdit(fn, it, label){
   const br = draw.tool && draw.tool !== "cutfill" && draw.tool !== "extend" && it.id === state.editing ? drawBranch() : null, s0 = br ? snapshotIds(it.spec) : null;
   const r = fn(it.spec);
   if (br){
-    for (const o of it.spec.points) if (!s0.P.has(o.id)) o.branch = br;
-    for (const o of it.spec.links) if (!s0.L.has(o.id)) o.branch = br;
-    for (const o of it.spec.shapes) if (!s0.S.has(o.id)) o.branch = br;
+    const ids = [...it.spec.points.filter(o => !s0.P.has(o.id)), ...it.spec.links.filter(o => !s0.L.has(o.id)), ...it.spec.shapes.filter(o => !s0.S.has(o.id))].map(o => o.id);
+    if (ids.length) Logic.setBranch(it.spec, ids, br);              // Logic API (รอบ 5)
   }
+  // Logic API คืน { ok: false, error } = ไม่ได้แก้อะไร (History ไม่นับ) → บอกใน banner
+  if (r && r.ok === false && r.error) flashBanner(r.error);
   persist(); renderAll();
   return r;
 }
@@ -771,8 +772,8 @@ function intersectClick(){
   if (!id) return flashBanner("Intersect ได้เฉพาะ link เส้นตรง — คลิกบนเส้น");
   if (!draw.chain.length || draw.chain[0].id === id){ draw.chain = [{ id, t: linkClickT(id) }]; showBanner(drawBanner()); return render(); }
   const c1 = draw.chain[0], c2 = { id, t: linkClickT(id) };
-  const test = Spec.addIntersect(JSON.parse(JSON.stringify(it.spec)), c1.id, c2.id, {});
-  if (test.error){ draw.chain = []; showBanner(drawBanner()); render(); return flashBanner(test.error); }
+  const test = Logic.addIntersect(JSON.parse(JSON.stringify(it.spec)), c1.id, c2.id, {});   // ลองบนสำเนา (Logic API)
+  if (!test.ok){ draw.chain = []; showBanner(drawBanner()); render(); return flashBanner(test.error); }
   const P1 = r.links[c1.id].path, P2 = r.links[c2.id].path, X = Spec.lineX(P1[0], P1[1], P2[0], P2[1]);
   if (!X){ draw.chain = []; showBanner(drawBanner()); render(); return flashBanner(`${c1.id} กับ ${c2.id} ขนานกัน ไม่มีจุดตัด`); }
   // ปลายที่เก็บ: ฝั่งเดียวกับที่คลิก เมื่อเทียบกับจุดตัด (tX = ตำแหน่งของจุดตัดบนเส้น ต่อออกไปได้)
@@ -819,10 +820,10 @@ function intersectCommit(trim){
   // ตัด: จุดตัดเป็นปลายของ link จริง จึงเป็น auxiliary ไม่ได้ (link ทั้งสองเป็น auxiliary = จุดตัด auxiliary เอง)
   const aux = auxDrawing() && !trim, opt = trim ? { trim: true, keep1: ix.keep1, keep2: ix.keep2 } : { aux };
   let res = null;
-  specEdit(spec => { res = Spec.addIntersect(spec, ix.l1, ix.l2, opt); if (res.point) state.sel = { type:"dpt", item: state.editing, id: res.point }; },
+  specEdit(spec => { res = Logic.addIntersect(spec, ix.l1, ix.l2, opt); if (res.ok && res.point) state.sel = { type:"dpt", item: state.editing, id: res.point }; },
            null, `Intersect ${ix.l1} กับ ${ix.l2}${trim ? " (ตัด / ยืด)" : ""}${aux ? " (Auxiliary)" : ""}`);
   showBanner(drawBanner());
-  if (res && res.error) return flashBanner(res.error);
+  if (res && !res.ok) return;                         // ข้อความ error ขึ้นจาก specEdit แล้ว
   if (res && res.kept.length) flashBanner(`ปลายเดิม ${res.kept.join(", ")} มี point code จึงยังเพิ่มลง Civil 3D (ติ๊ก "Auxiliary (ช่วยสร้าง)" ใน Properties ถ้าไม่ต้องการ)`);
   else if (trim && auxDrawing()) flashBanner("ตัด / ยืด: จุดตัดเป็นปลายของ link จริง จึงเป็นของจริง (Auxiliary ใช้กับ ไม่ตัด)");
 }
@@ -859,10 +860,10 @@ function offsetClick(){
   const g = offsetPreview(), src = draw.chain[0], D = offsetOpt().d;
   if (!g) return flashBanner(`ระยะ ${D} ใช้ไม่ได้ (ต้องไม่เป็น 0) — Tab = เปลี่ยนระยะ`);
   const aux = auxDrawing();
-  const test = Spec.addOffset(JSON.parse(JSON.stringify(it.spec)), src, D, g.side, { aux });
+  const test = Logic.addOffset(JSON.parse(JSON.stringify(it.spec)), src, D, g.side, { aux });   // ลองบนสำเนา (Logic API)
   draw.chain = [];
-  if (test.error){ showBanner(drawBanner()); render(); return flashBanner(test.error); }
-  specEdit(spec => { const o = Spec.addOffset(spec, src, D, g.side, { aux }); state.sel = { type:"dlink", item: state.editing, id: o.link }; },
+  if (!test.ok){ showBanner(drawBanner()); render(); return flashBanner(test.error); }
+  specEdit(spec => { const o = Logic.addOffset(spec, src, D, g.side, { aux }); if (o.ok) state.sel = { type:"dlink", item: state.editing, id: o.link }; return o; },
            null, `Offset ${src} ระยะ ${D}${aux ? " (Auxiliary)" : ""}`);
   showBanner(drawBanner());
 }

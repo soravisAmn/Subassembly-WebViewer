@@ -1018,8 +1018,10 @@ function branchRow(g, it, objs, r){
   const opts = [["", "เกิดเสมอ"]].concat(same ? [] : [["~", "(ต่างกัน)"]], brs.map(b => [b.id, `${b.id}: ${branchPath(sp, b.id)}`]), [["+", "+ เงื่อนไขใหม่…"]]);
   selectRow(g, it, "เกิดเมื่อ", opts, same ? cur : "~", v => {
     if (v === "~") return;
-    if (v === "+"){ const b = newCondition(sp, same ? cur || null : null); if (b) for (const o of objs) o.branch = b; }
-    else for (const o of objs){ if (v) o.branch = v; else delete o.branch; }
+    // Logic API (รอบ 5): สร้างเงื่อนไข / ย้ายเข้ากิ่ง — ใช้ id (object ใน spec ถูกแทนตัวใหม่หลังแก้)
+    const ids = objs.map(o => o.id);
+    if (v === "+"){ const b = newCondition(sp, same ? cur || null : null, it); if (b) return Logic.setBranch(sp, ids, b); }
+    else return Logic.setBranch(sp, ids, v || null);
   }, objs.length > 1 ? `ทุกชิ้นที่เลือก (${objs.length})` : "กิ่งของเงื่อนไข (ไม่เกิด = ไม่มีใน Civil 3D)");
   if (objs.length > 1) return;
   const obj = objs[0];
@@ -1028,36 +1030,38 @@ function branchRow(g, it, objs, r){
   if (!d){ div("expr-err", `⚠ ไม่มีกิ่ง ${esc(obj.branch)} แล้ว — object นี้จะไม่เกิด`, g); return; }
   const c = d.kind !== "switch" && (lg.conditions || []).find(x => x.name === d.test);
   const on = r && r.logic ? r.logic.branches[b.id] : undefined, v = r && r.logic ? r.logic.decisions[d.id] : undefined;
-  if (c) exprRow(g, it, `เงื่อนไข ${c.name}`, "จริง / เท็จ เช่น ground(P1) > P1.y", c.expr, x => { c.expr = x; }, { want: "bool" });
+  if (c){ const cn = c.name; exprRow(g, it, `เงื่อนไข ${cn}`, "จริง / เท็จ เช่น ground(P1) > P1.y", c.expr, x => condExprEdit(it, cn, x), { want: "bool" }); }
   kv(g, [["กิ่ง", `<i class="brdot" style="background:${branchColor(sp, b.id)}"></i>${esc(branchPath(sp, b.id))} (case ${esc(String(b.case))})`, true],
          ["ตอนนี้", v == null ? "ไม่รู้ค่า → ไม่เข้ากิ่งไหน" : `${d.test} = ${v} → ${on ? "เกิด" : "ไม่เกิด"}`]]);
   const risk = Spec.branchRisks(sp).find(x => x.id === obj.id);
   if (risk) div("expr-err", `⚠ อ้าง ${esc(risk.ref)} ที่เกิดเฉพาะกิ่ง ${esc(Spec.branchLabel(sp, risk.branch))} — กรณีอื่นจะหาไม่ได้ (ใช้ firstOf หรือ exists() ถ้าตั้งใจ)`, g);
 }
 // สร้างเงื่อนไข + decision + กิ่ง ใช่ / ไม่ใช่ — คืน id ของกิ่ง "ใช่" (ยกเลิก = null)
-function newCondition(sp, parent){
-  const name = (prompt("ชื่อเงื่อนไข (ใช้เป็นชื่อตัวแปรในโค้ด)", Spec.freeName(sp, "Test1")) || "").trim();
+//   ผ่าน Logic API (รอบ 5) — ชื่อเริ่มต้น Cond1, Cond2 … · it = item (ใช้ parameter ของโค้ดเดิมตรวจชื่อ / นิพจน์)
+function newCondition(sp, parent, it){
+  const opts = { codeParams: it ? codeParamsOf(it) : [] };
+  const name = (prompt("ชื่อเงื่อนไข (ใช้เป็นชื่อตัวแปรในโค้ด)", Logic.freeCondName(sp, opts)) || "").trim();
   if (!name) return null;
-  const bad = condNameError(sp, name);
+  const bad = condNameError(sp, name, opts);
   if (bad){ alert(bad); return null; }
   const p0 = sp.points.find(p => p.def.type !== "origin");
   const ex = (prompt("นิพจน์ จริง / เท็จ (เช่น ground(P1) > P1.y = ดินสูงกว่าจุด = ตัด)", p0 ? `ground(${p0.id}) > ${p0.id}.y` : "true") || "").trim();
   if (!ex) return null;
-  const chk = Expr.check(ex, Spec.names(sp), { ...Spec.exprOpts(sp), want: "bool" });
-  if (!chk.ok){ alert("นิพจน์ใช้ไม่ได้: " + chk.error); return null; }
-  return Spec.addIf(sp, { name, expr: ex, parent }).yes;
+  const r = Logic.addCondition(sp, { name, expr: ex, parentBranch: parent || null }, opts);
+  if (!r.ok){ alert(r.error); return null; }
+  return r.yes;
 }
-// ชื่อเงื่อนไขใช้ได้ไหม (null = ได้) — ห้ามซ้ำ parameter / เงื่อนไข / จุด และห้ามชื่อที่โค้ดใช้เอง
-function condNameError(sp, name){
-  const used = new Set(Spec.names(sp).concat(((sp.logic || {}).conditions || []).map(c => c.name), sp.points.map(p => p.id)));
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || used.has(name) || RESERVED.has(name) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(name)
-      || Expr.KEYWORDS.has(name.toLowerCase()) || Expr.FUNCS[name.toLowerCase()]) return `ตั้งชื่อ ${name} ไม่ได้ (ซ้ำ / เป็นชื่อที่โค้ดใช้เอง)`;
-  return null;
+// ชื่อเงื่อนไขใช้ได้ไหม (null = ได้) — กติกาเดียวกับ Logic API
+const condNameError = (sp, name, opts) => Logic.nameError(sp, name, opts);
+// แก้นิพจน์เงื่อนไขแบบสด (ช่องพิมพ์ใน Properties / แท็บ Logic) — ผ่าน Logic API · ผิด (เช่น วนกัน) = บอกใน banner ค่าเดิมคงอยู่
+function condExprEdit(it, name, expr){
+  const r = Logic.editCondition(it.spec, name, { expr }, { codeParams: codeParamsOf(it) });
+  if (!r.ok) flashBanner(r.error);
+  return r;
 }
 
 // ---------------- ปุ่มสำเร็จรูป "ถ้าตัด / ถม" (รอบ 4 M3) ----------------
 // จุดบานพับ (จุดที่วาดแล้ว ไม่ใช่ auxiliary) -> หน้าต่างตั้งค่า -> Spec.addCutFill (undo ก้อนเดียว)
-const slopeH = t => { const m = /^\s*1\s*:\s*([0-9.]+)\s*$/.exec(t || ""); const v = m ? +m[1] : +t; return v > 0 && isFinite(v) ? v : null; };
 function openCutFill(it, hinge){
   const sp = it.spec, h = Spec.byId(sp.points, hinge);
   if (!h) return;
@@ -1088,12 +1092,35 @@ function openCutFill(it, hinge){
     kv(b, [["จุดบานพับ", hinge + (h.codes.length ? " " + h.codes.join(",") : "") + (h.branch ? ` · อยู่ในกิ่ง ${Spec.branchLabel(sp, h.branch)} (กิ่งใหม่ซ้อนใต้กิ่งนี้)` : "")]]);
     if (sp.targets.length > 1) select("Target surface", "", "target", sp.targets.map(t => [t.name, t.displayName || t.name]));
     // ช่องลาดรับ 1:x หรือชื่อ parameter ชนิด Slope ที่มีอยู่ (รายการให้เลือก — ใช้ตัวนั้นเลย ไม่สร้างใหม่)
-    const slp = sp.params.filter(p => Spec.unitOf(p) === "slope").map(p => p.name);
+    // ช่องลาด = แบบเดียวกับช่อง slope ใน Properties (Spec.slopeMagnitude): 1:1.5 · parameter Slope · 2% · parameter Percent · ดิ่งต่อราบ 0.667
+    //   ทิศล็อก: ตัด = ↗ ขึ้นไปหาผิวดิน · ถม = ↘ ลงไปหาผิวดิน (ลูกศรบอกเฉยๆ กดไม่ได้) · ใต้ช่อง = ค่าเป็น 1:x หรือข้อความผิด
+    const slp = sp.params.filter(p => ["slope", "percent"].includes(Spec.unitOf(p))).map(p => p.name);
     const dl = document.createElement("datalist"); dl.id = "cf-slopes"; dl.innerHTML = slp.map(n => `<option value="${esc(n)}">`).join(""); b.appendChild(dl);
-    field("ลาดตัด", "1:x หรือ parameter Slope · ขึ้นไปหาผิวดิน", "cut").setAttribute("list", "cf-slopes");
-    field("ลาดถม", "1:x หรือ parameter Slope · ลงไปหาผิวดิน", "fill").setAttribute("list", "cf-slopes");
+    const slopeField = (label, key, arrow, dirText) => {
+      const inp = field(label, `${dirText} · 1:1.5 · parameter · 2% · ดิ่งต่อราบ 0.667`, key);
+      inp.setAttribute("list", "cf-slopes");
+      const row = inp.parentElement; row.classList.add("slope-row");
+      const wrap = document.createElement("span"); wrap.className = "slope-in";
+      const a = document.createElement("button"); a.type = "button"; a.className = "slope-dir on"; a.textContent = arrow; a.disabled = true; a.title = dirText + " (ล็อกตาม ตัด / ถม)";
+      wrap.append(a, inp); row.appendChild(wrap);
+      const e = div("expr-err", "", b); row.after(e);
+      const chk = () => {
+        try{
+          const s = Spec.slopeMagnitude(sp, inp.value, label), t = inp.value.trim();
+          // ชื่อ parameter ชนิด Number = ใช้เป็นดิ่งต่อราบ (ไม่ใช่ 1:x) — เตือนกันเข้าใจผิด (spec เก่าที่ CutSlope ยังไม่มีชนิดค่า)
+          e.textContent = s.x != null ? `= 1:${Expr.num(s.x)}` : /^[A-Za-z_][A-Za-z0-9_]*$/.test(t) && !s.param
+            ? `${t} เป็นชนิด Number = ใช้เป็นดิ่งต่อราบ · ถ้าหมายถึง 1:x ให้ตั้งชนิดค่าเป็น Slope (1:x) ในตาราง Parameter` : "";
+          e.classList.add("ok"); inp.classList.remove("bad");
+        }
+        catch(x){ e.textContent = x.message; e.classList.remove("ok"); inp.classList.add("bad"); }
+      };
+      inp.addEventListener("input", chk); chk();
+      return inp;
+    };
+    slopeField("ลาดตัด", "cut", "↗", "ขึ้นไปหาผิวดิน");
+    slopeField("ลาดถม", "fill", "↘", "ลงไปหาผิวดิน");
     const pc = document.createElement("label"); pc.className = "check";
-    pc.innerHTML = `<input type="checkbox" checked data-k="params"> สร้าง parameter <b>CutSlope</b> / <b>FillSlope</b> ชนิด Slope (1:x) <small>(แก้ใน Civil 3D ได้ · ช่องที่ใส่ชื่อ parameter ไม่สร้างใหม่)</small>`;
+    pc.innerHTML = `<input type="checkbox" checked data-k="params"> สร้าง parameter <b>CutSlope</b> / <b>FillSlope</b> ชนิด Slope (1:x) <small>(แก้ใน Civil 3D ได้ · สร้างเฉพาะช่องที่เป็นค่าคงที่ 1:x / % / ดิ่งต่อราบ — ช่องที่ใส่ชื่อ parameter / นิพจน์ ใช้ตามนั้น)</small>`;
     pc.querySelector("input").onchange = e => { o.params = e.target.checked; };
     b.appendChild(pc);
     select("ทิศ", "ฝั่ง Right = ไปทางขวา", "dir", [["1", "ออกด้านนอก (+)"], ["-1", "เข้าด้านใน (−)"]]);
@@ -1104,17 +1131,19 @@ function openCutFill(it, hinge){
               + `ได้: เงื่อนไข IsCut, กิ่ง ตัด / ถม, จุดลาดจนชนดินกิ่งละจุด + link, จุด Daylight (จุดแรกที่เกิด ไว้ต่อเรขาคณิต)`, b);
     div("btns", null, b).append(
       btn("สร้าง", () => {
-        const par = t => slp.includes(t) ? t : null, cut = par(o.cut) || slopeH(o.cut), fill = par(o.fill) || slopeH(o.fill);
-        if (!cut || !fill){ err.textContent = "ลาดต้องเป็นแบบ 1:1.5, ตัวเลขมากกว่า 0 หรือชื่อ parameter ชนิด Slope"; return; }
+        // ลองบนสำเนาก่อน (Logic API) — ผิด = บอกในหน้าต่าง ไม่ปิด
+        const opts = { hinge, target: o.target, cut: o.cut, fill: o.fill, params: o.params, dir: +o.dir, cutCode: o.cutCode, fillCode: o.fillCode };
+        const test = Logic.addCutFill(JSON.parse(JSON.stringify(sp)), opts);
+        if (!test.ok){ err.textContent = test.error; return; }
         closeDialog();
-        cutFillCommit(it, { hinge, target: o.target, cut, fill, params: o.params, dir: +o.dir, cutCode: o.cutCode, fillCode: o.fillCode });
+        cutFillCommit(it, opts);
       }),
       btn("ยกเลิก", cancelDialog));
   });
 }
 function cutFillCommit(it, opts){
-  const r = specEdit(sp => Spec.addCutFill(sp, opts), it, `Daylight Cut/Fill ที่ ${opts.hinge}`);
-  if (!r) return;
+  const r = specEdit(sp => Logic.addCutFill(sp, opts), it, `Daylight Cut/Fill ที่ ${opts.hinge}`);   // Logic API
+  if (!r || !r.ok) return;
   if (draw.tool === "cutfill") setTool(null);
   state.sel = { type:"dpt", item: it.id, id: r.cut.point }; renderAll();
   const cn = Spec.byId(it.spec.logic.conditions, r.cond).name;
@@ -1170,12 +1199,12 @@ function openArray(it){
       btn("สร้าง", () => {
         for (const k of ["dx", "dy"]){ const c = Expr.check(o[k] || "0", names, xo); if (!c.ok){ err.textContent = `${k}: ${c.error}`; return; } }
         const opt = { n: +o.n, dx: o.dx || "0", dy: o.dy || "0", join: o.mode ? { mode: o.mode, from: o.from, to: o.to } : null };
-        const test = Spec.addArray(JSON.parse(JSON.stringify(sp)), sel, opt);
-        if (test.error){ err.textContent = test.error; return; }
+        const test = Logic.addArray(JSON.parse(JSON.stringify(sp)), sel, opt);   // ลองบนสำเนา (Logic API)
+        if (!test.ok){ err.textContent = test.error; return; }
         closeDialog();
         let g = null;
-        specEdit(s => { g = Spec.addArray(s, sel, opt); }, it, `Array ${opt.n} ชุด`);
-        if (g && g.id){
+        specEdit(s => (g = Logic.addArray(s, sel, opt)), it, `Array ${opt.n} ชุด`);
+        if (g && g.ok && g.id){
           setSelList(g.members.flatMap(m => m.points.map(id => ({ type: "dpt", item: it.id, id }))).concat(g.members.flatMap(m => m.links.map(id => ({ type: "dlink", item: it.id, id })))));
           flashBanner(`Array ${g.id}: เพิ่ม ${g.n - 1} ชุด — แก้ N / dx / dy ได้ใน Properties ของสมาชิก (Ctrl+Z ย้อนได้)`);
         }
@@ -1198,16 +1227,16 @@ function propsArray(box, it, g){
     if (!(v >= 2 && v <= 200)){ n.value = g.n; return flashBanner("จำนวนชุดต้อง 2–200"); }
     const test = Spec.rebuildArray(JSON.parse(JSON.stringify(sp)), JSON.parse(JSON.stringify(g)), { n: v });
     if (test.block.length){ n.value = g.n; return alert(`เปลี่ยนจำนวนชุดไม่ได้ — มีของอื่นอ้างสมาชิกของ ${g.id} อยู่: ${test.block.join(", ")}\n(แก้ dx / dy ได้เสมอ)`); }
-    specEdit(s => Spec.rebuildArray(s, Spec.arrayOf(s, "point", g.source.points[0]) || g, { n: v }), it, `${g.id} จำนวนชุด = ${v}`);
+    specEdit(s => Logic.rebuildArray(s, g.id, { n: v }), it, `${g.id} จำนวนชุด = ${v}`);
     renderProps(true);
   };
   row.appendChild(n);
   for (const k of ["dx", "dy"]){
-    const inp = exprRow(gr, it, k, k === "dx" ? "ไปทางนอก + · ทุกชุด" : "ขึ้น + · ทุกชุด", g[k], v => Spec.updateArray(sp, g, { [k]: v }));
+    const inp = exprRow(gr, it, k, k === "dx" ? "ไปทางนอก + · ทุกชุด" : "ขึ้น + · ทุกชุด", g[k], v => Logic.updateArray(it.spec, g.id, { [k]: v }));
     if (canEdit(it)){
       const b = btn("+", () => {
         const name = newParamFromValue(it, inp.value.trim() || g[k], k === "dx" ? "StepX" : "StepY");
-        if (name){ specEdit(s => Spec.updateArray(s, Spec.arrayOf(s, "point", g.source.points[0]) || g, { [k]: name }), it, `${g.id} ใช้ parameter ${name}`); renderProps(true); }
+        if (name){ specEdit(s => Logic.updateArray(s, g.id, { [k]: name }), it, `${g.id} ใช้ parameter ${name}`); renderProps(true); }
       }, false, "สร้าง parameter ใหม่จากช่องนี้ (default = ค่าตอนนี้)");
       b.classList.add("par-btn"); inp.parentElement.appendChild(b);
     }
@@ -1254,7 +1283,7 @@ function openClip(it, from, to, refLink){
         const list = s => s.split(",").map(x => x.trim()).filter(Boolean);
         const opt = { ...(o.ref ? { refLink: o.ref } : { refLevel: o.level }), side: o.side, codes: list(o.codes), codesGround: list(o.codesGround), codesLine: list(o.codesLine), target: o.target };
         let res = null;
-        specEdit(s => { res = Spec.addFollowClipped(s, from, to, opt); if (res.link) state.sel = { type:"dlink", item: it.id, id: res.link }; }, it, `Clipped Surface Link ${from} → ${to}`);
+        specEdit(s => { res = Logic.addFollowClipped(s, from, to, opt); if (res.ok && res.link) state.sel = { type:"dlink", item: it.id, id: res.link }; }, it, `Clipped Surface Link ${from} → ${to}`);
         if (res && res.error) return flashBanner(res.error);
         if (res) flashBanner(`Clipped Surface Link: ${res.link} — ลากผิวดินขึ้นลงดู (Ctrl+Z ย้อนได้)`);
       }),
@@ -1305,7 +1334,7 @@ function openExtend(it, id, end){
         const list = s => s.split(",").map(x => x.trim()).filter(Boolean);
         const opt = { codes: list(o.codes), pointCodes: list(o.pointCodes), maxDistance: o.maxDistance || "50", rewire: o.rewire, target: o.target };
         let res = null;
-        specEdit(s => { res = Spec.addExtendToGround(s, id, end, opt); if (res.point) state.sel = { type:"dpt", item: it.id, id: res.point }; }, it, `Extend to Surface ${id} ที่ ${end}`);
+        specEdit(s => { res = Logic.addExtendToGround(s, id, end, opt); if (res.ok && res.point) state.sel = { type:"dpt", item: it.id, id: res.point }; }, it, `Extend to Surface ${id} ที่ ${end}`);
         if (res && res.error) return flashBanner(res.error);
         if (res) flashBanner(`Extend to Surface: ${res.point} (ต่อ) · ${res.link} (optional) · ปลายจริง ${res.tip}` + (res.rewired.length ? ` · ${res.rewired.join(", ")} ต่อที่ปลายจริงแล้ว` : "") + " — ลากผิวดินขึ้นลงดู (Ctrl+Z ย้อนได้)");
       }),
@@ -1415,7 +1444,7 @@ function propsParamTable(box, it){
     const ul = document.createElement("label"); ul.textContent = "ชนิดค่า";
     const us = document.createElement("select"); us.disabled = !ed_ || isSide;
     us.innerHTML = Object.entries(Spec.UNITS).map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(""); us.value = Spec.unitOf(p);
-    us.onchange = () => specEdit(s => Spec.setParamUnit(s, p.name, us.value), it, `${p.name} ชนิดค่า ${Spec.UNITS[us.value]}`);
+    us.onchange = () => specEdit(s => Logic.setParamUnit(s, p.name, us.value), it, `${p.name} ชนิดค่า ${Spec.UNITS[us.value]}`);
     ul.appendChild(us);
     const r0 = div("pc1", null, card); r0.appendChild(ul);
     card.insertBefore(r0, r2);
@@ -1427,7 +1456,7 @@ function propsParamTable(box, it){
       on(n);
     }, "mono");
     num("default", p.default, n => specEdit(() => { p.default = n ?? 0; }, it));
-    const bound = (k, label) => num(label, p[k], n => { try{ specEdit(s => Spec.setParamBounds(s, p.name, { [k]: n }), it); }catch(e){ alert(e.message); renderProps(true); } });
+    const bound = (k, label) => num(label, p[k], n => { const r = specEdit(s => Logic.setParamBounds(s, p.name, { [k]: n }), it); if (r && !r.ok) renderProps(true); });
     bound("min", "ขั้นต่ำ").placeholder = "ไม่จำกัด";
     bound("max", "ขั้นสูง").placeholder = "ไม่จำกัด";
     if (unit === "slope") card.insertBefore(div("hint","1:x = ดิ่ง 1 ราบ x · x น้อย = ชัน → ขั้นต่ำ = ชันสุดที่ยอม · ขั้นสูง = ลาดสุดที่ยอม · ช่อง slope ของเครื่องมือใส่ชื่อนี้ได้เลย", card), r3);
@@ -1436,7 +1465,7 @@ function propsParamTable(box, it){
     const r4 = div("pc1", null, card), cl = document.createElement("label"); cl.className = "check";
     cl.innerHTML = `<input type="checkbox"${p.positive ? " checked" : ""}> ต้องมากกว่า 0 <small>(≤ 0 = error + ใช้ default)</small>`;
     const cb = cl.querySelector("input"); cb.disabled = !ed_ || isSide;
-    cb.onchange = () => specEdit(s => Spec.setParamBounds(s, p.name, { positive: cb.checked }), it);
+    cb.onchange = () => specEdit(s => Logic.setParamBounds(s, p.name, { positive: cb.checked }), it);
     r4.appendChild(cl);
     const bad = Spec.paramBoundsIssue(p);
     if (bad) div("expr-err", "⚠ " + esc(bad), card);
@@ -1445,12 +1474,7 @@ function propsParamTable(box, it){
 }
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // ชื่อที่โค้ดที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved ฝั่ง server)
-const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
-  "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Offset ExtendToGround Opt FollowClipped Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
-  "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf Severe abstract as base bool break byte case catch char checked class const continue " +
-  "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
-  "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +
-  "static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while var").split(" "));
+const RESERVED = Logic.RESERVED;   // รายการเดียวกับ Logic API (logicops.js — ตรงกับ CodeGenerator.Reserved)
 function addSpecParam(it){
   const names = specNames(it);
   let i = 1; while (names.includes("Param" + i)) i++;
@@ -1601,7 +1625,7 @@ function renderLogic(){
 
   // ---- เงื่อนไข ----
   const s1 = div("lg-sec", "<h4>เงื่อนไข <small>ค่าตอนนี้อัปเดตตามผิวดิน / parameter</small></h4>", box);
-  if (ed_) s1.querySelector("h4").appendChild(btn("+ เงื่อนไขใหม่", () => specEdit(s => newCondition(s, null), it, "เพิ่มเงื่อนไข"), false, "เงื่อนไข + กิ่ง ใช่ / ไม่ใช่ (ยังไม่มี object) — ใส่ object เข้ากิ่งที่ Properties → เกิดเมื่อ หรือ B ตอนวาด"));
+  if (ed_) s1.querySelector("h4").appendChild(btn("+ เงื่อนไขใหม่", () => specEdit(s => newCondition(s, null, it), it, "เพิ่มเงื่อนไข"), false, "เงื่อนไข + กิ่ง ใช่ / ไม่ใช่ (ยังไม่มี object) — ใส่ object เข้ากิ่งที่ Properties → เกิดเมื่อ หรือ B ตอนวาด"));
   if (!conds.length) div("empty", "ยังไม่มีเงื่อนไข — ปุ่ม Daylight Cut/Fill ใน Drawer หรือ Properties → เกิดเมื่อ → + เงื่อนไขใหม่", s1);
   const names = specNames(it), xo = { ...Spec.exprOpts(sp), want: "bool" };
   for (const c of conds){
@@ -1610,7 +1634,8 @@ function renderLogic(){
     inp.title = c.note || "";
     const err = div("expr-err", "", null);
     const check = () => { const x = Expr.check(inp.value.trim(), names, xo); inp.classList.toggle("bad", !x.ok); err.textContent = x.ok ? "" : x.error; return x.ok; };
-    inp.addEventListener("input", () => { if (check()) liveEdit(it, () => { c.expr = inp.value.trim(); }); });
+    const cn = c.name;
+    inp.addEventListener("input", () => { if (check()) liveEdit(it, () => condExprEdit(it, cn, inp.value.trim())); });   // Logic API
     inp.addEventListener("change", () => renderLogic());
     const chip = document.createElement("span"); chip.dataset.cond = c.name; lgChip(chip, r && r.logic ? r.logic.conds[c.name] : undefined);
     row.append(inp, chip);
@@ -1656,22 +1681,22 @@ function renderLogic(){
 function renameCondition(it, c){
   const v = (prompt(`ชื่อใหม่ของเงื่อนไข ${c.name}`, c.name) || "").trim();
   if (!v || v === c.name) return;
-  const bad = condNameError(it.spec, v);
+  const bad = condNameError(it.spec, v, { codeParams: codeParamsOf(it) });
   if (bad) return alert(bad);
   const old = c.name;
-  specEdit(sp => Spec.renameCond(sp, old, v), it, `เปลี่ยนชื่อเงื่อนไข ${old} เป็น ${v}`);
+  specEdit(sp => Logic.renameCondition(sp, old, v, { codeParams: codeParamsOf(it) }), it, `เปลี่ยนชื่อเงื่อนไข ${old} เป็น ${v}`);
 }
 function renameBranch(it, b){
   const v = (prompt(`ชื่อกิ่ง ${b.id}`, b.label || "") || "").trim();
   if (!v || v === b.label) return;
-  specEdit(() => { b.label = v; }, it, `เปลี่ยนชื่อกิ่ง ${b.id}`);
+  specEdit(sp => Logic.renameBranch(sp, b.id, v), it, `เปลี่ยนชื่อกิ่ง ${b.id}`);
 }
 // ลบเงื่อนไข: ใช้ในนิพจน์อื่นอยู่ = ห้าม · decision ที่ใช้มัน = ลบด้วย (ถามว่าจะเอา object ในกิ่งไปไว้ไหน)
 function deleteCondition(it, c){
   const sp = it.spec, uses = Spec.condUses(sp, c.name);
   if (uses.length) return alert(`${c.name} ใช้อยู่ใน ${uses.join(", ")} — แก้นิพจน์เหล่านั้นก่อนลบ`);
   const decs = ((sp.logic || {}).decisions || []).filter(d => d.test === c.name);
-  if (!decs.length) return specEdit(s => { s.logic.conditions = s.logic.conditions.filter(x => x !== c); }, it, `ลบเงื่อนไข ${c.name}`);
+  if (!decs.length) return specEdit(s => Logic.removeCondition(s, c.name), it, `ลบเงื่อนไข ${c.name}`);
   removeDecisionsDialog(it, decs, `ลบเงื่อนไข ${c.name}`);
 }
 function deleteDecision(it, d){ removeDecisionsDialog(it, [d], `ลบ decision ${d.label || d.id}`); }
@@ -1681,7 +1706,8 @@ function removeDecisionsDialog(it, decs, title){
   const trees = decs.map(d => ({ d, t: Spec.decisionTree(sp, d.id) }));
   const objs = trees.flatMap(x => x.t.branches.flatMap(b => Spec.branchObjects(sp, b)));
   const lose = trees.flatMap(x => x.t.branches).map(b => branchPath(sp, b));
-  const go = how => { closeDialog(); specEdit(s => { for (const x of trees) Spec.removeDecision(s, x.d.id, how); }, it, title); };
+  // Logic API: how = parent (กิ่งแม่ / เกิดเสมอถ้าไม่มีกิ่งแม่) | remove · decision ที่ซ้อนอยู่ในตัวที่ลบไปก่อนแล้ว = ข้าม
+  const go = how => { closeDialog(); specEdit(s => { for (const x of trees) if (Spec.byId((s.logic || {}).decisions || [], x.d.id)) Logic.removeDecision(s, x.d.id, { how: how === "remove" ? "remove" : "parent" }); }, it, title); };
   if (!objs.length) return go("move");
   openDialog(title, b => {
     kv(b, [["กิ่งที่จะหาย", lose.join(", ")], ["object ในกิ่ง", objs.map(o => o.id).join(", ")]]);

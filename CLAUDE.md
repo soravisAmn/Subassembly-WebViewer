@@ -90,7 +90,12 @@
       parameter ชนิด Slope / Length, body จุดล่างใน = Extend to Surface บนเส้นดิ่ง (แทน min()) · RockPitchingTests เทียบกับไฟล์จริงผ่านทุกกรณี (143 test)
       + `rock-pitching-compare.assembly.json` (2 assembly เว็บ / ไฟล์จริง · item -web มี spec ฝังไว้) → **รอบ 4e จบ** รอ build / ทดสอบ -web.cs ใน Civil 3D
       แก้แล้ว (2026-11-08): item ใน project ที่มีแค่ `file` ของไฟล์ที่สร้างจากเว็บ → Edit อ่าน sa-spec ในไฟล์ก่อน (`enterEdit` → `loadSpecFromFile` → `enterEditNow`) เดิมได้ spec ว่าง Save ทับได้
-  ถัดไป: **`prompt-5.md`** (Logic API + มุมมองข้อความ + ต้นไม้ Conditions ในแถบซ้ายแทน flowchart + Variables) — ยังไม่เริ่ม · แล้ว prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+  รอบ 5 (`prompt-5.md`, ข้อเสนอ + คำตอบใน `prompt-5-design.md` — ข้อ 1 ผู้ใช้เลือกแบบ 2: Points / Links / Shapes แสดงทั้งหมด + ป้ายกิ่งสีกิ่ง และแสดงใต้กิ่งด้วย):
+    M0 เสร็จ (2026-11-08) · M1 เสร็จ (2026-11-08): `js/logicops.js` (`Logic.*` คืน { ok, error } · error = spec ไม่เปลี่ยน · ห่อฟังก์ชัน 4c / 4e · describe)
+      UI เดิม (เกิดเมื่อ, แท็บ Logic, Daylight Cut/Fill, Intersect, Offset, Extend, Clipped, Array, ตาราง Parameter, B) เรียก API · `specEdit` แสดง error ใน banner · README "Logic API" (test: `logicops.test.js`)
+      + หน้าต่าง Daylight Cut/Fill: ช่องลาดแบบช่อง slope (`Spec.slopeMagnitude` — 1:x / ดิ่งต่อราบ / % / parameter / นิพจน์, ทิศล็อก ตัด ↗ ถม ↘) · addCutFill รับข้อความ (number = x เดิม) · drawing-cases 82–83
+      — ถัดไป M2 ต้นไม้ Conditions
+  ก่อนหน้านี้วางแผน: `prompt-5.md` (Logic API + มุมมองข้อความ + ต้นไม้ Conditions ในแถบซ้ายแทน flowchart + Variables) · แล้ว prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

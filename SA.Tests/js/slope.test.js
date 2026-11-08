@@ -133,5 +133,38 @@ test("Daylight Cut/Fill: สร้าง CutSlope / FillSlope เป็นชน
   ok(s.points.some(p => p.def.slope === "-1/2"), "ไม่สร้าง parameter = ตัวเลข");
 });
 
+test("ขนาดลาด (Daylight Cut/Fill): 1:1.5 · 0.667 ดิ่งต่อราบ · 2% · parameter Slope / Percent · ตัวเลข = x แบบเดิม · ผิด", () => {
+  const s = base(), m = v => Spec.slopeMagnitude(s, v);
+  eq(JSON.stringify({ mag: "1/1.5", x: 1.5, param: null }), JSON.stringify(m("1:1.5")), "1:1.5");
+  eq(JSON.stringify({ mag: "1/1.5", x: 1.5, param: null }), JSON.stringify(m(1.5)), "ตัวเลข = x ของ 1:x (API เดิม)");
+  const r = m("0.667"); eq("0.667", r.mag, "ดิ่งต่อราบ"); near(1 / 0.667, r.x, "x");
+  eq(JSON.stringify({ mag: "2/100", x: 50, param: null }), JSON.stringify(m("2%")), "2%");
+  eq(JSON.stringify({ mag: "1/SideSlope", x: null, param: "SideSlope" }), JSON.stringify(m("SideSlope")), "parameter Slope");
+  eq(JSON.stringify({ mag: "Grade/100", x: null, param: "Grade" }), JSON.stringify(m("Grade")), "parameter Percent");
+  eq("1/2", m("-1:2").mag, "เครื่องหมายไม่มีผล"); eq("0.5", m("-0.5").mag, "ติดลบ = ขนาด");
+  eq("N / 10", m("N / 10").mag, "นิพจน์");
+  for (const bad of ["", "0", "1:0", "0%", "Nope", "1:abc"]){ let t = false; try{ m(bad); }catch{ t = true; } ok(t, `ต้อง error: "${bad}"`); }
+  let t = false; try{ m(-2); }catch{ t = true; } ok(t, "ตัวเลข ≤ 0");
+});
+
+test("Daylight Cut/Fill รับทุกแบบ: ตัด = ขึ้น / ถม = ลง เสมอ · ค่าคงที่ + สร้าง parameter = default เป็น x ของ 1:x · ไม่สร้าง = นิพจน์ตามแบบ", () => {
+  const slopes = s => { const c = s.points.find(p => (p.codes || []).includes("Daylight_Cut")), f = s.points.find(p => (p.codes || []).includes("Daylight_Fill")); return [c.def.slope, f.def.slope]; };
+  let s = base(); Spec.addCutFill(s, { hinge: "P1", cut: "0.667", fill: "2%", params: true, dir: 1, cutCode: "Daylight_Cut", fillCode: "Daylight_Fill" });
+  eq(JSON.stringify(["1/CutSlope", "-1/FillSlope"]), JSON.stringify(slopes(s)), "params → 1/CutSlope");
+  near(1 / 0.667, par(s, "CutSlope").default, "CutSlope = 1:1.4993", 1e-3); eq(50, par(s, "FillSlope").default, "FillSlope = 1:50");
+  s = base(); Spec.addCutFill(s, { hinge: "P1", cut: "0.667", fill: "2%", params: false, dir: 1, cutCode: "Daylight_Cut", fillCode: "Daylight_Fill" });
+  eq(JSON.stringify(["0.667", "-2/100"]), JSON.stringify(slopes(s)), "ไม่สร้าง parameter");
+  s = base(); Spec.addCutFill(s, { hinge: "P1", cut: "Grade", fill: "-1:3", params: true, dir: 1, cutCode: "Daylight_Cut", fillCode: "Daylight_Fill" });
+  eq(JSON.stringify(["Grade/100", "-1/FillSlope"]), JSON.stringify(slopes(s)), "parameter Percent ใช้เลย · -1:3 = ขนาด");
+  eq(3, par(s, "FillSlope").default, "FillSlope = 3");
+  s = base(); Spec.addCutFill(s, { hinge: "P1", cut: "N / 10", fill: "N / 10", params: true, dir: 1, cutCode: "Daylight_Cut", fillCode: "Daylight_Fill" });
+  eq(JSON.stringify(["N / 10", "-(N / 10)"]), JSON.stringify(slopes(s)), "นิพจน์ (ไม่สร้าง parameter · ถม = -(…))");
+  // ผลคำนวณ: ถมลง ตัดขึ้น จริง
+  s = base(); Spec.addCutFill(s, { hinge: "P1", cut: "50%", fill: "0.5", params: false, dir: 1, cutCode: "Daylight_Cut", fillCode: "Daylight_Fill" });
+  const pc = s.points.find(p => (p.codes || []).includes("Daylight_Cut")).id, pf = s.points.find(p => (p.codes || []).includes("Daylight_Fill")).id;
+  const up = run(s, {}, [{ x: -40, y: 3 }, { x: 40, y: 3 }]).pts[pc], dn = run(s, {}, [{ x: -40, y: -3 }, { x: 40, y: -3 }]).pts[pf];
+  near(6, up.x, "ตัด 50% ขึ้น 3 m = 6 m"); near(3, up.y, "ตัด y"); near(6, dn.x, "ถม 0.5 ลง 3 m = 6 m"); near(-3, dn.y, "ถม y");
+});
+
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
 if (typeof process !== "undefined") process.exitCode = failed ? 1 : 0;

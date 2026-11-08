@@ -1937,5 +1937,204 @@
       "SideSlope": -1
     },
     "copySpecFrom": 78
+  },
+  {
+    "name": "Daylight Cut/Fill ลาดแบบ % (parameter Percent) / นิพจน์ดิ่งต่อราบ -(N / 10): ดินสูง = ตัด (Right)",
+    "surface": [
+      {
+        "x": -30,
+        "y": 2
+      },
+      {
+        "x": 30,
+        "y": 2
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "CutFillForms",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "Grade",
+          "kind": "double",
+          "default": 50,
+          "displayName": "Grade",
+          "min": null,
+          "max": null,
+          "unit": "percent"
+        },
+        {
+          "name": "N",
+          "kind": "double",
+          "default": 5,
+          "displayName": "N",
+          "min": null,
+          "max": null
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "Shoulder"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "3",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "Daylight_Cut"
+          ],
+          "def": {
+            "type": "slopeToSurface",
+            "from": "P2",
+            "slope": "Grade/100",
+            "dir": 1,
+            "target": "TargetSurface",
+            "maxDistance": "50",
+            "layoutLength": "3"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "Daylight_Fill"
+          ],
+          "def": {
+            "type": "slopeToSurface",
+            "from": "P2",
+            "slope": "-(N / 10)",
+            "dir": 1,
+            "target": "TargetSurface",
+            "maxDistance": "50",
+            "layoutLength": "3"
+          },
+          "branch": "B2"
+        },
+        {
+          "id": "P5",
+          "codes": [
+            "Daylight"
+          ],
+          "def": {
+            "type": "firstOf",
+            "points": [
+              "P3",
+              "P4"
+            ]
+          },
+          "auxiliary": true
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P2",
+            "P3"
+          ],
+          "codes": [
+            "Daylight_Cut"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L2",
+          "points": [
+            "P2",
+            "P4"
+          ],
+          "codes": [
+            "Daylight_Fill"
+          ],
+          "branch": "B2"
+        }
+      ],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "logic": {
+        "conditions": [
+          {
+            "id": "C1",
+            "name": "IsCut",
+            "expr": "ground(P2) > P2.y",
+            "note": "ผิวดินสูงกว่าบานพับ = ตัด"
+          }
+        ],
+        "decisions": [
+          {
+            "id": "D1",
+            "parent": null,
+            "kind": "if",
+            "test": "IsCut",
+            "label": "ตัดหรือถม?"
+          }
+        ],
+        "branches": [
+          {
+            "id": "B1",
+            "decision": "D1",
+            "case": true,
+            "label": "ตัด"
+          },
+          {
+            "id": "B2",
+            "decision": "D1",
+            "case": false,
+            "label": "ถม"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "Daylight Cut/Fill ลาด % / -(N / 10): ดินต่ำ = ถม · Side = Left, N = 4",
+    "surface": [
+      {
+        "x": -30,
+        "y": -2
+      },
+      {
+        "x": 30,
+        "y": -2
+      }
+    ],
+    "values": {
+      "Side": 1,
+      "N": 4
+    },
+    "copySpecFrom": 82
   }
 ]

@@ -370,7 +370,11 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
   - `1:1.5` · ชื่อ parameter ชนิด Slope เช่น `SideSlope` (เว็บเขียน `-1/SideSlope` ให้) · `2%` · ชื่อ parameter ชนิด Percent (`-Grade/100`) — มีรายการชื่อให้เลือก
   - หรือนิพจน์ดิ่งต่อราบแบบเดิม (`-0.667`, `-1/SideSlope`) — เครื่องหมายอยู่ในนิพจน์ ปุ่ม ↗ ↘ ปิด
   - ที่เก็บยังเป็นนิพจน์เดิม → spec / ไฟล์เก่าเปิดได้ผลเหมือนเดิม (ไม่แก้ช่อง = ไม่เขียนทับ) · C# อ่านง่ายแบบเขียนเอง: `SlopeToSurface(…, -1.0 / SideSlope, …)`
-  - กล่องพิมพ์ค่า (Tab ตอนวาด): `1:x` / ชื่อ parameter / `%` = ขึ้นหรือลงตามเมาส์ · Daylight Cut/Fill: ช่องลาดใส่ชื่อ parameter ชนิด Slope ที่มีอยู่ = ใช้ตัวนั้น ไม่สร้าง `CutSlope` / `FillSlope` ใหม่ (ที่สร้างใหม่เป็นชนิด Slope)
+  - กล่องพิมพ์ค่า (Tab ตอนวาด): `1:x` / ชื่อ parameter / `%` = ขึ้นหรือลงตามเมาส์
+  - **หน้าต่าง Daylight Cut/Fill**: ช่องลาดตัด / ลาดถมรับแบบเดียวกัน (`1:1.5` · `0.667` ดิ่งต่อราบ · `2%` · ชื่อ parameter ชนิด Slope / Percent · นิพจน์) — **ทิศล็อก** ตัด ↗ ขึ้น / ถม ↘ ลง
+    (ใส่เครื่องหมายลบไม่มีผล) · ใต้ช่องบอกค่าเป็น `= 1:x` ทันที / ข้อความผิด · ชื่อ parameter ชนิด Number = ใช้เป็นดิ่งต่อราบ (มีคำเตือนใต้ช่อง)
+    · ติ๊ก "สร้าง parameter": ช่องที่เป็นค่าคงที่ได้ `CutSlope` / `FillSlope` ชนิด Slope (default = x ของ 1:x เช่น `0.667` → 1:1.4993, `2%` → 1:50) · ช่องที่ใส่ชื่อ parameter / นิพจน์ ใช้ตามนั้น
+    · **เปลี่ยนจากเดิม**: ตัวเลขเดี่ยวในช่องนี้เคยหมายถึง x ของ 1:x (`1.5` = 1:1.5) ตอนนี้ = ดิ่งต่อราบ เหมือนช่อง slope อื่น (Logic API `addCutFill` ที่ส่งเป็น number ยังเป็น x ของ 1:x)
   - Extend to Surface ไม่มีช่อง slope (ต่อตามทิศของเส้นเดิม)
 - `Side` = 1 (Left) กลับด้านแนวราบของส่วนที่วาดทั้งหมด · Mirror ใช้ได้กับตัวที่วาดด้วย
 - ส่วนที่วาดเก็บใน project (Save project) และในเบราว์เซอร์ · เขียนลงไฟล์ .cs เมื่อกด Save (.cs) เท่านั้น
@@ -604,6 +608,42 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 `addArray(spec, sel, { n, dx, dy, join })` / `updateArray(spec, g, { dx, dy })` / `rebuildArray(spec, g, { n, join })` / `arrayOf(spec, kind, id)` ·
 `isAlias(spec, id)` / `auxEnd(spec, id)` (ปลายจริง)
 
+### Logic API (รอบ 5) — `js/logicops.js`
+
+ฟังก์ชันล้วนชุดเดียวสำหรับแก้ logic / object ของส่วนที่วาด (ไม่แตะหน้าเว็บ — ใช้ได้ทั้งเว็บและ node) · หน้าเว็บทุกที่เรียกชุดนี้
+(Properties "เกิดเมื่อ", แท็บ Logic, Daylight Cut/Fill, Intersect, Offset, Extend to Surface, Clipped Surface Link, Array, ตาราง Parameter, วาดลงกิ่ง `B`) — prompt-6 ห่อเป็นเครื่องมือ MCP
+
+- ผล: `{ ok: true, …ผล, warnings? }` หรือ `{ ok: false, error: "ข้อความไทย" }` — **error = spec ไม่เปลี่ยนเลย** (ทำบนสำเนาก่อน ผ่านแล้วค่อยแทน · object `spec` ตัวเดิม)
+- ในหน้าเว็บเรียกผ่าน `specEdit(sp => Logic.xxx(sp, …), item, "ชื่อการกระทำ")` = Undo 1 ครั้ง · error = ข้อความใน banner และไม่มีก้อน Undo
+- `opts` ตัวสุดท้าย (ไม่ใส่ได้) = `{ codeParams }` parameter ของโค้ดเดิม (ไฟล์ที่ import) ที่นิพจน์ใช้ได้
+- ชื่อ (เงื่อนไข ฯลฯ): ตัวอังกฤษ / ตัวเลข / `_` ไม่ขึ้นต้นด้วยตัวเลข · ห้ามซ้ำ parameter / เงื่อนไข / จุด · ห้ามชื่อที่โค้ดใช้เอง (`Logic.RESERVED`, แบบ `P1` `L2` `D3` `B4` `C5` …) / คำในนิพจน์
+
+| ฟังก์ชัน | ทำอะไร | error ที่เป็นไปได้ |
+|---|---|---|
+| `addCondition(spec, { name?, expr, note?, parentBranch?, decision?, label?, yes?, no? })` | เงื่อนไข + decision if + กิ่ง ใช่ / ไม่ใช่ (ชื่อเริ่ม `Cond1`) · `parentBranch` = กิ่ง "ไม่ใช่" ของ decision อื่น = **elif** · `decision: false` = เงื่อนไขเปล่า | ชื่อซ้ำ / คำสงวน, ไม่ใช่จริง/เท็จ, จุดไม่มี, กิ่งไม่มี |
+| `editCondition(spec, name, { expr?, note? })` | แก้นิพจน์ / หมายเหตุ | ชนิดผิด, **อ้างกันเป็นวง** |
+| `renameCondition(spec, old, name)` | test / นิพจน์ / ป้ายที่ใช้ชื่อเดิมเปลี่ยนตาม | ชื่อซ้ำ |
+| `removeCondition(spec, name, { how })` | decision ที่ใช้ลบด้วย (`how`) | ยังมีนิพจน์อื่นใช้ (บอกรายการ) |
+| `addDecision(spec, { parentBranch?, kind, test, label?, cases?, elseLabel? })` | if (นิพจน์จริง/เท็จ) · switch (นิพจน์ตัวเลข + `cases: [{ value, label }]` + `else` ท้ายเสมอ) | ชนิด test, case ซ้ำ / ไม่ใช่ตัวเลข |
+| `editDecision(spec, id, { test?, label?, kind? })` | เปลี่ยน if ↔ switch (ใช่ = case 1, ไม่ใช่ = else) | switch หลาย case → if ไม่ได้ |
+| `removeDecision(spec, id, { how })` | `how`: `parent` (กิ่งแม่ — ค่าเริ่ม) · `always` (เกิดเสมอ) · `remove` (ลบ object ด้วย) · ที่ซ้อนอยู่ข้างในหายด้วย | |
+| `moveDecision(spec, id, parentBranch \| null)` | ย้ายทั้งก้อนไปซ้อนในกิ่งอื่น (ทำ / เลิก elif) | ย้ายเข้ากิ่งของตัวเอง |
+| `addCase(spec, decisionId, { value, label? })` · `editCase(spec, branchId, { value?, label? })` · `removeCase(spec, branchId, { how })` · `moveCase(spec, branchId, index)` | case ของ switch (แทรกก่อน else, เรียงด้วย index) | ค่าซ้ำ, แก้ / ลบ / ย้าย `else` |
+| `renameBranch(spec, id, label)` | ชื่อกิ่ง | ว่าง |
+| `setBranch(spec, ids, branchId \| null)` | ย้าย point / link / shape · `R#` กลุ่มหมุน / `A#` Array = ทั้งกลุ่ม · `null` = เกิดเสมอ → `warnings` (branchRisks) | id / กิ่งไม่มี |
+| `addCutFill(spec, { hinge, cut, fill, params, dir, … })` (cut / fill = number x ของ 1:x หรือข้อความแบบช่อง slope: `1:1.5` `0.667` `2%` ชื่อ parameter นิพจน์) · `addIntersect` · `addOffset` · `addExtendToGround` · `addFollowClipped` · `addArray` · `updateArray(spec, id, …)` · `rebuildArray(spec, id, …)` · `setParamBounds` · `setParamUnit` | ของรอบ 4c / 4e (args เดิม — Array ใช้ id) ห่อให้คืน `{ ok, error }` | ตามของเดิม |
+| `describe(spec, evalResult?)` | JSON สั้น: parameter, เงื่อนไข (+ ค่าตอนนี้), decision → กิ่ง → object (+ เกิดไหม), object เกิดเสมอ, risks | — |
+| `nameError(spec, name)` · `freeCondName(spec)` | ตรวจชื่อ · ชื่อว่างถัดไป | — |
+
+ตัวอย่าง (node — ดู `SA.Tests/js/logicops.test.js`):
+```js
+const r = Logic.addCondition(spec, { name: "IsCut", expr: "ground(P2) > P2.y" });      // { ok, cond: "C1", decision: "D1", yes: "B1", no: "B2" }
+Logic.setBranch(spec, ["P3", "L2"], r.yes);                                            // ลาดตัดเกิดเฉพาะกิ่ง ใช่
+Logic.addCondition(spec, { name: "HighFill", expr: "P2.y - ground(P2) > 3", parentBranch: r.no });   // elif
+const w = Logic.addDecision(spec, { kind: "switch", test: "ProtectionType", cases: [{ value: 1, label: "หินเรียง" }, { value: 2, label: "คอนกรีต" }] });
+Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่า case 1 ซ้ำ" } — spec ไม่เปลี่ยน
+```
+
 ### rock-pitching จากเว็บ (รอบ 4e) — `base_rock-pitching-web.cs` / `body_rock-pitching-web.cs`
 
 สองไฟล์ที่ root (ข้างไฟล์จริง) = วาดด้วยเครื่องมือของเว็บแล้ว **Save ผ่านเส้นทางเดียวกับปุ่ม Save (.cs)** (`/api/drawing/save`) — มี sa-spec ฝังอยู่ import กลับมาแก้ต่อได้
@@ -654,6 +694,7 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 | `node SA.Tests/js/rockpitching.test.js` | วาด base / body rock-pitching ใหม่ด้วยเครื่องมือ = sa-spec ใน `base_rock-pitching-web.cs` / `body_rock-pitching-web.cs`, คำนวณได้ไม่เตือน / รูปปิด (รอบ 4c / 4e) — เทียบกับไฟล์จริงอยู่ใน `dotnet run` |
 | `node SA.Tests/js/array.test.js` | Array: ขั้นบันได (จุดร่วม), แก้ dx / dy / parameter, Left, ต่อด้วย link, shape / aux / กิ่ง, เปลี่ยน N (ถูกขวาง), ลบ = เลิกเป็น Array, Move (รอบ 4c) |
 | `node SA.Tests/js/slope.test.js` | ชนิดค่า parameter (Number / Slope 1:x / Length / Percent): แสดง / พิมพ์ / ข้อความเตือน, ช่อง slope ↗ ↘ อ่าน / เขียน (spec เก่าไม่เปลี่ยน), Daylight Cut/Fill ใช้ parameter Slope (รอบ 4e) |
+| `node SA.Tests/js/logicops.test.js` | Logic API: ทุกฟังก์ชัน กรณีปกติ + error (ชื่อซ้ำ, คำสงวน, ชนิดนิพจน์, case ซ้ำ / else, ย้าย decision เข้าตัวเอง, ลบ 3 แบบ, วนกัน) — error แล้ว spec ไม่เปลี่ยน, describe (รอบ 5) |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |

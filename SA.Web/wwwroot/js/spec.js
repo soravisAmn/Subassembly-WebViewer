@@ -835,6 +835,28 @@ const Spec = (() => {
     }
     return { expr: t, mode: "expr" };
   }
+  // "ขนาด" ของลาด (ไม่มีเครื่องหมาย — ทิศกำหนดที่อื่น เช่น Daylight Cut/Fill: ตัด ขึ้น / ถม ลง) จากค่าแบบช่อง slope
+  //   v = ตัวเลข (x ของ 1:x — แบบเดิมของ addCutFill) หรือข้อความ: 1:1.5 · parameter Slope · 2% · parameter Percent · ดิ่งต่อราบ (0.667 / นิพจน์)
+  //   คืน { mag: นิพจน์ดิ่งต่อราบ (บวก), x: x ของ 1:x ถ้าเป็นค่าคงที่ (ไม่งั้น null), param: ชื่อ parameter ที่ใช้ (หรือ null) } · ผิด = throw
+  function slopeMagnitude(spec, v, what){
+    const W = what || "ลาด";
+    const pos = n => { if (!(n > 0) || !isFinite(n)) throw new Error(`${W}: ต้องมากกว่า 0 (ได้ ${n})`); return n; };
+    if (typeof v === "number"){ pos(v); return { mag: `1/${Expr.num(v)}`, x: v, param: null }; }
+    const t = String(v ?? "").trim().replace(/^-\s*/, "");          // เครื่องหมายไม่มีผล (ทิศกำหนดที่อื่น)
+    if (!t) throw new Error(`${W}: ว่าง`);
+    const w = slopeWrite(spec, true, t);
+    if (w.mode === "ratio"){ const x = pos(+/:\s*(.+)$/.exec(t)[1]); return { mag: `1/${Expr.num(x)}`, x, param: null }; }
+    if (w.mode === "param") return { mag: w.expr, x: null, param: t };
+    if (w.mode === "percent"){
+      const m = /^(\d+(?:\.\d+)?|\.\d+)\s*%$/.exec(t);
+      if (m) return { mag: w.expr, x: 100 / pos(+m[1]), param: null };
+      return { mag: w.expr, x: null, param: t };
+    }
+    if (/^(\d+(?:\.\d+)?|\.\d+)$/.test(t)){ const n = pos(+t); return { mag: Expr.num(n), x: 1 / n, param: null }; }
+    const r = Expr.check(t, names(spec), { ...exprOpts(spec), want: "num" });
+    if (!r.ok) throw new Error(`${W}: ${r.error}`);
+    return { mag: t, x: null, param: null };
+  }
 
   // ---------- Logic: สร้างเงื่อนไข / กิ่ง ----------
   // ชื่อที่ยังไม่มีใน parameter / เงื่อนไข / จุด: base, base2, base3, ...
@@ -923,16 +945,17 @@ const Spec = (() => {
     const h = byId(spec.points, o.hinge);
     if (!h) throw new Error(`ไม่มีจุด ${o.hinge}`);
     const target = o.target || (spec.targets[0] || {}).name || "TargetSurface";
-    // o.cut / o.fill = ตัวเลข x (1:x) หรือชื่อ parameter ชนิด Slope ที่มีอยู่ (ใช้เลย ไม่สร้างใหม่)
-    const isName = v => typeof v === "string" && paramUnit(spec, v) === "slope";
-    const mk = (v, base, label) => {
-      if (isName(v)) return v;
-      if (!o.params) return Expr.num(v);
+    // o.cut / o.fill = ตัวเลข x (1:x — แบบเดิม) หรือข้อความแบบช่อง slope (slopeMagnitude): 1:1.5 · parameter Slope · 2% · parameter Percent · ดิ่งต่อราบ 0.667
+    //   ทิศ: ตัด = ขึ้น · ถม = ลง เสมอ · params = ค่าคงที่ → สร้าง CutSlope / FillSlope ชนิด Slope (default = x ของ 1:x) · ใส่ชื่อ parameter = ใช้ตัวนั้นเลย
+    const mk = (v, base, label, what) => {
+      const s = slopeMagnitude(spec, v, what);
+      if (!o.params || s.x == null) return s.mag;
       const n = freeName(spec, base);
-      spec.params.push({ name: n, kind: "double", default: +v, displayName: label, min: null, max: null, unit: "slope", positive: true });
-      return n;
+      spec.params.push({ name: n, kind: "double", default: +Expr.num(s.x), displayName: label, min: null, max: null, unit: "slope", positive: true });
+      return `1/${n}`;
     };
-    const cutS = `1/${mk(o.cut, "CutSlope", "Cut Slope (1:x)")}`, fillS = `-1/${mk(o.fill, "FillSlope", "Fill Slope (1:x)")}`;
+    const neg = m => /^[A-Za-z0-9_.]+(\/[A-Za-z0-9_.]+)?$/.test(m) ? "-" + m : `-(${m})`;
+    const cutS = mk(o.cut, "CutSlope", "Cut Slope (1:x)", "ลาดตัด"), fillS = neg(mk(o.fill, "FillSlope", "Fill Slope (1:x)", "ลาดถม"));
     const first = !spec.targets.length || spec.targets[0].name === target;
     const g = first ? `ground(${h.id})` : `ground(${h.id}, "${target}")`;
     const lab = (spec.logic && (spec.logic.branches || []).some(b => b.label === "ตัด")) ? ` ${h.id}` : "";
@@ -1368,7 +1391,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
+           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, slopeMagnitude, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();

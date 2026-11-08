@@ -2,7 +2,7 @@
 //   UI ทุกที่ (ต้นไม้ Conditions, แท็บ Logic, "เกิดเมื่อ", Daylight Cut/Fill, ปุ่มรอบ 4c, B) เรียกชุดนี้ผ่าน specEdit — prompt-6 ห่อเป็นเครื่องมือ MCP
 //   ผล: { ok: true, ...ผล, warnings? } หรือ { ok: false, error: "ข้อความไทย" } — error = spec ไม่เปลี่ยนเลย (ทำบนสำเนาก่อน ผ่านแล้วค่อยแทน)
 //   opts (ตัวสุดท้าย ไม่ใส่ก็ได้) = { codeParams } — parameter ของโค้ดเดิม (ไฟล์ที่ import) ที่นิพจน์ใช้ได้
-//   รูปแบบ spec.logic เดิมไม่เปลี่ยน (conditions / decisions / branches — ดู prompt-4-design.md) · รายละเอียด / ตัวอย่างใน README หัวข้อ "Logic API"
+//   รูปแบบ spec.logic เดิมไม่เปลี่ยน (conditions / decisions / branches — ดู docs/prompts/prompt-4-design.md) · รายละเอียด / ตัวอย่างใน README หัวข้อ "Logic API"
 "use strict";
 const Logic = (() => {
   // ชื่อที่โค้ด C# ที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved) — ตั้งเป็นชื่อ parameter / เงื่อนไข / variable ไม่ได้

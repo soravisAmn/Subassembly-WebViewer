@@ -18,7 +18,7 @@ public class DrawingSpec
     public List<SpecShape> Shapes { get; set; } = new();
     public List<SpecRotation> Rotations { get; set; } = new();
     public List<SpecArray> Arrays { get; set; } = new();         // Array (รอบ 4c) — C# ใช้เฉพาะ Loop (รอบ 5b) · สมาชิกเป็นจุด / link / shape ธรรมดาอยู่แล้ว
-    public SpecLogic? Logic { get; set; }                 // เงื่อนไข / decision / กิ่ง (รอบ 4 — ดู prompt-4-design.md)
+    public SpecLogic? Logic { get; set; }                 // เงื่อนไข / decision / กิ่ง (รอบ 4 — ดู docs/prompts/prompt-4-design.md)
     public SpecSide? Side { get; set; }
     public bool Imported { get; set; }
 

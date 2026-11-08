@@ -52,7 +52,7 @@
 //   1 จุดอยู่ได้กลุ่มเดียว · pivot ไม่อยู่ในกลุ่มตัวเอง
 //
 // นิพจน์ (ดู expr.js) อ้างจุดได้: P3.x (กรอบ Side = Right) / P3.y / ground(P3) / exists(P3) — จุดที่อ้างนับเป็นการพึ่งพา (refs)
-// Logic (เงื่อนไข / กิ่ง) ของรอบ 4: โครงข้อมูลดู prompt-4-design.md
+// Logic (เงื่อนไข / กิ่ง) ของรอบ 4: โครงข้อมูลดู docs/prompts/prompt-4-design.md
 // ไฟล์นี้ไม่ใช้ DOM เพื่อให้ node โหลดไปทดสอบได้ (SA.Tests/js)
 "use strict";
 const Spec = (() => {
@@ -268,7 +268,7 @@ const Spec = (() => {
       cond: name => { const v = cond(name); if (v === null) throw new Error(`เงื่อนไข ${name} ไม่รู้ค่า`); return v; }
     });
 
-    // ---------- Logic (รอบ 4): เงื่อนไข / decision / กิ่ง — ดู prompt-4-design.md ----------
+    // ---------- Logic (รอบ 4): เงื่อนไข / decision / กิ่ง — ดู docs/prompts/prompt-4-design.md ----------
     //   เงื่อนไข = คำนวณทุกตัวเสมอ (ไม่รู้ค่า = null + เตือน) · decision คำนวณเมื่อกิ่งแม่เกิด · กิ่งเกิด = กิ่งแม่เกิด และค่าตรง case
     //   object ในกิ่งที่ไม่เกิด = { err, off: กิ่ง } (ไม่เตือน) · object ที่อ้างจุดที่ไม่เกิดผ่าน from / a / b ... = ไม่เกิดตาม (ไม่เตือน)
     //   ตรงกับโค้ด C# ที่สร้าง (ฟังก์ชันช่วยคืน null เงียบๆ เมื่อจุดตั้งต้นเป็น null)
@@ -307,7 +307,7 @@ const Spec = (() => {
       brBusy.delete(id);
       return (brVal[id] = on);
     }
-    // ---------- Array แบบ Loop (รอบ 5b — prompt-5b-design.md) ----------
+    // ---------- Array แบบ Loop (รอบ 5b — docs/prompts/prompt-5b-design.md) ----------
     //   N = ปัดเศษค่าของ loop.n (nRound: floor ค่าเริ่ม / ceil / round .5 ออกจากศูนย์) แล้วบีบ 1..nMax · ชุดที่ k (ต้นฉบับ k = 0) เกิดเมื่อ k < N
     //   ⚠ (เว็บ + C#): เกินสูงสุด / น้อยกว่า 1 / หาค่าไม่ได้ · ℹ (เว็บเท่านั้น): ปัดเศษด้วยค่าเริ่มต้น — ตรงกับ LoopN ใน CodeGenerator.cs
     const loopOf = {}, loopVal = {}, loopBusy = new Set();

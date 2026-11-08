@@ -36,13 +36,13 @@
 - `dotnet run --project SA.Tests` (รวมเทียบผล JS กับ C# ที่สร้าง ต้องมี `node`)
 - `node SA.Tests/js/<ชื่อ>.test.js` ทุกไฟล์ในโฟลเดอร์ `SA.Tests/js`
 - ยังไม่มี node: รัน test JS ในเบราว์เซอร์ (จำลอง `require` ของ fs / path / vm) และป้อนผล `eval-cli.js` ที่คำนวณในเบราว์เซอร์ให้ `dotnet run --project SA.Tests`
-  ผ่านตัวแทน `node.exe` ชั่วคราว — วิธีที่ใช้ใน M0 รอบ 4 (ดู `prompt-4-design.md`) · ติดตั้ง node แล้วไม่ต้องทำแบบนี้
+  ผ่านตัวแทน `node.exe` ชั่วคราว — วิธีที่ใช้ใน M0 รอบ 4 (ดู `docs/prompts/prompt-4-design.md`) · ติดตั้ง node แล้วไม่ต้องทำแบบนี้
 - ชุดทดสอบใน Civil 3D จริง: `tests-civil3d/` (ต้องมีเครื่องที่มี Civil 3D)
 
 ## สถานะล่าสุด (อัปเดตทุกครั้งที่จบ milestone)
-- รอบ 1 (`prompt.md`), รอบ 2 (`prompt-2.md`), รอบ 3 + 3b (`prompt-3.md`, `prompt-3b.md`) — **เสร็จแล้ว** (commit `ha`)
+- รอบ 1 (`docs/prompts/prompt.md`), รอบ 2 (`docs/prompts/prompt-2.md`), รอบ 3 + 3b (`docs/prompts/prompt-3.md`, `docs/prompts/prompt-3b.md`) — **เสร็จแล้ว** (commit `ha`)
 - ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs`, `round5-demo.cs`, `round5b-demo.cs` ใน Civil 3D จริง (เครื่องนี้ไม่มี Civil 3D · round4b-demo ถูกลบไปพร้อม Max / Min)
-- **รอบ 4 `prompt-4.md` เสร็จแล้ว** — M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบผู้ใช้อยู่ใน `prompt-4-design.md` (ตอบ "ตามที่เสนอ" ทุกข้อ), จัดระเบียบ repo แล้ว (เลิก track bin/obj · ยังเหลือของที่ควรลบ ดูไฟล์นั้น)
+- **รอบ 4 `docs/prompts/prompt-4.md` เสร็จแล้ว** — M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบผู้ใช้อยู่ใน `docs/prompts/prompt-4-design.md` (ตอบ "ตามที่เสนอ" ทุกข้อ), จัดระเบียบ repo แล้ว (เลิก track bin/obj · ยังเหลือของที่ควรลบ ดูไฟล์นั้น)
   M1 เสร็จ (2026-11-02): นิพจน์เงื่อนไข + P3.x/y, ground(), exists(), hasGround() ใน JS / C# (test: `cond.test.js`, `ExprTests.cs`, drawing-cases 31–35)
   M2 เสร็จ (2026-11-02): กิ่ง if / switch / ซ้อน + `firstOf` ใน JS / C# + UI ขั้นต่ำ "เกิดเมื่อ" ใน Properties (test: `logic.test.js`, ExprTests "กิ่ง -> C#", drawing-cases 36–44)
   - ตกลงระหว่างทำ: firstOf เป็น auxiliary → link จริงหลังกิ่งต้องต่อจากจุดในแต่ละกิ่งเอง (ยังไม่มี "จุดแทน" ที่ AddLink ได้)
@@ -53,13 +53,13 @@
   M5 เสร็จ (2026-11-02): ข้อ 6 (ไฟล์ที่แก้เองนอกช่วง + กิ่ง — test ใน DrawingTests), codelink ของเงื่อนไข / กิ่ง (แท็บ Logic → โค้ด, เคอร์เซอร์บรรทัดกิ่ง → object),
   `tests-civil3d/round4-demo.cs` + `round4-checklist.md` (+ drawing-cases 50–54) → **รอบ 4 จบ** รอทดสอบใน Civil 3D
   ข้อเสนอที่ยังไม่ทำ (prompt-4 ข้อ 6): แสดงในแท็บ Logic ว่าโค้ดที่เขียนเองเข้า if บรรทัดไหน — งานแยก ถ้าผู้ใช้ต้องการ
-  รอบ 4b M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบใน `prompt-4b-design.md` (ปุ่มชื่อ "Max / Min" · เลือกได้ว่าคุม ระยะดิ่ง / ตั้งฉากผิวดิน / ความยาว / ระยะราบ · ตัวอย่าง = base_rock-pitching)
+  รอบ 4b M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบใน `docs/prompts/prompt-4b-design.md` (ปุ่มชื่อ "Max / Min" · เลือกได้ว่าคุม ระยะดิ่ง / ตั้งฉากผิวดิน / ความยาว / ระยะราบ · ตัวอย่าง = base_rock-pitching)
   รอบ 4b M1 เสร็จ (2026-11-02): `p.limit` ใน evaluate (spec.js limitPt / setLimit / limitOptions) + C# `Limit()` + `limited()` + Properties ขั้นต่ำ
     (test: `limit.test.js`, drawing-cases 55–60, DrawingTests เทียบ base_rock-pitching.cs, ExprTests "Max / Min -> C#")
   รอบ 4b M2 เสร็จ (2026-11-02): ปุ่ม "Max / Min" ใน drawer + หน้าต่างถามเป็นประโยค (ชิดขวา) + พรีวิวสด (ข้อความ + เส้นประขอบ / ลูกศรบนรูป) — `js/limit.js`
   รอบ 4b M3 เสร็จ (2026-11-02): ไอคอน ↕ + เส้นขอบตอนเลือกจุด, Properties ประโยคสรุป, แท็บ Logic → Max / Min (สถานะสด + scenario), Delete ถาม, Rotate ไม่ให้หมุนจุดที่มี Max / Min,
     branchRisks นับจุดที่ Max / Min อ้าง, README ตาราง "ใช้อันไหนเมื่อไร", `tests-civil3d/round4b-demo.cs` + `round4b-checklist.md` (drawing-cases 61–66) → **รอบ 4b จบ** รอทดสอบใน Civil 3D
-  รอบ 4c M0 เสร็จ (2026-11-07): ข้อเสนอ + คำตอบใน `prompt-4c-design.md` (ชื่อปุ่มเป็นอังกฤษ: Daylight Cut/Fill, Extend to Surface, Clipped Surface Link, Intersect, Offset, Array + เปลี่ยนชื่อปุ่มเดิม · ข้อความอื่นยังไทย · Offset ติ๊ก Aux เอง · Intersect ถามตัด/ไม่ตัดทุกครั้ง)
+  รอบ 4c M0 เสร็จ (2026-11-07): ข้อเสนอ + คำตอบใน `docs/prompts/prompt-4c-design.md` (ชื่อปุ่มเป็นอังกฤษ: Daylight Cut/Fill, Extend to Surface, Clipped Surface Link, Intersect, Offset, Array + เปลี่ยนชื่อปุ่มเดิม · ข้อความอื่นยังไทย · Offset ติ๊ก Aux เอง · Intersect ถามตัด/ไม่ตัดทุกครั้ง)
   รอบ 4c M1 เสร็จ (2026-11-07): เอา Max / Min ออก (commit แยก `ea9dd1a` — ของเก่าตัดทิ้งตอนโหลด + แจ้งครั้งเดียว · `limited()` = "ไม่มีฟังก์ชัน"),
     ตาราง Parameter: `positive` (ต้องมากกว่า 0 → Severe + default) + ขั้นต่ำ / ขั้นสูง + เตือน default ขัดขอบเขต + ปุ่ม Parameter บนหัว Properties (`Spec.setParamBounds` / `paramBoundsIssue`),
     ชื่อปุ่มอังกฤษ (Daylight Cut/Fill, Slope to Surface, Follow Surface, Regular Polygon, Cut at Level, My Shapes) + คำอธิบาย / ภาพในหน้าต่าง Daylight Cut/Fill
@@ -81,7 +81,7 @@
     · แก้บั๊ก M2: Offset ระยะเป็นนิพจน์บวก / ลบ ใน C# ขาดวงเล็บ (drawing-case 77) → **รอบ 4c จบ** รอทดสอบใน Civil 3D (`round4c-checklist.md`)
   รอบ 4d เสร็จ (2026-11-07): ลากปรับความกว้างแถบซ้าย / ขวา (`js/panes.js` · `--lw` / `--rw` · `state.leftW` / `rightW` · ดับเบิลคลิก = 280 / 300 · workspace ≥ 320) + tooltip ชื่อเต็มในต้นไม้
     + แยกแผง: ซ้าย ต้นไม้ / Scenarios · ขวา Drawer / Properties (เลื่อนแยก, เส้นลากแนวนอน `state.drawerH` / `scH`, คลิกหัว = พับ `drawerFold` / `scFold`)
-  รอบ 4e (`prompt-4e.md`, ข้อเสนอ + คำตอบ "ตามที่เสนอ" ใน `prompt-4e-design.md`): M0 เสร็จ (2026-11-08)
+  รอบ 4e (`docs/prompts/prompt-4e.md`, ข้อเสนอ + คำตอบ "ตามที่เสนอ" ใน `docs/prompts/prompt-4e-design.md`): M0 เสร็จ (2026-11-08)
     M1 เสร็จ (2026-11-08): ปุ่มปิด — ต้นเหตุ CSS `.ghost{pointer-events:none}` (ของเส้นพรีวิว SVG) โดน `button.ghost` (× หน้าต่าง, ออกจาก Edit, ▾ แถบผลลัพธ์) → `:where(svg) .ghost`
       + `cancelDialog()` (ui.js: × / ยกเลิก / Esc / พื้นหลัง = ปิด + จบเครื่องมือ extend / clip / cutfill · มีค่าค้าง = พื้นหลังไม่ปิด `#dlg-note`) + × ในกล่อง `#dyn`
     M2 เสร็จ (2026-11-08): ชนิดค่า parameter `unit` (number | slope | length | percent — Spec.UNITS / fmtParam / parseUnitValue / setParamUnit, C# `Unit` + `UnitPre` / `UnitSuf`)
@@ -91,7 +91,7 @@
       parameter ชนิด Slope / Length, body จุดล่างใน = Extend to Surface บนเส้นดิ่ง (แทน min()) · RockPitchingTests เทียบกับไฟล์จริงผ่านทุกกรณี (143 test)
       + `rock-pitching-compare.assembly.json` (2 assembly เว็บ / ไฟล์จริง · item -web มี spec ฝังไว้) → **รอบ 4e จบ** รอ build / ทดสอบ -web.cs ใน Civil 3D
       แก้แล้ว (2026-11-08): item ใน project ที่มีแค่ `file` ของไฟล์ที่สร้างจากเว็บ → Edit อ่าน sa-spec ในไฟล์ก่อน (`enterEdit` → `loadSpecFromFile` → `enterEditNow`) เดิมได้ spec ว่าง Save ทับได้
-  รอบ 5 (`prompt-5.md`, ข้อเสนอ + คำตอบใน `prompt-5-design.md` — ข้อ 1 ผู้ใช้เลือกแบบ 2: Points / Links / Shapes แสดงทั้งหมด + ป้ายกิ่งสีกิ่ง และแสดงใต้กิ่งด้วย):
+  รอบ 5 (`docs/prompts/prompt-5.md`, ข้อเสนอ + คำตอบใน `docs/prompts/prompt-5-design.md` — ข้อ 1 ผู้ใช้เลือกแบบ 2: Points / Links / Shapes แสดงทั้งหมด + ป้ายกิ่งสีกิ่ง และแสดงใต้กิ่งด้วย):
     M0 เสร็จ (2026-11-08) · M1 เสร็จ (2026-11-08): `js/logicops.js` (`Logic.*` คืน { ok, error } · error = spec ไม่เปลี่ยน · ห่อฟังก์ชัน 4c / 4e · describe)
       UI เดิม (เกิดเมื่อ, แท็บ Logic, Daylight Cut/Fill, Intersect, Offset, Extend, Clipped, Array, ตาราง Parameter, B) เรียก API · `specEdit` แสดง error ใน banner · README "Logic API" (test: `logicops.test.js`)
       + หน้าต่าง Daylight Cut/Fill: ช่องลาดแบบช่อง slope (`Spec.slopeMagnitude` — 1:x / ดิ่งต่อราบ / % / parameter / นิพจน์, ทิศล็อก ตัด ↗ ถม ↘) · addCutFill รับข้อความ (number = x เดิม) · drawing-cases 82–83
@@ -102,7 +102,7 @@
     M5 เสร็จ (2026-11-08): `tests-civil3d/round5-demo.cs` (+ .assembly.json, `round5-checklist.md`) คันดิน switch ProtectionType + ตัด / ถม › elif HighFill ชานพัก + Variable DepthUsed
       สร้างด้วย Logic API ล้วน (`buildRound5()` ใน `SA.Tests/js/round5demo.test.js`) · drawing-cases 91–95 → **รอบ 5 จบ** รอทดสอบใน Civil 3D (`round5-checklist.md`)
       ข้อจำกัดที่รู้: ชานพักทำชั้นเดียว (ไม่ใช่ Array หลายขั้น — Loop อยู่ prompt-5b) · branchRisks ยังไม่ไล่จุดที่อ้างผ่าน variable
-  รอบ 5b (`prompt-5b.md`, ข้อเสนอ + คำตอบใน `prompt-5b-design.md` — แบบ ก, nMax 10, N < 1 = 1, i ต้นฉบับ 0, ปุ่ม Array + ติ๊ก Loop, C# if ต่อชุด, i เฉพาะ dx / dy, N หาค่าไม่ได้ = 1 + เตือน
+  รอบ 5b (`docs/prompts/prompt-5b.md`, ข้อเสนอ + คำตอบใน `docs/prompts/prompt-5b-design.md` — แบบ ก, nMax 10, N < 1 = 1, i ต้นฉบับ 0, ปุ่ม Array + ติ๊ก Loop, C# if ต่อชุด, i เฉพาะ dx / dy, N หาค่าไม่ได้ = 1 + เตือน
     + ข้อ 9 ปัดเศษ N (`loop.nRound` · round .5 ออกจากศูนย์) + ข้อ 10 ℹ / ⚠ (ℹ เว็บเท่านั้น · รายการที่อื่นที่ใช้ค่าแทน = เสนอไว้ในไฟล์นั้น ยังไม่แก้)):
     M0 เสร็จ (2026-11-08) · M1 เสร็จ (2026-11-08): `floor / ceil / round` (JS + C#) · `arrays[].loop` evaluate (`loopN` · ชุดที่ k off เมื่อ k ≥ N) + C# (`LoopN` / `N_A1 > k` gate · DrawingSpec.Arrays)
       Logic `updateArray` (n / nMax / nRound) / `setArrayLoop` / `removeArray` · หน้าต่าง Array ติ๊ก Loop + Properties + ตัวอย่างสด · Messages ℹ / ×n / คลิก = เลือก Array
@@ -117,7 +117,7 @@
     M4 เสร็จ (2026-11-08): `tests-civil3d/round5b-demo.cs` (+ .assembly.json, `round5b-checklist.md`) คันดินถม — Variable FillH + HighFill › Loop A1 ชานพักทุก BermInterval
       (i ในลาดชั้นล่าง · lastOf → ลาดสุดท้าย 1:(FillSlope + SlopeInc × count(A1))) สร้างด้วย Logic API ล้วน (`buildRound5b()` ใน `SA.Tests/js/round5bdemo.test.js`)
       · drawing-cases 109–114 · ต้นไม้ / ป้าย: Array ในกิ่งที่ไม่เกิด = – (`arrOff`) → **รอบ 5b จบ** รอทดสอบใน Civil 3D (`round5b-checklist.md`)
-  ถัดไป: prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+  ถัดไป: prompt-5c (`prompt-5c.md` — จัดไฟล์ลด token: เอกสารเป็นภาษาอังกฤษ, CLAUDE.md สั้นลง, แยก README ไป docs/, ย้าย prompt เก่า, test-all.bat) แล้ว prompt-6 (`prompt-6.md` — MCP: Claude Code / Desktop สั่งเว็บผ่านข้อเสนอที่ผู้ใช้กดรับ + ทดสอบกับ pavement-assembly / base / body rock-pitching-web แล้ว build ลง Civil 3D (วาดตามรูปสเก็ตช์เลื่อนไป prompt ถัดไป); Logic API เพิ่มของวาดพื้นฐาน + applyBatch) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`docs/prompts/prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

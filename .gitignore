@@ -8,3 +8,6 @@ obj/
 # ตั้งค่าเฉพาะเครื่อง
 .claude/launch.json
 .claude/settings.local.json
+
+# Full output of test-all.bat
+SA.Tests/test-all.log

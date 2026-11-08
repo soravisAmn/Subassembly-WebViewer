@@ -4,9 +4,9 @@
 โดยไม่ต้องเปิด Civil 3D: วางไฟล์ .cs แล้วเว็บจะคอมไพล์ รัน และวาดให้ทันที
 แก้โค้ดแล้วกด Save เว็บจะวาดใหม่เองภายใน 1–2 วินาที
 
-และ **วาด** subassembly แบบ CAD แล้วสร้างไฟล์ .cs ให้อัตโนมัติ (รอบแรก: `prompt.md` ถึง Milestone 3 — วาดแล้วกด **Save (.cs)** ได้ไฟล์ที่ build ลง Civil 3D ได้)
+และ **วาด** subassembly แบบ CAD แล้วสร้างไฟล์ .cs ให้อัตโนมัติ (รอบแรก: `docs/prompts/prompt.md` ถึง Milestone 3 — วาดแล้วกด **Save (.cs)** ได้ไฟล์ที่ build ลง Civil 3D ได้)
 
-**รอบ 2 (`prompt-2.md`)** — ทำงานแบบ AutoCAD ให้มากที่สุด:
+**รอบ 2 (`docs/prompts/prompt-2.md`)** — ทำงานแบบ AutoCAD ให้มากที่สุด:
 
 | เรื่อง | สรุป | หัวข้อ |
 |---|---|---|
@@ -17,7 +17,7 @@
 | object → โค้ด | เลือก object แล้วเห็นบรรทัดในไฟล์ + ปุ่มไปที่โค้ด, เคอร์เซอร์ในโค้ด → เน้น object | **object → บรรทัดโค้ด** |
 | Shortcut | กด `?` / `F1` บนหน้าเว็บ | **Shortcut** |
 
-**รอบ 4c (`prompt-4c.md`)** — ทำครบแล้ว (M0–M6): จัดปุ่มใหม่ตามงานจริง — ข้อตกลงอยู่ใน `prompt-4c-design.md`
+**รอบ 4c (`docs/prompts/prompt-4c.md`)** — ทำครบแล้ว (M0–M6): จัดปุ่มใหม่ตามงานจริง — ข้อตกลงอยู่ใน `docs/prompts/prompt-4c-design.md`
 - **วาด `base_rock-pitching.cs` / `body_rock-pitching.cs` ใหม่ในเว็บได้ทั้งตัวโดยไม่เขียนโค้ด** → `tests-civil3d/round4c-base.cs` / `round4c-body.cs`
   — test รันคู่กับไฟล์จริงผ่านตัวจำลอง: จุด / link / shape / code ตรงกัน (หัวข้อ **ทดสอบใน Civil 3D (รอบ 4c)** + ตาราง **ต่างกันตรงไหน**)
 - **ปุ่มใหม่ Intersect (`I`) / Offset (`O`)** ในกลุ่ม Geometry — หัวข้อ **Intersect / Offset** · ชนิดจุดใหม่ **Offset (เส้นขนาน)**
@@ -31,12 +31,12 @@
 - **ชื่อปุ่ม / เครื่องมือเป็นภาษาอังกฤษ** (ข้อความอื่นยังไทย — แปลทั้งเว็บทีหลัง): Daylight Cut/Fill (เดิม ถ้าตัด / ถม), Slope to Surface (ลาดจนชนดิน),
   Follow Surface (วิ่งตามผิวดิน), Regular Polygon (Polygon ด้านเท่า), Cut at Level (ตัดที่ระดับ — ยังปิด), My Shapes (รูปทรงของฉัน)
 
-**รอบ 4 (`prompt-4.md`)** — ทำครบแล้ว (M0–M5): Logic แบบ ก — เงื่อนไข / กิ่ง ติดที่ object (หัวข้อ **กิ่ง (ตัด / ถม ฯลฯ)**)
+**รอบ 4 (`docs/prompts/prompt-4.md`)** — ทำครบแล้ว (M0–M5): Logic แบบ ก — เงื่อนไข / กิ่ง ติดที่ object (หัวข้อ **กิ่ง (ตัด / ถม ฯลฯ)**)
 - นิพจน์เงื่อนไข (`and or not`, `if()`, `P3.x / P3.y`, `ground()`, `exists()`), กิ่ง if / switch / ซ้อน, ชนิดจุด **จุดแรกที่เกิด**, ปุ่ม **ถ้าตัด / ถม**,
   แท็บ **Logic** (ค่าสด + scenario ครอบคลุมกิ่ง), **แสดงทุกกรณี**, `B` = วาดลงกิ่ง — JS กับโค้ด C# ที่สร้างให้ผลตรงกัน (เทียบทุกกิ่ง ทั้ง Right / Left / Layout)
 - **ชุดทดสอบใน Civil 3D**: `tests-civil3d/round4-demo.cs` (+ `.assembly.json`) ตัด / ถม / ถมสูง / switch ขอบทาง · ทำตาม `tests-civil3d/round4-checklist.md` (**ยังไม่ได้ทดสอบใน Civil 3D จริง**)
 
-**รอบ 3 (`prompt-3.md`)** — ทำครบแล้ว: Milestone 1–6 + Auxiliary 3b-1, 3b-2 (`prompt-3b.md`)
+**รอบ 3 (`docs/prompts/prompt-3.md`)** — ทำครบแล้ว: Milestone 1–6 + Auxiliary 3b-1, 3b-2 (`docs/prompts/prompt-3b.md`)
 - **ชุดทดสอบใน Civil 3D**: `tests-civil3d/round3-demo.cs` (+ `.assembly.json`) มีครบทุกอย่างของรอบ 3 + auxiliary · ทำตาม `tests-civil3d/round3-checklist.md` (หัวข้อ **ทดสอบใน Civil 3D**)
 - **Auxiliary (ช่วยสร้าง)** point / link แบบ SAC: คำนวณ / อ้างอิง / snap ได้ แต่ไม่ส่งออกไป Civil 3D (หัวข้อ **Auxiliary**)
 - **Rotate (`R`)** แบบ AutoCAD: จุดหมุน → ลาก / พิมพ์มุม (นิพจน์ / parameter ได้) · ตัวเลือก `C` = หมุนสำเนา, `R` = Reference · เก็บเป็น **กลุ่มหมุน** แก้มุมทีหลังใน Properties ได้ (หัวข้อ **Rotate**)
@@ -802,6 +802,8 @@ Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่�
 | shape S1 / S2 | | | `RockPitching` / `CompactedSoil` |
 
 ### ทดสอบ
+
+Run everything quietly with `test-all.bat` (repository root): one summary line per suite plus only the failures; full log in `SA.Tests/test-all.log`.
 
 | คำสั่ง | ทดสอบอะไร |
 |---|---|

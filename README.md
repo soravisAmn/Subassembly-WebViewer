@@ -370,6 +370,20 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
     | ให้รูป **มี / ไม่มี** ตามเงื่อนไข | **Condition** (กิ่ง) |
     | ทางเลือกหลายแบบตามเลข (`ProtectionType`) | **Switch** |
   - **แท็บ Logic** (แถบผลลัพธ์ด้านล่าง ข้าง Points): เงื่อนไขทั้งหมด + ค่า จริง / เท็จ / ไม่รู้ค่า **อัปเดตสดตอนลากผิวดิน / แก้ parameter** · แก้นิพจน์ / เปลี่ยนชื่อ
+    - **ตาราง / ข้อความ** (รอบ 5): ปุ่มบนแท็บ Logic สลับเป็น **มุมมองข้อความ** = โครงทั้งหมดเป็น pseudo-code ภาษาไทย (`Logic.toText`) ค่าตอนนี้ต่อท้ายและอัปเดตสด · ปุ่ม **คัดลอก**
+      ```
+      Conditions:
+        IsCut = ground(P2) > P2.y                 ← ตอนนี้: จริง
+      เกิดเสมอ: P1, P2, P5 (aux), P6, L1
+      ถ้า IsCut:                                  [D1 ตัดหรือถม?]
+          ตัด (B1): P3, L2, L4                    ← เกิดตอนนี้
+      ไม่ใช่:
+          ถม (B2): P4, L3, L5
+          ถ้า HighFill:                           [D2 ถมสูงไหม?]      ← elif
+      switch Curb:                                [D3 ขอบทาง]   ← ตอนนี้: 1
+          = 1  มีขอบทาง (B5): P8, L7              ← เกิดตอนนี้
+      ```
+      (`– (กิ่งแม่ไม่เกิด)` = decision ที่ซ้อนอยู่ในกิ่งที่ไม่เกิด จึงไม่ได้คำนวณ)
     (นิพจน์ที่ใช้ชื่อนั้นเปลี่ยนตาม) / ลบ (ถ้ามี object ในกิ่ง ถามว่า ย้ายไปกิ่งแม่ / เกิดเสมอ หรือ ลบทิ้ง · เงื่อนไขที่ยังใช้ในนิพจน์อื่นลบไม่ได้)
     · ต้นไม้ decision → กิ่ง พร้อมสี, เกิด / ไม่เกิด, จำนวน object (คลิก = เลือก object ในกิ่ง), เปลี่ยนชื่อกิ่ง
   - **Scenario ครอบคลุมกิ่ง**: แต่ละกิ่งในแท็บ Logic บอกว่า scenario ไหนเข้ากิ่งนั้น และขึ้น ⚠ **"ยังไม่มี scenario ไหนเข้ากิ่ง …"** ·
@@ -679,6 +693,8 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 | `addVariable(spec, { name, kind?, unit?, expr, rules?: [{ when, value, warn?, error? }], note?, index? })` · `editVariable(spec, name, {…})` · `renameVariable` · `removeVariable` · `moveVariable(spec, name, index)` · `variableUses(spec, name)` | Variables (rules = if / elif ตัวแรกที่จริงชนะ) · `kind: "bool"` = เงื่อนไขเปล่า | ชื่อซ้ำ / คำสงวน, ชนิดนิพจน์, **วนกัน** (variable / จุด), `{ชื่อ}` ในข้อความไม่รู้จัก, CorridorError ไม่มี, ลบตอนมีที่ใช้ |
 | `addCutFill(spec, { hinge, cut, fill, params, dir, … })` (cut / fill = number x ของ 1:x หรือข้อความแบบช่อง slope: `1:1.5` `0.667` `2%` ชื่อ parameter นิพจน์) · `addIntersect` · `addOffset` · `addExtendToGround` · `addFollowClipped` · `addArray` · `updateArray(spec, id, …)` · `rebuildArray(spec, id, …)` · `setParamBounds` · `setParamUnit` | ของรอบ 4c / 4e (args เดิม — Array ใช้ id) ห่อให้คืน `{ ok, error }` | ตามของเดิม |
 | `describe(spec, evalResult?)` | JSON สั้น: parameter, เงื่อนไข (+ ค่าตอนนี้), decision → กิ่ง → object (+ เกิดไหม), object เกิดเสมอ, risks | — |
+| `toText(spec, evalResult?)` | มุมมองข้อความ (variables / เงื่อนไข / เกิดเสมอ / if · elif · switch ซ้อนกี่ชั้นก็ได้) · ส่งผลคำนวณ = ต่อท้าย "← ตอนนี้" | — |
+| `diffText(before, after)` | สิ่งที่เปลี่ยนระหว่าง spec สองชุดเป็นบรรทัดภาษาไทย (`+` เพิ่ม · `-` ลบ · `~` แก้): parameter, variable, เงื่อนไข, decision (ย้าย / kind / ป้าย), กิ่ง, object (เพิ่ม / ลบ / ย้ายกิ่ง) — prompt-6 ใช้แสดงก่อนยืนยันสิ่งที่ AI แก้ | — |
 | `nameError(spec, name)` · `freeCondName(spec)` | ตรวจชื่อ · ชื่อว่างถัดไป | — |
 
 ตัวอย่าง (node — ดู `SA.Tests/js/logicops.test.js`):
@@ -742,6 +758,7 @@ Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่�
 | `node SA.Tests/js/slope.test.js` | ชนิดค่า parameter (Number / Slope 1:x / Length / Percent): แสดง / พิมพ์ / ข้อความเตือน, ช่อง slope ↗ ↘ อ่าน / เขียน (spec เก่าไม่เปลี่ยน), Daylight Cut/Fill ใช้ parameter Slope (รอบ 4e) |
 | `node SA.Tests/js/logicops.test.js` | Logic API: ทุกฟังก์ชัน กรณีปกติ + error (ชื่อซ้ำ, คำสงวน, ชนิดนิพจน์, case ซ้ำ / else, ย้าย decision เข้าตัวเอง, ลบ 3 แบบ, วนกัน) — error แล้ว spec ไม่เปลี่ยน, describe (รอบ 5) |
 | `node SA.Tests/js/variables.test.js` | Variables: rules ตัวแรกที่จริงชนะ + ข้อความเตือน, อ้างจุด / ผิวดิน (ไม่รู้ค่า), ใช้ใน slope / Offset / Array / เงื่อนไข, วนกัน, rename / ลบ / เรียง, bool = เงื่อนไข (รอบ 5) — JS = C# ใน drawing-cases 84–90 + RockPitchingTests (DepthUsed) |
+| `node SA.Tests/js/logictext.test.js` | มุมมองข้อความ: toText (if / elif / switch / ซ้อน 3 ชั้น / กิ่งว่าง / variable มี-ไม่มี rules / มี-ไม่มีค่าตอนนี้) · diffText (เพิ่ม / แก้ / เปลี่ยนชื่อ / ลบ / ย้าย / ไม่เปลี่ยน) (รอบ 5) |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |

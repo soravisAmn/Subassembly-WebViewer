@@ -1599,6 +1599,7 @@ function updateLogicLive(){
   if (!state.dock.open || state.dock.tab !== "logic") return;
   const box = $("logic-pane"), it = logicItem(), r = it && drawRes[it.id];
   if (!box || !r || !r.logic) return;
+  const pre = box.querySelector("#lg-text"); if (pre) pre.textContent = Logic.toText(it.spec, r);   // มุมมองข้อความ: ค่าตอนนี้สด
   for (const e of box.querySelectorAll("[data-cond]")) lgChip(e, r.logic.conds[e.dataset.cond]);
   for (const e of box.querySelectorAll("[data-dec]")) lgChip(e, r.logic.decisions[e.dataset.dec]);
   for (const e of box.querySelectorAll("[data-br]")){ const on = !!r.logic.branches[e.dataset.br]; lgChip(e, on, "br"); const row = e.closest(".lg-br"); if (row) row.classList.toggle("off", !on); }
@@ -1637,6 +1638,22 @@ function renderLogic(){
   const sp = it.spec, ed_ = canEdit(it), r = drawRes[it.id];
   const conds = lg.conditions || [], decs = lg.decisions || [], brs = lg.branches || [];
   const cov = logicCoverage(it);
+
+  // ---- ตาราง / ข้อความ (รอบ 5 M4) — ข้อความ = Logic.toText (ค่าตอนนี้อัปเดตสด) + คัดลอก ----
+  const view = state.logicView === "text" ? "text" : "table";
+  const bar = div("lg-bar", "", box);
+  const tg = (v, label, title) => { const b = btn(label, () => { state.logicView = v; persist(); renderLogic(); }, false, title); b.classList.add("tg"); if (view === v) b.classList.add("on"); bar.appendChild(b); };
+  tg("table", "ตาราง", "แก้เงื่อนไข / ดูกิ่ง + scenario ที่ทดสอบ");
+  tg("text", "ข้อความ", "โครง if / elif / switch + variables เป็นข้อความ (ค่าตอนนี้ต่อท้าย) — คัดลอกไปวางที่อื่นได้");
+  if (view === "text"){
+    bar.appendChild(btn("คัดลอก", () => {
+      const t = Logic.toText(sp, drawRes[it.id]);
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => flashBanner("คัดลอกมุมมองข้อความแล้ว"), () => { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); flashBanner("คัดลอกมุมมองข้อความแล้ว"); });
+    }, false, "คัดลอกข้อความทั้งหมด"));
+    const pre = document.createElement("pre"); pre.className = "lg-text"; pre.id = "lg-text"; pre.textContent = Logic.toText(sp, r);
+    box.appendChild(pre);
+    return;
+  }
 
   // ---- เงื่อนไข ----
   const s1 = div("lg-sec", "<h4>เงื่อนไข <small>ค่าตอนนี้อัปเดตตามผิวดิน / parameter</small></h4>", box);

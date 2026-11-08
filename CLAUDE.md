@@ -97,7 +97,8 @@
     M2 เสร็จ (2026-11-08): ต้นไม้ Conditions (`js/condtree.js` — treeConditions / updateTreeLive / condDialog / condCtxItems / ลาก = setBranch) ชิปค่าสด, + Condition / + Switch, elif, case ↑↓, ดับเบิลคลิกแก้นิพจน์
     M3 เสร็จ (2026-11-08): Variables — `spec.logic.variables` (rules if / elif ตัวแรกชนะ + warn {ชื่อ} + error) evaluate (getter ใน env) + C# `VariableLines` (double + if / else if · อ้างจุด = double? ผ่าน Val + `VN()` เฉพาะเมื่อใช้)
       Logic.addVariable / edit / rename / remove / move / variableUses (วนกันผ่าน variable / จุด = error) · ต้นไม้ Variables + หน้าต่าง + Variable · drawing-cases 84–90 · RockPitchingTests: base + DepthUsed = ไฟล์จริง
-      — ถัดไป M4 มุมมองข้อความ (toText / diffText)
+    M4 เสร็จ (2026-11-08): Logic.toText (pseudo-code ไทย + ค่าตอนนี้ · – = กิ่งแม่ไม่เกิด) / Logic.diffText (+ - ~) · แท็บ Logic ปุ่ม ตาราง / ข้อความ + คัดลอก (ค่าสด) · test: logictext.test.js
+      — ถัดไป M5 round5-demo + checklist + รวมงาน
   ก่อนหน้านี้วางแผน: `prompt-5.md` (Logic API + มุมมองข้อความ + ต้นไม้ Conditions ในแถบซ้ายแทน flowchart + Variables) · แล้ว prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)

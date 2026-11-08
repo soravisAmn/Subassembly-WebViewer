@@ -452,7 +452,112 @@ const Logic = (() => {
     };
   }
 
-  return { RESERVED, nameError, freeCondName,
+  // ---------- มุมมองข้อความ (รอบ 5 M4) ----------
+  // toText: pseudo-code ภาษาไทยของ variables / เงื่อนไข / object เกิดเสมอ / decision → กิ่ง (ซ้อน = elif) · evalResult (ผลของ Spec.evaluate) = ต่อท้าย "← ตอนนี้: …"
+  const COL = 44;
+  const pad = (s, note) => note ? (s.length < COL ? s + " ".repeat(COL - s.length) : s + "  ") + note : s;
+  const objList = (spec, b) => {
+    const o = [...spec.points.filter(x => (x.branch || null) === b).map(x => x.id + (Spec.isAux(x) ? " (aux)" : "")),
+               ...spec.links.filter(x => (x.branch || null) === b).map(x => x.id + (Spec.isAux(x) ? " (aux)" : "")),
+               ...spec.shapes.filter(x => (x.branch || null) === b).map(x => x.id)];
+    return o.length ? o.join(", ") : "(ว่าง)";
+  };
+  const fmtVal = (v, unit) => v === undefined ? "– (กิ่งแม่ไม่เกิด)" : v === null ? "ไม่รู้ค่า" : typeof v === "boolean" ? (v ? "จริง" : "เท็จ") : Spec.fmtUnit(unit || "number", Expr.num(v));
+  function varText(v){
+    const rs = v.rules || [];
+    if (!rs.length) return `${v.name} = ${v.expr}`;
+    return `${v.name} = ` + rs.map((r, i) => `${i ? "ไม่งั้นถ้า" : "ถ้า"} ${r.when} → ${r.value}${r.warn ? " (เตือน)" : ""}`).join(" · ") + ` · ไม่งั้น → ${v.expr}`;
+  }
+  function toText(spec, evalResult){
+    const lg = spec.logic || {}, L = evalResult && evalResult.logic, out = [];
+    const decs = lg.decisions || [], brs = lg.branches || [];
+    const now = v => L ? `← ตอนนี้: ${v}` : "";
+    out.push("Variables:" + ((lg.variables || []).length ? "" : " (ไม่มี)"));
+    for (const v of lg.variables || []) out.push(pad("  " + varText(v), L && L.vars ? now(fmtVal(L.vars[v.name], v.unit)) : ""));
+    out.push("Conditions:" + ((lg.conditions || []).length ? "" : " (ไม่มี)"));
+    for (const c of lg.conditions || []) out.push(pad(`  ${c.name} = ${c.expr}`, L ? now(fmtVal(L.conds[c.name])) : ""));
+    out.push(`เกิดเสมอ: ${objList(spec, null)}`);
+    const walk = (parent, ind) => {
+      const sp = " ".repeat(ind);
+      for (const d of decs.filter(x => (x.parent || null) === parent)){
+        const mine = brs.filter(b => b.decision === d.id), tag = `[${d.id}${d.label && d.label !== d.test ? " " + d.label : ""}]`;
+        const on = b => L && L.branches[b.id] ? "← เกิดตอนนี้" : "";
+        if (d.kind === "switch"){
+          out.push(pad(`${sp}switch ${d.test}:`, tag + (L ? "   " + now(fmtVal(L.decisions[d.id])) : "")));
+          for (const b of mine){
+            out.push(pad(`${sp}    ${b.case === "else" ? "อื่นๆ" : "= " + b.case}  ${b.label || ""} (${b.id}): ${objList(spec, b.id)}`, on(b)));
+            walk(b.id, ind + 8);
+          }
+          continue;
+        }
+        const yes = mine.find(b => b.case === true || b.case === "true"), no = mine.find(b => !(b.case === true || b.case === "true"));
+        out.push(pad(`${sp}ถ้า ${d.test}:`, tag));
+        if (yes){ out.push(pad(`${sp}    ${yes.label || "ใช่"} (${yes.id}): ${objList(spec, yes.id)}`, on(yes))); walk(yes.id, ind + 4); }
+        if (no){ out.push(`${sp}ไม่ใช่:`); out.push(pad(`${sp}    ${no.label || "ไม่ใช่"} (${no.id}): ${objList(spec, no.id)}`, on(no))); walk(no.id, ind + 4); }
+      }
+    };
+    walk(null, 0);
+    return out.join("\n");
+  }
+
+  // diffText: สิ่งที่เปลี่ยนระหว่าง spec สองชุด เป็นบรรทัดภาษาไทย (+ เพิ่ม · - ลบ · ~ แก้) — ไว้ให้ผู้ใช้ดูก่อนยืนยันสิ่งที่ AI แก้ (prompt-6)
+  function diffText(before, after){
+    const A = before || {}, B = after || {}, la = A.logic || {}, lb = B.logic || {}, out = [];
+    const by = (list, k) => { const m = new Map(); for (const x of list || []) m.set(x[k], x); return m; };
+    const brName = (lg, id) => { const b = (lg.branches || []).find(x => x.id === id); return b ? `${b.label || b.id} (${b.id})` : "เกิดเสมอ"; };
+    // parameter
+    const pa = by(A.params, "name"), pb = by(B.params, "name");
+    for (const [n, p] of pb) if (!pa.has(n)) out.push(`+ parameter ${n} = ${Spec.fmtParam(p, p.default)}`);
+    for (const [n] of pa) if (!pb.has(n)) out.push(`- parameter ${n}`);
+    for (const [n, p] of pb){ const q = pa.get(n); if (!q) continue;
+      const ch = ["default", "min", "max", "positive", "unit", "kind"].filter(k => JSON.stringify(q[k] ?? null) !== JSON.stringify(p[k] ?? null)).map(k => `${k} ${JSON.stringify(q[k] ?? null)} → ${JSON.stringify(p[k] ?? null)}`);
+      if (ch.length) out.push(`~ parameter ${n}: ${ch.join(" · ")}`); }
+    // variable (จับคู่ด้วย id — เปลี่ยนชื่อ = ~)
+    const va = by(la.variables, "id"), vb = by(lb.variables, "id");
+    for (const [id, v] of vb) if (!va.has(id)) out.push(`+ variable ${varText(v)}`);
+    for (const [id, v] of va) if (!vb.has(id)) out.push(`- variable ${v.name}`);
+    for (const [id, v] of vb){ const o = va.get(id); if (!o) continue;
+      if (o.name !== v.name) out.push(`~ variable ${o.name} เปลี่ยนชื่อเป็น ${v.name}`);
+      if (varText({ ...o, name: v.name }) !== varText(v)) out.push(`~ variable ${v.name}: ${varText({ ...o, name: v.name }).slice(v.name.length + 3)} → ${varText(v).slice(v.name.length + 3)}`); }
+    // เงื่อนไข
+    const ca = by(la.conditions, "id"), cb = by(lb.conditions, "id");
+    for (const [id, c] of cb) if (!ca.has(id)) out.push(`+ เงื่อนไข ${c.name} = ${c.expr}`);
+    for (const [id, c] of ca) if (!cb.has(id)) out.push(`- เงื่อนไข ${c.name}`);
+    for (const [id, c] of cb){ const o = ca.get(id); if (!o) continue;
+      if (o.name !== c.name) out.push(`~ เงื่อนไข ${o.name} เปลี่ยนชื่อเป็น ${c.name}`);
+      if (o.expr !== c.expr) out.push(`~ เงื่อนไข ${c.name}: ${o.expr} → ${c.expr}`); }
+    // decision + กิ่ง
+    const da = by(la.decisions, "id"), db = by(lb.decisions, "id"), ba = by(la.branches, "id"), bb = by(lb.branches, "id");
+    const caseText = (d, b) => d && d.kind === "switch" ? (b.case === "else" ? "อื่นๆ" : `= ${b.case}`) : (b.case === true || b.case === "true" ? "ใช่" : "ไม่ใช่");
+    for (const [id, d] of db) if (!da.has(id)){
+      const kids = (lb.branches || []).filter(b => b.decision === id).map(b => `${b.label || b.id} (${b.id})`).join(" / ");
+      out.push(`+ decision ${id} "${d.label || d.test}" (${d.kind === "switch" ? "switch" : "if"} ${d.test})${d.parent ? " ในกิ่ง " + brName(lb, d.parent) : ""} → กิ่ง ${kids}`);
+    }
+    for (const [id, d] of da) if (!db.has(id)) out.push(`- decision ${id} "${d.label || d.test}" (และกิ่งของมัน)`);
+    for (const [id, d] of db){ const o = da.get(id); if (!o) continue;
+      if ((o.kind || "if") !== (d.kind || "if")) out.push(`~ decision ${id}: ${o.kind || "if"} → ${d.kind || "if"}`);
+      if (o.test !== d.test) out.push(`~ decision ${id}: ${o.test} → ${d.test}`);
+      if ((o.label || "") !== (d.label || "")) out.push(`~ decision ${id} ป้าย: ${o.label || "-"} → ${d.label || "-"}`);
+      if ((o.parent || null) !== (d.parent || null)) out.push(`~ decision ${id} ย้าย: ${o.parent ? "ในกิ่ง " + brName(la, o.parent) : "ระดับบนสุด"} → ${d.parent ? "ในกิ่ง " + brName(lb, d.parent) : "ระดับบนสุด"}`); }
+    for (const [id, b] of bb) if (!ba.has(id) && da.has(b.decision)) out.push(`+ กิ่ง ${b.label || id} (${id}) ${caseText(db.get(b.decision), b)} ของ ${b.decision}`);
+    for (const [id, b] of ba) if (!bb.has(id) && db.has(b.decision)) out.push(`- กิ่ง ${b.label || id} (${id}) ของ ${b.decision}`);
+    for (const [id, b] of bb){ const o = ba.get(id); if (!o) continue;
+      if ((o.label || "") !== (b.label || "")) out.push(`~ กิ่ง ${id} ชื่อ: ${o.label || "-"} → ${b.label || "-"}`);
+      if (JSON.stringify(o.case) !== JSON.stringify(b.case)) out.push(`~ กิ่ง ${id} case: ${caseText(da.get(o.decision), o)} → ${caseText(db.get(b.decision), b)}`); }
+    // object: เพิ่ม / ลบ / ย้ายกิ่ง (รวมเป็นกลุ่มตามทางที่ย้าย)
+    const all = s => [...(s.points || []), ...(s.links || []), ...(s.shapes || [])];
+    const oa = by(all(A), "id"), ob = by(all(B), "id");
+    const added = [...ob.keys()].filter(k => !oa.has(k)), removed = [...oa.keys()].filter(k => !ob.has(k));
+    if (added.length) out.push(`+ object ${added.join(", ")}`);
+    if (removed.length) out.push(`- object ${removed.join(", ")}`);
+    const moves = new Map();
+    for (const [id, o] of ob){ const p = oa.get(id); if (!p || (p.branch || null) === (o.branch || null)) continue;
+      const k = `${brName(la, p.branch || null)} → ${brName(lb, o.branch || null)}`; moves.set(k, (moves.get(k) || []).concat(id)); }
+    for (const [k, ids] of moves) out.push(`~ ${ids.join(", ")}: ${k}`);
+    return out.length ? out.join("\n") : "(ไม่มีอะไรเปลี่ยน)";
+  }
+
+  return { RESERVED, nameError, freeCondName, toText, diffText,
            addCondition, editCondition, renameCondition, removeCondition,
            addDecision, editDecision, removeDecision, moveDecision,
            addCase, editCase, removeCase, moveCase, renameBranch, setBranch,

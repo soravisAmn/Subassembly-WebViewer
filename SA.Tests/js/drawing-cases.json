@@ -2647,5 +2647,729 @@
         ]
       }
     }
+  },
+  {
+    "name": "round5-demo (tests-civil3d): ดินสูง +2 = ตัด · ProtectionType 1 หินเรียง",
+    "surface": [
+      {
+        "x": -30,
+        "y": 2
+      },
+      {
+        "x": 30,
+        "y": 2
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "Round5Demo",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "Width",
+          "kind": "double",
+          "default": 4,
+          "displayName": "Crest Width",
+          "min": 1,
+          "max": null,
+          "unit": "length"
+        },
+        {
+          "name": "ProtectionType",
+          "kind": "long",
+          "default": 1,
+          "displayName": "Protection (1 หินเรียง · 2 คอนกรีต · อื่นๆ ไม่มี)",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "RockT",
+          "kind": "double",
+          "default": 0.5,
+          "displayName": "Rock Thickness",
+          "min": null,
+          "max": null,
+          "unit": "length",
+          "positive": true
+        },
+        {
+          "name": "ConcT",
+          "kind": "double",
+          "default": 0.2,
+          "displayName": "Concrete Thickness",
+          "min": null,
+          "max": null,
+          "unit": "length",
+          "positive": true
+        },
+        {
+          "name": "Depth",
+          "kind": "double",
+          "default": 2.5,
+          "displayName": "Key Depth",
+          "min": null,
+          "max": null,
+          "unit": "length"
+        },
+        {
+          "name": "KeyW",
+          "kind": "double",
+          "default": 1,
+          "displayName": "Key Width",
+          "min": null,
+          "max": null,
+          "unit": "length",
+          "positive": true
+        },
+        {
+          "name": "BermH",
+          "kind": "double",
+          "default": 3,
+          "displayName": "Berm Height",
+          "min": null,
+          "max": null,
+          "unit": "length",
+          "positive": true
+        },
+        {
+          "name": "BermW",
+          "kind": "double",
+          "default": 2,
+          "displayName": "Berm Width",
+          "min": null,
+          "max": null,
+          "unit": "length",
+          "positive": true
+        },
+        {
+          "name": "CutSlope",
+          "kind": "double",
+          "default": 1.5,
+          "displayName": "Cut Slope (1:x)",
+          "min": null,
+          "max": null,
+          "unit": "slope",
+          "positive": true
+        },
+        {
+          "name": "FillSlope",
+          "kind": "double",
+          "default": 2,
+          "displayName": "Fill Slope (1:x)",
+          "min": null,
+          "max": null,
+          "unit": "slope",
+          "positive": true
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [
+            "CrestInside"
+          ],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "CrestOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "Width",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "Daylight_Cut"
+          ],
+          "def": {
+            "type": "slopeToSurface",
+            "from": "P2",
+            "slope": "1/CutSlope",
+            "dir": 1,
+            "target": "TargetSurface",
+            "maxDistance": "50",
+            "layoutLength": "3"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "Daylight_Fill"
+          ],
+          "def": {
+            "type": "slopeToSurface",
+            "from": "P2",
+            "slope": "-1/FillSlope",
+            "dir": 1,
+            "target": "TargetSurface",
+            "maxDistance": "50",
+            "layoutLength": "3"
+          },
+          "branch": "B4"
+        },
+        {
+          "id": "P5",
+          "codes": [
+            "Daylight"
+          ],
+          "def": {
+            "type": "firstOf",
+            "points": [
+              "P3",
+              "P4",
+              "P8"
+            ]
+          },
+          "auxiliary": true
+        },
+        {
+          "id": "P6",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "slopeLength",
+            "from": "P2",
+            "slope": "-1/FillSlope",
+            "length": "BermH",
+            "dir": 1,
+            "measure": "dy"
+          },
+          "branch": "B3"
+        },
+        {
+          "id": "P7",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P6",
+            "dx": "BermW",
+            "dy": "0"
+          },
+          "branch": "B3"
+        },
+        {
+          "id": "P8",
+          "codes": [
+            "Daylight_Fill"
+          ],
+          "def": {
+            "type": "slopeToSurface",
+            "from": "P7",
+            "slope": "-1/FillSlope",
+            "dir": 1,
+            "target": "TargetSurface",
+            "maxDistance": "50",
+            "layoutLength": "3"
+          },
+          "branch": "B3"
+        },
+        {
+          "id": "P9",
+          "codes": [
+            "KeyBottomInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "0",
+            "dy": "-DepthUsed"
+          }
+        },
+        {
+          "id": "P10",
+          "codes": [
+            "KeyBottomOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P9",
+            "dx": "KeyW",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P11",
+          "codes": [
+            "KeyTop"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P10",
+            "dx": "0",
+            "dy": "DepthUsed"
+          }
+        },
+        {
+          "id": "P12",
+          "codes": [
+            "RockTopInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "0",
+            "dy": "RockT"
+          },
+          "branch": "B5"
+        },
+        {
+          "id": "P13",
+          "codes": [
+            "RockTopOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "0",
+            "dy": "RockT"
+          },
+          "branch": "B5"
+        },
+        {
+          "id": "P14",
+          "codes": [
+            "ConcreteTopInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "0",
+            "dy": "ConcT"
+          },
+          "branch": "B6"
+        },
+        {
+          "id": "P15",
+          "codes": [
+            "ConcreteTopOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "0",
+            "dy": "ConcT"
+          },
+          "branch": "B6"
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P1",
+            "P2"
+          ],
+          "codes": [
+            "Top",
+            "Crest"
+          ]
+        },
+        {
+          "id": "L2",
+          "points": [
+            "P2",
+            "P3"
+          ],
+          "codes": [
+            "Daylight_Cut"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L3",
+          "points": [
+            "P2",
+            "P4"
+          ],
+          "codes": [
+            "Daylight_Fill"
+          ],
+          "branch": "B4"
+        },
+        {
+          "id": "L4",
+          "points": [
+            "P2",
+            "P6"
+          ],
+          "codes": [
+            "Top",
+            "Daylight_Fill"
+          ],
+          "branch": "B3"
+        },
+        {
+          "id": "L5",
+          "points": [
+            "P6",
+            "P7"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B3"
+        },
+        {
+          "id": "L6",
+          "points": [
+            "P7",
+            "P8"
+          ],
+          "codes": [
+            "Top",
+            "Daylight_Fill"
+          ],
+          "branch": "B3"
+        },
+        {
+          "id": "L7",
+          "points": [
+            "P1",
+            "P9"
+          ],
+          "codes": [
+            "Key"
+          ]
+        },
+        {
+          "id": "L8",
+          "points": [
+            "P9",
+            "P10"
+          ],
+          "codes": [
+            "Key",
+            "KeyBottom"
+          ]
+        },
+        {
+          "id": "L9",
+          "points": [
+            "P10",
+            "P11"
+          ],
+          "codes": [
+            "Key"
+          ]
+        },
+        {
+          "id": "L10",
+          "points": [
+            "P11",
+            "P1"
+          ],
+          "codes": [
+            "Key"
+          ]
+        },
+        {
+          "id": "L11",
+          "points": [
+            "P1",
+            "P12"
+          ],
+          "codes": [
+            "Rock"
+          ],
+          "branch": "B5"
+        },
+        {
+          "id": "L12",
+          "points": [
+            "P12",
+            "P13"
+          ],
+          "codes": [
+            "Top",
+            "Rock"
+          ],
+          "branch": "B5"
+        },
+        {
+          "id": "L13",
+          "points": [
+            "P13",
+            "P2"
+          ],
+          "codes": [
+            "Rock"
+          ],
+          "branch": "B5"
+        },
+        {
+          "id": "L14",
+          "points": [
+            "P1",
+            "P14"
+          ],
+          "codes": [
+            "Concrete"
+          ],
+          "branch": "B6"
+        },
+        {
+          "id": "L15",
+          "points": [
+            "P14",
+            "P15"
+          ],
+          "codes": [
+            "Top",
+            "Concrete"
+          ],
+          "branch": "B6"
+        },
+        {
+          "id": "L16",
+          "points": [
+            "P15",
+            "P2"
+          ],
+          "codes": [
+            "Concrete"
+          ],
+          "branch": "B6"
+        }
+      ],
+      "shapes": [
+        {
+          "id": "S1",
+          "links": [
+            "L7",
+            "L8",
+            "L9",
+            "L10"
+          ],
+          "codes": [
+            "CoreKey"
+          ]
+        },
+        {
+          "id": "S2",
+          "links": [
+            "L11",
+            "L12",
+            "L13",
+            "L1"
+          ],
+          "codes": [
+            "Rock"
+          ],
+          "branch": "B5"
+        },
+        {
+          "id": "S3",
+          "links": [
+            "L14",
+            "L15",
+            "L16",
+            "L1"
+          ],
+          "codes": [
+            "Concrete"
+          ],
+          "branch": "B6"
+        }
+      ],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "logic": {
+        "conditions": [
+          {
+            "id": "C1",
+            "name": "IsCut",
+            "expr": "ground(P2) > P2.y",
+            "note": "ผิวดินสูงกว่าบานพับ = ตัด"
+          },
+          {
+            "id": "C2",
+            "name": "HighFill",
+            "expr": "P2.y - ground(P2) > BermH"
+          }
+        ],
+        "decisions": [
+          {
+            "id": "D1",
+            "parent": null,
+            "kind": "if",
+            "test": "IsCut",
+            "label": "ตัดหรือถม?"
+          },
+          {
+            "id": "D2",
+            "parent": "B2",
+            "kind": "if",
+            "test": "HighFill",
+            "label": "ถมสูงไหม?"
+          },
+          {
+            "id": "D3",
+            "parent": null,
+            "kind": "switch",
+            "test": "ProtectionType",
+            "label": "ชั้นป้องกัน"
+          }
+        ],
+        "branches": [
+          {
+            "id": "B1",
+            "decision": "D1",
+            "case": true,
+            "label": "ตัด"
+          },
+          {
+            "id": "B2",
+            "decision": "D1",
+            "case": false,
+            "label": "ถม"
+          },
+          {
+            "id": "B3",
+            "decision": "D2",
+            "case": true,
+            "label": "ถมสูง (ชานพัก)"
+          },
+          {
+            "id": "B4",
+            "decision": "D2",
+            "case": false,
+            "label": "ถมปกติ"
+          },
+          {
+            "id": "B5",
+            "decision": "D3",
+            "case": 1,
+            "label": "หินเรียง"
+          },
+          {
+            "id": "B6",
+            "decision": "D3",
+            "case": 2,
+            "label": "คอนกรีต"
+          },
+          {
+            "id": "B7",
+            "decision": "D3",
+            "case": "else",
+            "label": "ไม่มีชั้นป้องกัน"
+          }
+        ],
+        "variables": [
+          {
+            "id": "V1",
+            "name": "DepthUsed",
+            "kind": "double",
+            "unit": "length",
+            "note": "ร่องแกนลึกขั้นต่ำ 2 m",
+            "expr": "Depth",
+            "rules": [
+              {
+                "when": "Depth < 2",
+                "value": "2",
+                "warn": "Depth = {Depth} m < 2 m ใช้ 2 m แทน",
+                "error": "ValueTooSmall"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "round5-demo: ดินต่ำ 1.5 m = ถมปกติ · ProtectionType 2 คอนกรีต",
+    "surface": [
+      {
+        "x": -30,
+        "y": -1.5
+      },
+      {
+        "x": 30,
+        "y": -1.5
+      }
+    ],
+    "values": {
+      "ProtectionType": 2
+    },
+    "copySpecFrom": 91
+  },
+  {
+    "name": "round5-demo: ดินต่ำ 6 m = ถมสูง ชานพัก · ProtectionType 3 ไม่มี · Depth 1.5 → 2 + เตือน",
+    "surface": [
+      {
+        "x": -30,
+        "y": -6
+      },
+      {
+        "x": 30,
+        "y": -6
+      }
+    ],
+    "values": {
+      "ProtectionType": 3,
+      "Depth": 1.5
+    },
+    "copySpecFrom": 91
+  },
+  {
+    "name": "round5-demo: Side = Left ดินลาด (ซ้ายต่ำ = ถมสูง)",
+    "surface": [
+      {
+        "x": -30,
+        "y": -12
+      },
+      {
+        "x": 30,
+        "y": 4
+      }
+    ],
+    "values": {
+      "Side": 1
+    },
+    "copySpecFrom": 91
+  },
+  {
+    "name": "round5-demo: Layout mode (ไม่มีดิน = ถมปกติ)",
+    "surface": [
+      {
+        "x": -30,
+        "y": 2
+      },
+      {
+        "x": 30,
+        "y": 2
+      }
+    ],
+    "layout": true,
+    "copySpecFrom": 91
   }
 ]

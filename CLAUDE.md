@@ -40,7 +40,7 @@
 
 ## สถานะล่าสุด (อัปเดตทุกครั้งที่จบ milestone)
 - รอบ 1 (`prompt.md`), รอบ 2 (`prompt-2.md`), รอบ 3 + 3b (`prompt-3.md`, `prompt-3b.md`) — **เสร็จแล้ว** (commit `ha`)
-- ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs` ใน Civil 3D จริง (เครื่องนี้ไม่มี Civil 3D · round4b-demo ถูกลบไปพร้อม Max / Min)
+- ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs`, `round5-demo.cs` ใน Civil 3D จริง (เครื่องนี้ไม่มี Civil 3D · round4b-demo ถูกลบไปพร้อม Max / Min)
 - **รอบ 4 `prompt-4.md` เสร็จแล้ว** — M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบผู้ใช้อยู่ใน `prompt-4-design.md` (ตอบ "ตามที่เสนอ" ทุกข้อ), จัดระเบียบ repo แล้ว (เลิก track bin/obj · ยังเหลือของที่ควรลบ ดูไฟล์นั้น)
   M1 เสร็จ (2026-11-02): นิพจน์เงื่อนไข + P3.x/y, ground(), exists(), hasGround() ใน JS / C# (test: `cond.test.js`, `ExprTests.cs`, drawing-cases 31–35)
   M2 เสร็จ (2026-11-02): กิ่ง if / switch / ซ้อน + `firstOf` ใน JS / C# + UI ขั้นต่ำ "เกิดเมื่อ" ใน Properties (test: `logic.test.js`, ExprTests "กิ่ง -> C#", drawing-cases 36–44)
@@ -98,8 +98,10 @@
     M3 เสร็จ (2026-11-08): Variables — `spec.logic.variables` (rules if / elif ตัวแรกชนะ + warn {ชื่อ} + error) evaluate (getter ใน env) + C# `VariableLines` (double + if / else if · อ้างจุด = double? ผ่าน Val + `VN()` เฉพาะเมื่อใช้)
       Logic.addVariable / edit / rename / remove / move / variableUses (วนกันผ่าน variable / จุด = error) · ต้นไม้ Variables + หน้าต่าง + Variable · drawing-cases 84–90 · RockPitchingTests: base + DepthUsed = ไฟล์จริง
     M4 เสร็จ (2026-11-08): Logic.toText (pseudo-code ไทย + ค่าตอนนี้ · – = กิ่งแม่ไม่เกิด) / Logic.diffText (+ - ~) · แท็บ Logic ปุ่ม ตาราง / ข้อความ + คัดลอก (ค่าสด) · test: logictext.test.js
-      — ถัดไป M5 round5-demo + checklist + รวมงาน
-  ก่อนหน้านี้วางแผน: `prompt-5.md` (Logic API + มุมมองข้อความ + ต้นไม้ Conditions ในแถบซ้ายแทน flowchart + Variables) · แล้ว prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+    M5 เสร็จ (2026-11-08): `tests-civil3d/round5-demo.cs` (+ .assembly.json, `round5-checklist.md`) คันดิน switch ProtectionType + ตัด / ถม › elif HighFill ชานพัก + Variable DepthUsed
+      สร้างด้วย Logic API ล้วน (`buildRound5()` ใน `SA.Tests/js/round5demo.test.js`) · drawing-cases 91–95 → **รอบ 5 จบ** รอทดสอบใน Civil 3D (`round5-checklist.md`)
+      ข้อจำกัดที่รู้: ชานพักทำชั้นเดียว (ไม่ใช่ Array หลายขั้น — Loop อยู่ prompt-5b) · branchRisks ยังไม่ไล่จุดที่อ้างผ่าน variable
+  ถัดไป: prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

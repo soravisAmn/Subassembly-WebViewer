@@ -630,6 +630,16 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 - ต้องมี target surface ที่ corridor ผ่านทั้งช่วงตัดและถม แล้วทำตาม `tests-civil3d/round4-checklist.md` (10 ข้อ + ตารางพิกัดเมื่อดินราบ)
 - spec เดียวกันอยู่ใน `drawing-cases.json` (เทียบ JS กับ C# 5 กรณี: ตัด, ถมปกติ, ถมสูง + ไม่มีขอบทาง, Left, Layout)
 
+### ทดสอบใน Civil 3D (รอบ 5) — round5-demo คันดิน
+
+`tests-civil3d/round5-demo.cs` = subassembly `TestSubassembly.Round5Demo` ที่สร้างด้วยเครื่องมือของเว็บเท่านั้น (ลำดับการกด = `buildRound5()` ใน `SA.Tests/js/round5demo.test.js` — ทุกขั้นผ่าน Logic API)
+แล้ว Save ผ่าน `/api/drawing/save` (เส้นทางของปุ่ม Save (.cs)) · เปิดดูในเว็บ: ไฟล์ ▾ → Open project → `round5-demo.assembly.json`
+
+- **switch `ProtectionType`**: 1 หินเรียง (shape `Rock`) · 2 คอนกรีต (shape `Concrete`) · อื่นๆ ไม่มีชั้นป้องกัน — ชั้นบนสันคันดิน
+- **Daylight Cut/Fill** ที่ไหล่ → **elif `HighFill`** ในกิ่งถม (ไหล่สูงกว่าดินเกิน `BermH`): ถมสูง = ลาดลง `BermH` → **ชานพัก** `BermW` → ลาดจนชนดิน · ถมปกติ = ลาดถมเดิม
+- **Variable `DepthUsed`**: ร่องแกน (shape `CoreKey`) ลึก `Depth` แต่ไม่น้อยกว่า 2 m (เตือน ValueTooSmall)
+- drawing-cases 91–95 เทียบ JS = C# (ตัด / ถมปกติ / ถมสูง / Left / Layout) · ใน Civil 3D: ทำตาม `tests-civil3d/round5-checklist.md`
+
 ### ทดสอบใน Civil 3D (รอบ 4c) — rock-pitching ที่วาดใหม่
 
 `tests-civil3d/round4c-base.cs` (`Round4cBase`) / `round4c-body.cs` (`Round4cBody`) = `base_rock-pitching.cs` / `body_rock-pitching.cs` ที่วาดใหม่ด้วยเครื่องมือของเว็บเท่านั้น
@@ -759,6 +769,7 @@ Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่�
 | `node SA.Tests/js/logicops.test.js` | Logic API: ทุกฟังก์ชัน กรณีปกติ + error (ชื่อซ้ำ, คำสงวน, ชนิดนิพจน์, case ซ้ำ / else, ย้าย decision เข้าตัวเอง, ลบ 3 แบบ, วนกัน) — error แล้ว spec ไม่เปลี่ยน, describe (รอบ 5) |
 | `node SA.Tests/js/variables.test.js` | Variables: rules ตัวแรกที่จริงชนะ + ข้อความเตือน, อ้างจุด / ผิวดิน (ไม่รู้ค่า), ใช้ใน slope / Offset / Array / เงื่อนไข, วนกัน, rename / ลบ / เรียง, bool = เงื่อนไข (รอบ 5) — JS = C# ใน drawing-cases 84–90 + RockPitchingTests (DepthUsed) |
 | `node SA.Tests/js/logictext.test.js` | มุมมองข้อความ: toText (if / elif / switch / ซ้อน 3 ชั้น / กิ่งว่าง / variable มี-ไม่มี rules / มี-ไม่มีค่าตอนนี้) · diffText (เพิ่ม / แก้ / เปลี่ยนชื่อ / ลบ / ย้าย / ไม่เปลี่ยน) (รอบ 5) |
+| `node SA.Tests/js/round5demo.test.js` | round5-demo สร้างด้วย Logic API ล้วน: โครง / ไม่มี branchRisks, ตัด / ถมปกติ / ถมสูง (ชานพัก) / Layout, switch 3 กิ่ง, DepthUsed เตือน, Left · spec = sa-spec ใน `tests-civil3d/round5-demo.cs` (รอบ 5) |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |

@@ -41,7 +41,7 @@
 
 ## สถานะล่าสุด (อัปเดตทุกครั้งที่จบ milestone)
 - รอบ 1 (`prompt.md`), รอบ 2 (`prompt-2.md`), รอบ 3 + 3b (`prompt-3.md`, `prompt-3b.md`) — **เสร็จแล้ว** (commit `ha`)
-- ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs`, `round5-demo.cs` ใน Civil 3D จริง (เครื่องนี้ไม่มี Civil 3D · round4b-demo ถูกลบไปพร้อม Max / Min)
+- ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs`, `round5-demo.cs`, `round5b-demo.cs` ใน Civil 3D จริง (เครื่องนี้ไม่มี Civil 3D · round4b-demo ถูกลบไปพร้อม Max / Min)
 - **รอบ 4 `prompt-4.md` เสร็จแล้ว** — M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบผู้ใช้อยู่ใน `prompt-4-design.md` (ตอบ "ตามที่เสนอ" ทุกข้อ), จัดระเบียบ repo แล้ว (เลิก track bin/obj · ยังเหลือของที่ควรลบ ดูไฟล์นั้น)
   M1 เสร็จ (2026-11-02): นิพจน์เงื่อนไข + P3.x/y, ground(), exists(), hasGround() ใน JS / C# (test: `cond.test.js`, `ExprTests.cs`, drawing-cases 31–35)
   M2 เสร็จ (2026-11-02): กิ่ง if / switch / ซ้อน + `firstOf` ใน JS / C# + UI ขั้นต่ำ "เกิดเมื่อ" ใน Properties (test: `logic.test.js`, ExprTests "กิ่ง -> C#", drawing-cases 36–44)
@@ -113,8 +113,11 @@
       (test: `loop.test.js` 12, drawing-cases 105–108)
     M3 เสร็จ (2026-11-08): ต้นไม้ Arrays (`treeArrays` ใน condtree.js — ชิป ×N + ℹ / ⚠ สด · ชุด ✓ / – · คลิก = เลือก), ป้าย "A1 ×N" บนรูป (`.arr-lbl`),
       แสดงทุกกรณีของชุดที่ไม่เกิด (ghost คำนวณเมื่อมี Loop ด้วย · `Spec.offLabel` ป้ายสั้น), scenario: `scenarioEval` / `scenarioLoops` + `logicCoverage().loops / loopMiss` (⚠ ยังไม่มี N = 1 / สูงสุด),
-      Logic.toText หัว Arrays + สมาชิกย่อ · diffText ของ Array · แก้บั๊ก snapshot scenario ที่อ้าง params ของจริง (copy ทั้งก้อน) (test: `loop.test.js` 13) — ถัดไป M4 round5b-demo
-  ถัดไป: รอบ 5b M4 → prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+      Logic.toText หัว Arrays + สมาชิกย่อ · diffText ของ Array · แก้บั๊ก snapshot scenario ที่อ้าง params ของจริง (copy ทั้งก้อน) (test: `loop.test.js` 13)
+    M4 เสร็จ (2026-11-08): `tests-civil3d/round5b-demo.cs` (+ .assembly.json, `round5b-checklist.md`) คันดินถม — Variable FillH + HighFill › Loop A1 ชานพักทุก BermInterval
+      (i ในลาดชั้นล่าง · lastOf → ลาดสุดท้าย 1:(FillSlope + SlopeInc × count(A1))) สร้างด้วย Logic API ล้วน (`buildRound5b()` ใน `SA.Tests/js/round5bdemo.test.js`)
+      · drawing-cases 109–114 · ต้นไม้ / ป้าย: Array ในกิ่งที่ไม่เกิด = – (`arrOff`) → **รอบ 5b จบ** รอทดสอบใน Civil 3D (`round5b-checklist.md`)
+  ถัดไป: prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

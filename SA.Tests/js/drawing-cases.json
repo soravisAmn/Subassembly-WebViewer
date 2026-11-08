@@ -4924,5 +4924,983 @@
         }
       ]
     }
+  },
+  {
+    "name": "round5b-demo (tests-civil3d): ถม 7 m = ชานพัก 2 ชั้น (ลาดชั้น 2 = 1:2.25 · ลาดสุดท้าย 1:2.5)",
+    "surface": [
+      {
+        "x": -60,
+        "y": -7
+      },
+      {
+        "x": 80,
+        "y": -7
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "Round5bDemo",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "Width",
+          "kind": "double",
+          "default": 4,
+          "displayName": "Crest Width",
+          "min": 1,
+          "max": null,
+          "unit": "length"
+        },
+        {
+          "name": "FillSlope",
+          "kind": "double",
+          "default": 2,
+          "displayName": "Fill Slope (1:x)",
+          "min": null,
+          "max": null,
+          "unit": "slope",
+          "positive": true
+        },
+        {
+          "name": "SlopeInc",
+          "kind": "double",
+          "default": 0.25,
+          "displayName": "Slope Increase per Bench",
+          "min": 0,
+          "max": null
+        },
+        {
+          "name": "BermInterval",
+          "kind": "double",
+          "default": 3,
+          "displayName": "Berm Every (Height)",
+          "min": null,
+          "max": null,
+          "unit": "length",
+          "positive": true
+        },
+        {
+          "name": "BermW",
+          "kind": "double",
+          "default": 2,
+          "displayName": "Berm Width",
+          "min": null,
+          "max": null,
+          "unit": "length",
+          "positive": true
+        },
+        {
+          "name": "LayoutH",
+          "kind": "double",
+          "default": 7,
+          "displayName": "Fill Height (Layout / ไม่มีดิน)",
+          "min": null,
+          "max": null,
+          "unit": "length",
+          "positive": true
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [
+            "CrestInside"
+          ],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "CrestOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "Width",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "Daylight_Fill"
+          ],
+          "def": {
+            "type": "slopeToSurface",
+            "from": "P2",
+            "slope": "-1/FillSlope",
+            "dir": 1,
+            "target": "TargetSurface",
+            "maxDistance": "50",
+            "layoutLength": "3"
+          },
+          "branch": "B2"
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "slopeLength",
+            "from": "P2",
+            "slope": "-1/FillSlope",
+            "length": "BermInterval",
+            "dir": 1,
+            "measure": "dy"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P5",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P4",
+            "dx": "BermW",
+            "dy": "0"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P6",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P4",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (1))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P7",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P5",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (1))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P8",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P6",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (2))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P9",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P7",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (2))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P10",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P8",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (3))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P11",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P9",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (3))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P12",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P10",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (4))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P13",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P11",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (4))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P14",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P12",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (5))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P15",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P13",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (5))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P16",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P14",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (6))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P17",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P15",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (6))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P18",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P16",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (7))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P19",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P17",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (7))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P20",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P18",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (8))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P21",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P19",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (8))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P22",
+          "codes": [
+            "BermInside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P20",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (9))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P23",
+          "codes": [
+            "BermOutside"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P21",
+            "dx": "BermW + BermInterval * (FillSlope + SlopeInc * (9))",
+            "dy": "-BermInterval"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P24",
+          "codes": [],
+          "def": {
+            "type": "lastOf",
+            "array": "A1",
+            "point": "P5",
+            "points": [
+              "P23",
+              "P21",
+              "P19",
+              "P17",
+              "P15",
+              "P13",
+              "P11",
+              "P9",
+              "P7",
+              "P5"
+            ]
+          },
+          "auxiliary": true,
+          "branch": "B1"
+        },
+        {
+          "id": "P25",
+          "codes": [
+            "Daylight_Fill"
+          ],
+          "def": {
+            "type": "slopeToSurface",
+            "from": "P24",
+            "slope": "-1/(FillSlope + SlopeInc * count(A1))",
+            "dir": 1,
+            "target": "TargetSurface",
+            "maxDistance": "50",
+            "layoutLength": "3"
+          },
+          "branch": "B1"
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P1",
+            "P2"
+          ],
+          "codes": [
+            "Top",
+            "Crest"
+          ]
+        },
+        {
+          "id": "L2",
+          "points": [
+            "P2",
+            "P3"
+          ],
+          "codes": [
+            "Top",
+            "Daylight_Fill"
+          ],
+          "branch": "B2"
+        },
+        {
+          "id": "L3",
+          "points": [
+            "P2",
+            "P4"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L4",
+          "points": [
+            "P4",
+            "P5"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L5",
+          "points": [
+            "P5",
+            "P6"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L6",
+          "points": [
+            "P6",
+            "P7"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L7",
+          "points": [
+            "P7",
+            "P8"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L8",
+          "points": [
+            "P8",
+            "P9"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L9",
+          "points": [
+            "P9",
+            "P10"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L10",
+          "points": [
+            "P10",
+            "P11"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L11",
+          "points": [
+            "P11",
+            "P12"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L12",
+          "points": [
+            "P12",
+            "P13"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L13",
+          "points": [
+            "P13",
+            "P14"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L14",
+          "points": [
+            "P14",
+            "P15"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L15",
+          "points": [
+            "P15",
+            "P16"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L16",
+          "points": [
+            "P16",
+            "P17"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L17",
+          "points": [
+            "P17",
+            "P18"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L18",
+          "points": [
+            "P18",
+            "P19"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L19",
+          "points": [
+            "P19",
+            "P20"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L20",
+          "points": [
+            "P20",
+            "P21"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L21",
+          "points": [
+            "P21",
+            "P22"
+          ],
+          "codes": [
+            "Top",
+            "Fill"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L22",
+          "points": [
+            "P22",
+            "P23"
+          ],
+          "codes": [
+            "Top",
+            "Berm"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L23",
+          "points": [
+            "P24",
+            "P25"
+          ],
+          "codes": [
+            "Top",
+            "Daylight_Fill"
+          ],
+          "branch": "B1"
+        }
+      ],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "logic": {
+        "conditions": [
+          {
+            "id": "C1",
+            "name": "HighFill",
+            "expr": "FillH > BermInterval"
+          }
+        ],
+        "decisions": [
+          {
+            "id": "D1",
+            "parent": null,
+            "kind": "if",
+            "test": "HighFill",
+            "label": "มีชานพักไหม?"
+          }
+        ],
+        "branches": [
+          {
+            "id": "B1",
+            "decision": "D1",
+            "case": true,
+            "label": "มีชานพัก (Loop)"
+          },
+          {
+            "id": "B2",
+            "decision": "D1",
+            "case": false,
+            "label": "ถมต่ำ"
+          }
+        ],
+        "variables": [
+          {
+            "id": "V1",
+            "name": "FillH",
+            "kind": "double",
+            "unit": "length",
+            "note": "ความสูงถมที่ไหล่คันดิน",
+            "expr": "P2.y - ground(P2)",
+            "rules": [
+              {
+                "when": "not hasGround()",
+                "value": "LayoutH"
+              }
+            ]
+          }
+        ]
+      },
+      "arrays": [
+        {
+          "id": "A1",
+          "source": {
+            "points": [
+              "P2",
+              "P4",
+              "P5"
+            ],
+            "links": [
+              "L3",
+              "L4"
+            ],
+            "shapes": []
+          },
+          "n": 10,
+          "dx": "BermW + BermInterval * (FillSlope + SlopeInc * i)",
+          "dy": "-BermInterval",
+          "join": {
+            "mode": "share",
+            "from": "P5",
+            "to": "P2"
+          },
+          "members": [
+            {
+              "points": [
+                "P6",
+                "P7"
+              ],
+              "links": [
+                "L5",
+                "L6"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P8",
+                "P9"
+              ],
+              "links": [
+                "L7",
+                "L8"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P10",
+                "P11"
+              ],
+              "links": [
+                "L9",
+                "L10"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P12",
+                "P13"
+              ],
+              "links": [
+                "L11",
+                "L12"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P14",
+                "P15"
+              ],
+              "links": [
+                "L13",
+                "L14"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P16",
+                "P17"
+              ],
+              "links": [
+                "L15",
+                "L16"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P18",
+                "P19"
+              ],
+              "links": [
+                "L17",
+                "L18"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P20",
+                "P21"
+              ],
+              "links": [
+                "L19",
+                "L20"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P22",
+                "P23"
+              ],
+              "links": [
+                "L21",
+                "L22"
+              ],
+              "shapes": []
+            }
+          ],
+          "loop": {
+            "n": "max(1, floor(FillH / BermInterval))",
+            "nMax": 10,
+            "nRound": "floor"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "round5b-demo: ถม 2 m = ไม่มีชานพัก (กิ่ง ถมต่ำ) · Side = Left",
+    "surface": [
+      {
+        "x": -60,
+        "y": -2
+      },
+      {
+        "x": 80,
+        "y": -2
+      }
+    ],
+    "values": {
+      "Side": 1
+    },
+    "copySpecFrom": 109
+  },
+  {
+    "name": "round5b-demo: ถม 13 m = 4 ชั้น · BermW 3",
+    "surface": [
+      {
+        "x": -60,
+        "y": -13
+      },
+      {
+        "x": 80,
+        "y": -13
+      }
+    ],
+    "values": {
+      "BermW": 3
+    },
+    "copySpecFrom": 109
+  },
+  {
+    "name": "round5b-demo: Layout (ไม่มีดิน) = LayoutH 7 → 2 ชั้น",
+    "surface": [
+      {
+        "x": -60,
+        "y": -7
+      },
+      {
+        "x": 80,
+        "y": -7
+      }
+    ],
+    "layout": true,
+    "copySpecFrom": 109
+  },
+  {
+    "name": "round5b-demo: ถม 40 m → 13 ชั้น เกินสูงสุด 10 ใช้ 10 + เตือน",
+    "surface": [
+      {
+        "x": -60,
+        "y": -40
+      },
+      {
+        "x": 80,
+        "y": -40
+      }
+    ],
+    "copySpecFrom": 109
+  },
+  {
+    "name": "round5b-demo: ดินลาด (ไหล่ถม 9.5 m → 3 ชั้น) · BermInterval 2.5 · SlopeInc 0",
+    "surface": [
+      {
+        "x": -20,
+        "y": -6
+      },
+      {
+        "x": 4,
+        "y": -9.5
+      },
+      {
+        "x": 80,
+        "y": -15
+      }
+    ],
+    "values": {
+      "BermInterval": 2.5,
+      "SlopeInc": 0
+    },
+    "copySpecFrom": 109
   }
 ]

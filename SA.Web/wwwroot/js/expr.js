@@ -15,7 +15,7 @@ const Expr = (() => {
   const FUNCS = {
     min:  { min: 1, max: 99 }, max: { min: 1, max: 99 }, abs: { min: 1, max: 1 }, sqrt: { min: 1, max: 1 },
     pow:  { min: 2, max: 2 },  sin: { min: 1, max: 1 },  cos: { min: 1, max: 1 }, tan: { min: 1, max: 1 }, atan: { min: 1, max: 1 },
-    floor: { min: 1, max: 1 }, ceil: { min: 1, max: 1 }, round: { min: 1, max: 1 }, count: { min: 1, max: 1 },   // count(A1) = จำนวนชุดของ Array   // รอบ 5b · round = ปัดออกจากศูนย์ที่ .5 (= C# AwayFromZero)
+    floor: { min: 1, max: 1 }, ceil: { min: 1, max: 1 }, round: { min: 1, max: 1 }, count: { min: 1, max: 1 },   // รอบ 5b · count(A1) = จำนวนชุดของ Array · round = ปัดออกจากศูนย์ที่ .5 (= C# AwayFromZero)
     if: { min: 3, max: 3 }, ground: { min: 1, max: 2 }, exists: { min: 1, max: 1 }, hasground: { min: 0, max: 1 }
   };
   // คำสงวน (ตั้งเป็นชื่อ parameter / เงื่อนไขไม่ได้ — ไม่สนตัวพิมพ์)

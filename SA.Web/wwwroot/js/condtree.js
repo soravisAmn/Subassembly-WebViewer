@@ -91,13 +91,15 @@ function treeVariables(node, h, it, ik, depth){
 // ---------------- Arrays (รอบ 5b M3) ----------------
 // Array แต่ละตัว: N (นิพจน์ / คงที่) · สูงสุด · ชิป ×N ตอนนี้ · ℹ / ⚠ จาก Messages · ⚠ ยังไม่มี scenario ที่ N = 1 / สูงสุด
 //   ใต้ Array: ชุด 1 (ต้นฉบับ), ชุด 2, … ✓ = เกิดตอนนี้ (จาง = ไม่เกิด) · คลิก Array = เลือกทั้ง Array · คลิกชุด = เลือกชุดนั้น
-const arrNow = (r, g) => !g.loop ? g.n : r && r.logic && r.logic.loops ? r.logic.loops[g.id] : undefined;
+// Array ไม่เกิดทั้งก้อน (ชุดต้นฉบับอยู่ในกิ่งที่ไม่เกิด — ดู link ของชุด ไม่มี link = ดูจุด) → ชิป / ป้าย = – แทน ×N
+const arrOff = (r, g) => { if (!r) return false; const ids = g.source.links.length ? g.source.links.map(id => r.links[id]) : g.source.points.map(id => r.pts[id]); return ids.every(q => q && q.off && !String(q.off).includes("#")); };
+const arrNow = (r, g) => arrOff(r, g) ? "off" : !g.loop ? g.n : r && r.logic && r.logic.loops ? r.logic.loops[g.id] : undefined;
 function arrIconHtml(r, id){
   const ms = r ? (r.issues || []).filter(x => x.msg.startsWith(`Array ${id}:`)) : [];
   const w = ms.filter(x => x.level !== "i"), i = ms.filter(x => x.level === "i");
   return (w.length ? `<span class="lg-ic w" title="${esc(w.map(x => x.msg).join("\n"))}">⚠</span> ` : "") + (i.length ? `<span class="lg-ic i" title="${esc(i.map(x => x.msg).join("\n"))}">ℹ</span> ` : "");
 }
-const arrChipHtml = (r, g) => { const n = arrNow(r, g); return n == null ? '<span class="lg-val u">?</span>' : `<span class="lg-val t">×${n}</span>`; };
+const arrChipHtml = (r, g) => { const n = arrNow(r, g); return n === "off" ? `<span class="lg-val" title="Array อยู่ในกิ่งที่ไม่เกิดตอนนี้">–</span>` : n == null ? '<span class="lg-val u">?</span>' : `<span class="lg-val t">×${n}</span>`; };
 function arrSetObjs(g, k){ const m = k === 0 ? g.source : g.members[k - 1]; return m ? [...m.points.map(id => ["dpt", id]), ...m.links.map(id => ["dlink", id]), ...m.shapes.map(id => ["dshape", id])] : []; }
 function treeArrays(node, h, it, ik, depth){
   const sp = it.spec, arrs = sp.arrays || []; if (!arrs.length) return;
@@ -115,7 +117,7 @@ function treeArrays(node, h, it, ik, depth){
     if (!isOpen(gk)) continue;
     const n = arrNow(r, g);
     for (let k = 0; k < g.n; k++){
-      const objs = arrSetObjs(g, k), on = n == null || k < n;
+      const objs = arrSetObjs(g, k), on = n !== "off" && (n == null || k < n);
       node({ depth: depth + 2, cls: "lg-br lg-set" + (on ? " on" : " off"), s: { type: "lg", item: it.id, k: "aset", id: g.id, n: k },
              name: `ชุด ${k + 1}${k === 0 ? " <small>(ต้นฉบับ)</small>" : ""} <small>${esc(objs.map(o => o[1]).join(", "))}</small>`,
              title: "คลิก = เลือกชุดนี้" + (g.loop && !on ? " · ไม่เกิดตอนนี้ (k ≥ N)" : ""),
@@ -215,7 +217,7 @@ function updateTreeLive(){
   }
   for (const e of box.querySelectorAll("[data-tset]")){
     const r = drawRes[e.dataset.it], it = itemById(e.dataset.it), g = it && it.spec && Spec.byId(it.spec.arrays || [], e.dataset.arr); if (!r || !g) continue;
-    const n = arrNow(r, g), on = n == null || +e.dataset.tset < n;
+    const n = arrNow(r, g), on = n !== "off" && (n == null || +e.dataset.tset < n);
     e.textContent = on ? "✓" : "–"; const row = e.closest(".tn"); if (row){ row.classList.toggle("on", on); row.classList.toggle("off", !on); }
   }
   for (const e of box.querySelectorAll("[data-tbr]")){

@@ -221,6 +221,8 @@ link ใน Civil 3D เป็น**เส้นตรงเท่านั้น
 
 ### Loop — Array ที่จำนวนชุดคำนวณตอนรัน (รอบ 5b)
 
+ตัวอย่างครบทุกส่วน: `tests-civil3d/round5b-demo.cs` (คันดินถม ชานพักทุก BermInterval — ดูหัวข้อ "ทดสอบใน Civil 3D (รอบ 5b)")
+
 ปุ่ม **Array** เดิม → ติ๊ก **Loop** (หรือ Properties "Array A1" → ☐ Loop):
 
 | ช่อง | ใช้ทำอะไร |
@@ -662,6 +664,18 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 - ต้องมี target surface ที่ corridor ผ่านทั้งช่วงตัดและถม แล้วทำตาม `tests-civil3d/round4-checklist.md` (10 ข้อ + ตารางพิกัดเมื่อดินราบ)
 - spec เดียวกันอยู่ใน `drawing-cases.json` (เทียบ JS กับ C# 5 กรณี: ตัด, ถมปกติ, ถมสูง + ไม่มีขอบทาง, Left, Layout)
 
+### ทดสอบใน Civil 3D (รอบ 5b) — round5b-demo คันดินถม ชานพักทุก BermInterval (Loop)
+
+`tests-civil3d/round5b-demo.cs` = subassembly `TestSubassembly.Round5bDemo` ที่สร้างด้วยเครื่องมือของเว็บเท่านั้น (ลำดับการกด = `buildRound5b()` ใน `SA.Tests/js/round5bdemo.test.js` — ทุกขั้นผ่าน Logic API)
+แล้ว Save ผ่าน `/api/drawing/save` · เปิดดูในเว็บ: ไฟล์ ▾ → Open project → `round5b-demo.assembly.json` (ลากจุดผิวดินที่ไหล่ขึ้นลง = จำนวนชั้นเปลี่ยนสด)
+
+- **Variable `FillH`** = ความสูงถมที่ไหล่ (`P2.y - ground(P2)` · ไม่มีดิน = `LayoutH`) → **`HighFill`** = `FillH > BermInterval`
+- กิ่ง มีชานพัก: **Loop A1** ชุด "ลาดลง `BermInterval` → ชานพัก `BermW`" N = `max(1, floor(FillH / BermInterval))` สูงสุด 10 · ต่อชุดด้วยจุดร่วม
+  · dx = `BermW + BermInterval * (FillSlope + SlopeInc * i)` (ลาดชั้นล่างลาดขึ้น) · **จุดชุดสุดท้าย** (lastOf) → ลาดสุดท้ายชนดินที่ 1:(FillSlope + SlopeInc × `count(A1)`)
+- กิ่ง ถมต่ำ: ลาดถมเส้นเดียว · ต้นไม้ Arrays ขึ้น – (Array อยู่ในกิ่งที่ไม่เกิด) แทน ×N
+- drawing-cases 109–114 เทียบ JS = C# (ถม 2 / 7 / 13 / 40 m, Layout, ดินลาด, Left) · ใน Civil 3D: ทำตาม `tests-civil3d/round5b-checklist.md`
+- ข้อจำกัด: FillH วัดที่ไหล่จุดเดียว (ดินลาดมาก ชั้นล่างอาจอยู่ใต้ดิน) · ชานพักกว้างเท่ากันทุกชั้น (dx / dy เลื่อนทั้งชุดเท่ากัน)
+
 ### ทดสอบใน Civil 3D (รอบ 5) — round5-demo คันดิน
 
 `tests-civil3d/round5-demo.cs` = subassembly `TestSubassembly.Round5Demo` ที่สร้างด้วยเครื่องมือของเว็บเท่านั้น (ลำดับการกด = `buildRound5()` ใน `SA.Tests/js/round5demo.test.js` — ทุกขั้นผ่าน Logic API)
@@ -801,6 +815,7 @@ Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่�
 | `node SA.Tests/js/logicops.test.js` | Logic API: ทุกฟังก์ชัน กรณีปกติ + error (ชื่อซ้ำ, คำสงวน, ชนิดนิพจน์, case ซ้ำ / else, ย้าย decision เข้าตัวเอง, ลบ 3 แบบ, วนกัน) — error แล้ว spec ไม่เปลี่ยน, describe (รอบ 5) |
 | `node SA.Tests/js/variables.test.js` | Variables: rules ตัวแรกที่จริงชนะ + ข้อความเตือน, อ้างจุด / ผิวดิน (ไม่รู้ค่า), ใช้ใน slope / Offset / Array / เงื่อนไข, วนกัน, rename / ลบ / เรียง, bool = เงื่อนไข (รอบ 5) — JS = C# ใน drawing-cases 84–90 + RockPitchingTests (DepthUsed) |
 | `node SA.Tests/js/logictext.test.js` | มุมมองข้อความ: toText (if / elif / switch / ซ้อน 3 ชั้น / กิ่งว่าง / variable มี-ไม่มี rules / มี-ไม่มีค่าตอนนี้) · diffText (เพิ่ม / แก้ / เปลี่ยนชื่อ / ลบ / ย้าย / ไม่เปลี่ยน) (รอบ 5) |
+| `node SA.Tests/js/round5bdemo.test.js` | round5b-demo สร้างด้วย Logic API ล้วน: Loop ในกิ่ง + lastOf + ไม่มี branchRisks, ถม 2 / 7 / 13 m = 0 / 2 / 4 ชั้น (ลาด 1:2.25 / 1:2.5), Layout, BermInterval 2, Left, เกินสูงสุด 10 · spec = sa-spec ใน `tests-civil3d/round5b-demo.cs` (รอบ 5b) |
 | `node SA.Tests/js/round5demo.test.js` | round5-demo สร้างด้วย Logic API ล้วน: โครง / ไม่มี branchRisks, ตัด / ถมปกติ / ถมสูง (ชานพัก) / Layout, switch 3 กิ่ง, DepthUsed เตือน, Left · spec = sa-spec ใน `tests-civil3d/round5-demo.cs` (รอบ 5) |
 | `node SA.Tests/js/loop.test.js` | Array แบบ Loop: floor / ceil / round (.5 / ค่าลบ), N = 1 / 2 / nMax, ⚠ เกิน / น้อยกว่า 1 / หาค่าไม่ได้, ℹ ปัดลงค่าเริ่ม, ปัดเศษ 3 แบบ, join link + shape + กิ่ง, แปลง Array ↔ Loop, แก้ nMax (ถูกขวางเมื่อมีของนอกอ้าง), removeArray, แสดงทุกกรณี (รอบ 5b) + ตัวนับ i, lastOf (join share / ตามสูงสุด), count(A1) (Loop / คงที่ / ชื่อผิด), เตือนอ้างชุดกลาง (M2), toText / diffText ของ Array + ป้ายสั้นบนรูป (M3) — JS = C# ใน drawing-cases 96–108 |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |

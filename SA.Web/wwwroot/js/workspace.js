@@ -248,7 +248,7 @@ function renderSpec(it, r, grp, isSel){
   }
   // ป้าย "A1 ×3" ที่จุดแรกของชุดต้นฉบับของ Loop (ตัวที่แก้อยู่) — ×N = จำนวนชุดตอนนี้ (รอบ 5b)
   if (editingThis) for (const g of spec.arrays || []){
-    const n = g.loop && r.logic && r.logic.loops ? r.logic.loops[g.id] : null, q = n != null && geo("pts", g.source.points[0]);
+    const n = g.loop && r.logic && r.logic.loops && !arrOff(r, g) ? r.logic.loops[g.id] : null, q = n != null && geo("pts", g.source.points[0]);
     if (!q) continue;
     const t = el("text", {x: X(q) - 8, y: Y(q) - 10, class: "arr-lbl", "text-anchor": "end"}, grp);
     t.textContent = `${g.id} ×${n}`;

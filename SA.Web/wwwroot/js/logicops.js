@@ -425,8 +425,46 @@ const Logic = (() => {
   const addExtendToGround = wrap((s, id, end, o) => Spec.addExtendToGround(s, id, end, o));
   const addFollowClipped = wrap((s, from, to, o) => Spec.addFollowClipped(s, from, to, o));
   const addArray = wrap((s, sel, o) => Spec.addArray(s, sel, o));
-  const updateArray = wrap((s, id, o) => { const g = byId(s.arrays, id) || fail(`ไม่มี Array ${id}`); return Spec.updateArray(s, g, o); });
-  const rebuildArray = wrap((s, id, o) => { const g = byId(s.arrays, id) || fail(`ไม่มี Array ${id}`); return Spec.rebuildArray(s, g, o); });
+  const needArr = (s, id) => byId(s.arrays, id) || fail(`ไม่มี Array ${id}`);
+  // สร้างสมาชิกใหม่ (n / nMax / Loop เปิด-ปิด) — มีของนอก Array อ้างสมาชิกอยู่ = ไม่ยอม (บอกรายการ)
+  const rebuild = (s, g, o) => { const r = Spec.rebuildArray(s, g, o); if (r.error) fail(r.error); if (r.block && r.block.length) fail(`เปลี่ยนจำนวนชุดของ ${g.id} ไม่ได้ — มีของนอก Array อ้างสมาชิกอยู่: ${r.block.join(", ")}`); return r; };
+  // o = { dx?, dy?, n?, nMax?, nRound? } — Loop: n = นิพจน์ / nRound แก้ได้เลย · nMax = สร้างสมาชิกใหม่ · Array N คงที่: n = ตัวเลข (สร้างใหม่)
+  function updateArray(spec, id, o, opts){
+    return tx(spec, s => {
+      const g = needArr(s, id); o = o || {};
+      if ("dx" in o || "dy" in o){
+        for (const k of ["dx", "dy"]) if (k in o) checkExpr(s, String(o[k]).trim() || "0", "num", opts, `${id} ${k}`);
+        Spec.updateArray(s, g, o);
+      }
+      if (g.loop){
+        if ("n" in o) g.loop.n = checkExpr(s, o.n, "num", opts, `${id} N`);
+        if ("nRound" in o){ if (o.nRound && !Spec.LOOP_ROUND.includes(o.nRound)) fail("ปัดเศษ N ต้องเป็น floor / ceil / round"); if (o.nRound) g.loop.nRound = o.nRound; else delete g.loop.nRound; }
+        if ("nMax" in o && Math.round(+o.nMax) !== g.loop.nMax) rebuild(s, g, { loop: { ...g.loop, nMax: o.nMax } });
+      } else {
+        if ("nMax" in o || "nRound" in o) fail(`${id} ไม่ใช่ Loop — เปิด Loop ก่อน (setArrayLoop)`);
+        if ("n" in o && Math.round(+o.n) !== g.n) rebuild(s, g, { n: o.n });
+      }
+      return { array: id };
+    });
+  }
+  const rebuildArray = wrap((s, id, o) => { const g = needArr(s, id); return Spec.rebuildArray(s, g, o); });
+  // เปิด Loop (loop = { n, nMax?, nRound? }) / ปิด (null = Array N คงที่ เท่าจำนวนชุดที่สร้างไว้)
+  function setArrayLoop(spec, id, loop, opts){
+    return tx(spec, s => {
+      const g = needArr(s, id);
+      if (loop){ checkExpr(s, loop.n, "num", opts, `${id} N`); rebuild(s, g, { loop }); }
+      else if (g.loop) rebuild(s, g, { loop: null, n: g.n });
+      return { array: id, loop: g.loop || null };
+    });
+  }
+  // เลิกเป็น Array: object ทุกชิ้นอยู่ต่อ (Loop: ชุดที่เคยไม่เกิดจะเกิดทั้งหมด — แจ้งใน warnings)
+  function removeArray(spec, id){
+    return tx(spec, s => {
+      const g = needArr(s, id);
+      s.arrays = s.arrays.filter(x => x !== g);
+      return { warnings: g.loop ? [`${id} เคยเป็น Loop — ตอนนี้ทุกชุด (${g.n}) เกิดเสมอ`] : [] };
+    });
+  }
   const setParamBounds = wrap((s, name, b) => { Spec.setParamBounds(s, name, b); return { param: name }; });
   const setParamUnit = wrap((s, name, unit) => { Spec.setParamUnit(s, name, unit); return { param: name }; });
 
@@ -447,6 +485,8 @@ const Logic = (() => {
       variables: (lg.variables || []).map(v => ({ name: v.name, kind: v.kind || "double", unit: v.unit || "number", expr: v.expr, ...(v.rules && v.rules.length ? { rules: v.rules } : {}), ...(v.note ? { note: v.note } : {}), ...(L && L.vars ? { value: L.vars[v.name] ?? null } : {}) })),
       conditions: (lg.conditions || []).map(c => ({ name: c.name, expr: c.expr, ...(c.note ? { note: c.note } : {}), ...(L && L.conds ? { value: L.conds[c.name] ?? null } : {}) })),
       decisions: decs,
+      arrays: (spec.arrays || []).map(g => ({ id: g.id, sets: g.n, dx: g.dx, dy: g.dy, source: [...g.source.points, ...g.source.links, ...g.source.shapes],
+        ...(g.loop ? { loop: { n: g.loop.n, nMax: g.loop.nMax, nRound: g.loop.nRound || "floor" }, ...(L && L.loops ? { value: L.loops[g.id] } : {}) } : {}) })),
       always: { points: spec.points.filter(always).map(o => o.id), links: spec.links.filter(always).map(o => o.id), shapes: spec.shapes.filter(always).map(o => o.id) },
       risks: Spec.branchRisks(spec)
     };
@@ -562,7 +602,7 @@ const Logic = (() => {
            addDecision, editDecision, removeDecision, moveDecision,
            addCase, editCase, removeCase, moveCase, renameBranch, setBranch,
            addVariable, editVariable, renameVariable, removeVariable, moveVariable, variableUses, VAR_ERRORS, guessError,
-           addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setParamBounds, setParamUnit,
+           addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setArrayLoop, removeArray, setParamBounds, setParamUnit,
            describe };
 })();
 if (typeof module !== "undefined") module.exports = { Logic };

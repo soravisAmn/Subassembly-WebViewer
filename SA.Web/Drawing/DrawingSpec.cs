@@ -17,6 +17,7 @@ public class DrawingSpec
     public List<SpecLink> Links { get; set; } = new();
     public List<SpecShape> Shapes { get; set; } = new();
     public List<SpecRotation> Rotations { get; set; } = new();
+    public List<SpecArray> Arrays { get; set; } = new();         // Array (รอบ 4c) — C# ใช้เฉพาะ Loop (รอบ 5b) · สมาชิกเป็นจุด / link / shape ธรรมดาอยู่แล้ว
     public SpecLogic? Logic { get; set; }                 // เงื่อนไข / decision / กิ่ง (รอบ 4 — ดู prompt-4-design.md)
     public SpecSide? Side { get; set; }
     public bool Imported { get; set; }
@@ -148,6 +149,29 @@ public class SpecShape
     public List<string> Links { get; set; } = new();
     public List<string> Codes { get; set; } = new();
     public string? Branch { get; set; }
+}
+
+// ---------------- Array แบบ Loop (รอบ 5b) ----------------
+// members[k-1] = ชุดที่ k (ต้นฉบับ k = 0) · Loop = ชุดที่ k เกิดเมื่อ k < N (N = ปัดเศษ Loop.N แล้วบีบ 1..NMax)
+public class SpecArray
+{
+    public string Id { get; set; } = "";
+    public List<SpecArrayMember> Members { get; set; } = new();
+    public SpecLoop? Loop { get; set; }
+}
+
+public class SpecArrayMember
+{
+    public List<string> Points { get; set; } = new();
+    public List<string> Links { get; set; } = new();
+    public List<string> Shapes { get; set; } = new();
+}
+
+public class SpecLoop
+{
+    public string? N { get; set; }
+    public int NMax { get; set; } = 10;
+    public string? NRound { get; set; }               // floor (ค่าเริ่ม) | ceil | round
 }
 
 // ---------------- Logic (รอบ 4) ----------------

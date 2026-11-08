@@ -219,6 +219,25 @@ link ใน Civil 3D เป็น**เส้นตรงเท่านั้น
 - ลบสมาชิก / ต้นฉบับเอง = ถามก่อน แล้วเลิกเป็น Array · Undo ได้ทุกขั้น
 - spec: `arrays: [{ id, source: { points, links, shapes }, n, dx, dy, join: { mode: "share" | "link", from, to } | null, members: [...] }]`
 
+### Loop — Array ที่จำนวนชุดคำนวณตอนรัน (รอบ 5b)
+
+ปุ่ม **Array** เดิม → ติ๊ก **Loop** (หรือ Properties "Array A1" → ☐ Loop):
+
+| ช่อง | ใช้ทำอะไร |
+|---|---|
+| **N** | จำนวนชุดรวมต้นฉบับ = นิพจน์ / parameter / variable เช่น `floor(Height / BermInterval)` (อ้างจุด / ผิวดินได้) — ใต้ช่องแสดงตัวอย่างสด `7 / 3 = 2.3333 → 2 ชุด (ปัดลง)` |
+| **สูงสุด** | สร้างชุดเผื่อไว้ (ค่าเริ่ม 10 · 2–50) — ชุดที่ k (ต้นฉบับ k = 0) **เกิดเมื่อ k < N** ไม่เกิด = แบบ object ในกิ่งที่ไม่เกิด (ไม่ใช่ error) |
+| **ปัดเศษ N** | N ไม่ใช่จำนวนเต็ม: (ไม่ได้เลือก = ปัดลง + ℹ) · ลง (floor) · ขึ้น (ceil) · ใกล้สุด (round — .5 ปัดออกจากศูนย์ เท่ากันทั้งเว็บ / C#) |
+
+- **N ผิดปกติ** = ⚠ เตือน (เว็บ + Civil 3D Event Viewer): เกินสูงสุด → ใช้สูงสุด (`ValueTooLarge`) · น้อยกว่า 1 → ใช้ 1 (`ValueTooSmall`) · หาค่าไม่ได้ → ใช้ 1 (`Failure`)
+- **ℹ แจ้งให้ทราบ** (สีฟ้า — เว็บเท่านั้น ไม่ส่งไป Civil 3D) = ระบบใช้ค่าเริ่มต้นเพราะยังไม่ได้เลือก (เช่น ปัดลง)
+- แท็บ **Messages**: ข้อความเดียวกันขึ้นบรรทัดเดียว (×n) · badge แยก ⚠ / ℹ · **คลิกข้อความของ Array = เลือกทั้ง Array**
+- ฟังก์ชันในนิพจน์ทุกช่อง: `floor(x)` `ceil(x)` `round(x)` (round .5 ออกจากศูนย์: 2.5 → 3, −2.5 → −3)
+- C#: `int N_A1 = LoopN(cs, "A1", () => Height / BermInterval, 10, 0);` ครั้งเดียว แล้วทุกบรรทัดของชุด k = `N_A1 > k ? … : null` (shape = `if (N_A1 > k) AddShape…`)
+  → Points / Links / Shapes ใน Civil 3D มีเฉพาะชุดที่เกิด · ไฟล์ที่ไม่มี Loop ได้โค้ดเหมือนเดิมทุกตัวอักษร
+- spec: `arrays[].loop = { n: "นิพจน์", nMax: 10, nRound?: "floor" | "ceil" | "round" }` (ไม่มี = Array N คงที่แบบเดิม) · Logic API: `addArray(…, { loop })` / `updateArray(spec, id, { n, nMax, nRound, dx, dy })` / `setArrayLoop(spec, id, loop | null)` / `removeArray`
+- ยังไม่มี (M2–M3 รอบ 5b): ตัวนับ `i` ใน dx / dy, `lastOf`, `count(A1)`, โหนด Arrays ในต้นไม้
+
 ### Extend to Surface (รอบ 4c)
 
 ต่อเส้นลงถึงดิน**เฉพาะเมื่อปลายลอยเหนือดิน** แบบ `extendOutside` ของ `base_rock-pitching.cs` / เส้นปิดปลายที่ O ของ `body_rock-pitching.cs`
@@ -770,6 +789,7 @@ Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่�
 | `node SA.Tests/js/variables.test.js` | Variables: rules ตัวแรกที่จริงชนะ + ข้อความเตือน, อ้างจุด / ผิวดิน (ไม่รู้ค่า), ใช้ใน slope / Offset / Array / เงื่อนไข, วนกัน, rename / ลบ / เรียง, bool = เงื่อนไข (รอบ 5) — JS = C# ใน drawing-cases 84–90 + RockPitchingTests (DepthUsed) |
 | `node SA.Tests/js/logictext.test.js` | มุมมองข้อความ: toText (if / elif / switch / ซ้อน 3 ชั้น / กิ่งว่าง / variable มี-ไม่มี rules / มี-ไม่มีค่าตอนนี้) · diffText (เพิ่ม / แก้ / เปลี่ยนชื่อ / ลบ / ย้าย / ไม่เปลี่ยน) (รอบ 5) |
 | `node SA.Tests/js/round5demo.test.js` | round5-demo สร้างด้วย Logic API ล้วน: โครง / ไม่มี branchRisks, ตัด / ถมปกติ / ถมสูง (ชานพัก) / Layout, switch 3 กิ่ง, DepthUsed เตือน, Left · spec = sa-spec ใน `tests-civil3d/round5-demo.cs` (รอบ 5) |
+| `node SA.Tests/js/loop.test.js` | Array แบบ Loop: floor / ceil / round (.5 / ค่าลบ), N = 1 / 2 / nMax, ⚠ เกิน / น้อยกว่า 1 / หาค่าไม่ได้, ℹ ปัดลงค่าเริ่ม, ปัดเศษ 3 แบบ, join link + shape + กิ่ง, แปลง Array ↔ Loop, แก้ nMax (ถูกขวางเมื่อมีของนอกอ้าง), removeArray, แสดงทุกกรณี (รอบ 5b) — JS = C# ใน drawing-cases 96–104 |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |

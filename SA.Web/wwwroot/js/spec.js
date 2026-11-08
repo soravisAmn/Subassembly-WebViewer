@@ -295,7 +295,37 @@ const Spec = (() => {
       brBusy.delete(id);
       return (brVal[id] = on);
     }
-    const offOf = o => o.branch && !ctx.allBranches && !branchOn(o.branch) ? { err: `ไม่เกิด (กิ่ง ${branchLabel(spec, o.branch)})`, off: o.branch } : null;
+    // ---------- Array แบบ Loop (รอบ 5b — prompt-5b-design.md) ----------
+    //   N = ปัดเศษค่าของ loop.n (nRound: floor ค่าเริ่ม / ceil / round .5 ออกจากศูนย์) แล้วบีบ 1..nMax · ชุดที่ k (ต้นฉบับ k = 0) เกิดเมื่อ k < N
+    //   ⚠ (เว็บ + C#): เกินสูงสุด / น้อยกว่า 1 / หาค่าไม่ได้ · ℹ (เว็บเท่านั้น): ปัดเศษด้วยค่าเริ่มต้น — ตรงกับ LoopN ใน CodeGenerator.cs
+    const loopOf = {}, loopVal = {}, loopBusy = new Set();
+    for (const g of spec.arrays || []) if (g.loop) (g.members || []).forEach((m, i) => { for (const id of [...m.points, ...m.links, ...m.shapes]) loopOf[id] = { g, k: i + 1 }; });
+    const ROUND_TH = { floor: "ปัดลง", ceil: "ปัดขึ้น", round: "ปัดใกล้สุด" };
+    function loopN(g){
+      if (g.id in loopVal) return loopVal[g.id];
+      if (loopBusy.has(g.id)){ warn(g.id, `Array ${g.id}: หาจำนวนชุดไม่ได้ ใช้ 1`); return (loopVal[g.id] = 1); }
+      loopBusy.add(g.id);
+      const L = g.loop, nMax = Math.round(+L.nMax) || 10, mode = ROUND_TH[L.nRound] ? L.nRound : "floor";
+      let raw = null;
+      try{ raw = Expr.value(String(L.n), env, exprCtx(null)); if (!isFinite(raw)) raw = null; }catch{ raw = null; }
+      let n;
+      if (raw === null){ warn(g.id, `Array ${g.id}: หาจำนวนชุดไม่ได้ ใช้ 1`); n = 1; }
+      else {
+        const r = mode === "ceil" ? Math.ceil(raw) : mode === "round" ? Expr.roundAway(raw) : Math.floor(raw);
+        if (!L.nRound && r !== raw) issues.push({ level: "i", obj: g.id, msg: `Array ${g.id}: N = ${Expr.num(raw)} → ${r} ชุด (ปัดลง — ค่าเริ่มต้น เปลี่ยนได้ที่ "ปัดเศษ N")` });
+        if (r > nMax){ warn(g.id, `Array ${g.id}: ต้องการ ${r} ชุด เกินสูงสุด ${nMax} ใช้ ${nMax}`); n = nMax; }
+        else if (r < 1){ warn(g.id, `Array ${g.id}: ได้ ${r} ชุด น้อยกว่า 1 ใช้ 1`); n = 1; }
+        else n = r;
+      }
+      loopBusy.delete(g.id);
+      return (loopVal[g.id] = n);
+    }
+    const loopOff = o => {
+      const l = loopOf[o.id];
+      if (!l || ctx.allBranches) return null;
+      return l.k < loopN(l.g) ? null : { err: `ไม่เกิด (${l.g.id} ชุดที่ ${l.k + 1})`, off: `${l.g.id}#${l.k}` };
+    };
+    const offOf = o => (o.branch && !ctx.allBranches && !branchOn(o.branch) ? { err: `ไม่เกิด (กิ่ง ${branchLabel(spec, o.branch)})`, off: o.branch } : null) || loopOff(o);
     const Xv = (src, what, viewer) => { try{ return Expr.value(src, env, exprCtx(viewer)); }catch(e){ throw new Error(`${what}: ${e.message}`); } };
     const X = (src, what) => Xv(src, what, null);
 
@@ -562,7 +592,10 @@ const Spec = (() => {
     // variable ที่ยังไม่มีใครใช้ก็คำนวณ (เตือนครบเหมือน C#) · vars = ค่าตอนนี้ (null = ไม่รู้ค่า)
     const vars = {};
     for (const v of VARS){ try{ vars[v.name] = variable(v); }catch{ vars[v.name] = null; } }
-    return { pts, links, shapes, issues, flip: F, env, raw: raws, logic: { conds: condVal, decisions: decVal, branches: brVal, vars } };
+    // Loop ที่ยังไม่มีใครถามก็คำนวณ (เตือนครบเหมือน C#) · loops = N ตอนนี้
+    const loops = {};
+    for (const g of spec.arrays || []) if (g.loop) loops[g.id] = loopN(g);
+    return { pts, links, shapes, issues, flip: F, env, raw: raws, logic: { conds: condVal, decisions: decVal, branches: brVal, vars, loops } };
   }
   // หมุนจุด q รอบ c ด้วยมุม a องศา (ทวนเข็ม +) — ตรงกับ Rotate ใน CodeGenerator.cs
   function rotatePt(q, c, a){
@@ -1245,6 +1278,8 @@ const Spec = (() => {
   function addArray(spec, sel, o){
     const g = { id: null, source: { points: (sel.points || []).slice(), links: (sel.links || []).slice(), shapes: (sel.shapes || []).slice() },
                 n: Math.round(+o.n), dx: String(o.dx ?? "0").trim() || "0", dy: String(o.dy ?? "0").trim() || "0", join: o.join || null, members: [] };
+    // Loop (รอบ 5b): สร้างเผื่อไว้ nMax ชุด · ชุดที่ k เกิดเมื่อ k < N (evaluate / C#)
+    if (o.loop) setLoop(g, o.loop);
     const err = arrayIssue(spec, g);
     if (err) return { error: err };
     spec.arrays = spec.arrays || [];
@@ -1254,8 +1289,22 @@ const Spec = (() => {
     spec.arrays.push(g);
     return g;
   }
+  // Loop: { n: นิพจน์, nMax: 2..50 (ค่าเริ่ม 10), nRound?: floor | ceil | round } — n ของ array = nMax (ชุดที่สร้างไว้)
+  const LOOP_MAX = 50, LOOP_DEFAULT = 10, LOOP_ROUND = ["floor", "ceil", "round"];
+  function setLoop(g, L){
+    g.loop = { n: String(L.n ?? "").trim(), nMax: L.nMax == null || L.nMax === "" ? LOOP_DEFAULT : Math.round(+L.nMax) };
+    if (L.nRound && L.nRound !== "") g.loop.nRound = L.nRound;
+    g.n = g.loop.nMax;
+  }
   function arrayIssue(spec, g){
-    if (!(g.n >= 2 && g.n <= 200)) return "จำนวนชุดต้อง 2–200 (รวมชุดต้นฉบับ)";
+    if (g.loop){
+      const L = g.loop;
+      if (!(L.nMax >= 2 && L.nMax <= LOOP_MAX)) return `สูงสุดต้อง 2–${LOOP_MAX} ชุด (รวมชุดต้นฉบับ)`;
+      if (L.nRound && !LOOP_ROUND.includes(L.nRound)) return "ปัดเศษ N ต้องเป็น floor / ceil / round";
+      const c = Expr.check(L.n || "", names(spec), { ...exprOpts(spec), want: "num" });
+      if (!c.ok) return "N: " + (L.n ? c.error : "ว่าง");
+    }
+    else if (!(g.n >= 2 && g.n <= 200)) return "จำนวนชุดต้อง 2–200 (รวมชุดต้นฉบับ)";
     if (!g.source.points.length) return "เลือก object ก่อน (จุด / link / shape ที่วาด)";
     if (g.source.points.some(id => !byId(spec.points, id))) return "มีจุดในชุดที่ไม่มีอยู่";
     for (const id of g.source.links){ const l = byId(spec.links, id); if (!l) return `ไม่มี link ${id}`; if (!linkRefs(l).every(p => g.source.points.includes(p))) return `ปลายของ ${id} ไม่อยู่ในชุด`; }
@@ -1322,12 +1371,15 @@ const Spec = (() => {
       .concat(spec.shapes.filter(s => !S.has(s.id) && s.links.some(l => L.has(l))).map(s => s.id));
     if (block.length) return { block };
     const next = { ...g, n: "n" in o ? Math.round(+o.n) : g.n, join: "join" in o ? o.join : g.join };
+    // Loop: เปิด / ปิด / แก้ nMax (o.loop = { n, nMax, nRound } | null)
+    if ("loop" in o){ if (o.loop) setLoop(next, o.loop); else { delete next.loop; } }
     const err = arrayIssue(spec, next);
     if (err) return { error: err };
     spec.points = spec.points.filter(p => !P.has(p.id));
     spec.links = spec.links.filter(l => !L.has(l.id));
     spec.shapes = spec.shapes.filter(s => !S.has(s.id));
     g.n = next.n; g.join = next.join;
+    if (next.loop) g.loop = next.loop; else delete g.loop;
     buildArray(spec, g);
     return { block: [] };
   }
@@ -1428,7 +1480,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, slopeMagnitude, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
+           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();

@@ -1166,6 +1166,57 @@ function cutFillCommit(it, opts){
 }
 // Array (รอบ 4c): ชุดที่เลือก → ทำซ้ำ N ชุด ห่างชุดละ dx, dy · ต่อชุดด้วยจุดร่วม / link
 //   ค่าเริ่มต้น: ชุดที่เป็นเส้นเปิด (ไม่มี shape) = ระยะจากจุดแรกถึงจุดสุดท้ายของชุด + จุดร่วม (ขั้นบันได) · มี shape = กว้างเท่ากรอบของชุด ไม่ต่อ
+// เลือก object ทุกชิ้นของ Array (ต้นฉบับ + ทุกชุด)
+function selectArray(it, g){
+  const all = [g.source, ...g.members];
+  setSelList(all.flatMap(m => m.points.map(id => ({ type: "dpt", item: it.id, id })).concat(m.links.map(id => ({ type: "dlink", item: it.id, id })), m.shapes.map(id => ({ type: "dshape", item: it.id, id })))));
+}
+// ---------------- Array แบบ Loop (รอบ 5b) ----------------
+const ROUND_LABEL = { floor: "ปัดลง", ceil: "ปัดขึ้น", round: "ปัดใกล้สุด" };
+// ตัวอย่างสดใต้ช่อง N: "7 / 3 = 2.33 → 2 ชุด (ปัดลง)" + ⚠ (เกินสูงสุด / น้อยกว่า 1 / หาค่าไม่ได้) + ℹ (ปัดลงเป็นค่าเริ่ม) — ตรงกับ loopN ใน spec.js
+function loopPreview(it, L){
+  const r = drawRes[it.id], env = r && r.env ? r.env : {}, nMax = Math.round(+L.nMax) || Spec.LOOP_DEFAULT, mode = ROUND_LABEL[L.nRound] ? L.nRound : "floor";
+  const src = String(L.n || "").trim();
+  if (!src) return { html: '<span class="lp-w">⚠ ใส่ N (นิพจน์ / parameter / variable)</span>', n: null };
+  let raw;
+  try{ raw = Expr.value(src, env); }catch{ return { html: `<span class="lp-i">ℹ N = ${esc(src)} คำนวณตอนรัน (อ้างจุด / ผิวดิน) — หาค่าไม่ได้จะใช้ 1 + เตือน</span>`, n: null }; }
+  if (!isFinite(raw)) return { html: '<span class="lp-w">⚠ หาจำนวนชุดไม่ได้ — ใช้ 1</span>', n: 1 };
+  const shown = src.replace(/\b[A-Za-z_][A-Za-z0-9_]*\b/g, n => { try{ const v = env[n]; return typeof v === "number" ? Expr.num(v) : n; }catch{ return n; } });
+  const rd = mode === "ceil" ? Math.ceil(raw) : mode === "round" ? Expr.roundAway(raw) : Math.floor(raw);
+  const n = Math.max(1, Math.min(nMax, rd));
+  let h = `${esc(shown)} = ${Expr.num(raw)}${rd !== raw ? ` → ${rd}` : ""} ชุด${rd !== raw ? ` (${ROUND_LABEL[mode]})` : ""}`;
+  if (rd !== raw && !L.nRound) h += '<br><span class="lp-i">ℹ ปัดลงเป็นค่าเริ่มต้น — เลือกได้ที่ "ปัดเศษ N"</span>';
+  if (rd > nMax) h += `<br><span class="lp-w">⚠ ต้องการ ${rd} ชุด เกินสูงสุด ${nMax} ใช้ ${nMax}</span>`;
+  else if (rd < 1) h += `<br><span class="lp-w">⚠ ได้ ${rd} ชุด น้อยกว่า 1 ใช้ 1</span>`;
+  return { html: h, n };
+}
+// ช่อง Loop (หน้าต่าง Array / Properties): N · สูงสุด · ปัดเศษ N + ตัวอย่างสด — on(L) เมื่อค่าเปลี่ยน
+function loopFields(parent, it, L, on){
+  const names = specNames(it), xo = Spec.exprOpts(it.spec);
+  const row = (label, small) => div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, parent);
+  const n = document.createElement("input"); n.className = "expr"; n.value = L.n || ""; n.placeholder = "เช่น floor(Height / BermInterval)";
+  row("N", "จำนวนชุด รวมต้นฉบับ · นิพจน์ / parameter / variable").appendChild(n);
+  const pv = div("lp-prev", "", parent);
+  const mx = document.createElement("input"); mx.type = "number"; mx.min = 2; mx.max = Spec.LOOP_MAX; mx.step = 1; mx.value = L.nMax || Spec.LOOP_DEFAULT;
+  row("สูงสุด", `สร้างเผื่อไว้ (2–${Spec.LOOP_MAX}) · ชุดที่เกินไม่เกิด`).appendChild(mx);
+  const rs = document.createElement("select");
+  // "" = ผู้ใช้ยังไม่เลือก → ปัดลง + ℹ (ค่าเริ่มต้น) · เลือก "ลง (floor)" เอง = ไม่มี ℹ
+  rs.innerHTML = `<option value="">(ไม่ได้เลือก) — ปัดลง ค่าเริ่ม</option><option value="floor">ลง (floor)</option><option value="ceil">ขึ้น (ceil)</option><option value="round">ใกล้สุด (round · .5 ปัดออกจากศูนย์)</option>`;
+  rs.value = L.nRound || "";
+  row("ปัดเศษ N", "เมื่อ N ไม่ใช่จำนวนเต็ม").appendChild(rs);
+  const sync = () => {
+    const c = Expr.check(n.value.trim() || "", names, { ...xo, want: "num" });
+    n.classList.toggle("bad", !!n.value.trim() && !c.ok); n.title = c.ok ? "" : c.error;
+    const cur = { n: n.value.trim(), nMax: +mx.value, ...(rs.value ? { nRound: rs.value } : {}) };
+    pv.innerHTML = c.ok || !n.value.trim() ? loopPreview(it, cur).html : `<span class="lp-w">⚠ ${esc(c.error)}</span>`;
+    return cur;
+  };
+  n.addEventListener("input", () => on(sync(), "n"));
+  mx.addEventListener("change", () => on(sync(), "nMax"));
+  rs.addEventListener("change", () => on(sync(), "nRound"));
+  sync();
+  return { sync };
+}
 function openArray(it){
   if (!it || !it.spec) return;
   const sp = it.spec, r = drawRes[it.id], F = r ? r.flip : 1;
@@ -1193,7 +1244,20 @@ function openArray(it){
       inp.oninput = () => { o[key] = inp.value.trim(); if (expr){ const c = Expr.check(o[key] || "0", names, xo); inp.classList.toggle("bad", !c.ok); inp.title = c.ok ? "" : c.error; } };
       rr.appendChild(inp); return inp;
     };
-    field("จำนวนชุด", "ทั้งหมด รวมชุดต้นฉบับ (2–200)", "n");
+    const nIn = field("จำนวนชุด", "ทั้งหมด รวมชุดต้นฉบับ (2–200)", "n");
+    // Loop (รอบ 5b): ติ๊ก = จำนวนชุดคำนวณตอนรัน (N นิพจน์ + สูงสุด + ปัดเศษ) — สร้างเผื่อไว้ถึงสูงสุด ชุดที่ k เกิดเมื่อ k < N
+    const lc = document.createElement("label"); lc.className = "check";
+    lc.innerHTML = `<input type="checkbox"> <b>Loop</b> — จำนวนชุดคำนวณตอนรัน (N เป็นนิพจน์ / parameter)`;
+    b.appendChild(lc);
+    const lbox = div("lp-box", "", b);
+    o.loop = null;
+    let lf = null;
+    lc.querySelector("input").onchange = e => {
+      nIn.parentElement.hidden = e.target.checked; lbox.hidden = !e.target.checked;
+      if (e.target.checked){ if (!o.loop) o.loop = { n: o.n, nMax: Spec.LOOP_DEFAULT }; if (!lf) lf = loopFields(lbox, it, o.loop, cur => { o.loop = cur; }); }
+      else o.loop = null;
+    };
+    lbox.hidden = true;
     field("dx", "ไปทางนอก + (ฝั่ง Right = ขวา) · นิพจน์ / parameter ได้", "dx", true);
     field("dy", "ขึ้น + · นิพจน์ / parameter ได้", "dy", true);
     const sel_ = (label, small, key, opts) => {
@@ -1213,7 +1277,7 @@ function openArray(it){
     div("btns", null, b).append(
       btn("สร้าง", () => {
         for (const k of ["dx", "dy"]){ const c = Expr.check(o[k] || "0", names, xo); if (!c.ok){ err.textContent = `${k}: ${c.error}`; return; } }
-        const opt = { n: +o.n, dx: o.dx || "0", dy: o.dy || "0", join: o.mode ? { mode: o.mode, from: o.from, to: o.to } : null };
+        const opt = { n: +o.n, dx: o.dx || "0", dy: o.dy || "0", join: o.mode ? { mode: o.mode, from: o.from, to: o.to } : null, ...(o.loop ? { loop: o.loop } : {}) };
         const test = Logic.addArray(JSON.parse(JSON.stringify(sp)), sel, opt);   // ลองบนสำเนา (Logic API)
         if (!test.ok){ err.textContent = test.error; return; }
         closeDialog();
@@ -1231,11 +1295,32 @@ function openArray(it){
 function propsArray(box, it, g){
   const sp = it.spec;
   const gr = group(box, `Array ${g.id}`, canEdit(it) ? { label: "เลิกเป็น Array", title: "เลิกจับกลุ่ม — ทุกชิ้นยังอยู่ (เป็นจุด / link ธรรมดา)",
-    cmd: () => { specEdit(s => { s.arrays = s.arrays.filter(x => x.id !== g.id); }, it, `เลิกเป็น Array ${g.id}`); renderProps(true); } } : null);
+    cmd: () => { const r = specEdit(s => Logic.removeArray(s, g.id), it, `เลิกเป็น Array ${g.id}`); if (r && r.ok && r.warnings.length) flashBanner(r.warnings[0]); renderProps(true); } } : null);
   const src = g.source;
+  const dr = drawRes[it.id], nNow = dr && dr.logic && dr.logic.loops ? dr.logic.loops[g.id] : undefined;
   kv(gr, [["ต้นฉบับ", [src.points.join(", "), src.links.join(", "), src.shapes.join(", ")].filter(Boolean).join(" · ")],
-          ["ต่อชุด", !g.join ? "ไม่ต่อ" : g.join.mode === "share" ? `จุดร่วม: ${g.join.to} ของชุดถัดไป = ${g.join.from} ของชุดก่อน` : `link ${g.join.from} → ${g.join.to}`]]);
+          ["ต่อชุด", !g.join ? "ไม่ต่อ" : g.join.mode === "share" ? `จุดร่วม: ${g.join.to} ของชุดถัดไป = ${g.join.from} ของชุดก่อน` : `link ${g.join.from} → ${g.join.to}`],
+          ...(g.loop ? [["ตอนนี้", nNow == null ? "—" : `${nNow} จาก ${g.loop.nMax} ชุด เกิด`]] : [])]);
+  // Loop (รอบ 5b): เปิด / ปิด · N / สูงสุด / ปัดเศษ — ผ่าน Logic API (แก้ N = สด · สูงสุด = สร้างสมาชิกใหม่)
+  const lc = document.createElement("label"); lc.className = "check";
+  lc.innerHTML = `<input type="checkbox"${g.loop ? " checked" : ""}${canEdit(it) ? "" : " disabled"}> <b>Loop</b> — จำนวนชุดคำนวณตอนรัน`;
+  gr.appendChild(lc);
+  lc.querySelector("input").onchange = e => {
+    const r = e.target.checked
+      ? specEdit(s => Logic.setArrayLoop(s, g.id, { n: String(g.n), nMax: Math.max(g.n, Spec.LOOP_DEFAULT) }, { codeParams: codeParamsOf(it) }), it, `${g.id} เป็น Loop`)
+      : specEdit(s => Logic.setArrayLoop(s, g.id, null), it, `${g.id} เลิก Loop (${g.n} ชุดคงที่)`);
+    if (!r || !r.ok) e.target.checked = !e.target.checked;
+    renderProps(true);
+  };
+  if (g.loop){
+    const lb = div("lp-box", "", gr);
+    loopFields(lb, it, g.loop, (cur, what) => {
+      if (what === "n"){ const c = Expr.check(cur.n || "", specNames(it), { ...Spec.exprOpts(sp), want: "num" }); if (c.ok) liveEdit(it, () => Logic.updateArray(it.spec, g.id, { n: cur.n })); }
+      else { const r = specEdit(s => Logic.updateArray(s, g.id, what === "nMax" ? { nMax: cur.nMax } : { nRound: cur.nRound || "" }), it, `${g.id} ${what === "nMax" ? "สูงสุด " + cur.nMax : "ปัดเศษ N"}`); if (what === "nMax") renderProps(true); }
+    });
+  }
   const row = div("row", `<label>จำนวนชุด<small>รวมต้นฉบับ (สร้างใหม่ทั้งชุด)</small></label>`, gr);
+  if (g.loop) row.hidden = true;
   const n = document.createElement("input"); n.type = "number"; n.min = 2; n.max = 200; n.step = 1; n.value = g.n; n.disabled = !canEdit(it);
   n.onchange = () => {
     const v = Math.round(+n.value);
@@ -1542,17 +1627,30 @@ function renderDock(){
 
   const iss = $("issues"), tb = $("pt-table"), log = $("log");
   iss.innerHTML = ""; tb.innerHTML = "";
-  let ne = 0, nw = 0;
+  let ne = 0, nw = 0, ni = 0;
   if (!it){ iss.innerHTML = '<div class="empty">เลือก subassembly ในต้นไม้หรือบนรูป</div>'; log.innerHTML = ""; }
   else {
-    const add = (cls, text) => { div(cls, null, iss).textContent = text; cls === "e" ? ne++ : nw++; };
+    // ข้อความเดียวกันขึ้นบรรทัดเดียว (ซ้ำ = ×n) · ℹ (รอบ 5b) = แจ้งให้ทราบ (ใช้ค่าเริ่มต้น — เว็บเท่านั้น) · ข้อความของ Array (Loop) คลิก = เลือก Array นั้น
+    const seen = new Map();
+    const add = (cls, text) => {
+      const key = cls + "|" + text, prev = seen.get(key);
+      if (prev){ prev.n++; prev.el.querySelector(".x").textContent = ` ×${prev.n}`; return; }
+      const d = div(cls, null, iss); d.textContent = (cls === "i" ? "ℹ " : "") + text;
+      const x = document.createElement("span"); x.className = "x"; d.appendChild(x);
+      seen.set(key, { n: 1, el: d });
+      const m = /Array (A\d+):/.exec(text), g = m && it.spec && (it.spec.arrays || []).find(a => a.id === m[1]);
+      if (g){ d.classList.add("link"); d.title = `คลิก = เลือก ${g.id} ทั้ง Array`; d.onclick = () => selectArray(it, g); }
+      cls === "e" ? ne++ : cls === "i" ? ni++ : nw++;
+    };
     if (rr && rr.attachState === "lost") add("w", "จุดเกาะ · " + rr.attachNote);
     if (result){
       for (const i of result.issues) add(i.level === "Severe" ? "e" : "w", `${i.level} · ${i.error} — ${i.message ?? ""}`);
       if (result.exception) add("e", `${result.exception.type} — ${result.exception.message}`);
     }
     // ส่วนที่วาด: มีผลรันโค้ดที่สร้างแล้ว ข้อความเตือนมาจากโค้ด C# (result.issues) ไม่ต้องซ้ำจาก JS
-    if (drawRes[it.id] && !(rr && rr.generated && rr.result)) for (const i of drawRes[it.id].issues) add(i.level === "e" ? "e" : "w", "วาด · " + i.msg);
+    if (drawRes[it.id] && !(rr && rr.generated && rr.result)) for (const i of drawRes[it.id].issues) if (i.level !== "i") add(i.level === "e" ? "e" : "w", "วาด · " + i.msg);
+    // ℹ มีแต่ในเว็บ (โค้ด C# ไม่ส่งไป Civil 3D) → แสดงเสมอ
+    if (drawRes[it.id]) for (const i of drawRes[it.id].issues) if (i.level === "i") add("i", i.msg);
     const mis = it.spec ? csharpMismatch(it) : null;
     if (mis) add("e", "รูปที่วาด (JS) ไม่ตรงกับผลรันโค้ด C# ที่สร้าง — " + mis);
     if (it.specEdited) add("w", "ช่วง SA-DRAWING ในไฟล์ถูกแก้ด้วยมือ (ไม่ตรงกับ sa-spec) — Save (.cs) จะถามก่อนเขียนทับด้วยส่วนที่วาด");
@@ -1581,6 +1679,7 @@ function renderDock(){
   }
   const nm = $("n-msg");
   nm.textContent = ne + nw ? String(ne + nw) : ""; nm.className = "badge" + (ne ? " e" : nw ? " w" : "");
+  const nf = $("n-info"); if (nf){ nf.textContent = ni ? "ℹ" + ni : ""; nf.title = ni ? `${ni} ข้อความแจ้งให้ทราบ (ใช้ค่าเริ่มต้น)` : ""; }
   $("n-log").textContent = result && result.log.length ? String(result.log.length) : "";
   const npt = (result && !(rr && rr.generated) ? result.points.length : 0) + (it && it.spec ? it.spec.points.length : 0);
   $("n-pts").textContent = npt ? String(npt) : "";

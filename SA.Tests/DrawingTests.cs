@@ -236,7 +236,7 @@ static class DrawingTests
             if (!jm.SequenceEqual(cm)) throw new Exception($"ข้อความเตือน parameter: JS [{string.Join(" | ", jm)}] / C# [{string.Join(" | ", cm)}]");
         }
         // ข้อความเตือนของ rules ใน Variables (รอบ 5) ต้องมีใน C# ตรงตัว (ข้อความเดียวกัน = นับเท่ากัน)
-        if (js["varMsgs"] is JsonArray vm)
+        foreach (var vm in new[] { js["varMsgs"], js["loopMsgs"] }.OfType<JsonArray>())   // + Loop (รอบ 5b)
             foreach (var g in vm.Select(m => (string)m!).GroupBy(m => m))
                 if (o.Issues.Count(i => i.Message == g.Key) != g.Count())
                     throw new Exception($"ข้อความเตือน variable \"{g.Key}\": JS {g.Count()} / C# {o.Issues.Count(i => i.Message == g.Key)} — C#: {string.Join(" | ", o.Issues.Select(i => i.Message))}");

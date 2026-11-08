@@ -15,11 +15,14 @@ const Expr = (() => {
   const FUNCS = {
     min:  { min: 1, max: 99 }, max: { min: 1, max: 99 }, abs: { min: 1, max: 1 }, sqrt: { min: 1, max: 1 },
     pow:  { min: 2, max: 2 },  sin: { min: 1, max: 1 },  cos: { min: 1, max: 1 }, tan: { min: 1, max: 1 }, atan: { min: 1, max: 1 },
+    floor: { min: 1, max: 1 }, ceil: { min: 1, max: 1 }, round: { min: 1, max: 1 },   // รอบ 5b · round = ปัดออกจากศูนย์ที่ .5 (= C# AwayFromZero)
     if: { min: 3, max: 3 }, ground: { min: 1, max: 2 }, exists: { min: 1, max: 1 }, hasground: { min: 0, max: 1 }
   };
   // คำสงวน (ตั้งเป็นชื่อ parameter / เงื่อนไขไม่ได้ — ไม่สนตัวพิมพ์)
   const KEYWORDS = new Set(["and", "or", "not", "true", "false"]);
   const EPS = 1e-6;                    // tolerance ของ == / != (เท่ากับ SpecExpr.Eps ฝั่ง C#)
+  // ปัดใกล้สุด .5 ออกจากศูนย์ (2.5 → 3 · -2.5 → -3) — ตรงกับ Math.Round(x, MidpointRounding.AwayFromZero) ใน C#
+  const roundAway = x => Math.sign(x) * Math.round(Math.abs(x));
   const DEG = Math.PI / 180;
   const CMP = new Set(["<", ">", "<=", ">=", "==", "!="]);
   const TYPE_TH = { num: "ตัวเลข", bool: "จริง/เท็จ", str: "ข้อความ" };
@@ -278,6 +281,9 @@ const Expr = (() => {
           case "cos": return Math.cos(v[0] * DEG);
           case "tan": return Math.tan(v[0] * DEG);
           case "atan": return Math.atan(v[0]) / DEG;
+          case "floor": return Math.floor(v[0]);
+          case "ceil": return Math.ceil(v[0]);
+          case "round": return roundAway(v[0]);
         }
       }
     }
@@ -328,6 +334,6 @@ const Expr = (() => {
   // ตัวเลขเป็นข้อความสั้นๆ สำหรับเก็บใน spec (ปัดทศนิยม 4 ตำแหน่ง)
   const num = v => { const r = Math.round(v * 1e4) / 1e4; return String(Object.is(r, -0) ? 0 : r); };
 
-  return { parse, vars, pointRefs, pointRefsOf, typeOf, eval: evaluate, check, value, test, num, FUNCS, KEYWORDS, EPS };
+  return { roundAway, parse, vars, pointRefs, pointRefsOf, typeOf, eval: evaluate, check, value, test, num, FUNCS, KEYWORDS, EPS };
 })();
 if (typeof module !== "undefined") module.exports = Expr;

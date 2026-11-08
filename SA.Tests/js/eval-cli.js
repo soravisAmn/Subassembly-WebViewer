@@ -30,7 +30,9 @@ const out = cases.map(c => {
                    : [{ id: l.id, path, codes: l.codes || [] }];
     }),
     shapes: c.spec.shapes.map(s => r.shapes[s.id] && !r.shapes[s.id].err ? { id: s.id, poly: r.shapes[s.id].poly ? r.shapes[s.id].poly.map(p => [p.x, p.y]) : null } : { id: s.id, err: true }),
-    issues: r.issues.length,
+    issues: r.issues.filter(i => i.level !== "i").length,                 // ℹ (รอบ 5b) = แจ้งในเว็บเท่านั้น ไม่มีใน C#
+    // ข้อความเตือนของ Array แบบ Loop (รอบ 5b) — ต้องมีใน C# ตรงตัว
+    loopMsgs: r.issues.filter(i => i.level === "w" && (c.spec.arrays || []).some(g => g.loop && g.id === i.obj)).map(i => i.msg),
     // ข้อความเตือนของ parameter (ขอบเขต / ต้องมากกว่า 0) — DrawingTests เทียบข้อความตรงตัวกับ C# (ชนิดค่า 1:x / m / % รอบ 4e)
     paramMsgs: r.issues.filter(i => c.spec.params.some(p => p.name === i.obj)).map(i => i.msg),
     // ข้อความเตือนของ rules ใน Variables (รอบ 5) — ต้องมีใน C# ตรงตัว

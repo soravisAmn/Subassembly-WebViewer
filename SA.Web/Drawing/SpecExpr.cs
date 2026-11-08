@@ -30,6 +30,7 @@ public static class SpecExpr
     {
         ["min"] = (1, 99), ["max"] = (1, 99), ["abs"] = (1, 1), ["sqrt"] = (1, 1), ["pow"] = (2, 2),
         ["sin"] = (1, 1), ["cos"] = (1, 1), ["tan"] = (1, 1), ["atan"] = (1, 1),
+        ["floor"] = (1, 1), ["ceil"] = (1, 1), ["round"] = (1, 1),     // รอบ 5b · round = .5 ออกจากศูนย์ (= JS roundAway)
         ["if"] = (3, 3), ["ground"] = (1, 2), ["exists"] = (1, 1), ["hasground"] = (0, 1)
     };
     public static readonly HashSet<string> Keywords = new(StringComparer.OrdinalIgnoreCase) { "and", "or", "not", "true", "false" };
@@ -372,6 +373,9 @@ public static class SpecExpr
                     "cos" => $"Math.Cos({a[0]} * Deg)",
                     "tan" => $"Math.Tan({a[0]} * Deg)",
                     "atan" => Wrap($"Math.Atan({a[0]}) / Deg", 1, need),
+                    "floor" => $"Math.Floor({a[0]})",
+                    "ceil" => $"Math.Ceiling({a[0]})",
+                    "round" => $"Math.Round({a[0]}, MidpointRounding.AwayFromZero)",
                     _ => throw new FormatException(c.F)
                 };
             }

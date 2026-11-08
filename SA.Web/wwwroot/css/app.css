@@ -268,6 +268,15 @@ svg#view{width:100%;height:100%;display:block;touch-action:none;user-select:none
 .msgs div{font-size:12.5px;padding:4px 8px;border-radius:4px;margin-bottom:4px;overflow-wrap:anywhere}
 .msgs .e{background:var(--err-soft);color:var(--err)}
 .msgs .w{background:var(--warn-soft);color:var(--warn)}
+/* ℹ แจ้งให้ทราบ (รอบ 5b — ใช้ค่าเริ่มต้น เว็บเท่านั้น) · ×n = ข้อความซ้ำ · คลิกได้ = เลือก Array */
+.msgs .i{background:color-mix(in srgb,#3b82f6 14%,transparent);color:#2f6fd6}
+.msgs .x{font-weight:600;margin-left:4px}
+.msgs .link{cursor:pointer;text-decoration:underline dotted}
+.badge.i{color:#2f6fd6;margin-left:3px}
+.lp-box{margin:4px 0 6px;padding:4px 8px;border:1px solid var(--line);border-radius:6px}
+.lp-prev{font:11.5px "IBM Plex Mono",monospace;color:var(--muted);margin:-2px 0 6px;text-align:right}
+.lp-prev .lp-w{color:var(--warn)}
+.lp-prev .lp-i{color:#2f6fd6}
 .log{font:12px "IBM Plex Mono",monospace;white-space:pre-wrap;margin:0}
 
 /* svg */

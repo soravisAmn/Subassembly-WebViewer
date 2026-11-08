@@ -3371,5 +3371,990 @@
     ],
     "layout": true,
     "copySpecFrom": 91
+  },
+  {
+    "name": "Loop ขั้นบันได N = Height / Step: 7 / 3 → 2 ชุด (ปัดลงค่าเริ่ม ℹ เว็บเท่านั้น)",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "LoopStairs",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "Height",
+          "kind": "double",
+          "default": 7,
+          "displayName": "Height",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "Step",
+          "kind": "double",
+          "default": 3,
+          "displayName": "Step",
+          "min": null,
+          "max": null
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "Top"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "2",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "0",
+            "dy": "-1"
+          }
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P3",
+            "dx": "2",
+            "dy": "-1"
+          }
+        },
+        {
+          "id": "P5",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P4",
+            "dx": "2",
+            "dy": "-1"
+          }
+        },
+        {
+          "id": "P6",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P5",
+            "dx": "2",
+            "dy": "-1"
+          }
+        },
+        {
+          "id": "P7",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P6",
+            "dx": "2",
+            "dy": "-1"
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P1",
+            "P2"
+          ],
+          "codes": []
+        },
+        {
+          "id": "L2",
+          "points": [
+            "P2",
+            "P3"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        },
+        {
+          "id": "L3",
+          "points": [
+            "P3",
+            "P4"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        },
+        {
+          "id": "L4",
+          "points": [
+            "P4",
+            "P5"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        },
+        {
+          "id": "L5",
+          "points": [
+            "P5",
+            "P6"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        },
+        {
+          "id": "L6",
+          "points": [
+            "P6",
+            "P7"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        }
+      ],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "arrays": [
+        {
+          "id": "A1",
+          "source": {
+            "points": [
+              "P2",
+              "P3"
+            ],
+            "links": [
+              "L2"
+            ],
+            "shapes": []
+          },
+          "n": 5,
+          "dx": "2",
+          "dy": "-1",
+          "join": {
+            "mode": "share",
+            "from": "P3",
+            "to": "P2"
+          },
+          "members": [
+            {
+              "points": [
+                "P4"
+              ],
+              "links": [
+                "L3"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P5"
+              ],
+              "links": [
+                "L4"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P6"
+              ],
+              "links": [
+                "L5"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P7"
+              ],
+              "links": [
+                "L6"
+              ],
+              "shapes": []
+            }
+          ],
+          "loop": {
+            "n": "Height / Step",
+            "nMax": 5
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "Loop ขั้นบันได: Height 20 → 6 เกินสูงสุด 5 ใช้ 5 + เตือน · Side = Left",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "values": {
+      "Height": 20,
+      "Side": 1
+    },
+    "copySpecFrom": 96
+  },
+  {
+    "name": "Loop ขั้นบันได: Height 2 → 0 น้อยกว่า 1 ใช้ 1 + เตือน · Layout",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "values": {
+      "Height": 2
+    },
+    "layout": true,
+    "copySpecFrom": 96
+  },
+  {
+    "name": "Loop ขั้นบันได: Height 9 Step 3 → 3 ชุด พอดี (ไม่มีเตือน)",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "values": {
+      "Height": 9
+    },
+    "copySpecFrom": 96
+  },
+  {
+    "name": "Loop shape + ต่อด้วย link ในกิ่ง: N = round(2.5) = 3 (.5 ออกจากศูนย์)",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "LoopShapes",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "K",
+          "kind": "double",
+          "default": 2.5,
+          "displayName": "K",
+          "min": null,
+          "max": null
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "A"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "1",
+            "dy": "0"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "B"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "1",
+            "dy": "0"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "C"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "0",
+            "dy": "-1"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P5",
+          "codes": [
+            "A"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "2.5",
+            "dy": "-0.5"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P6",
+          "codes": [
+            "B"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P3",
+            "dx": "2.5",
+            "dy": "-0.5"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P7",
+          "codes": [
+            "C"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P4",
+            "dx": "2.5",
+            "dy": "-0.5"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P8",
+          "codes": [
+            "A"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P5",
+            "dx": "2.5",
+            "dy": "-0.5"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P9",
+          "codes": [
+            "B"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P6",
+            "dx": "2.5",
+            "dy": "-0.5"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P10",
+          "codes": [
+            "C"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P7",
+            "dx": "2.5",
+            "dy": "-0.5"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P11",
+          "codes": [
+            "A"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P8",
+            "dx": "2.5",
+            "dy": "-0.5"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P12",
+          "codes": [
+            "B"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P9",
+            "dx": "2.5",
+            "dy": "-0.5"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P13",
+          "codes": [
+            "C"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P10",
+            "dx": "2.5",
+            "dy": "-0.5"
+          },
+          "branch": "B1"
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P2",
+            "P3"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L2",
+          "points": [
+            "P3",
+            "P4"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L3",
+          "points": [
+            "P4",
+            "P2"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L4",
+          "points": [
+            "P5",
+            "P6"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L5",
+          "points": [
+            "P6",
+            "P7"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L6",
+          "points": [
+            "P7",
+            "P5"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L7",
+          "points": [
+            "P3",
+            "P5"
+          ],
+          "codes": []
+        },
+        {
+          "id": "L8",
+          "points": [
+            "P8",
+            "P9"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L9",
+          "points": [
+            "P9",
+            "P10"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L10",
+          "points": [
+            "P10",
+            "P8"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L11",
+          "points": [
+            "P6",
+            "P8"
+          ],
+          "codes": []
+        },
+        {
+          "id": "L12",
+          "points": [
+            "P11",
+            "P12"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L13",
+          "points": [
+            "P12",
+            "P13"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L14",
+          "points": [
+            "P13",
+            "P11"
+          ],
+          "codes": [
+            "Box"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "L15",
+          "points": [
+            "P9",
+            "P11"
+          ],
+          "codes": []
+        }
+      ],
+      "shapes": [
+        {
+          "id": "S1",
+          "links": [
+            "L1",
+            "L2",
+            "L3"
+          ],
+          "codes": [
+            "Block"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "S2",
+          "links": [
+            "L4",
+            "L5",
+            "L6"
+          ],
+          "codes": [
+            "Block"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "S3",
+          "links": [
+            "L8",
+            "L9",
+            "L10"
+          ],
+          "codes": [
+            "Block"
+          ],
+          "branch": "B1"
+        },
+        {
+          "id": "S4",
+          "links": [
+            "L12",
+            "L13",
+            "L14"
+          ],
+          "codes": [
+            "Block"
+          ],
+          "branch": "B1"
+        }
+      ],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "logic": {
+        "conditions": [
+          {
+            "id": "C1",
+            "name": "Go",
+            "expr": "K > 0"
+          }
+        ],
+        "decisions": [
+          {
+            "id": "D1",
+            "parent": null,
+            "kind": "if",
+            "test": "Go",
+            "label": "Go"
+          }
+        ],
+        "branches": [
+          {
+            "id": "B1",
+            "decision": "D1",
+            "case": true,
+            "label": "Go"
+          },
+          {
+            "id": "B2",
+            "decision": "D1",
+            "case": false,
+            "label": "ไม่ Go"
+          }
+        ]
+      },
+      "arrays": [
+        {
+          "id": "A1",
+          "source": {
+            "points": [
+              "P2",
+              "P3",
+              "P4"
+            ],
+            "links": [
+              "L1",
+              "L2",
+              "L3"
+            ],
+            "shapes": [
+              "S1"
+            ]
+          },
+          "n": 4,
+          "dx": "2.5",
+          "dy": "-0.5",
+          "join": {
+            "mode": "link",
+            "from": "P3",
+            "to": "P2"
+          },
+          "members": [
+            {
+              "points": [
+                "P5",
+                "P6",
+                "P7"
+              ],
+              "links": [
+                "L4",
+                "L5",
+                "L6",
+                "L7"
+              ],
+              "shapes": [
+                "S2"
+              ]
+            },
+            {
+              "points": [
+                "P8",
+                "P9",
+                "P10"
+              ],
+              "links": [
+                "L8",
+                "L9",
+                "L10",
+                "L11"
+              ],
+              "shapes": [
+                "S3"
+              ]
+            },
+            {
+              "points": [
+                "P11",
+                "P12",
+                "P13"
+              ],
+              "links": [
+                "L12",
+                "L13",
+                "L14",
+                "L15"
+              ],
+              "shapes": [
+                "S4"
+              ]
+            }
+          ],
+          "loop": {
+            "n": "round(K)",
+            "nMax": 4,
+            "nRound": "ceil"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "Loop shape ในกิ่ง: K = 1.4 → round 1 ชุด · Left",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "values": {
+      "K": 1.4,
+      "Side": 1
+    },
+    "copySpecFrom": 100
+  },
+  {
+    "name": "Loop ในกิ่งที่ไม่เกิด (K = -1): ทั้ง Array ไม่เกิด · N = round(-1) → น้อยกว่า 1 เตือน",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "values": {
+      "K": -1
+    },
+    "copySpecFrom": 100
+  },
+  {
+    "name": "floor / ceil / round ในนิพจน์จุด (ค่าลบ, .5) X = -2.5",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "RoundFns",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "X",
+          "kind": "double",
+          "default": -2.5,
+          "displayName": "X",
+          "min": null,
+          "max": null
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "R"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "round(X) + floor(-1.5) + ceil(-0.3)",
+            "dy": "round(2.5) - floor(X) + ceil(X / 2)"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "S"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "round(-X)",
+            "dy": "floor(7 / 3) * ceil(7 / 3)"
+          }
+        }
+      ],
+      "links": [],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      }
+    }
+  },
+  {
+    "name": "floor / ceil / round: X = 3.5 · Left",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "values": {
+      "X": 3.5,
+      "Side": 1
+    },
+    "copySpecFrom": 103
   }
 ]

@@ -101,7 +101,12 @@
     M5 เสร็จ (2026-11-08): `tests-civil3d/round5-demo.cs` (+ .assembly.json, `round5-checklist.md`) คันดิน switch ProtectionType + ตัด / ถม › elif HighFill ชานพัก + Variable DepthUsed
       สร้างด้วย Logic API ล้วน (`buildRound5()` ใน `SA.Tests/js/round5demo.test.js`) · drawing-cases 91–95 → **รอบ 5 จบ** รอทดสอบใน Civil 3D (`round5-checklist.md`)
       ข้อจำกัดที่รู้: ชานพักทำชั้นเดียว (ไม่ใช่ Array หลายขั้น — Loop อยู่ prompt-5b) · branchRisks ยังไม่ไล่จุดที่อ้างผ่าน variable
-  ถัดไป: prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+  รอบ 5b (`prompt-5b.md`, ข้อเสนอ + คำตอบใน `prompt-5b-design.md` — แบบ ก, nMax 10, N < 1 = 1, i ต้นฉบับ 0, ปุ่ม Array + ติ๊ก Loop, C# if ต่อชุด, i เฉพาะ dx / dy, N หาค่าไม่ได้ = 1 + เตือน
+    + ข้อ 9 ปัดเศษ N (`loop.nRound` · round .5 ออกจากศูนย์) + ข้อ 10 ℹ / ⚠ (ℹ เว็บเท่านั้น · รายการที่อื่นที่ใช้ค่าแทน = เสนอไว้ในไฟล์นั้น ยังไม่แก้)):
+    M0 เสร็จ (2026-11-08) · M1 เสร็จ (2026-11-08): `floor / ceil / round` (JS + C#) · `arrays[].loop` evaluate (`loopN` · ชุดที่ k off เมื่อ k ≥ N) + C# (`LoopN` / `N_A1 > k` gate · DrawingSpec.Arrays)
+      Logic `updateArray` (n / nMax / nRound) / `setArrayLoop` / `removeArray` · หน้าต่าง Array ติ๊ก Loop + Properties + ตัวอย่างสด · Messages ℹ / ×n / คลิก = เลือก Array
+      (test: `loop.test.js`, drawing-cases 96–104 เทียบข้อความเตือน loopMsgs) — ถัดไป M2 `i` + `lastOf` + `count()`
+  ถัดไป: รอบ 5b M2–M4 → prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

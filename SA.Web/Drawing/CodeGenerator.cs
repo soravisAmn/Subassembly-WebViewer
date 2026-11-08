@@ -40,7 +40,7 @@ public static class CodeGenerator
         // ชื่อตัวช่วยในโค้ดที่สร้าง (ตัวแปรชื่อเดียวกันจะบังเมธอด / ชนิด)
         "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Offset", "ExtendToGround", "Opt", "FollowClipped", "Tangent", "Rotate",
         "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
-        "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "VN", "FirstOf", "Severe",
+        "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "VN", "LoopN", "FirstOf", "Severe",
         // คำในนิพจน์ (and or not true false — ไม่สนตัวพิมพ์ ตรวจใน IsReservedName)
         "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue","decimal","default",
         "delegate","do","double","else","enum","event","explicit","extern","false","finally","fixed","float","for","foreach","goto",
@@ -199,6 +199,9 @@ public static class CodeGenerator
         private readonly SpecLogic _logic;
         // variable ที่ไม่รู้ค่าได้ (อ้างจุด / เงื่อนไข / variable แบบนี้ / วนกัน) = double? — คำนวณหลัง TopoOrder ก่อนเขียนบรรทัดแรกที่ใช้
         private readonly HashSet<string> _runtimeVars = new();
+        // Array แบบ Loop (รอบ 5b): object id -> (array, ชุดที่ k) · ชุดที่ k เกิดเมื่อ N_A1 > k
+        private readonly Dictionary<string, (SpecArray G, int K)> _loopOf = new();
+        private IEnumerable<SpecArray> Loops => _s.Arrays.Where(g => g.Loop != null);
 
         public Gen(DrawingSpec s)
         {
@@ -206,6 +209,13 @@ public static class CodeGenerator
             _names = s.Params.Select(p => p.Name).ToHashSet();
             _logic = s.Logic ?? new SpecLogic();
             CheckLogicNames();
+            foreach (var g in s.Arrays.Where(g => g.Loop != null))
+            {
+                if (!System.Text.RegularExpressions.Regex.IsMatch(g.Id, @"^A\d+$")) throw new FormatException($"ชื่อ Array '{g.Id}' ใช้ไม่ได้");
+                if (g.Loop!.NMax < 2 || g.Loop.NMax > 50) throw new FormatException($"Array {g.Id}: สูงสุดต้อง 2–50 ชุด");
+                for (int k = 1; k <= g.Members.Count; k++)
+                    foreach (var id in g.Members[k - 1].Points.Concat(g.Members[k - 1].Links).Concat(g.Members[k - 1].Shapes)) _loopOf[id] = (g, k);
+            }
             // นิพจน์อ้างจุดได้ (จุดที่ไม่มี = หาไม่ได้ตอนรัน แบบเดียวกับในเว็บ) · ไฟล์ import ใช้ target ของโค้ดเดิม = ไม่ตรวจชื่อ
             _scope = new ExprScope
             {
@@ -345,7 +355,12 @@ public static class CodeGenerator
             ComputeRuntimeVars(cyclic);
             foreach (var key in cyclic)
             {
-                if (key.StartsWith('$'))
+                if (key.StartsWith("#L"))
+                {
+                    L($"        int N_{key[2..]} = 1;");
+                    L($"        Warn(cs, CorridorError.Failure, \"Array {key[2..]}: หาจำนวนชุดไม่ได้ ใช้ 1\");");
+                }
+                else if (key.StartsWith('$'))
                 {
                     L($"        double? {key[1..]} = null;");
                     L($"        Warn(cs, CorridorError.Failure, \"{key[1..]} อ้างถึงตัวเองเป็นวง\");");
@@ -372,6 +387,7 @@ public static class CodeGenerator
                 else if (o is SpecCondition c) ConditionLine(c);
                 else if (o is SpecDecision d) DecisionLines(d);
                 else if (o is SpecVariable v) VariableLines(v);
+                else if (o is SpecArray g) LoopLine(g);
                 else RotationLines((SpecRotation)o);
             }
             L();
@@ -380,7 +396,7 @@ public static class CodeGenerator
             foreach (var p in _s.Points)
                 // จุด auxiliary: ไม่ประกาศตัวแปร Point (ไม่มีใครใช้ — กันคำเตือน CS0219 ของ compiler)
                 L(p.Auxiliary ? $"        // {p.Id} auxiliary: ใช้คำนวณอย่างเดียว ไม่เพิ่มลง Civil 3D"
-                              : $"        Point {Lc(p.Id)} = {InBranch(p.Branch, $"AddPoint(cs, {p.Id}{Codes(p.Codes)})")};{BrNote(p.Branch)}");
+                              : $"        Point {Lc(p.Id)} = {InGate(p.Branch, p.Id, $"AddPoint(cs, {p.Id}{Codes(p.Codes)})")};{BrNote(p.Branch)}");
             // ปลายจริง (firstOf auxiliary) ที่ link จริงใช้: Point = ของจุดแรกในรายการที่เกิด (ไม่ Points.Add ซ้ำ)
             var aliasUsed = _s.Links.Where(l => !l.Auxiliary).SelectMany(l => new[] { l.Ends.A, l.Ends.B })
                                     .Where(id => IsAlias(id) && AuxEnd(id) == null).Distinct().ToHashSet();
@@ -415,7 +431,7 @@ public static class CodeGenerator
                     string cc = Codes(l.Codes);
                     // รัศมี / ความละเอียดอ้างจุด: หาจุดไม่ได้ = link นี้หาไม่ได้ + เตือน (แบบเดียวกับในเว็บ)
                     bool wrap = UsesRuntime(LinkExprs(l));
-                    string W(string call) => InBranch(l.Branch, wrap ? $"Try(cs, \"{l.Id}\", () => {call})" : call);
+                    string W(string call) => InGate(l.Branch, l.Id, wrap ? $"Try(cs, \"{l.Id}\", () => {call})" : call);
                     if (l.Type == "arc3")
                         L($"        Link[] {Lc(l.Id)} = {W($"Arc3(cs, \"{l.Id}\", {a}, {Lc(a)}, {l.Via}, {b}, {Lc(b)}, {seg}{cc})")};   // {l.Id} โค้งผ่าน {a} {l.Via} {b}{BrTag(l.Branch)}");
                     else if (l.Type == "arcR")
@@ -441,20 +457,20 @@ public static class CodeGenerator
                     bool above = l.Side == "above";
                     string call = $"FollowClipped(cs, \"{l.Id}\", {SurfVar(l.Target)}, {a}, {Lc(a)}, {b}, {Lc(b)}, {r1}, {r2}, {(above ? "false" : "true")}, {Arr(l.Codes)}, {Arr(l.CodesGround)}, {Arr(l.CodesLine)})";
                     bool wrap = UsesRuntime(LinkExprs(l));
-                    L($"        Link[] {Lc(l.Id)} = {InBranch(l.Branch, wrap ? $"Try(cs, \"{l.Id}\", () => {call})" : call)};   // {l.Id} ตามดิน ไม่{(above ? "ต่ำ" : "สูง")}กว่า{(rl != null ? $"เส้น {l.RefLink}" : $"ระดับ {l.RefLevel}")}{BrTag(l.Branch)}");
+                    L($"        Link[] {Lc(l.Id)} = {InGate(l.Branch, l.Id, wrap ? $"Try(cs, \"{l.Id}\", () => {call})" : call)};   // {l.Id} ตามดิน ไม่{(above ? "ต่ำ" : "สูง")}กว่า{(rl != null ? $"เส้น {l.RefLink}" : $"ระดับ {l.RefLevel}")}{BrTag(l.Branch)}");
                     continue;
                 }
                 if (l.Follow)
-                    L($"        Link {Lc(l.Id)} = {InBranch(l.Branch, $"FollowSurface(cs, \"{l.Id}\", {SurfVar(l.Target)}, {a}, {Lc(a)}, {b}, {Lc(b)}{Codes(l.Codes)})")};   // {l.Id} วิ่งตามผิวดิน{BrTag(l.Branch)}");
+                    L($"        Link {Lc(l.Id)} = {InGate(l.Branch, l.Id, $"FollowSurface(cs, \"{l.Id}\", {SurfVar(l.Target)}, {a}, {Lc(a)}, {b}, {Lc(b)}{Codes(l.Codes)})")};   // {l.Id} วิ่งตามผิวดิน{BrTag(l.Branch)}");
                 else
-                    L($"        Link {Lc(l.Id)} = {InBranch(l.Branch, $"AddLink(cs, \"{l.Id}\", {Lc(a)}, {Lc(b)}{Codes(l.Codes)})")};{BrNote(l.Branch)}");
+                    L($"        Link {Lc(l.Id)} = {InGate(l.Branch, l.Id, $"AddLink(cs, \"{l.Id}\", {Lc(a)}, {Lc(b)}{Codes(l.Codes)})")};{BrNote(l.Branch)}");
             }
             foreach (var sh in _s.Shapes)
             {
                 var ok = sh.Links.All(id => _s.Links.Any(l => l.Id == id));
                 // shape ใน Civil 3D ประกอบจาก link จริงเท่านั้น
                 var ax = ok ? sh.Links.FirstOrDefault(id => _s.Links.First(l => l.Id == id).Auxiliary) : null;
-                string shOn = sh.Branch != null ? $"if ({Br(sh.Branch)}) " : "";
+                string shOn = Gate(sh.Branch, sh.Id) is { } shg ? $"if ({shg}) " : "";
                 if (ax != null)
                 {
                     L($"        // {sh.Id}: ใช้ link auxiliary {ax} — ข้าม");
@@ -532,7 +548,7 @@ public static class CodeGenerator
             };
             // นิพจน์ที่อ้างจุด (P3.y, ground(P3) ...): จุดที่อ้างหาไม่ได้ = จุดนี้หาไม่ได้ + เตือน (แบบเดียวกับในเว็บ) ไม่ทำให้ Draw ล้มทั้งตัว
             if (UsesRuntime(d.Exprs())) rhs = $"Try(cs, {Q}, () => {rhs})";
-            L($"        Pt? {id} = {InBranch(p.Branch, rhs)};   // {note}{BrTag(p.Branch)}");
+            L($"        Pt? {id} = {InGate(p.Branch, p.Id, rhs)};   // {note}{BrTag(p.Branch)}{LoopTag(p.Id)}");
         }
 
         // กลุ่มหมุน: สมาชิกคำนวณตาม def ก่อน (ค่าก่อนหมุน) แล้ว Rotate ทีละจุดรอบ pivot
@@ -618,6 +634,20 @@ public static class CodeGenerator
                 return ok;
             }
             bool VisitBranch(string? branch) => branch == null || DecOf(branch) is not { } d || VisitDec(d);
+            // Loop (รอบ 5b): N คำนวณก่อนชุดแรกที่ใช้ · นิพจน์ N อ้างจุด / เงื่อนไข / variable ได้
+            bool VisitLoop(SpecArray g)
+            {
+                string key = "#L" + g.Id;
+                if (done.Contains(key)) return true;
+                if (state.GetValueOrDefault(key) == 1) return false;
+                state[key] = 1;
+                string? e = g.Loop!.N;
+                bool ok = SpecExpr.PointRefs(e).All(r => NeedPt(r, null)) & CondDeps(e).All(VisitCond) & VarDeps(e).All(VisitVar);
+                state[key] = 2;
+                if (ok) { done.Add(key); order.Add(g); } else if (!cyc.Contains(key)) cyc.Add(key);
+                return ok;
+            }
+            bool VisitLoopOf(string id) => !_loopOf.TryGetValue(id, out var lp) || VisitLoop(lp.G);
             bool VisitRot(SpecRotation g)
             {
                 string key = "#" + g.Id;
@@ -641,7 +671,7 @@ public static class CodeGenerator
                 if (state.GetValueOrDefault(p.Id) == 1) return false;
                 state[p.Id] = 1;
                 // อ้างสมาชิกกลุ่มหมุนแบบเห็นค่าที่หมุนแล้ว = ต้องอยู่หลังบรรทัดหมุนของกลุ่มนั้น (NeedPt) · อยู่ในกิ่ง = หลังบรรทัดกิ่ง
-                bool ok = p.Def.Refs().All(r => NeedPt(r, p.Id)) & VisitBranch(p.Branch) & p.Def.Exprs().SelectMany(CondDeps).All(VisitCond) & p.Def.Exprs().SelectMany(VarDeps).All(VisitVar);
+                bool ok = p.Def.Refs().All(r => NeedPt(r, p.Id)) & VisitBranch(p.Branch) & VisitLoopOf(p.Id) & p.Def.Exprs().SelectMany(CondDeps).All(VisitCond) & p.Def.Exprs().SelectMany(VarDeps).All(VisitVar);
                 state[p.Id] = 2;
                 if (ok) { done.Add(p.Id); order.Add(p); } else if (!cyc.Contains(p.Id)) cyc.Add(p.Id);
                 return ok;
@@ -651,12 +681,13 @@ public static class CodeGenerator
             foreach (var v in _logic.Variables) VisitVar(v);          // variable คำนวณทุกตัวเสมอ (เตือนครบแบบในเว็บ)
             foreach (var p in _s.Points) Visit(p);
             foreach (var g in _s.Rotations) VisitRot(g);
+            foreach (var g in Loops) VisitLoop(g);                 // Loop ที่ไม่มีจุดในชุด (แต่มี link / shape) ก็ประกาศ N
             foreach (var d in _logic.Decisions) VisitDec(d);
             // จุดที่พึ่งจุดในวงก็คำนวณไม่ได้ (อยู่ใน order แต่ from = null) — ประกาศจุดในวงไว้ก่อน
             cyclic = cyc;
             return order.Where(o => o switch
             {
-                SpecPoint p => !cyc.Contains(p.Id), SpecCondition c => !cyc.Contains("?" + c.Name), SpecDecision d => !cyc.Contains("!" + d.Id), SpecVariable v => !cyc.Contains("$" + v.Name), _ => true
+                SpecPoint p => !cyc.Contains(p.Id), SpecCondition c => !cyc.Contains("?" + c.Name), SpecDecision d => !cyc.Contains("!" + d.Id), SpecVariable v => !cyc.Contains("$" + v.Name), SpecArray g => !cyc.Contains("#L" + g.Id), _ => true
             }).ToList();
         }
 
@@ -671,12 +702,32 @@ public static class CodeGenerator
         private string BrLabel(string branch) => _logic.Branches.FirstOrDefault(b => b.Id == branch)?.Label ?? branch;
         // object ในกิ่ง: ค่า = null เมื่อกิ่งไม่เกิด
         private string InBranch(string? branch, string expr) => branch == null ? expr : $"{Br(branch)} ? {expr} : null";
+        // กิ่ง + ชุดของ Loop: เงื่อนไขที่ object นี้เกิด (null = เกิดเสมอ)
+        private string? Gate(string? branch, string id)
+        {
+            var c = new List<string>();
+            if (branch != null) c.Add(Br(branch));
+            if (_loopOf.TryGetValue(id, out var lp)) c.Add($"N_{lp.G.Id} > {lp.K}");
+            return c.Count == 0 ? null : string.Join(" && ", c);
+        }
+        private string InGate(string? branch, string id, string expr) => Gate(branch, id) is { } g ? $"{g} ? {expr} : null" : expr;
+        private string LoopTag(string id) => _loopOf.TryGetValue(id, out var lp) ? $" [{lp.G.Id} ชุดที่ {lp.K + 1}]" : "";
         private string BrTag(string? branch) => branch == null ? "" : $" [กิ่ง {BrLabel(branch)}]";            // ต่อท้ายคอมเมนต์ที่มีอยู่
         private string BrNote(string? branch) => branch == null ? "" : $"   // [กิ่ง {BrLabel(branch)}]";      // คอมเมนต์ท้ายบรรทัด
         private bool UsesRuntime(IEnumerable<string?> exprs) => exprs.Any(e => SpecExpr.PointRefs(e).Count > 0 || CondDeps(e).Any() || SpecExpr.NamesOf(e).Any(_runtimeVars.Contains));
         // variable ที่นิพจน์ใช้
         private IEnumerable<SpecVariable> VarDeps(string? expr) =>
             SpecExpr.NamesOf(expr).Select(n => _logic.Variables.FirstOrDefault(v => v.Name == n)).Where(v => v != null)!;
+
+        // Array แบบ Loop (รอบ 5b): จำนวนชุดครั้งเดียว — ปัดเศษ (0 ลง · 1 ขึ้น · 2 ใกล้สุด) แล้วบีบ 1..nMax (LoopN เตือนเอง)
+        private void LoopLine(SpecArray g)
+        {
+            var L0 = g.Loop!;
+            int mode = L0.NRound == "ceil" ? 1 : L0.NRound == "round" ? 2 : 0;
+            string rt = mode == 1 ? "ปัดขึ้น" : mode == 2 ? "ปัดใกล้สุด" : "ปัดลง";
+            L($"        // {g.Id} ทำซ้ำ (Loop): N = {L0.N} · {rt} · สูงสุด {L0.NMax} ชุด");
+            L($"        int N_{g.Id} = LoopN(cs, \"{g.Id}\", () => {X(L0.N, "N", g.Id)}, {L0.NMax}, {mode});");
+        }
 
         // variable ที่ไม่รู้ค่าได้: อ้างจุด / เงื่อนไข / วนกัน / ใช้ variable แบบนี้ (ทางอ้อมด้วย)
         private void ComputeRuntimeVars(List<string> cyclic)
@@ -1442,6 +1493,43 @@ public static class CodeGenerator
     }
 
 """);
+            // Array แบบ Loop (รอบ 5b) — มีเฉพาะเมื่อใช้ (ไฟล์เดิมไม่เปลี่ยน)
+            if (Loops.Any())
+                _o.Append("""
+
+    // จำนวนชุดของ Array แบบ Loop: ปัดเศษ (0 ลง · 1 ขึ้น · 2 ใกล้สุด .5 ออกจากศูนย์) แล้วบีบ 1..nMax — นอกช่วง / หาค่าไม่ได้ = เตือน (ตรงกับ loopN ใน spec.js)
+    private static int LoopN(CorridorState cs, string id, Func<double> value, int nMax, int mode)
+    {
+        double v;
+        try
+        {
+            v = value();
+        }
+        catch (InvalidOperationException)
+        {
+            v = double.NaN;
+        }
+        if (double.IsNaN(v) || double.IsInfinity(v))
+        {
+            Warn(cs, CorridorError.Failure, "Array " + id + ": หาจำนวนชุดไม่ได้ ใช้ 1");
+            return 1;
+        }
+        double r = mode == 1 ? Math.Ceiling(v) : mode == 2 ? Math.Round(v, MidpointRounding.AwayFromZero) : Math.Floor(v);
+        if (r == 0) r = 0;   // -0 (เช่น ceil(-0.3)) แสดงเป็น 0 แบบ JS
+        if (r > nMax)
+        {
+            Warn(cs, CorridorError.ValueTooLarge, "Array " + id + ": ต้องการ " + r + " ชุด เกินสูงสุด " + nMax + " ใช้ " + nMax);
+            return nMax;
+        }
+        if (r < 1)
+        {
+            Warn(cs, CorridorError.ValueTooSmall, "Array " + id + ": ได้ " + r + " ชุด น้อยกว่า 1 ใช้ 1");
+            return 1;
+        }
+        return (int)r;
+    }
+
+""");
             // variable ที่ไม่รู้ค่าได้ (รอบ 5) — มีเฉพาะเมื่อใช้ (ไฟล์ที่ไม่มี variable ไม่เปลี่ยน)
             if (_runtimeVars.Count > 0)
                 _o.Append("""
@@ -1505,18 +1593,19 @@ public static class CodeGenerator
     private static readonly System.Text.RegularExpressions.Regex[] MapPatterns =
     {
         new(@"^\s*Pt\? (\w+) = (?!null;)"),
-        new(@"^\s*Point \w+ = (?:\w+ \? )?AddPoint\(cs, (\w+)"),
-        new(@"^\s*Link \w+ = (?:\w+ \? )?(?:AddLink|FollowSurface)\(cs, ""([^""]+)"""),
-        new(@"^\s*Link\[\] \w+ = (?:\w+ \? )?(?:Try\(cs, ""[^""]+"", \(\) => )?(?:Arc3|ArcR|Fillet|FollowClipped)\(cs, ""([^""]+)"""),
+        new(@"^\s*Point \w+ = (?:[\w ><&]+ \? )?AddPoint\(cs, (\w+)"),
+        new(@"^\s*Link \w+ = (?:[\w ><&]+ \? )?(?:AddLink|FollowSurface)\(cs, ""([^""]+)"""),
+        new(@"^\s*Link\[\] \w+ = (?:[\w ><&]+ \? )?(?:Try\(cs, ""[^""]+"", \(\) => )?(?:Arc3|ArcR|Fillet|FollowClipped)\(cs, ""([^""]+)"""),
         new(@"^\s*bool\?? (\w+) = "),                         // เงื่อนไข (ชื่อ) / decision (D1) / กิ่ง (B1)
         new(@"^\s*// (V\d+) \w+"),                          // variable (รอบ 5): บรรทัดคอมเมนต์หัว
+        new(@"^\s*// (A\d+) ทำซ้ำ"),                         // Array แบบ Loop (รอบ 5b): บรรทัดหัว
         new(@"^\s*double\? (\w+) = "),                        // switch
         new(@"^\s*\w+ = (?:Try\(cs, ""[^""]+"", \(\) => )?Rotate\(cs, ""([^""]+)"""),
         new(@"^\s*Link(?:\[\])? \w+ = null;\s+// ([^:]+):"),
         new(@"^\s*// (\w+): (?:ไม่มีจุด|ปลาย \w+ เป็นจุด auxiliary)"),
         new(@"^\s*// (\w+) auxiliary:"),
         new(@"^\s*// (\w+): ใช้ link auxiliary"),
-        new(@"^\s*(?:if \(\w+\) )?AddShape\(cs, ""([^""]+)"""),
+        new(@"^\s*(?:if \([\w ><&]+\) )?AddShape\(cs, ""([^""]+)"""),
         new(@"^\s*// (\w+): มี link ที่ไม่มีอยู่จริง"),
     };
     public static Dictionary<string, List<int>> SourceMap(string source)

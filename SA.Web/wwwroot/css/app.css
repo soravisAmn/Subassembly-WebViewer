@@ -146,6 +146,24 @@ body.row-resizing #main,body.row-resizing .pane-sec{pointer-events:none}
 .tn .nm small.dup{color:var(--warn);font-family:inherit}
 .tn .dirty-tag{color:var(--warn);margin-left:4px;font-size:11px}
 .tn .edit-tag{font-size:10.5px;color:#fff;background:var(--accent);border-radius:3px;padding:0 5px;margin-left:4px}
+/* ต้นไม้ Conditions (รอบ 5 — condtree.js) */
+.lg-acts{padding:1px 6px 3px}
+.lg-acts .tbtns,.tn .tbtns{display:flex;gap:4px;flex:none}
+.lg-acts .tbtns button,.tn .tbtns button{font-size:10.5px;padding:0 5px;line-height:17px}
+.tn .ic.dec{color:var(--accent);font-size:11px}
+.tn.lg-dec .nm b{font-weight:600}
+.tn.lg-dec .nm small.kw{margin:0 2px 0 0;color:var(--accent)}
+.tn.lg-dec .nm small.lbl{font-family:inherit}
+.tn.lg-br .case{color:var(--muted);font-size:11px}
+.tn.lg-br.on .nm{font-weight:600}
+.tn.lg-br .meta .cnt{font-family:"IBM Plex Mono",monospace}
+.tn.lg-br .meta .tick{display:inline-block;width:12px;text-align:center;color:var(--ok)}
+.tn.lg-br .meta .miss{color:var(--warn)}
+.tn .meta .lg-val{font-size:10.5px;padding:0 5px}
+.tn.lg-dec .nm,.tn.lg-br .nm{flex:1 1 auto;max-width:none}
+.tn.lg-dec .meta,.tn.lg-br .meta{flex:none;overflow:visible}
+.tn.drop-over{outline:2px dashed var(--accent);outline-offset:-2px;background:var(--accent-soft)}
+.tn .tn-edit{flex:1 1 auto;min-width:60px;font:12px "IBM Plex Mono",monospace;padding:1px 4px}
 .att{font-size:11.5px;color:var(--muted);padding:0 6px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .att.lost,.att.free{color:var(--warn)}
 .sdot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--ok)}

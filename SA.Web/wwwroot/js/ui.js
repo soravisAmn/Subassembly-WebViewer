@@ -66,7 +66,7 @@ function renderTree(){
   const tip = html => String(html).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").replace(/"/g, "&quot;").trim();
   const node = (o) => {
     const car = o.key ? `<span class="car" data-tog="${o.key}">${isOpen(o.key) ? "▾" : "▸"}</span>` : `<span class="car"></span>`;
-    h.push(`<div class="tn${o.cls ? " " + o.cls : ""}${o.sel ? " sel" : ""}" style="padding-left:${6 + o.depth * 14}px" data-sel='${JSON.stringify(o.s)}'${o.ctx ? ` data-ctx='${JSON.stringify(o.ctx)}'` : ""}${o.title ? ` title="${esc(o.title)}"` : ""}>${car}${o.icon || ""}<span class="nm"${o.title ? "" : ` title="${tip(o.name)}"`}>${o.name}</span>${o.meta ? `<span class="meta${o.metaCls ? " " + o.metaCls : ""}" title="${tip(o.meta)}">${o.meta}</span>` : ""}</div>`);
+    h.push(`<div class="tn${o.cls ? " " + o.cls : ""}${o.sel ? " sel" : ""}" style="padding-left:${6 + o.depth * 14}px" data-sel='${JSON.stringify(o.s)}'${o.ctx ? ` data-ctx='${JSON.stringify(o.ctx)}'` : ""}${o.title ? ` title="${esc(o.title)}"` : ""}${o.attrs || ""}>${car}${o.icon || ""}<span class="nm"${o.title ? "" : ` title="${tip(o.name)}"`}>${o.name}</span>${o.meta ? `<span class="meta${o.metaCls ? " " + o.metaCls : ""}" title="${tip(o.meta)}">${o.meta}</span>` : ""}${o.metaHtml ? `<span class="meta">${o.metaHtml}</span>` : ""}${o.btns || ""}</div>`);
     if (o.after) h.push(o.after);
   };
   const editing = state.editing;
@@ -116,8 +116,10 @@ function treeItem(node, h, a, it, depth, editing){
   const sp = it.spec, dr = drawRes[it.id];
   if (!isOpen(ik) || (!res && !sp)) return;
   const d2 = depth + 1;
+  // ตัวที่แก้อยู่: ลาก object ได้ (ไปวางที่กิ่งในต้นไม้ Conditions) · หัว Points / Links / Shapes = วางแล้วเกิดเสมอ (รอบ 5)
+  const mine = state.editing === it.id, dragA = mine ? ' draggable="true" data-drag="1"' : "", dropA = mine ? ` data-drop="" data-it="${esc(it.id)}"` : "";
   const grp = (key, label, n, kids) => {
-    node({ key, depth: d2, s:{type:"item", item:it.id}, name: `${label} <small>(${n})</small>` });
+    node({ key, depth: d2, s:{type:"item", item:it.id}, name: `${label} <small>(${n})</small>`, attrs: dropA, title: mine ? "ลาก object มาวางที่นี่ = เกิดเสมอ (ออกจากกิ่ง)" : undefined });
     if (isOpen(key)) kids();
   };
   // ส่วนที่วาด (P1, L1, S1 …) ก่อน ตามด้วยของที่โค้ดสร้าง (#0, L0 …)
@@ -132,19 +134,27 @@ function treeItem(node, h, a, it, depth, editing){
   const cp = code ? code.points : [], cl = code ? code.links : [], cs = code ? code.shapes : [];
   const dupP = dupOf(dp), dupL = dupOf(dl), dupS = dupOf(ds);
   grp(ik + ":pts", "Points", dp.length + cp.length, () => {
-    dp.forEach(p => node({ depth: d2 + 1, cls:"leaf drawn" + (Spec.isAux(p) ? " aux" : ""), s:{type:"dpt", item:it.id, id:p.id}, sel: isSel("dpt", it.id, p.id),
+    dp.forEach(p => node({ depth: d2 + 1, cls:"leaf drawn" + (Spec.isAux(p) ? " aux" : ""), s:{type:"dpt", item:it.id, id:p.id}, sel: isSel("dpt", it.id, p.id), attrs: dragA,
                            name: brTag(p) + dname(p, dupP), meta: errMeta(dr && dr.pts[p.id]) || (Spec.isAux(p) ? "aux · " : "") + (Spec.rotationOf(sp, p.id) ? `หมุน ${Spec.rotationOf(sp, p.id).id} · ` : "") + Spec.POINT_TYPES[p.def.type], metaCls: dr && dr.pts[p.id] && dr.pts[p.id].err && !dr.pts[p.id].off ? "warn" : "" }));
     cp.forEach((p, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"pt", item:it.id, i}, sel: isSel("pt", it.id, i), name: `#${i} ${esc(p.codes.join(", ") || "—")}`, meta: "โค้ด" }));
   });
   grp(ik + ":links", "Links", dl.length + cl.length, () => {
-    dl.forEach(l => node({ depth: d2 + 1, cls:"leaf drawn" + (Spec.isAux(l) ? " aux" : ""), s:{type:"dlink", item:it.id, id:l.id}, sel: isSel("dlink", it.id, l.id),
+    dl.forEach(l => node({ depth: d2 + 1, cls:"leaf drawn" + (Spec.isAux(l) ? " aux" : ""), s:{type:"dlink", item:it.id, id:l.id}, sel: isSel("dlink", it.id, l.id), attrs: dragA,
                            name: brTag(l) + dname(l, dupL), meta: errMeta(dr && dr.links[l.id]) || (Spec.isAux(l) ? "aux · " : "") + Spec.linkEnds(l).join("→") + (l.type === "followSurface" ? " ตามดิน" : l.type === "followClipped" ? " ตามดิน ไม่เกินเส้น" : Spec.isArc(l) ? " " + Spec.LINK_TYPES[l.type] : "") }));
     cl.forEach((l, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"link", item:it.id, i}, sel: isSel("link", it.id, i), name: `L${i} ${esc(l.codes.join(", ") || "—")}`, meta: "#" + l.pts.join("→#") }));
   });
   grp(ik + ":shapes", "Shapes", ds.length + cs.length, () => {
-    ds.forEach(s => node({ depth: d2 + 1, cls:"leaf drawn", s:{type:"dshape", item:it.id, id:s.id}, sel: isSel("dshape", it.id, s.id),
+    ds.forEach(s => node({ depth: d2 + 1, cls:"leaf drawn", s:{type:"dshape", item:it.id, id:s.id}, sel: isSel("dshape", it.id, s.id), attrs: dragA,
                            name: brTag(s) + dname(s, dupS), meta: errMeta(dr && dr.shapes[s.id]) || s.links.join(",") }));
     cs.forEach((s, i) => node({ depth: d2 + 1, cls:"leaf", s:{type:"shape", item:it.id, i}, sel: isSel("shape", it.id, i), name: `S${i} ${esc(s.codes.join(", ") || "—")}`, meta: "โค้ด" }));
+  });
+  // ต้นไม้ Conditions (รอบ 5 M2 — condtree.js): object ของกิ่งแสดงใต้กิ่งด้วย (แถวเดียวกับข้างบน คลิกที่ไหนก็เลือกตัวเดียวกัน)
+  if (sp) treeConditions(node, h, it, ik, d2, (kind, o, dep) => {
+    if (!o) return;
+    const sel = isSel(kind, it.id, o.id), q = dr && (kind === "dpt" ? dr.pts : kind === "dlink" ? dr.links : dr.shapes)[o.id];
+    const meta = errMeta(q) || (Spec.isAux(o) ? "aux · " : "") + (kind === "dpt" ? Spec.POINT_TYPES[o.def.type] : kind === "dlink" ? Spec.linkEnds(o).join("→") : o.links.join(","));
+    node({ depth: dep, cls: "leaf drawn" + (kind !== "dshape" && Spec.isAux(o) ? " aux" : ""), s: { type: kind, item: it.id, id: o.id }, sel, attrs: dragA,
+           name: dname(o, kind === "dpt" ? dupP : kind === "dlink" ? dupL : dupS), meta, metaCls: q && q.err && !q.off ? "warn" : "" });
   });
   const np = (res ? res.params.length : 0) + (sp ? sp.params.length : 0);
   node({ depth: d2, s:{type:"params", item:it.id}, sel: isSel("params", it.id), name: `Parameters <small>(${np})</small>` });
@@ -153,6 +163,8 @@ function treeItem(node, h, a, it, depth, editing){
 $("tree").addEventListener("click", e => {
   const tog = e.target.closest("[data-tog]");
   if (tog){ const k = tog.dataset.tog; state.open[k] = !isOpen(k); persist(); renderTree(); return; }
+  if (e.target.closest(".tn-edit")) return;                          // ช่องแก้นิพจน์ในบรรทัด
+  if (condTreeClick(e)) return;                                      // ต้นไม้ Conditions + ปุ่มในแถว (condtree.js)
   const n = e.target.closest(".tn"); if (!n) return;
   const s = JSON.parse(n.dataset.sel);
   if (state.editing && s.item && s.item !== state.editing) return;     // Edit mode: ตัวอื่นแก้ไม่ได้
@@ -161,6 +173,7 @@ $("tree").addEventListener("click", e => {
   setSel(s);
 });
 $("tree").addEventListener("dblclick", e => {
+  if (e.target.closest(".tn-edit") || condTreeDblClick(e)) return;  // ดับเบิลคลิก decision = แก้นิพจน์ในบรรทัด
   const n = e.target.closest(".tn"); if (!n) return;
   const t = n.querySelector("[data-tog]"); if (!t) return;
   const k = t.dataset.tog; state.open[k] = !isOpen(k); persist(); renderTree();
@@ -170,12 +183,13 @@ $("tree").addEventListener("contextmenu", e => {
   e.preventDefault();
   const c = JSON.parse(n.dataset.ctx);
   if (state.editing && c.kind === "item" && c.id !== state.editing) return;
-  setSel(JSON.parse(n.dataset.sel));
-  openCtx(e, c.kind, c.id);
+  if (c.kind !== "lg") setSel(JSON.parse(n.dataset.sel));
+  openCtx(e, c.kind, c.id, c);
 });
 
 // ---------------- คลิกขวา ----------------
 function ctxItems(kind, id, extra){
+  if (kind === "lg") return condCtxItems(id, extra);                // ต้นไม้ Conditions (condtree.js)
   if (kind === "drawn"){
     const it = itemById(id), k = { dpt: "point", dlink: "link", dshape: "shape" }[extra.type];
     return [

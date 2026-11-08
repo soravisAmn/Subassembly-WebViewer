@@ -193,6 +193,7 @@ function render(){
   $("welcome").style.display = allItems().length ? "none" : "flex";
   renderLegend();
   updateLogicLive();           // แผง Logic: ค่าจริง / เท็จ สดตอนลากผิวดิน
+  updateTreeLive();            // ต้นไม้ Conditions: ชิปค่าสด (condtree.js)
 }
 
 // ส่วนที่วาด (DrawingSpec) ของ item: เส้นทึบหนากว่าของโค้ด จุดเป็นสี่เหลี่ยม ป้าย P1/L1 แสดงตอนแก้อยู่

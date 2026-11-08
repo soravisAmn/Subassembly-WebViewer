@@ -94,7 +94,8 @@
     M0 เสร็จ (2026-11-08) · M1 เสร็จ (2026-11-08): `js/logicops.js` (`Logic.*` คืน { ok, error } · error = spec ไม่เปลี่ยน · ห่อฟังก์ชัน 4c / 4e · describe)
       UI เดิม (เกิดเมื่อ, แท็บ Logic, Daylight Cut/Fill, Intersect, Offset, Extend, Clipped, Array, ตาราง Parameter, B) เรียก API · `specEdit` แสดง error ใน banner · README "Logic API" (test: `logicops.test.js`)
       + หน้าต่าง Daylight Cut/Fill: ช่องลาดแบบช่อง slope (`Spec.slopeMagnitude` — 1:x / ดิ่งต่อราบ / % / parameter / นิพจน์, ทิศล็อก ตัด ↗ ถม ↘) · addCutFill รับข้อความ (number = x เดิม) · drawing-cases 82–83
-      — ถัดไป M2 ต้นไม้ Conditions
+    M2 เสร็จ (2026-11-08): ต้นไม้ Conditions (`js/condtree.js` — treeConditions / updateTreeLive / condDialog / condCtxItems / ลาก = setBranch) ชิปค่าสด, + Condition / + Switch, elif, case ↑↓, ดับเบิลคลิกแก้นิพจน์
+      — ถัดไป M3 Variables
   ก่อนหน้านี้วางแผน: `prompt-5.md` (Logic API + มุมมองข้อความ + ต้นไม้ Conditions ในแถบซ้ายแทน flowchart + Variables) · แล้ว prompt-5b (Loop ต่อยอด Array — ยังไม่มีไฟล์) → prompt-6 (MCP) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)

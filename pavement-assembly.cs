@@ -80,7 +80,7 @@ namespace TestSubassembly
     }
 
     // ===== SA-DRAWING BEGIN (สร้างโดย SA Drawing Studio — แก้ด้วยการวาดในเว็บ อย่าแก้ช่วงนี้ด้วยมือ) =====
-    // sa-spec: {"version":1,"className":"PavementAssembly","namespace":"TestSubassembly","params":[{"name":"Side","kind":"long","default":0,"displayName":"Side","min":null,"max":null}],"targets":[{"name":"TargetSurface","type":"Surface","displayName":"Target Surface"}],"points":[{"id":"P1","codes":[],"def":{"type":"origin"}},{"id":"P2","codes":[],"def":{"type":"delta","dx":"0","dy":"0"}},{"id":"P3","codes":[],"def":{"type":"delta","from":"P2","dx":"-0.25","dy":"0"}},{"id":"P4","codes":[],"def":{"type":"delta","dx":"0","dy":"-0.5","from":"P3"}},{"id":"P5","codes":[],"def":{"type":"delta","from":"P4","dx":"0.25","dy":"0"}},{"id":"P6","codes":[],"def":{"type":"delta","from":"P3","dx":"-0.3","dy":"0"}},{"id":"P7","codes":[],"def":{"type":"delta","from":"P6","dx":"0","dy":"-0.1"}},{"id":"P8","codes":[],"def":{"type":"between","a":"P3","b":"P4","t":"0.2"}},{"id":"P9","codes":[],"def":{"type":"delta","from":"P6","dx":"-0.3","dy":"0"}},{"id":"P10","codes":[],"def":{"type":"delta","from":"P9","dx":"0","dy":"-0.1"}},{"id":"P11","codes":[],"def":{"type":"delta","from":"P9","dx":"-0.3","dy":"0"}},{"id":"P12","codes":[],"def":{"type":"delta","from":"P11","dx":"0","dy":"-0.1"}},{"id":"P13","codes":[],"def":{"type":"delta","from":"P11","dx":"-0.3","dy":"0"}},{"id":"P14","codes":[],"def":{"type":"delta","from":"P13","dx":"0","dy":"-0.1"}},{"id":"P15","codes":[],"def":{"type":"delta","from":"P13","dx":"-0.3","dy":"0"}},{"id":"P16","codes":[],"def":{"type":"delta","from":"P15","dx":"0","dy":"-0.1"}},{"id":"P17","codes":[],"def":{"type":"delta","from":"P15","dx":"-0.3","dy":"0"}},{"id":"P18","codes":[],"def":{"type":"delta","from":"P17","dx":"0","dy":"-0.1"}},{"id":"P19","codes":[],"def":{"type":"delta","from":"P17","dx":"-0.3","dy":"0"}},{"id":"P20","codes":[],"def":{"type":"delta","from":"P19","dx":"0","dy":"-0.1"}},{"id":"P21","codes":[],"def":{"type":"delta","dx":"-2.65","dy":"0"}},{"id":"P22","codes":[],"def":{"type":"delta","dx":"-2.65","dy":"-0.1"}},{"id":"P23","codes":[],"def":{"type":"delta","dx":"-2.95","dy":"0"}},{"id":"P24","codes":[],"def":{"type":"delta","dx":"-2.95","dy":"-0.1"}},{"id":"P25","codes":[],"def":{"type":"delta","dx":"-2.65","dy":"-0.1"}},{"id":"P26","codes":[],"def":{"type":"delta","from":"P1","dx":"-0.05","dy":"-0.000"}},{"id":"P27","codes":[],"def":{"type":"delta","from":"P26","dx":"0","dy":"0.100"}},{"id":"P28","codes":[],"def":{"type":"delta","from":"P27","dx":"-0.15","dy":"0"}},{"id":"P29","codes":[],"def":{"type":"delta","dx":"0","dy":"-0.1","from":"P28"}},{"id":"P30","codes":[],"def":{"type":"delta","dx":"-0.0375","dy":"0","from":"P27"}},{"id":"P31","codes":[],"def":{"type":"delta","from":"P30","dx":"0","dy":"0.96"}},{"id":"P32","codes":[],"def":{"type":"delta","from":"P31","dx":"-0.075","dy":"-0.0014"}},{"id":"P33","codes":[],"def":{"type":"between","a":"P27","b":"P28","t":"0.75"}},{"id":"P34","codes":[],"def":{"type":"delta","from":"P23","dx":"0","dy":"-0.4"}},{"id":"P35","codes":[],"def":{"type":"delta","from":"P34","dx":"-0.5","dy":"0"}},{"id":"P36","codes":[],"def":{"type":"delta","from":"P35","dx":"0","dy":"0.24"}},{"id":"P38","codes":[],"def":{"type":"slopeLength","from":"P36","slope":"-1/8.33","length":"0.3022","dir":1,"measure":"along"}},{"id":"P41","codes":[],"def":{"type":"slopeToSurface","from":"P35","slope":"-1/1.5","dir":-1,"target":"TargetSurface","maxDistance":"50","layoutLength":"3"}},{"id":"P42","codes":[],"def":{"type":"delta","from":"P36","dx":"-0.5","dy":"0.0051"}},{"id":"P43","codes":[],"def":{"type":"slopeToSurface","from":"P42","slope":"-1/2","dir":-1,"target":"TargetSurface","maxDistance":"50","layoutLength":"3"}},{"id":"P44","codes":[],"def":{"type":"delta","from":"P5","dx":"-0.045","dy":"-0.00"}},{"id":"P45","codes":[],"def":{"type":"delta","from":"P44","dx":"0","dy":"0.05"}},{"id":"P46","codes":[],"def":{"type":"delta","from":"P45","dx":"-0.16","dy":"-0.0"}},{"id":"P47","codes":[],"def":{"type":"delta","from":"P46","dx":"0","dy":"-2.5"}},{"id":"P48","codes":[],"def":{"type":"delta","from":"P47","dx":"0.16","dy":"0.0034"}},{"id":"P49","codes":[],"def":{"type":"onSurface","from":"P5","dx":"-0.0","target":"TargetSurface"}},{"id":"P50","codes":[],"def":{"type":"delta","from":"P38","dx":"0.0453","dy":"0.1923"}}],"links":[{"id":"L1","points":["P2","P3"],"codes":[]},{"id":"L2","points":["P4","P5"],"codes":[]},{"id":"L3","points":["P5","P1"],"codes":[]},{"id":"L4","points":["P3","P4"],"codes":[]},{"id":"L5","points":["P3","P6"],"codes":[]},{"id":"L6","points":["P6","P7"],"codes":[]},{"id":"L7","points":["P7","P8"],"codes":[]},{"id":"L8","points":["P8","P3"],"codes":[]},{"id":"L9","points":["P6","P9"],"codes":[]},{"id":"L10","points":["P9","P10"],"codes":[]},{"id":"L11","points":["P10","P7"],"codes":[]},{"id":"L12","points":["P9","P11"],"codes":[]},{"id":"L13","points":["P11","P12"],"codes":[]},{"id":"L14","points":["P12","P10"],"codes":[]},{"id":"L15","points":["P11","P13"],"codes":[]},{"id":"L16","points":["P13","P14"],"codes":[]},{"id":"L17","points":["P14","P12"],"codes":[]},{"id":"L18","points":["P13","P15"],"codes":[]},{"id":"L19","points":["P15","P16"],"codes":[]},{"id":"L20","points":["P16","P14"],"codes":[]},{"id":"L21","points":["P15","P17"],"codes":[]},{"id":"L22","points":["P17","P18"],"codes":[]},{"id":"L23","points":["P18","P16"],"codes":[]},{"id":"L24","points":["P17","P19"],"codes":[]},{"id":"L25","points":["P19","P20"],"codes":[]},{"id":"L26","points":["P20","P18"],"codes":[]},{"id":"L27","points":["P19","P21"],"codes":[]},{"id":"L28","points":["P21","P22"],"codes":[]},{"id":"L29","points":["P22","P20"],"codes":[]},{"id":"L30","points":["P21","P23"],"codes":[]},{"id":"L31","points":["P23","P24"],"codes":[]},{"id":"L32","points":["P24","P25"],"codes":[]},{"id":"L33","points":["P3","P1"],"codes":[]},{"id":"L34","points":["P1","P26"],"codes":[]},{"id":"L35","points":["P26","P27"],"codes":[]},{"id":"L36","points":["P27","P28"],"codes":[]},{"id":"L37","points":["P28","P29"],"codes":[]},{"id":"L38","points":["P30","P31"],"codes":[]},{"id":"L39","points":["P31","P32"],"codes":[]},{"id":"L40","points":["P32","P33"],"codes":[]},{"id":"L41","points":["P23","P34"],"codes":[]},{"id":"L42","points":["P34","P35"],"codes":[]},{"id":"L43","points":["P35","P36"],"codes":[]},{"id":"L45","points":["P36","P38"],"codes":[]},{"id":"L49","points":["P35","P41"],"codes":[]},{"id":"L50","points":["P36","P42"],"codes":[]},{"id":"L51","points":["P42","P43"],"codes":[]},{"id":"L52","type":"followSurface","from":"P43","to":"P41","target":"TargetSurface","codes":["Datum"]},{"id":"L54","points":["P44","P45"],"codes":[]},{"id":"L55","points":["P45","P46"],"codes":[]},{"id":"L56","points":["P46","P47"],"codes":[]},{"id":"L57","points":["P47","P48"],"codes":[]},{"id":"L58","points":["P48","P44"],"codes":[]},{"id":"L59","points":["P5","P49"],"codes":[]},{"id":"L60","type":"followSurface","from":"P49","to":"P41","target":"TargetSurface","codes":["Datum"]},{"id":"L61","points":["P34","P24"],"codes":["compact soil"]},{"id":"L62","points":["P24","P8"],"codes":[]},{"id":"L63","points":["P8","P4"],"codes":[]},{"id":"L64","points":["P38","P50"],"codes":[]},{"id":"L65","points":["P50","P23"],"codes":[]}],"shapes":[{"id":"S1","links":["L33","L3","L2","L4"],"codes":[]},{"id":"S2","links":["L50","L43","L49","L52","L51"],"codes":["compact soil"]},{"id":"S3","links":["L49","L42","L61","L62","L63","L2","L59","L60"],"codes":["sand"]}],"side":{"param":"Side","mirror":true}}
+    // sa-spec: {"version":1,"className":"PavementAssembly","namespace":"TestSubassembly","params":[{"name":"Side","kind":"long","default":0,"displayName":"Side","min":null,"max":null},{"name":"MinDrop","kind":"double","default":2,"displayName":"MinDrop","min":null,"max":null}],"targets":[{"name":"TargetSurface","type":"Surface","displayName":"Target Surface"}],"points":[{"id":"P1","codes":[],"def":{"type":"origin"}},{"id":"P2","codes":[],"def":{"type":"delta","dx":"0","dy":"0"}},{"id":"P3","codes":[],"def":{"type":"delta","from":"P2","dx":"-0.25","dy":"0"}},{"id":"P4","codes":[],"def":{"type":"delta","dx":"0","dy":"-0.5","from":"P3"}},{"id":"P5","codes":[],"def":{"type":"delta","from":"P4","dx":"0.25","dy":"0"}},{"id":"P6","codes":[],"def":{"type":"delta","from":"P3","dx":"-0.3","dy":"0"}},{"id":"P7","codes":[],"def":{"type":"delta","from":"P6","dx":"0","dy":"-0.1"}},{"id":"P8","codes":[],"def":{"type":"between","a":"P3","b":"P4","t":"0.2"}},{"id":"P9","codes":[],"def":{"type":"delta","from":"P6","dx":"-0.3","dy":"0"}},{"id":"P10","codes":[],"def":{"type":"delta","from":"P9","dx":"0","dy":"-0.1"}},{"id":"P11","codes":[],"def":{"type":"delta","from":"P9","dx":"-0.3","dy":"0"}},{"id":"P12","codes":[],"def":{"type":"delta","from":"P11","dx":"0","dy":"-0.1"}},{"id":"P13","codes":[],"def":{"type":"delta","from":"P11","dx":"-0.3","dy":"0"}},{"id":"P14","codes":[],"def":{"type":"delta","from":"P13","dx":"0","dy":"-0.1"}},{"id":"P15","codes":[],"def":{"type":"delta","from":"P13","dx":"-0.3","dy":"0"}},{"id":"P16","codes":[],"def":{"type":"delta","from":"P15","dx":"0","dy":"-0.1"}},{"id":"P17","codes":[],"def":{"type":"delta","from":"P15","dx":"-0.3","dy":"0"}},{"id":"P18","codes":[],"def":{"type":"delta","from":"P17","dx":"0","dy":"-0.1"}},{"id":"P19","codes":[],"def":{"type":"delta","from":"P17","dx":"-0.3","dy":"0"}},{"id":"P20","codes":[],"def":{"type":"delta","from":"P19","dx":"0","dy":"-0.1"}},{"id":"P21","codes":[],"def":{"type":"delta","dx":"-2.65","dy":"0"}},{"id":"P22","codes":[],"def":{"type":"delta","dx":"-2.65","dy":"-0.1"}},{"id":"P23","codes":[],"def":{"type":"delta","dx":"-2.95","dy":"0"}},{"id":"P24","codes":[],"def":{"type":"delta","dx":"-2.95","dy":"-0.1"}},{"id":"P25","codes":[],"def":{"type":"delta","dx":"-2.65","dy":"-0.1"}},{"id":"P26","codes":[],"def":{"type":"delta","from":"P1","dx":"-0.05","dy":"-0.000"}},{"id":"P27","codes":[],"def":{"type":"delta","from":"P26","dx":"0","dy":"0.100"}},{"id":"P28","codes":[],"def":{"type":"delta","from":"P27","dx":"-0.15","dy":"0"}},{"id":"P29","codes":[],"def":{"type":"delta","dx":"0","dy":"-0.1","from":"P28"}},{"id":"P30","codes":[],"def":{"type":"delta","dx":"-0.0375","dy":"0","from":"P27"}},{"id":"P31","codes":[],"def":{"type":"delta","from":"P30","dx":"0","dy":"0.96"}},{"id":"P32","codes":[],"def":{"type":"delta","from":"P31","dx":"-0.075","dy":"-0.0014"}},{"id":"P33","codes":[],"def":{"type":"between","a":"P27","b":"P28","t":"0.75"}},{"id":"P34","codes":[],"def":{"type":"delta","from":"P23","dx":"0","dy":"-0.4"}},{"id":"P35","codes":[],"def":{"type":"delta","from":"P34","dx":"-0.5","dy":"0"}},{"id":"P36","codes":[],"def":{"type":"delta","from":"P35","dx":"0","dy":"0.24"}},{"id":"P38","codes":[],"def":{"type":"slopeLength","from":"P36","slope":"-1/8.33","length":"0.3022","dir":1,"measure":"along"}},{"id":"P41","codes":[],"def":{"type":"slopeToSurface","from":"P35","slope":"-1/1.5","dir":-1,"target":"TargetSurface","maxDistance":"50","layoutLength":"3"}},{"id":"P42","codes":[],"def":{"type":"delta","from":"P36","dx":"-0.5","dy":"0.0051"}},{"id":"P43","codes":[],"def":{"type":"slopeToSurface","from":"P42","slope":"-1/2","dir":-1,"target":"TargetSurface","maxDistance":"50","layoutLength":"3"}},{"id":"P44","codes":[],"def":{"type":"delta","from":"P5","dx":"-0.045","dy":"-0.00"}},{"id":"P45","codes":[],"def":{"type":"delta","from":"P44","dx":"0","dy":"0.05"}},{"id":"P46","codes":[],"def":{"type":"delta","from":"P45","dx":"-0.16","dy":"-0.0"}},{"id":"P47","codes":[],"def":{"type":"delta","from":"P46","dx":"0","dy":"-2.5"}},{"id":"P48","codes":[],"def":{"type":"delta","from":"P47","dx":"0.16","dy":"0.0034"}},{"id":"P49","codes":[],"def":{"type":"onSurface","from":"P5","dx":"-0.0","target":"TargetSurface"}},{"id":"P50","codes":[],"def":{"type":"delta","from":"P38","dx":"0.0453","dy":"0.1923"},"auxiliary":true},{"id":"P51","codes":[],"def":{"type":"tangent","corner":"P50","toward":"P38","other":"P23","radius":"0.01"}},{"id":"P52","codes":[],"def":{"type":"tangent","corner":"P50","toward":"P23","other":"P38","radius":"0.01"}}],"links":[{"id":"L1","points":["P2","P3"],"codes":[]},{"id":"L2","points":["P4","P5"],"codes":[]},{"id":"L3","points":["P5","P1"],"codes":[]},{"id":"L4","points":["P3","P4"],"codes":[]},{"id":"L5","points":["P3","P6"],"codes":[]},{"id":"L6","points":["P6","P7"],"codes":[]},{"id":"L7","points":["P7","P8"],"codes":[]},{"id":"L8","points":["P8","P3"],"codes":[]},{"id":"L9","points":["P6","P9"],"codes":[]},{"id":"L10","points":["P9","P10"],"codes":[]},{"id":"L11","points":["P10","P7"],"codes":[]},{"id":"L12","points":["P9","P11"],"codes":[]},{"id":"L13","points":["P11","P12"],"codes":[]},{"id":"L14","points":["P12","P10"],"codes":[]},{"id":"L15","points":["P11","P13"],"codes":[]},{"id":"L16","points":["P13","P14"],"codes":[]},{"id":"L17","points":["P14","P12"],"codes":[]},{"id":"L18","points":["P13","P15"],"codes":[]},{"id":"L19","points":["P15","P16"],"codes":[]},{"id":"L20","points":["P16","P14"],"codes":[]},{"id":"L21","points":["P15","P17"],"codes":[]},{"id":"L22","points":["P17","P18"],"codes":[]},{"id":"L23","points":["P18","P16"],"codes":[]},{"id":"L24","points":["P17","P19"],"codes":[]},{"id":"L25","points":["P19","P20"],"codes":[]},{"id":"L26","points":["P20","P18"],"codes":[]},{"id":"L27","points":["P19","P21"],"codes":[]},{"id":"L28","points":["P21","P22"],"codes":[]},{"id":"L29","points":["P22","P20"],"codes":[]},{"id":"L30","points":["P21","P23"],"codes":[]},{"id":"L31","points":["P23","P24"],"codes":[]},{"id":"L32","points":["P24","P25"],"codes":[]},{"id":"L33","points":["P3","P1"],"codes":[]},{"id":"L34","points":["P1","P26"],"codes":[]},{"id":"L35","points":["P26","P27"],"codes":[]},{"id":"L36","points":["P27","P28"],"codes":[]},{"id":"L37","points":["P28","P29"],"codes":[]},{"id":"L38","points":["P30","P31"],"codes":[]},{"id":"L39","points":["P31","P32"],"codes":[]},{"id":"L40","points":["P32","P33"],"codes":[]},{"id":"L41","points":["P23","P34"],"codes":[]},{"id":"L42","points":["P34","P35"],"codes":[]},{"id":"L43","points":["P35","P36"],"codes":[]},{"id":"L45","points":["P36","P38"],"codes":[]},{"id":"L49","points":["P35","P41"],"codes":[]},{"id":"L50","points":["P36","P42"],"codes":[]},{"id":"L51","points":["P42","P43"],"codes":[]},{"id":"L52","type":"followSurface","from":"P43","to":"P41","target":"TargetSurface","codes":["Datum"]},{"id":"L54","points":["P44","P45"],"codes":[]},{"id":"L55","points":["P45","P46"],"codes":[]},{"id":"L56","points":["P46","P47"],"codes":[]},{"id":"L57","points":["P47","P48"],"codes":[]},{"id":"L58","points":["P48","P44"],"codes":[]},{"id":"L59","points":["P5","P49"],"codes":[]},{"id":"L60","type":"followSurface","from":"P49","to":"P41","target":"TargetSurface","codes":["Datum"]},{"id":"L61","points":["P34","P24"],"codes":[]},{"id":"L62","points":["P24","P8"],"codes":[]},{"id":"L63","points":["P8","P4"],"codes":[]},{"id":"L64","points":["P38","P51"],"codes":[]},{"id":"L66","type":"fillet","from":"P51","to":"P52","corner":"P50","radius":"0.01","codes":[],"seg":{"by":"chord","value":"0.005"}},{"id":"L65","points":["P52","P23"],"codes":[]}],"shapes":[{"id":"S1","links":["L33","L3","L2","L4"],"codes":[]},{"id":"S2","links":["L50","L43","L49","L52","L51"],"codes":["compact soil"]},{"id":"S3","links":["L49","L42","L61","L62","L63","L2","L59","L60"],"codes":["sand"]}],"side":{"param":"Side","mirror":true}}
     internal static class SaDrawing_PavementAssembly
     {
         private const string Source = "PavementAssembly";
@@ -97,12 +97,14 @@ namespace TestSubassembly
         internal static void AddParams(CorridorState cs)
         {
             cs.ParamsLong.Add("Side", 0).DisplayName = "Side";
+            cs.ParamsDouble.Add("MinDrop", 2.0).DisplayName = "MinDrop";
         }
 
         internal static void Draw(CorridorState cs)
         {
-            // ---- parameter (นอกขอบเขต = ใช้ค่าขอบแทน + เตือน) ----
+            // ---- parameter (≤ 0 ที่ต้องมากกว่า 0 = error + ใช้ default · นอกขอบเขต = ใช้ค่าขอบแทน + เตือน) ----
             long Side = GetLong(cs, "Side", 0);
+            double MinDrop = GetDouble(cs, "MinDrop", 2.0);
             double F = Side == 1 ? -1.0 : 1.0;   // Side = 1 (Left) -> กลับด้านแนวราบทั้งหมด
 
             // ---- target surface (Layout mode / ไม่ได้กำหนด = วาดแบบไม่มีดิน) ----
@@ -156,6 +158,8 @@ namespace TestSubassembly
             Pt? P48 = Delta(cs, "P48", P47, F * 0.16, 0.0034);   // P48 ห่างจาก P47
             Pt? P49 = OnSurface(cs, "P49", surface, P5, F * -0.0);   // P49 บนผิวดิน
             Pt? P50 = Delta(cs, "P50", P38, F * 0.0453, 0.1923);   // P50 ห่างจาก P38
+            Pt? P51 = Tangent(cs, "P51", P50, P38, P23, 0.01);   // P51 จุดสัมผัสของ Fillet ที่มุม P50
+            Pt? P52 = Tangent(cs, "P52", P50, P23, P38, 0.01);   // P52 จุดสัมผัสของ Fillet ที่มุม P50
 
             // ---- เพิ่มจุด / link / shape ลง CorridorState ----
             Point p1 = AddPoint(cs, P1);
@@ -204,7 +208,9 @@ namespace TestSubassembly
             Point p47 = AddPoint(cs, P47);
             Point p48 = AddPoint(cs, P48);
             Point p49 = AddPoint(cs, P49);
-            Point p50 = AddPoint(cs, P50);
+            // P50 auxiliary: ใช้คำนวณอย่างเดียว ไม่เพิ่มลง Civil 3D
+            Point p51 = AddPoint(cs, P51);
+            Point p52 = AddPoint(cs, P52);
             Link l1 = AddLink(cs, "L1", p2, p3);
             Link l2 = AddLink(cs, "L2", p4, p5);
             Link l3 = AddLink(cs, "L3", p5, p1);
@@ -260,11 +266,12 @@ namespace TestSubassembly
             Link l58 = AddLink(cs, "L58", p48, p44);
             Link l59 = AddLink(cs, "L59", p5, p49);
             Link l60 = FollowSurface(cs, "L60", surface, P49, p49, P41, p41, "Datum");   // L60 วิ่งตามผิวดิน
-            Link l61 = AddLink(cs, "L61", p34, p24, "compact soil");
+            Link l61 = AddLink(cs, "L61", p34, p24);
             Link l62 = AddLink(cs, "L62", p24, p8);
             Link l63 = AddLink(cs, "L63", p8, p4);
-            Link l64 = AddLink(cs, "L64", p38, p50);
-            Link l65 = AddLink(cs, "L65", p50, p23);
+            Link l64 = AddLink(cs, "L64", p38, p51);
+            Link[] l66 = Fillet(cs, "L66", P51, p51, P50, P52, p52, 0.01, Seg.Chord, 0.005);   // L66 Fillet ที่มุม P50
+            Link l65 = AddLink(cs, "L65", p52, p23);
             AddShape(cs, "S1", new[] { l33, l3, l2, l4 });
             AddShape(cs, "S2", new[] { l50, l43, l49, l52, l51 }, "compact soil");
             AddShape(cs, "S3", new[] { l49, l42, l61, l62, l63, l2, l59, l60 }, "sand");
@@ -375,6 +382,158 @@ namespace TestSubassembly
             return Check(cs, id, new Pt(p.X + t * (q.X - p.X), p.Y + t * (q.Y - p.Y)));
         }
 
+        // Offset: จุด e (ปลายของเส้น a→b) เลื่อนตั้งฉากไป k (+ = ซ้ายของทิศ a→b บนจอจริง — ตัวเรียกคูณ F ให้แล้ว) — เส้นขนาน
+        private static Pt? Offset(CorridorState cs, string id, Pt? a, Pt? b, Pt? e, double k)
+        {
+            if (a == null || b == null || e == null) return null;
+            double dx = b.Value.X - a.Value.X, dy = b.Value.Y - a.Value.Y, n = Math.Sqrt(dx * dx + dy * dy);
+            if (n < 1e-9) { Warn(cs, CorridorError.Failure, id + ": เส้นยาวเป็นศูนย์ หาทิศ offset ไม่ได้"); return null; }
+            return Check(cs, id, new Pt(e.Value.X - dy * k / n, e.Value.Y + dx * k / n));
+        }
+
+        // Extend to Surface: ต่อเส้น along→from เลย from ออกไป (ทิศเดิม) จนชนดิน — เฉพาะเมื่อปลาย from ลอยเหนือดิน
+        //   ไม่ลอย / ไม่มีดิน (Layout / ไม่มี target) = null เงียบๆ (link / shape ที่ใช้ = ไม่เกิด) · ไม่ชนดินภายใน maxDistance (ระยะราบ) = เตือน + null
+        private static Pt? ExtendToGround(CorridorState cs, string id, ObjectId surface, Pt? from, Pt? along, double maxDistance)
+        {
+            if (from == null || along == null || surface.IsNull) return null;
+            Pt f = from.Value;
+            double gy;
+            try
+            {
+                gy = Elevation(cs, surface, cs.CurrentOffset + f.X) - cs.CurrentElevation;
+            }
+            catch (Exception e)
+            {
+                Warn(cs, CorridorError.Failure, id + " ต่อลงถึงดิน: " + e.Message);
+                return null;
+            }
+            if (!(gy < f.Y - 1e-9)) return null;
+            double dx = f.X - along.Value.X, dy = f.Y - along.Value.Y;
+            if (Math.Abs(dx) < 1e-12 && Math.Abs(dy) < 1e-12) { Warn(cs, CorridorError.Failure, id + " ต่อลงถึงดิน: เส้นยาวเป็นศูนย์"); return null; }
+            Pt? hit = null;
+            if (Math.Abs(dx) < 1e-12)
+            {
+                if (dy < 0) hit = new Pt(f.X, gy);
+            }
+            else
+            {
+                try
+                {
+                    IPoint h = cs.IntersectSurface(surface, cs.CurrentAlignmentId, Abs(cs, f), dx > 0, dy / Math.Abs(dx));
+                    if (h != null) hit = new Pt(h.Offset - cs.CurrentOffset, h.Elevation - cs.CurrentElevation);
+                }
+                catch
+                {
+                    hit = null;
+                }
+            }
+            if (hit == null || Math.Abs(hit.Value.X - f.X) > maxDistance + 1e-9)
+            {
+                Warn(cs, CorridorError.NoSideslopeIntersectFound, id + " ต่อลงถึงดิน: ไม่ชนผิวดินภายใน " + maxDistance + " m");
+                return null;
+            }
+            return Check(cs, id, hit.Value);
+        }
+
+        // Clipped Surface Link: ตามผิวดินจาก a ถึง b แต่ไม่สูงกว่า (below) / ไม่ต่ำกว่า เส้นอ้างอิง r1–r2 (ต่อออกไปได้)
+        //   แบบ BuildBottom ของ base_rock-pitching.cs — ตรงกับ clipPath ใน wwwroot/js/spec.js
+        //   ช่วงที่ปลายทั้งสองอยู่บนเส้น = codes + codesLine · นอกนั้น = codes + codesGround · ไม่มีดิน / เส้นอ้างอิงแนวดิ่ง = เส้นตรง + codesLine
+        private static Link[] FollowClipped(CorridorState cs, string id, ObjectId surface, Pt? pa, Point a, Pt? pb, Point b, Pt? r1, Pt? r2, bool below,
+                                            string[] codes, string[] codesGround, string[] codesLine)
+        {
+            if (a == null || b == null || r1 == null || r2 == null) return null;
+            Pt A = pa.Value, B = pb.Value, R1 = r1.Value, R2 = r2.Value;
+            var lineCodes = new List<string>(codes); lineCodes.AddRange(codesLine);
+            var gndCodes = new List<string>(codes); gndCodes.AddRange(codesGround);
+            var path = new List<Pt> { A, B };
+            bool clipped = false;
+            Func<double, double> line = x => R1.Y + (R2.Y - R1.Y) * (x - R1.X) / (R2.X - R1.X);
+            string fail = null;
+            if (Math.Abs(R2.X - R1.X) < 1e-9) fail = "เส้นอ้างอิงเป็นแนวดิ่ง";
+            else if (surface.IsNull)
+            {
+                if (cs.Mode != CorridorMode.Layout) fail = "ไม่ได้กำหนด Target Surface";
+            }
+            else
+            {
+                try
+                {
+                    // ผิวดิน: ปลายทั้งสอง + จุดหักระหว่างทาง (แบบ FollowSurface)
+                    var prof = new List<(double X, double Y)> { (A.X, Elevation(cs, surface, cs.CurrentOffset + A.X) - cs.CurrentElevation) };
+                    double lo = Math.Min(A.X, B.X), hi = Math.Max(A.X, B.X);
+                    var mids = new List<(double X, double Y)>();
+                    SampledSectionLinkCollection sampled = cs.SampleSection(surface, cs.CurrentAlignmentId, Abs(cs, A), Abs(cs, B));
+                    foreach (SampledSectionLink s in sampled)
+                    {
+                        double x = s.EndPointOffset - cs.CurrentOffset;
+                        if (x > lo + 1e-9 && x < hi - 1e-9)
+                            mids.Add((x, s.EndPointElevation - cs.CurrentElevation));
+                    }
+                    mids.Sort((p, q) => p.X.CompareTo(q.X));
+                    if (A.X > B.X) mids.Reverse();
+                    prof.AddRange(mids);
+                    prof.Add((B.X, Elevation(cs, surface, cs.CurrentOffset + B.X) - cs.CurrentElevation));
+
+                    Func<double, double, double> clip = (x, y) => below ? Math.Min(y, line(x)) : Math.Max(y, line(x));
+                    var raw = new List<Pt> { new Pt(prof[0].X, clip(prof[0].X, prof[0].Y)) };
+                    for (int i = 0; i < prof.Count - 1; i++)
+                    {
+                        var p = prof[i];
+                        var q = prof[i + 1];
+                        double da = p.Y - line(p.X), db = q.Y - line(q.X);
+                        if (da * db < 0)
+                        {
+                            double t = da / (da - db), x = p.X + t * (q.X - p.X);
+                            raw.Add(new Pt(x, line(x)));
+                        }
+                        raw.Add(new Pt(q.X, clip(q.X, q.Y)));
+                    }
+                    // ตัดจุดซ้ำ (ระยะราบ < 0.0001) และจุดกลางของช่วงที่อยู่บนเส้น
+                    var c = new List<Pt>();
+                    foreach (Pt p in raw)
+                    {
+                        if (c.Count > 0 && Math.Abs(p.X - c[c.Count - 1].X) < 1e-4) continue;
+                        if (c.Count >= 2 && Math.Abs(p.Y - line(p.X)) < 1e-4 && Math.Abs(c[c.Count - 1].Y - line(c[c.Count - 1].X)) < 1e-4
+                            && Math.Abs(c[c.Count - 2].Y - line(c[c.Count - 2].X)) < 1e-4)
+                        {
+                            c[c.Count - 1] = p;
+                            continue;
+                        }
+                        c.Add(p);
+                    }
+                    if (c.Count >= 2)
+                    {
+                        path = new List<Pt> { A };
+                        for (int i = 1; i < c.Count - 1; i++) path.Add(c[i]);
+                        path.Add(B);
+                    }
+                    clipped = true;
+                }
+                catch (Exception e)
+                {
+                    fail = e.Message;
+                }
+            }
+            if (fail != null) Warn(cs, CorridorError.Failure, id + " ตามดิน ไม่เกินเส้น: " + fail + " — ใช้เส้นตรงแทน");
+            var pts = new Point[path.Count];
+            pts[0] = a;
+            pts[path.Count - 1] = b;
+            for (int i = 1; i < path.Count - 1; i++) pts[i] = cs.Points.Add(path[i].X, path[i].Y, "");
+            var links = new Link[path.Count - 1];
+            for (int i = 0; i < links.Length; i++)
+            {
+                links[i] = cs.Links.Add(new[] { pts[i], pts[i + 1] }, "");
+                bool on = clipped && Math.Abs(path[i].Y - line(path[i].X)) < 1e-4 && Math.Abs(path[i + 1].Y - line(path[i + 1].X)) < 1e-4;
+                foreach (string code in (on || !clipped ? lineCodes : gndCodes))
+                    links[i].Codes.TryAdd(code);
+            }
+            return links;
+        }
+
+        // link optional ใน shape (ต่อลงถึงดิน): ไม่เกิด / วาดไม่ได้ (null) = ข้ามไป
+        private static Link[] Opt(Link l) => l == null ? new Link[0] : new[] { l };
+        private static Link[] Opt(Link[] l) => l ?? new Link[0];
+
         // หมุนจุด p รอบ pivot ด้วยมุม angle (องศา ทวนเข็ม +) — สมาชิกกลุ่มหมุน
         private static Pt? Rotate(CorridorState cs, string id, Pt? p, Pt? pivot, double angle)
         {
@@ -382,6 +541,112 @@ namespace TestSubassembly
             if (pivot == null) { Warn(cs, CorridorError.Failure, id + ": ข้ามเพราะหาจุดหมุนไม่ได้"); return null; }
             double r = angle * Deg, c = Math.Cos(r), s = Math.Sin(r), dx = p.Value.X - pivot.Value.X, dy = p.Value.Y - pivot.Value.Y;
             return Check(cs, id, new Pt(pivot.Value.X + dx * c - dy * s, pivot.Value.Y + dx * s + dy * c));
+        }
+
+        // ---- ค่าจากเรขาคณิตในนิพจน์ (P3.x / P3.y / ground / exists) ----
+        // จุดที่อ้างหาไม่ได้ = โยน InvalidOperationException -> Try ข้างล่างเตือน แล้วให้ object นี้หาไม่ได้ (ตรงกับตัวคำนวณในเว็บ)
+
+        private static double PX(Pt? p)
+        {
+            if (p == null) throw new InvalidOperationException("ข้ามเพราะหาจุดที่นิพจน์อ้างไม่ได้");
+            return p.Value.X;
+        }
+
+        private static double PY(Pt? p)
+        {
+            if (p == null) throw new InvalidOperationException("ข้ามเพราะหาจุดที่นิพจน์อ้างไม่ได้");
+            return p.Value.Y;
+        }
+
+        private static bool Exists(Pt? p)
+        {
+            return p != null;
+        }
+
+        // == / != ของตัวเลขเทียบด้วย tolerance เดียวกับเว็บ
+        private static bool Eq(double a, double b)
+        {
+            return Math.Abs(a - b) <= 1e-6;
+        }
+
+        // ระดับผิวดินที่ offset ของจุด (เทียบ origin) · ไม่มีผิวดิน (Layout mode / ไม่ได้กำหนด target) = ระดับของจุดเอง + เตือน
+        private static double Ground(CorridorState cs, ObjectId surface, Pt? p)
+        {
+            double y = PY(p);
+            if (surface.IsNull)
+            {
+                if (cs.Mode != CorridorMode.Layout)
+                    Warn(cs, CorridorError.LogicalNameNotFound, "ground(): ไม่ได้กำหนด Target Surface — ใช้ระดับของจุดเอง");
+                return y;
+            }
+            try
+            {
+                return Elevation(cs, surface, cs.CurrentOffset + p.Value.X) - cs.CurrentElevation;
+            }
+            catch (Exception e)
+            {
+                throw new InvalidOperationException("ground(): " + e.Message);
+            }
+        }
+
+        // ---- เงื่อนไข / กิ่ง ----
+        // เงื่อนไขคำนวณไม่ได้ (อ้างจุดที่หาไม่ได้ / เงื่อนไขที่ไม่รู้ค่า) = null + เตือน -> ไม่เข้ากิ่งไหน (ตรงกับตัวคำนวณในเว็บ)
+
+        private static bool? Cond(CorridorState cs, string name, Func<bool> test)
+        {
+            try
+            {
+                return test();
+            }
+            catch (InvalidOperationException e)
+            {
+                Warn(cs, CorridorError.Failure, "เงื่อนไข " + name + ": " + e.Message);
+                return null;
+            }
+        }
+
+        private static double? Val(CorridorState cs, string name, Func<double> value)
+        {
+            try
+            {
+                return value();
+            }
+            catch (InvalidOperationException e)
+            {
+                Warn(cs, CorridorError.Failure, name + ": " + e.Message);
+                return null;
+            }
+        }
+
+        // ค่าของเงื่อนไขที่ใช้ในนิพจน์อื่น — ไม่รู้ค่า = โยน (ให้ Cond / Try ข้างนอกจัดการ)
+        private static bool V(bool? b)
+        {
+            if (b == null) throw new InvalidOperationException("เงื่อนไขที่อ้างไม่รู้ค่า");
+            return b.Value;
+        }
+
+        // จุดแรกในรายการที่เกิด (ไว้ต่อเรขาคณิตหลังกิ่ง) · ไม่มีสักจุด = หาไม่ได้ + เตือน
+        private static Pt? FirstOf(CorridorState cs, string id, params Pt?[] points)
+        {
+            foreach (Pt? p in points)
+            {
+                if (p != null) return p;
+            }
+            Warn(cs, CorridorError.Failure, id + ": ไม่มีจุดในรายการที่เกิด");
+            return null;
+        }
+
+        private static T Try<T>(CorridorState cs, string id, Func<T> calc)
+        {
+            try
+            {
+                return calc();
+            }
+            catch (InvalidOperationException e)
+            {
+                Warn(cs, CorridorError.Failure, id + ": " + e.Message);
+                return default(T);
+            }
         }
 
         private static Pt? Check(CorridorState cs, string id, Pt p)
@@ -667,6 +932,12 @@ namespace TestSubassembly
         private static void Warn(CorridorState cs, CorridorError error, string message)
         {
             cs.RecordError(error, CorridorErrorLevel.AsWarning, message, Source, true);
+        }
+
+        // error ระดับ Severe (parameter ≤ 0 ที่ต้องมากกว่า 0 — แบบ RecordError ใน base_rock-pitching.cs)
+        private static void Severe(CorridorState cs, CorridorError error, string message)
+        {
+            cs.RecordError(error, CorridorErrorLevel.Severe, message, Source, true);
         }
     }
 

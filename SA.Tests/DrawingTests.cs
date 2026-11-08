@@ -229,11 +229,17 @@ static class DrawingTests
         {
             var jm = pm.Select(m => (string)m!).OrderBy(m => m, StringComparer.Ordinal).ToList();
             // (ValueTooLarge ใช้กับเตือนอื่นด้วย เช่น จุดสัมผัส Fillet → คัดเฉพาะรูป "ชื่อ = ค่า ...")
+            var vmsg = js["varMsgs"] is JsonArray va ? va.Select(m => (string)m!).ToHashSet() : new HashSet<string>();   // ของ variable เทียบแยกด้านล่าง
             var cm = o.Issues.Where(i => i.Error is "ValueTooSmall" or "ValueTooLarge" or "ValueShouldNotBeLessThanOrEqualToZero"
-                                         && System.Text.RegularExpressions.Regex.IsMatch(i.Message, @"^[A-Za-z_][A-Za-z0-9_]* = "))
+                                         && System.Text.RegularExpressions.Regex.IsMatch(i.Message, @"^[A-Za-z_][A-Za-z0-9_]* = ") && !vmsg.Contains(i.Message))
                              .Select(i => i.Message).OrderBy(m => m, StringComparer.Ordinal).ToList();
             if (!jm.SequenceEqual(cm)) throw new Exception($"ข้อความเตือน parameter: JS [{string.Join(" | ", jm)}] / C# [{string.Join(" | ", cm)}]");
         }
+        // ข้อความเตือนของ rules ใน Variables (รอบ 5) ต้องมีใน C# ตรงตัว (ข้อความเดียวกัน = นับเท่ากัน)
+        if (js["varMsgs"] is JsonArray vm)
+            foreach (var g in vm.Select(m => (string)m!).GroupBy(m => m))
+                if (o.Issues.Count(i => i.Message == g.Key) != g.Count())
+                    throw new Exception($"ข้อความเตือน variable \"{g.Key}\": JS {g.Count()} / C# {o.Issues.Count(i => i.Message == g.Key)} — C#: {string.Join(" | ", o.Issues.Select(i => i.Message))}");
         bool jw = (int)js["issues"]! > 0, cw = o.Issues.Count > 0;
         if (jw != cw) throw new Exception($"warning: JS {(int)js["issues"]!} / C# {o.Issues.Count} ({string.Join(" | ", o.Issues.Select(x => x.Message))})");
     }

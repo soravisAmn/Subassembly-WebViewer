@@ -40,7 +40,7 @@ public static class CodeGenerator
         // ชื่อตัวช่วยในโค้ดที่สร้าง (ตัวแปรชื่อเดียวกันจะบังเมธอด / ชนิด)
         "Seg", "Arc", "Delta", "Polar", "SlopeLength", "SlopeToSurface", "OnSurface", "Between", "Intersect", "Offset", "ExtendToGround", "Opt", "FollowClipped", "Tangent", "Rotate",
         "Arc3", "ArcR", "Fillet", "Join", "AddPoint", "AddLink", "AddShape", "FollowSurface", "Check", "Warn", "TargetSurface",
-        "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "FirstOf", "Severe",
+        "GetLong", "GetDouble", "Elevation", "Ground", "Exists", "PX", "PY", "Eq", "Try", "Cond", "Val", "V", "VN", "FirstOf", "Severe",
         // คำในนิพจน์ (and or not true false — ไม่สนตัวพิมพ์ ตรวจใน IsReservedName)
         "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue","decimal","default",
         "delegate","do","double","else","enum","event","explicit","extern","false","finally","fixed","float","for","foreach","goto",
@@ -197,6 +197,8 @@ public static class CodeGenerator
         private readonly Dictionary<string, string> _surf = new();   // ชื่อ target -> ตัวแปร ObjectId
         private readonly ExprScope _scope;
         private readonly SpecLogic _logic;
+        // variable ที่ไม่รู้ค่าได้ (อ้างจุด / เงื่อนไข / variable แบบนี้ / วนกัน) = double? — คำนวณหลัง TopoOrder ก่อนเขียนบรรทัดแรกที่ใช้
+        private readonly HashSet<string> _runtimeVars = new();
 
         public Gen(DrawingSpec s)
         {
@@ -207,8 +209,8 @@ public static class CodeGenerator
             // นิพจน์อ้างจุดได้ (จุดที่ไม่มี = หาไม่ได้ตอนรัน แบบเดียวกับในเว็บ) · ไฟล์ import ใช้ target ของโค้ดเดิม = ไม่ตรวจชื่อ
             _scope = new ExprScope
             {
-                Params = _names, Points = s.Points.Select(p => p.Id).ToHashSet(), AllowMissingPoints = true,
-                Conds = _logic.Conditions.Select(c => c.Name).ToHashSet(),
+                Params = _names.Concat(_logic.Variables.Select(v => v.Name)).ToHashSet(), Points = s.Points.Select(p => p.Id).ToHashSet(), AllowMissingPoints = true,
+                Conds = _logic.Conditions.Select(c => c.Name).ToHashSet(), Nullable = _runtimeVars,
                 Targets = s.Imported ? null : s.Targets.Select(t => t.Name).ToHashSet(), Surface = SurfVar
             };
             foreach (var p in s.Params)
@@ -228,6 +230,7 @@ public static class CodeGenerator
                 if (!used.Add(n!)) throw new FormatException($"ชื่อ{what} {n} ซ้ำกับ parameter / จุด / ชื่ออื่น");
             }
             foreach (var c in _logic.Conditions) Name(c.Name, "เงื่อนไข");
+            foreach (var v in _logic.Variables) { Name(v.Name, " variable"); if (v.Kind != "double") throw new FormatException($"variable {v.Name}: ชนิด {v.Kind} ยังไม่รองรับ"); }
             foreach (var d in _logic.Decisions) Name(d.Id, " decision");
             foreach (var b in _logic.Branches) Name(b.Id, "กิ่ง");
         }
@@ -324,6 +327,7 @@ public static class CodeGenerator
                 .Concat(_s.Links.Where(l => l.Follow || l.IsClipped).Select(l => l.Target))
                 // ground() / hasGround() ในนิพจน์
                 .Concat(_s.Points.SelectMany(p => p.Def.Exprs()).Concat(_s.Links.SelectMany(LinkExprs)).Concat(_s.Rotations.Select(g => g.Angle))
+                    .Concat(_logic.Conditions.Select(c => c.Expr)).Concat(_logic.Decisions.Select(d => d.Test)).Concat(_logic.Variables.SelectMany(v => v.Exprs()))
                     .SelectMany(SpecExpr.GroundTargets)).ToList();
             if (usesSurface.Count > 0)
             {
@@ -338,9 +342,15 @@ public static class CodeGenerator
             if (_logic.Conditions.Count > 0 || _logic.Decisions.Count > 0)
                 L("        // (เงื่อนไข / กิ่ง: bool? = null คือไม่รู้ค่า เพราะหาจุดที่อ้างไม่ได้ -> ไม่เข้ากิ่งไหน · object ในกิ่งที่ไม่เกิด = null ไม่เพิ่มลง Civil 3D)");
             var order = TopoOrder(out var cyclic);
+            ComputeRuntimeVars(cyclic);
             foreach (var key in cyclic)
             {
-                if (key.StartsWith('?'))
+                if (key.StartsWith('$'))
+                {
+                    L($"        double? {key[1..]} = null;");
+                    L($"        Warn(cs, CorridorError.Failure, \"{key[1..]} อ้างถึงตัวเองเป็นวง\");");
+                }
+                else if (key.StartsWith('?'))
                 {
                     L($"        bool? {key[1..]} = null;");
                     L($"        Warn(cs, CorridorError.Failure, \"เงื่อนไข {key[1..]} อ้างถึงตัวเองเป็นวง\");");
@@ -361,6 +371,7 @@ public static class CodeGenerator
                 if (o is SpecPoint p) PointLine(p);
                 else if (o is SpecCondition c) ConditionLine(c);
                 else if (o is SpecDecision d) DecisionLines(d);
+                else if (o is SpecVariable v) VariableLines(v);
                 else RotationLines((SpecRotation)o);
             }
             L();
@@ -575,9 +586,22 @@ public static class CodeGenerator
                 if (done.Contains(key)) return true;
                 if (state.GetValueOrDefault(key) == 1) return false;
                 state[key] = 1;
-                bool ok = SpecExpr.PointRefs(c.Expr).All(r => NeedPt(r, null)) & CondDeps(c.Expr).All(VisitCond);
+                bool ok = SpecExpr.PointRefs(c.Expr).All(r => NeedPt(r, null)) & CondDeps(c.Expr).All(VisitCond) & VarDeps(c.Expr).All(VisitVar);
                 state[key] = 2;
                 if (ok) { done.Add(key); order.Add(c); } else if (!cyc.Contains(key)) cyc.Add(key);
+                return ok;
+            }
+            // variable (รอบ 5): จุด / เงื่อนไข / variable อื่นในนิพจน์ทั้งหมด (ค่าปกติ + rules)
+            bool VisitVar(SpecVariable v)
+            {
+                string key = "$" + v.Name;
+                if (done.Contains(key)) return true;
+                if (state.GetValueOrDefault(key) == 1) return false;
+                state[key] = 1;
+                bool ok = true;
+                foreach (var e in v.Exprs()) ok &= SpecExpr.PointRefs(e).All(r => NeedPt(r, null)) & CondDeps(e).All(VisitCond) & VarDeps(e).All(VisitVar);
+                state[key] = 2;
+                if (ok) { done.Add(key); order.Add(v); } else if (!cyc.Contains(key)) cyc.Add(key);
                 return ok;
             }
             // decision (+ บรรทัดกิ่งของมัน): test + กิ่งแม่
@@ -587,7 +611,7 @@ public static class CodeGenerator
                 if (done.Contains(key)) return true;
                 if (state.GetValueOrDefault(key) == 1) return false;
                 state[key] = 1;
-                bool ok = SpecExpr.PointRefs(d.Test).All(r => NeedPt(r, null)) & CondDeps(d.Test).All(VisitCond);
+                bool ok = SpecExpr.PointRefs(d.Test).All(r => NeedPt(r, null)) & CondDeps(d.Test).All(VisitCond) & VarDeps(d.Test).All(VisitVar);
                 if (d.Parent != null && DecOf(d.Parent) is { } pd && !VisitDec(pd)) ok = false;
                 state[key] = 2;
                 if (ok) { done.Add(key); order.Add(d); } else if (!cyc.Contains(key)) cyc.Add(key);
@@ -600,7 +624,7 @@ public static class CodeGenerator
                 if (done.Contains(key)) return true;
                 if (state.GetValueOrDefault(key) == 1) return false;
                 state[key] = 1;
-                bool ok = true;
+                bool ok = VarDeps(g.Angle).All(VisitVar);
                 foreach (var id in g.Points.Append(g.Pivot).Concat(SpecExpr.PointRefs(g.Angle)))
                 {
                     var q = _s.Points.FirstOrDefault(x => x.Id == id);
@@ -617,13 +641,14 @@ public static class CodeGenerator
                 if (state.GetValueOrDefault(p.Id) == 1) return false;
                 state[p.Id] = 1;
                 // อ้างสมาชิกกลุ่มหมุนแบบเห็นค่าที่หมุนแล้ว = ต้องอยู่หลังบรรทัดหมุนของกลุ่มนั้น (NeedPt) · อยู่ในกิ่ง = หลังบรรทัดกิ่ง
-                bool ok = p.Def.Refs().All(r => NeedPt(r, p.Id)) & VisitBranch(p.Branch) & p.Def.Exprs().SelectMany(CondDeps).All(VisitCond);
+                bool ok = p.Def.Refs().All(r => NeedPt(r, p.Id)) & VisitBranch(p.Branch) & p.Def.Exprs().SelectMany(CondDeps).All(VisitCond) & p.Def.Exprs().SelectMany(VarDeps).All(VisitVar);
                 state[p.Id] = 2;
                 if (ok) { done.Add(p.Id); order.Add(p); } else if (!cyc.Contains(p.Id)) cyc.Add(p.Id);
                 return ok;
             }
             // เงื่อนไขคำนวณทุกตัวเสมอ (แบบในเว็บ) แม้ไม่มีใครใช้
             foreach (var c in _logic.Conditions) VisitCond(c);
+            foreach (var v in _logic.Variables) VisitVar(v);          // variable คำนวณทุกตัวเสมอ (เตือนครบแบบในเว็บ)
             foreach (var p in _s.Points) Visit(p);
             foreach (var g in _s.Rotations) VisitRot(g);
             foreach (var d in _logic.Decisions) VisitDec(d);
@@ -631,7 +656,7 @@ public static class CodeGenerator
             cyclic = cyc;
             return order.Where(o => o switch
             {
-                SpecPoint p => !cyc.Contains(p.Id), SpecCondition c => !cyc.Contains("?" + c.Name), SpecDecision d => !cyc.Contains("!" + d.Id), _ => true
+                SpecPoint p => !cyc.Contains(p.Id), SpecCondition c => !cyc.Contains("?" + c.Name), SpecDecision d => !cyc.Contains("!" + d.Id), SpecVariable v => !cyc.Contains("$" + v.Name), _ => true
             }).ToList();
         }
 
@@ -648,7 +673,74 @@ public static class CodeGenerator
         private string InBranch(string? branch, string expr) => branch == null ? expr : $"{Br(branch)} ? {expr} : null";
         private string BrTag(string? branch) => branch == null ? "" : $" [กิ่ง {BrLabel(branch)}]";            // ต่อท้ายคอมเมนต์ที่มีอยู่
         private string BrNote(string? branch) => branch == null ? "" : $"   // [กิ่ง {BrLabel(branch)}]";      // คอมเมนต์ท้ายบรรทัด
-        private bool UsesRuntime(IEnumerable<string?> exprs) => exprs.Any(e => SpecExpr.PointRefs(e).Count > 0 || CondDeps(e).Any());
+        private bool UsesRuntime(IEnumerable<string?> exprs) => exprs.Any(e => SpecExpr.PointRefs(e).Count > 0 || CondDeps(e).Any() || SpecExpr.NamesOf(e).Any(_runtimeVars.Contains));
+        // variable ที่นิพจน์ใช้
+        private IEnumerable<SpecVariable> VarDeps(string? expr) =>
+            SpecExpr.NamesOf(expr).Select(n => _logic.Variables.FirstOrDefault(v => v.Name == n)).Where(v => v != null)!;
+
+        // variable ที่ไม่รู้ค่าได้: อ้างจุด / เงื่อนไข / วนกัน / ใช้ variable แบบนี้ (ทางอ้อมด้วย)
+        private void ComputeRuntimeVars(List<string> cyclic)
+        {
+            _runtimeVars.Clear();
+            foreach (var v in _logic.Variables)
+                if (cyclic.Contains("$" + v.Name) || v.Exprs().Any(e => SpecExpr.PointRefs(e).Count > 0 || CondDeps(e).Any())) _runtimeVars.Add(v.Name);
+            for (bool more = true; more; )
+            {
+                more = false;
+                foreach (var v in _logic.Variables)
+                    if (!_runtimeVars.Contains(v.Name) && v.Exprs().Any(e => SpecExpr.NamesOf(e).Any(_runtimeVars.Contains))) { _runtimeVars.Add(v.Name); more = true; }
+            }
+        }
+
+        // ข้อความเตือนของ variable: {ชื่อ} -> ค่า ("Depth = " + Depth + " m ...") — ตรงกับ varWarnText ใน spec.js
+        private string WarnText(string text)
+        {
+            var parts = System.Text.RegularExpressions.Regex.Split(text, @"\{([A-Za-z_][A-Za-z0-9_]*)\}");
+            var list = new List<string>();
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (i % 2 == 0) { if (parts[i].Length > 0) list.Add("\"" + parts[i] + "\""); }
+                else list.Add(_runtimeVars.Contains(parts[i]) ? $"VN({parts[i]})" : parts[i]);
+            }
+            if (list.Count == 0) return "\"\"";
+            if (!list[0].StartsWith("\"")) list.Insert(0, "\"\"");
+            return string.Join(" + ", list);
+        }
+        private static readonly HashSet<string> VarErrors = new() { "ValueTooSmall", "ValueTooLarge", "Failure", "ValueShouldNotBeLessThanOrEqualToZero", "ValueShouldNotBeLessThanZero", "ValueShouldNotBeZero", "ValueInABadPosition" };
+        private string VarWarn(SpecVarRule r) =>
+            string.IsNullOrWhiteSpace(r.Warn) ? "" : $"Warn(cs, CorridorError.{(VarErrors.Contains(r.Error ?? "") ? r.Error : "Failure")}, {WarnText(r.Warn!)}); ";
+
+        // Variable (รอบ 5): ไม่อ้างจุด = double ธรรมดา + if / else if (อ่านแบบเขียนเอง) · อ้างจุด / เงื่อนไข = double? ผ่าน Val (หาไม่ได้ = null + เตือน)
+        private void VariableLines(SpecVariable v)
+        {
+            foreach (var r in v.Rules)
+                if (!string.IsNullOrEmpty(r.Warn) && (r.Warn.Contains('"') || r.Warn.Contains('\\'))) throw new FormatException($"variable {v.Name}: ข้อความเตือนใช้ \" หรือ \\ ไม่ได้");
+            L($"        // {v.Id} {v.Name}{(string.IsNullOrWhiteSpace(v.Note) ? "" : ": " + v.Note)}");
+            string Num(string? e, string what) => X(e, what, v.Name);
+            string Bool(string? e, string what) => X(e, what, v.Name, 0, "bool");
+            if (!_runtimeVars.Contains(v.Name))
+            {
+                L($"        double {v.Name} = {Num(v.Expr, "ค่าปกติ")};");
+                for (int i = 0; i < v.Rules.Count; i++)
+                {
+                    var r = v.Rules[i];
+                    string head = (i == 0 ? "if" : "else if") + $" ({Bool(r.When, $"ถ้า ข้อ {i + 1}")})";
+                    string set = $"{v.Name} = {Num(r.Value, $"ค่า ข้อ {i + 1}")};";
+                    L(string.IsNullOrWhiteSpace(r.Warn) ? $"        {head} {set}" : $"        {head} {{ {VarWarn(r)}{set} }}");
+                }
+                return;
+            }
+            if (v.Rules.Count == 0) { L($"        double? {v.Name} = Val(cs, \"{v.Name}\", () => {Num(v.Expr, "ค่าปกติ")});"); return; }
+            L($"        double? {v.Name} = Val(cs, \"{v.Name}\", () =>");
+            L("        {");
+            for (int i = 0; i < v.Rules.Count; i++)
+            {
+                var r = v.Rules[i];
+                L($"            if ({Bool(r.When, $"ถ้า ข้อ {i + 1}")}) {{ {VarWarn(r)}return {Num(r.Value, $"ค่า ข้อ {i + 1}")}; }}");
+            }
+            L($"            return {Num(v.Expr, "ค่าปกติ")};");
+            L("        });");
+        }
 
         private void ConditionLine(SpecCondition c)
         {
@@ -1350,6 +1442,18 @@ public static class CodeGenerator
     }
 
 """);
+            // variable ที่ไม่รู้ค่าได้ (รอบ 5) — มีเฉพาะเมื่อใช้ (ไฟล์ที่ไม่มี variable ไม่เปลี่ยน)
+            if (_runtimeVars.Count > 0)
+                _o.Append("""
+
+    // ค่าของ variable ที่ใช้ในนิพจน์อื่น — ไม่รู้ค่า = โยน (ให้ Val / Try / Cond ข้างนอกจัดการ)
+    private static double VN(double? v)
+    {
+        if (v == null) throw new InvalidOperationException("variable ที่อ้างไม่รู้ค่า");
+        return v.Value;
+    }
+
+""");
         }
 
         private static string Lc(string id) => id.ToLowerInvariant();
@@ -1405,6 +1509,7 @@ public static class CodeGenerator
         new(@"^\s*Link \w+ = (?:\w+ \? )?(?:AddLink|FollowSurface)\(cs, ""([^""]+)"""),
         new(@"^\s*Link\[\] \w+ = (?:\w+ \? )?(?:Try\(cs, ""[^""]+"", \(\) => )?(?:Arc3|ArcR|Fillet|FollowClipped)\(cs, ""([^""]+)"""),
         new(@"^\s*bool\?? (\w+) = "),                         // เงื่อนไข (ชื่อ) / decision (D1) / กิ่ง (B1)
+        new(@"^\s*// (V\d+) \w+"),                          // variable (รอบ 5): บรรทัดคอมเมนต์หัว
         new(@"^\s*double\? (\w+) = "),                        // switch
         new(@"^\s*\w+ = (?:Try\(cs, ""[^""]+"", \(\) => )?Rotate\(cs, ""([^""]+)"""),
         new(@"^\s*Link(?:\[\])? \w+ = null;\s+// ([^:]+):"),

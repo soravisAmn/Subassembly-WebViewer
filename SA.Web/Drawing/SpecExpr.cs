@@ -17,6 +17,7 @@ public sealed class ExprScope
     public ISet<string>? Points { get; init; }            // null = ช่องนี้อ้างจุดไม่ได้
     public bool AllowMissingPoints { get; init; }         // จุดที่ไม่มีใน spec = null (หาไม่ได้ตอนรัน แบบเดียวกับในเว็บ) แทน error
     public ISet<string>? Conds { get; init; }             // ชื่อเงื่อนไข (จริง/เท็จ)
+    public ISet<string>? Nullable { get; init; }          // variable ที่ไม่รู้ค่าได้ (double?) -> VN(ชื่อ) โยนเมื่อไม่รู้ค่า (รอบ 5)
     public ISet<string>? Targets { get; init; }           // null = ไม่ตรวจชื่อ target
     public Func<string?, string>? Surface { get; init; }  // ชื่อ target (null = TargetSurface) -> ตัวแปร ObjectId
 }
@@ -321,7 +322,7 @@ public static class SpecExpr
         {
             case Num x: return Lit(x.V);
             case Bool b: return b.V ? "true" : "false";
-            case Var v: return sc.Conds != null && sc.Conds.Contains(v.Name) ? $"V({v.Name})" : v.Name;   // เงื่อนไขไม่รู้ค่า = โยน (Try / Cond จัดการ)
+            case Var v: return sc.Conds != null && sc.Conds.Contains(v.Name) ? $"V({v.Name})" : sc.Nullable != null && sc.Nullable.Contains(v.Name) ? $"VN({v.Name})" : v.Name;   // เงื่อนไขไม่รู้ค่า = โยน (Try / Cond จัดการ)
             case PtRef r: return r.Axis == "x" ? Wrap($"F * PX({Pt(r.Id)})", 1, need) : $"PY({Pt(r.Id)})";
             case Neg g:
             {

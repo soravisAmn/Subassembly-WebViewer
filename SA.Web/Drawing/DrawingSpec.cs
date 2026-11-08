@@ -158,6 +158,29 @@ public class SpecLogic
     public List<SpecCondition> Conditions { get; set; } = new();
     public List<SpecDecision> Decisions { get; set; } = new();
     public List<SpecBranch> Branches { get; set; } = new();
+    public List<SpecVariable> Variables { get; set; } = new();          // รอบ 5 M3
+}
+
+// Variable (รอบ 5): ค่าตัวเลขที่คำนวณครั้งเดียว ใช้ชื่อในนิพจน์ไหนก็ได้ — rules = if / elif ตัวแรกที่จริงชนะ ไม่เข้าข้อไหน = Expr
+public class SpecVariable
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Kind { get; set; } = "double";
+    public string? Unit { get; set; }                 // ชนิดค่าแบบ parameter (แสดงในเว็บเท่านั้น)
+    public string? Expr { get; set; }
+    public List<SpecVarRule> Rules { get; set; } = new();
+    public string? Note { get; set; }
+
+    public IEnumerable<string> Exprs() => new[] { Expr }.Concat(Rules.SelectMany(r => new[] { r.When, r.Value })).Where(e => !string.IsNullOrWhiteSpace(e))!;
+}
+
+public class SpecVarRule
+{
+    public string? When { get; set; }
+    public string? Value { get; set; }
+    public string? Warn { get; set; }                 // ข้อความเตือนเมื่อใช้ข้อนี้ ({ชื่อ} = ค่า)
+    public string? Error { get; set; }                // ชื่อ CorridorError (ไม่ใส่ = Failure)
 }
 
 public class SpecCondition

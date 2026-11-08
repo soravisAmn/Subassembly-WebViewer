@@ -134,6 +134,7 @@ const Spec = (() => {
   function names(spec, codeParams){
     const s = new Set(spec.params.map(p => p.name));
     for (const p of codeParams || []) if (p.kind === "double" || p.kind === "long") s.add(p.name);
+    for (const v of (spec.logic || {}).variables || []) s.add(v.name);          // Variables (รอบ 5) = ตัวเลข ใช้แบบ parameter
     return [...s];
   }
   // ---------- Logic: กิ่ง ----------
@@ -297,6 +298,35 @@ const Spec = (() => {
     const offOf = o => o.branch && !ctx.allBranches && !branchOn(o.branch) ? { err: `ไม่เกิด (กิ่ง ${branchLabel(spec, o.branch)})`, off: o.branch } : null;
     const Xv = (src, what, viewer) => { try{ return Expr.value(src, env, exprCtx(viewer)); }catch(e){ throw new Error(`${what}: ${e.message}`); } };
     const X = (src, what) => Xv(src, what, null);
+
+    // ---------- Variables (รอบ 5 M3) — ค่าที่คำนวณครั้งเดียว ใช้ชื่อในนิพจน์ไหนก็ได้ (แบบ Define Variable ของ SAC) ----------
+    //   rules = if / elif ตามลำดับ ตัวแรกที่จริงชนะ (warn = ข้อความเตือน {ชื่อ} = ค่า) · ไม่เข้าข้อไหน = expr
+    //   ไม่รู้ค่า (อ้างจุดที่หาไม่ได้ / วนกัน) = เตือน + ทุกนิพจน์ที่ใช้ชื่อนี้หาไม่ได้ · คำนวณทุกตัวเสมอ (เตือนครบ) — ตรงกับ VariableLines ใน CodeGenerator.cs
+    const VARS = LG.variables || [], varVal = {}, varBusy = new Set();
+    const varWarnText = (t, self) => String(t).replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (m, n) => {
+      if (n === self) return m;
+      try{ const x = env[n]; return typeof x === "number" ? `${x}` : m; }catch{ return m; }
+    });
+    function variable(v){
+      if (!(v.name in varVal)){
+        if (varBusy.has(v.name)) throw new Error(`${v.name} อ้างถึงตัวเองเป็นวง`);
+        varBusy.add(v.name);
+        let r;
+        try{
+          const c = exprCtx(null);
+          const hit = (v.rules || []).find(rule => Expr.test(rule.when, env, c));
+          r = { v: Expr.value(hit ? hit.value : v.expr, env, c) };
+          if (hit && hit.warn) warn(v.name, varWarnText(hit.warn, v.name));
+        }catch(e){ r = { err: `${v.name}: ${e.message}` }; warn(v.id || v.name, r.err); }   // obj = id (ข้อความเตือนของ rules ใช้ obj = ชื่อ — DrawingTests เทียบเฉพาะแบบหลัง)
+        varBusy.delete(v.name);
+        varVal[v.name] = r;
+      }
+      const r = varVal[v.name];
+      if (r.err) throw new Error(r.err);
+      return r.v;
+    }
+    // ชื่อ variable ใน env = getter (คำนวณตอนมีนิพจน์ใช้ครั้งแรก) · ไม่ enumerable (กัน spread / JSON ไปเรียกตัวที่ error)
+    for (const v of VARS) Object.defineProperty(env, v.name, { get: () => variable(v), enumerable: false, configurable: true });
 
     // กลุ่มหมุน: จุด -> กลุ่ม · pre[กลุ่ม] = จุดนอกกลุ่มที่ pivot อ้างถึง (ทางอ้อมด้วย) — เห็นสมาชิกเป็นค่า raw
     const groupOf = {}, pre = {};
@@ -529,7 +559,10 @@ const Spec = (() => {
       shapes[s.id] = { poly };
     }
     for (const b of BRS) branchOn(b.id);
-    return { pts, links, shapes, issues, flip: F, env, raw: raws, logic: { conds: condVal, decisions: decVal, branches: brVal } };
+    // variable ที่ยังไม่มีใครใช้ก็คำนวณ (เตือนครบเหมือน C#) · vars = ค่าตอนนี้ (null = ไม่รู้ค่า)
+    const vars = {};
+    for (const v of VARS){ try{ vars[v.name] = variable(v); }catch{ vars[v.name] = null; } }
+    return { pts, links, shapes, issues, flip: F, env, raw: raws, logic: { conds: condVal, decisions: decVal, branches: brVal, vars } };
   }
   // หมุนจุด q รอบ c ด้วยมุม a องศา (ทวนเข็ม +) — ตรงกับ Rotate ใน CodeGenerator.cs
   function rotatePt(q, c, a){
@@ -807,7 +840,7 @@ const Spec = (() => {
   // เก็บแบบเดิมเสมอ = นิพจน์ดิ่งต่อราบมีเครื่องหมาย (ลง = ลบ) เช่น "-1/SideSlope" → evaluator / C# / spec เก่าไม่เปลี่ยน
   // หน้าตาในเว็บ = ทิศ ↗ / ↘ + ข้อความ: 1:1.5 · ชื่อ parameter ชนิด Slope · 2% · ชื่อ parameter ชนิด Percent · นิพจน์ (เครื่องหมายอยู่ในนิพจน์เอง)
   const SLOPE_NUM = "\\d+(?:\\.\\d+)?|\\.\\d+", SLOPE_ID = "[A-Za-z_][A-Za-z0-9_]*";
-  const paramUnit = (spec, name) => { const p = (spec.params || []).find(x => x.name === name); return p ? unitOf(p) : null; };
+  const paramUnit = (spec, name) => { const p = (spec.params || []).find(x => x.name === name) || ((spec.logic || {}).variables || []).find(x => x.name === name); return p ? unitOf(p) : null; };   // variable มีชนิดค่าแบบ parameter
   // นิพจน์ที่เก็บ → { up, text, mode: "ratio" | "param" | "percent" | "expr" } (ไม่เข้ารูปแบบ = expr แสดงตามเดิม)
   function slopeRead(spec, expr){
     const raw = String(expr ?? "").trim(), s = raw.replace(/\s+/g, "");
@@ -861,7 +894,7 @@ const Spec = (() => {
   // ---------- Logic: สร้างเงื่อนไข / กิ่ง ----------
   // ชื่อที่ยังไม่มีใน parameter / เงื่อนไข / จุด: base, base2, base3, ...
   function freeName(spec, base){
-    const used = new Set(spec.params.map(p => p.name).concat(((spec.logic || {}).conditions || []).map(c => c.name), spec.points.map(p => p.id)));
+    const used = new Set(spec.params.map(p => p.name).concat(((spec.logic || {}).conditions || []).map(c => c.name), ((spec.logic || {}).variables || []).map(v => v.name), spec.points.map(p => p.id)));
     let n = base, i = 2; while (used.has(n)) n = base + i++;
     return n;
   }
@@ -1099,6 +1132,10 @@ const Spec = (() => {
     const lg = spec.logic || {};
     for (const c of lg.conditions || []) if (c.expr != null) out.push({ obj: c, key: "expr", id: c.name });
     for (const d of lg.decisions || []) if (d.test != null) out.push({ obj: d, key: "test", id: d.label || d.id });
+    for (const v of lg.variables || []){
+      if (v.expr != null) out.push({ obj: v, key: "expr", id: v.name });
+      for (const r of v.rules || []) for (const k of ["when", "value", "warn"]) if (r[k] != null) out.push({ obj: r, key: k, id: v.name });
+    }
     return out;
   }
 

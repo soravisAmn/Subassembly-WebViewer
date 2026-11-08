@@ -57,9 +57,118 @@ function treeConditions(node, h, it, ik, depth, leaf){
   walk(null, depth + 1);
 }
 
+// ---------------- Variables (รอบ 5 M3) ----------------
+// variable (ตัวเลข) + เงื่อนไขที่ไม่มี decision ใช้ (bool — คำตอบ M0 ข้อ 3) · ชิป = ค่าตอนนี้ (ชนิดค่าแบบ parameter)
+function varChipHtml(v, unit, bool){
+  if (v === null || v === undefined) return '<span class="lg-val u">? ไม่รู้</span>';
+  if (bool) return v ? '<span class="lg-val t">● จริง</span>' : '<span class="lg-val f">○ เท็จ</span>';
+  return `<span class="lg-val t">${esc(Spec.fmtUnit(unit || "number", Expr.num(v)))}</span>`;
+}
+function treeVariables(node, h, it, ik, depth){
+  const sp = it.spec, lg = sp.logic || {}, vars = lg.variables || [], ed_ = state.editing === it.id, L = (drawRes[it.id] || {}).logic;
+  const loneConds = (lg.conditions || []).filter(c => !(lg.decisions || []).some(d => d.test === c.name));
+  const key = ik + ":vars";
+  const btns = ed_ ? `<span class="tbtns"><button data-act="add-var" data-it="${esc(it.id)}" title="ค่าที่คำนวณครั้งเดียว ใช้ชื่อในนิพจน์ไหนก็ได้ — ถ้า … ใช้ค่า … (แบบ Define Variable ของ SAC)">+ Variable</button></span>` : "";
+  node({ key, depth, cls: "lg-root", s: { type: "lg", item: it.id, k: "vars" }, ctx: { kind: "lg", id: it.id, k: "vars" },
+         name: `Variables <small>(${vars.length + loneConds.length})</small>`, after: btns ? `<div class="lg-acts" style="padding-left:${6 + depth * 14 + 18}px">${btns}</div>` : "" });
+  if (!isOpen(key)) return;
+  if (!vars.length && !loneConds.length){ h.push(`<div class="att" style="padding-left:${6 + (depth + 1) * 14 + 18}px">ยังไม่มี${ed_ ? " — กด + Variable" : ""}</div>`); return; }
+  for (const v of vars){
+    const n = (v.rules || []).length;
+    node({ depth: depth + 1, cls: "lg-var", icon: '<span class="ic dec">𝑥</span>', s: { type: "lg", item: it.id, k: "var", id: v.name },
+           ctx: { kind: "lg", id: it.id, k: "var", v: v.name },
+           name: `<b>${esc(v.name)}</b><small>= ${esc(v.expr)}${n ? ` · ถ้า ${n} ข้อ` : ""}</small>`, title: (v.note ? v.note + " · " : "") + (ed_ ? "ดับเบิลคลิก = แก้" : ""),
+           metaHtml: `<span data-tvar="${esc(v.name)}" data-it="${esc(it.id)}" data-unit="${esc(v.unit || "")}">${varChipHtml(L && L.vars ? L.vars[v.name] : undefined, v.unit)}</span>`,
+           attrs: ` data-var-edit="${esc(v.name)}"` });
+  }
+  for (const c of loneConds)
+    node({ depth: depth + 1, cls: "lg-var", icon: '<span class="ic dec">◇</span>', s: { type: "lg", item: it.id, k: "cond", id: c.name },
+           ctx: { kind: "lg", id: it.id, k: "cond", c: c.name },
+           name: `<b>${esc(c.name)}</b><small class="kw">bool</small><small>${esc(c.expr)}</small>`, title: c.note || "เงื่อนไขที่ยังไม่มี decision ใช้ (ใช้ในนิพจน์อื่นได้)",
+           metaHtml: `<span data-tcond="${esc(c.name)}" data-it="${esc(it.id)}">${varChipHtml(L ? L.conds[c.name] : undefined, "", true)}</span>` });
+}
+
+// หน้าต่าง + Variable / แก้ variable — ถามเป็นประโยค: ชื่อ = [ค่าปกติ] · ถ้า [เงื่อนไข] → [ค่า] ☐ เตือน [ข้อความ] [CorridorError] · + ถ้า อีกข้อ (elif)
+function varDialog(it, name){
+  const sp = it.spec, opts = lgOpts(it), old = name ? ((sp.logic || {}).variables || []).find(v => v.name === name) : null;
+  const o = old ? JSON.parse(JSON.stringify(old)) : { name: freeVarName(sp, opts), unit: "", expr: "", rules: [], note: "" };
+  o.unit = o.unit || ""; o.rules = (o.rules || []).map(r => ({ ...r, on: !!r.warn }));
+  const names = () => specNames(it).concat(o.name && !old ? [o.name] : []), xo = Spec.exprOpts(sp);
+  const chk = (v, want) => { if (!String(v || "").trim()) return "ว่าง"; const r = Expr.check(v, names(), { ...xo, want }); return r.ok ? "" : r.error; };
+  openDialog(old ? `แก้ Variable ${old.name}` : "+ Variable", b => {
+    const err = div("expr-err", "", null);
+    const inp = (val, ph, cls, on, check) => {
+      const i = document.createElement("input"); i.type = "text"; i.value = val ?? ""; i.placeholder = ph || ""; i.className = "expr " + (cls || "");
+      const run = () => { on(i.value.trim()); const m = check ? check(i.value.trim()) : ""; i.classList.toggle("bad", !!m); i.title = m || ""; };
+      i.addEventListener("input", run); run(); return i;
+    };
+    // บรรทัดหัว: ชื่อ = ค่าปกติ · ชนิดค่า
+    const head = div("var-line", "", b);
+    head.append(inp(o.name, "ชื่อ", "var-name", v => { o.name = v; }, v => v === (old && old.name) ? "" : Logic.nameError(sp, v, opts) || ""),
+                Object.assign(document.createElement("span"), { textContent: "=" }),
+                inp(o.expr, "ค่าปกติ เช่น Depth", "var-expr", v => { o.expr = v; }, v => chk(v, "num")));
+    const ul = div("var-line", "<span>ชนิดค่า</span>", b), us = document.createElement("select");
+    us.innerHTML = Object.entries(Spec.UNITS).map(([k, t]) => `<option value="${k === "number" ? "" : k}">${esc(t)}</option>`).join(""); us.value = o.unit;
+    us.onchange = () => { o.unit = us.value; }; ul.appendChild(us);
+    const rulesBox = div("var-rules", "", b);
+    const drawRules = () => {
+      rulesBox.innerHTML = "";
+      o.rules.forEach((r, i) => {
+        const row = div("var-rule", `<span class="kw">${i ? "ไม่งั้น ถ้า" : "ถ้า"}</span>`, rulesBox);
+        row.append(inp(r.when, "เงื่อนไข เช่น Depth < 2", "var-when", v => { r.when = v; }, v => chk(v, "bool")),
+                   Object.assign(document.createElement("span"), { textContent: "→", className: "kw" }),
+                   inp(r.value, "ค่า", "var-val", v => { r.value = v; }, v => chk(v, "num")),
+                   btn("×", () => { o.rules.splice(i, 1); drawRules(); }, false, "ลบข้อนี้"));
+        const w = div("var-warn", "", rulesBox), cb = document.createElement("label"); cb.className = "check";
+        cb.innerHTML = `<input type="checkbox"${r.on ? " checked" : ""}> เตือนเมื่อใช้ค่านี้`;
+        const ws = document.createElement("select"); ws.innerHTML = Logic.VAR_ERRORS.map(e => `<option>${e}</option>`).join("");
+        ws.value = r.error || Logic.guessError(r.when); ws.onchange = () => { r.error = ws.value; r.errTouched = true; };
+        const wt = inp(r.warn || "", "ข้อความ ({ชื่อ} = ค่า)", "var-wtext", v => { if (r.on) r.warn = v; }, null);
+        // ข้อความ / CorridorError เริ่มต้น เดาตอนติ๊ก (ตอนนั้นมีเงื่อนไข / ค่าแล้ว) เช่น Depth < 2 → "Depth = {Depth} < 2 ใช้ 2 แทน" · ValueTooSmall
+        const guessText = () => { const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*([<>]=?)\s*(.+)$/.exec(r.when || ""); return m ? `${m[1]} = {${m[1]}} ${m[2]} ${m[3].trim()} ใช้ ${r.value || "…"} แทน` : `${o.name} = {${o.name}}`; };
+        const sync = first => {
+          r.on = cb.querySelector("input").checked; wt.disabled = ws.disabled = !r.on;
+          if (r.on){ if (!first && !wt.value.trim()) wt.value = guessText(); if (!first && !r.errTouched) ws.value = Logic.guessError(r.when); r.warn = wt.value.trim(); r.error = ws.value; }
+          else { delete r.warn; delete r.error; }
+        };
+        cb.querySelector("input").onchange = () => sync(false); sync(true);
+        w.append(cb, wt, ws);
+      });
+      div("btns", null, rulesBox).append(btn(o.rules.length ? "+ ถ้า อีกข้อ (elif)" : "+ ถ้า … ใช้ค่า …", () => { o.rules.push({ when: "", value: "", on: false }); drawRules(); }));
+    };
+    drawRules();
+    const nl = div("var-line", "<span>หมายเหตุ</span>", b); nl.append(inp(o.note, "เช่น ความลึกขั้นต่ำ 2 m", "var-note", v => { o.note = v; }, null));
+    b.appendChild(err);
+    div("hint", "ตัวแรกที่จริงชนะ (if / elif) ไม่เข้าข้อไหน = ค่าปกติ · ใช้ชื่อนี้ใน dx / dy / slope / ระยะ Offset / Array / เงื่อนไข ได้เลย · ตาราง Parameter (ขั้นต่ำ / ขั้นสูง) ง่ายกว่าถ้าแค่บีบค่าที่กรอก", b);
+    div("btns", null, b).append(btn(old ? "บันทึก" : "สร้าง", () => {
+      const rules = o.rules.map(r => ({ when: r.when, value: r.value, ...(r.on && r.warn ? { warn: r.warn, error: r.error || Logic.guessError(r.when) } : {}) }));
+      const body = { expr: o.expr, rules, unit: o.unit || "number", note: o.note };
+      const go = s => {
+        if (!old) return Logic.addVariable(s, { name: o.name, ...body }, opts);
+        if (o.name !== old.name){ const r = Logic.renameVariable(s, old.name, o.name, opts); if (!r.ok) return r; }
+        return Logic.editVariable(s, o.name, body, opts);
+      };
+      const test = go(JSON.parse(JSON.stringify(sp)));
+      if (!test.ok){ err.textContent = test.error; return; }
+      closeDialog();
+      const r = specEdit(go, it, old ? `แก้ Variable ${o.name}` : `เพิ่ม Variable ${o.name}`);
+      if (r && r.ok){ state.open[`i:${it.id}:vars`] = true; persist(); renderTree(); }
+    }), btn("ยกเลิก", cancelDialog));
+  });
+}
+function freeVarName(sp, opts){ for (let i = 1; ; i++){ const n = "Var" + i; if (!Logic.nameError(sp, n, opts)) return n; } }
+
 // ค่าสดในต้นไม้ (เรียกจาก render ทุกครั้ง — ไม่สร้างแถวใหม่)
 function updateTreeLive(){
   const box = $("tree");
+  for (const e of box.querySelectorAll("[data-tvar]")){
+    const r = drawRes[e.dataset.it]; if (!r || !r.logic || !r.logic.vars) continue;
+    e.innerHTML = varChipHtml(r.logic.vars[e.dataset.tvar], e.dataset.unit);
+  }
+  for (const e of box.querySelectorAll("[data-tcond]")){
+    const r = drawRes[e.dataset.it]; if (!r || !r.logic) continue;
+    e.innerHTML = varChipHtml(r.logic.conds[e.dataset.tcond], "", true);
+  }
   for (const e of box.querySelectorAll("[data-tdec]")){
     const r = drawRes[e.dataset.it]; if (!r || !r.logic) continue;
     e.innerHTML = condChipHtml(r.logic.decisions[e.dataset.tdec], e.dataset.sw ? "switch" : "");
@@ -173,6 +282,30 @@ function condCtxItems(itemId, x){
   const lg = sp.logic || {}, can = state.editing === itemId, note = can ? "" : "เข้า Edit ก่อน", opts = lgOpts(it);
   const E = (label, cmd, extra) => ({ label, cmd, disabled: !can, note, ...(extra || {}) });
   if (x.k === "root") return [{ h: `${itemLabel(it)} · Conditions` }, E("+ Condition", () => condDialog(it, null, "if")), E("+ Switch", () => condDialog(it, null, "switch"))];
+  if (x.k === "vars") return [{ h: `${itemLabel(it)} · Variables` }, E("+ Variable", () => varDialog(it, null))];
+  if (x.k === "var"){
+    const list = lg.variables || [], i = list.findIndex(v => v.name === x.v); if (i < 0) return [];
+    const v = list[i], rr = asmRes[it.id], Ls = rr && rr.ok && rr.drawnLines && rr.drawnLines[v.id];
+    return [
+      { h: `𝑥 ${v.name} (${v.id})` },
+      E("แก้… (ดับเบิลคลิก)", () => varDialog(it, v.name)),
+      E("↑ เลื่อนขึ้น", () => specEdit(s => Logic.moveVariable(s, v.name, i - 1), it, `เลื่อน ${v.name}`), { disabled: !can || i <= 0 }),
+      E("↓ เลื่อนลง", () => specEdit(s => Logic.moveVariable(s, v.name, i + 1), it, `เลื่อน ${v.name}`), { disabled: !can || i >= list.length - 1 }),
+      { sep: true },
+      { label: "ไปที่โค้ด", cmd: () => gotoCode(it, Ls, rr.linesFor), disabled: !(Ls && Ls.length), note: Ls && Ls.length ? "" : "ยังไม่รู้บรรทัด" },
+      E("ลบ", () => { const u = Logic.variableUses(sp, v.name); if (u.length) return alert(`ลบ ${v.name} ไม่ได้ — ยังใช้อยู่ใน ${u.join(", ")} (แก้ที่ใช้ก่อน)`); if (confirm(`ลบ Variable ${v.name}?`)) specEdit(s => Logic.removeVariable(s, v.name), it, `ลบ ${v.name}`); })
+    ];
+  }
+  if (x.k === "cond"){
+    const c = (lg.conditions || []).find(o => o.name === x.c); if (!c) return [];
+    return [
+      { h: `◇ ${c.name} (bool)` },
+      E("แก้นิพจน์…", () => { const v = (prompt(`นิพจน์ จริง / เท็จ ของ ${c.name}`, c.expr) || "").trim(); if (v && v !== c.expr) specEdit(s => Logic.editCondition(s, c.name, { expr: v }, opts), it, `แก้ ${c.name}`); }),
+      E("เปลี่ยนชื่อ…", () => renameCondition(it, c)),
+      E("+ decision if ที่ใช้เงื่อนไขนี้", () => specEdit(s => Logic.addDecision(s, { kind: "if", test: c.name }, opts), it, `if ${c.name}`)),
+      E("ลบ", () => deleteCondition(it, c))
+    ];
+  }
   if (x.k === "dec"){
     const d = Spec.byId(lg.decisions, x.d); if (!d) return [];
     const rr = asmRes[it.id], Ls = rr && rr.ok && rr.drawnLines && rr.drawnLines[d.id];
@@ -226,6 +359,7 @@ function condTreeClick(e){
     const it = itemById(a.dataset.it); if (!it || state.editing !== it.id) return true;
     if (a.dataset.act === "add-if") condDialog(it, null, "if");
     if (a.dataset.act === "add-sw") condDialog(it, null, "switch");
+    if (a.dataset.act === "add-var") varDialog(it, null);
     return true;
   }
   const n = e.target.closest(".tn"); if (!n || !n.dataset.sel) return false;
@@ -240,6 +374,8 @@ function condTreeClick(e){
   return true;
 }
 function condTreeDblClick(e){
+  const vr = e.target.closest("[data-var-edit]");
+  if (vr && !e.target.closest("[data-tog]")){ const s = JSON.parse(vr.dataset.sel), it = itemById(s.item); if (it && state.editing === it.id){ varDialog(it, vr.dataset.varEdit); return true; } }
   const row = e.target.closest("[data-dec-edit]"); if (!row || e.target.closest("[data-tog]")) return false;
   const s = JSON.parse(row.dataset.sel), it = itemById(s.item);
   if (!it || state.editing !== it.id) return false;

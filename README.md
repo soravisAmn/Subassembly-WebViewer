@@ -343,6 +343,32 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
     - **ลาก object** (แถว P / L / S ใน Points / Links / Shapes หรือใต้กิ่ง) ไปวางที่กิ่ง = ย้ายเข้ากิ่ง · วางที่หัว Points / Links / Shapes = เกิดเสมอ · ลากตัวที่อยู่ในชุดที่เลือก = ย้ายทั้งชุด
       (คำเตือน "อ้างจุดที่เกิดเฉพาะบางกิ่ง" ขึ้นใน banner) · ทุกอย่าง Undo ได้ครั้งเดียวต่อการกระทำ (ผ่าน Logic API)
     - **ไม่ต้องเปิด / ปิดเงื่อนไขเอง**: เงื่อนไขที่ยังไม่มี object ในกิ่ง = แค่คำนวณค่า ไม่สร้างอะไรใน Civil 3D
+  - **Variables** (รอบ 5 — แถบซ้าย ใต้ Conditions · แบบ Define Variable ของ SAC): ค่าตัวเลขที่คำนวณครั้งเดียว แล้วใช้ชื่อในนิพจน์ไหนก็ได้
+    (dx / dy, slope, ระยะ Offset, Array, เงื่อนไข, switch) · **+ Variable** = หน้าต่างถามเป็นประโยค
+    ```
+    DepthUsed = [Depth]                       ชนิดค่า [Length (m)]
+      ถ้า        [Depth < 2]  → [2]           ☑ เตือนเมื่อใช้ค่านี้ [Depth = {Depth} m < 2 m ใช้ 2 m แทน] [ValueTooSmall]
+      ไม่งั้น ถ้า [Depth > 10] → [10]          (+ ถ้า อีกข้อ = elif · ตัวแรกที่จริงชนะ · ไม่เข้าข้อไหน = ค่าปกติ)
+    ```
+    - ชิปในต้นไม้ = ค่าตอนนี้ (ตามชนิดค่า เช่น `2 m`, `1:1.5`) · ดับเบิลคลิก = แก้ · คลิกขวา: แก้ / ↑ ↓ / ไปที่โค้ด / ลบ (มีที่ใช้อยู่ = ไม่ยอม บอกรายการ)
+    - ชนิดค่า Slope (1:x) ใส่ในช่อง slope ได้ตรงๆ (`-1/SideSlopeUsed`) · ข้อความเตือนใช้ `{ชื่อ}` แทนค่า · CorridorError เดาให้ (`<` = ValueTooSmall, `>` = ValueTooLarge) เปลี่ยนได้
+    - อ้างจุด / ผิวดินได้ (`P2.y - ground(P2)`) · หาจุดไม่ได้ = ไม่รู้ค่า + เตือน → สิ่งที่ใช้ชื่อนี้หาไม่ได้ · อ้างกันเป็นวง (ผ่าน variable / จุด) = ไม่ยอม
+    - เปลี่ยนชื่อ = นิพจน์ทุกช่อง + ข้อความเตือนเปลี่ยนตาม · เงื่อนไขที่ยังไม่มี decision ใช้แสดงใต้ Variables ด้วย (ชนิด bool)
+    - **C#**: ไม่อ้างจุด = บล็อก if อ่านง่ายแบบเขียนเอง · อ้างจุด / เงื่อนไข = `double?` ผ่าน `Val(…)`
+      ```csharp
+      // V1 DepthUsed: ความลึกขั้นต่ำ 2 m
+      double DepthUsed = Depth;
+      if (Depth < 2.0) { Warn(cs, CorridorError.ValueTooSmall, "Depth = " + Depth + " m < 2 m ใช้ 2 m แทน"); DepthUsed = 2.0; }
+      ```
+
+    **ใช้อันไหนเมื่อไร**
+
+    | ต้องการ | ใช้ |
+    |---|---|
+    | บีบค่าที่ผู้ใช้กรอกให้อยู่ในช่วง (`Depth ≥ 2`) | ตาราง Parameter (ขั้นต่ำ / ขั้นสูง) — ง่ายสุด |
+    | ค่าขึ้นกับค่าอื่น / ผิวดิน / จุด, หลายกรณี, ข้อความเตือนเอง | **Variable** |
+    | ให้รูป **มี / ไม่มี** ตามเงื่อนไข | **Condition** (กิ่ง) |
+    | ทางเลือกหลายแบบตามเลข (`ProtectionType`) | **Switch** |
   - **แท็บ Logic** (แถบผลลัพธ์ด้านล่าง ข้าง Points): เงื่อนไขทั้งหมด + ค่า จริง / เท็จ / ไม่รู้ค่า **อัปเดตสดตอนลากผิวดิน / แก้ parameter** · แก้นิพจน์ / เปลี่ยนชื่อ
     (นิพจน์ที่ใช้ชื่อนั้นเปลี่ยนตาม) / ลบ (ถ้ามี object ในกิ่ง ถามว่า ย้ายไปกิ่งแม่ / เกิดเสมอ หรือ ลบทิ้ง · เงื่อนไขที่ยังใช้ในนิพจน์อื่นลบไม่ได้)
     · ต้นไม้ decision → กิ่ง พร้อมสี, เกิด / ไม่เกิด, จำนวน object (คลิก = เลือก object ในกิ่ง), เปลี่ยนชื่อกิ่ง
@@ -650,6 +676,7 @@ point / link ที่มีไว้ช่วยสร้าง: **คำนว
 | `addCase(spec, decisionId, { value, label? })` · `editCase(spec, branchId, { value?, label? })` · `removeCase(spec, branchId, { how })` · `moveCase(spec, branchId, index)` | case ของ switch (แทรกก่อน else, เรียงด้วย index) | ค่าซ้ำ, แก้ / ลบ / ย้าย `else` |
 | `renameBranch(spec, id, label)` | ชื่อกิ่ง | ว่าง |
 | `setBranch(spec, ids, branchId \| null)` | ย้าย point / link / shape · `R#` กลุ่มหมุน / `A#` Array = ทั้งกลุ่ม · `null` = เกิดเสมอ → `warnings` (branchRisks) | id / กิ่งไม่มี |
+| `addVariable(spec, { name, kind?, unit?, expr, rules?: [{ when, value, warn?, error? }], note?, index? })` · `editVariable(spec, name, {…})` · `renameVariable` · `removeVariable` · `moveVariable(spec, name, index)` · `variableUses(spec, name)` | Variables (rules = if / elif ตัวแรกที่จริงชนะ) · `kind: "bool"` = เงื่อนไขเปล่า | ชื่อซ้ำ / คำสงวน, ชนิดนิพจน์, **วนกัน** (variable / จุด), `{ชื่อ}` ในข้อความไม่รู้จัก, CorridorError ไม่มี, ลบตอนมีที่ใช้ |
 | `addCutFill(spec, { hinge, cut, fill, params, dir, … })` (cut / fill = number x ของ 1:x หรือข้อความแบบช่อง slope: `1:1.5` `0.667` `2%` ชื่อ parameter นิพจน์) · `addIntersect` · `addOffset` · `addExtendToGround` · `addFollowClipped` · `addArray` · `updateArray(spec, id, …)` · `rebuildArray(spec, id, …)` · `setParamBounds` · `setParamUnit` | ของรอบ 4c / 4e (args เดิม — Array ใช้ id) ห่อให้คืน `{ ok, error }` | ตามของเดิม |
 | `describe(spec, evalResult?)` | JSON สั้น: parameter, เงื่อนไข (+ ค่าตอนนี้), decision → กิ่ง → object (+ เกิดไหม), object เกิดเสมอ, risks | — |
 | `nameError(spec, name)` · `freeCondName(spec)` | ตรวจชื่อ · ชื่อว่างถัดไป | — |
@@ -714,6 +741,7 @@ Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่�
 | `node SA.Tests/js/array.test.js` | Array: ขั้นบันได (จุดร่วม), แก้ dx / dy / parameter, Left, ต่อด้วย link, shape / aux / กิ่ง, เปลี่ยน N (ถูกขวาง), ลบ = เลิกเป็น Array, Move (รอบ 4c) |
 | `node SA.Tests/js/slope.test.js` | ชนิดค่า parameter (Number / Slope 1:x / Length / Percent): แสดง / พิมพ์ / ข้อความเตือน, ช่อง slope ↗ ↘ อ่าน / เขียน (spec เก่าไม่เปลี่ยน), Daylight Cut/Fill ใช้ parameter Slope (รอบ 4e) |
 | `node SA.Tests/js/logicops.test.js` | Logic API: ทุกฟังก์ชัน กรณีปกติ + error (ชื่อซ้ำ, คำสงวน, ชนิดนิพจน์, case ซ้ำ / else, ย้าย decision เข้าตัวเอง, ลบ 3 แบบ, วนกัน) — error แล้ว spec ไม่เปลี่ยน, describe (รอบ 5) |
+| `node SA.Tests/js/variables.test.js` | Variables: rules ตัวแรกที่จริงชนะ + ข้อความเตือน, อ้างจุด / ผิวดิน (ไม่รู้ค่า), ใช้ใน slope / Offset / Array / เงื่อนไข, วนกัน, rename / ลบ / เรียง, bool = เงื่อนไข (รอบ 5) — JS = C# ใน drawing-cases 84–90 + RockPitchingTests (DepthUsed) |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |

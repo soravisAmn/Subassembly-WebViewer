@@ -156,6 +156,7 @@ function treeItem(node, h, a, it, depth, editing){
     node({ depth: dep, cls: "leaf drawn" + (kind !== "dshape" && Spec.isAux(o) ? " aux" : ""), s: { type: kind, item: it.id, id: o.id }, sel, attrs: dragA,
            name: dname(o, kind === "dpt" ? dupP : kind === "dlink" ? dupL : dupS), meta, metaCls: q && q.err && !q.off ? "warn" : "" });
   });
+  if (sp) treeVariables(node, h, it, ik, d2);                       // Variables (รอบ 5 M3 — condtree.js)
   const np = (res ? res.params.length : 0) + (sp ? sp.params.length : 0);
   node({ depth: d2, s:{type:"params", item:it.id}, sel: isSel("params", it.id), name: `Parameters <small>(${np})</small>` });
 }

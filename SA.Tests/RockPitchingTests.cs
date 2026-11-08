@@ -107,6 +107,42 @@ static class RockPitchingTests
                         }
                 });
         }
+
+        // รอบ 5 M3: base แบบใช้ Variable DepthUsed (ถ้า Depth < 2 → 2 + เตือน) แทนขั้นต่ำในตาราง Parameter → ต้องได้ผลเหมือนไฟล์จริง
+        test("base-web + Variable DepthUsed แทนขั้นต่ำ Depth (ทุกผิวดิน × Right / Left × 4 ชุดค่า)", () =>
+        {
+            var blk = CodeGenerator.FindBlock(File.ReadAllText(Path.Combine(root, "base_rock-pitching-web.cs"))) ?? throw new Exception("ไม่มีช่วง SA-DRAWING");
+            var spec = System.Text.Json.Nodes.JsonNode.Parse(blk.SpecJson!)!;
+            spec["className"] = "RockPitchingBaseVar";
+            foreach (var p in spec["params"]!.AsArray()) if ((string)p!["name"]! == "Depth") p["min"] = null;
+            foreach (var p in spec["points"]!.AsArray())
+                foreach (var k in new[] { "dx", "dy" })
+                    if (p!["def"]![k] is { } e) p["def"]![k] = System.Text.RegularExpressions.Regex.Replace((string)e!, @"\bDepth\b", "DepthUsed");
+            spec["logic"] = System.Text.Json.Nodes.JsonNode.Parse("""
+                { "conditions": [], "decisions": [], "branches": [],
+                  "variables": [{ "id": "V1", "name": "DepthUsed", "kind": "double", "unit": "length", "expr": "Depth", "note": "ลึกขั้นต่ำ 2 m",
+                                  "rules": [{ "when": "Depth < 2", "value": "2", "warn": "Depth = {Depth} m < 2 m ใช้ 2 m แทน", "error": "ValueTooSmall" }] }] }
+                """);
+            string json = spec.ToJsonString();
+            string src = CodeGenerator.GenerateFile(DrawingSpec.Parse(json), json, "RockPitchingBaseVar.cs");
+            if (!src.Contains("double DepthUsed = Depth;") || !src.Contains("if (Depth < 2.0) { Warn(cs, CorridorError.ValueTooSmall, \"Depth = \" + Depth + \" m < 2 m ใช้ 2 m แทน\"); DepthUsed = 2.0; }"))
+                throw new Exception("โค้ด C# ของ DepthUsed ไม่เป็นบล็อก if อ่านง่ายตามที่ตกลง");
+            var a = compiler.Compile(File.ReadAllText(Path.Combine(root, "base_rock-pitching.cs")), "base_rock-pitching.cs");
+            var b = compiler.Compile(src, "RockPitchingBaseVar.cs");
+            if (!a.Success || !b.Success) throw new Exception("คอมไพล์ไม่ผ่าน: " + string.Join(" | ", b.Diagnostics.Where(d => d.Severity == "Error").Select(d => d.Message)));
+            foreach (var c in baseCases)
+                foreach (int side in new[] { 0, 1 })
+                    foreach (var p in baseParams)
+                    {
+                        var values = p.ToDictionary(kv => kv.Key, kv => JsonDocument.Parse(kv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)).RootElement);
+                        values["Side"] = JsonDocument.Parse(side.ToString()).RootElement;
+                        var world = new WorldInput { Surface = c.Surface!.Select(q => new SurfacePt(side == 1 ? -q.X : q.X, q.Y)).ToList(), SurfaceAssigned = c.Assigned, LayoutMode = c.Layout, ExtendEnds = true, OriginElevation = 100 };
+                        var ra = runner.Run(a.Classes[0], values, world); var rb = runner.Run(b.Classes[0], values, world);
+                        string where = $"{c.Name} Side = {side} {string.Join(" ", p.Select(kv => $"{kv.Key} = {kv.Value}"))}";
+                        if (ra.Exception != null || rb.Exception != null) throw new Exception($"{where}: exception");
+                        Same(ra, rb, where);
+                    }
+        });
     }
 
     // เทียบผลแบบไม่สนลำดับ: พิกัดปัด 5 ตำแหน่ง (−0 = 0)

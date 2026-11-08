@@ -8,7 +8,7 @@ const Logic = (() => {
   // ชื่อที่โค้ด C# ที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved) — ตั้งเป็นชื่อ parameter / เงื่อนไข / variable ไม่ได้
   const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
     "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Offset ExtendToGround Opt FollowClipped Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
-    "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V FirstOf Severe abstract as base bool break byte case catch char checked class const continue " +
+    "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V VN FirstOf Severe abstract as base bool break byte case catch char checked class const continue " +
     "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
     "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +
     "static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while var").split(" "));
@@ -44,7 +44,7 @@ const Logic = (() => {
     if (RESERVED.has(name) || /^([PpLlSsBbDdCcVvRrAa]\d+|surface\d+)$/.test(name)) return `ตั้งชื่อ ${name} ไม่ได้ — โค้ดที่สร้างใช้ชื่อนี้เอง (เช่น F, P1, cs, double)`;
     if (Expr.KEYWORDS.has(name.toLowerCase()) || Expr.FUNCS[name.toLowerCase()]) return `ตั้งชื่อ ${name} ไม่ได้ — เป็นคำ / ฟังก์ชันในนิพจน์`;
     const used = new Set(Spec.names(spec, (opts || {}).codeParams).concat(((spec.logic || {}).conditions || []).map(c => c.name), spec.points.map(p => p.id)));
-    if (name !== except && used.has(name)) return `มีชื่อ ${name} อยู่แล้ว (parameter / เงื่อนไข / จุด)`;
+    if (name !== except && used.has(name)) return `มีชื่อ ${name} อยู่แล้ว (parameter / เงื่อนไข / variable / จุด)`;
     return null;
   }
   // ตรวจนิพจน์: want = "bool" | "num" → โยน error ไทย
@@ -55,24 +55,44 @@ const Logic = (() => {
     if (!r.ok) fail(`${what || "นิพจน์"}: ${r.error}`);
     return s;
   }
-  // เงื่อนไขอ้างกันเป็นวง (ผ่านชื่อในนิพจน์)
+  // เงื่อนไข / variable อ้างกันเป็นวง (ผ่านชื่อในนิพจน์ — variable: expr + rules)
   function condCycle(spec){
-    const cs = (spec.logic || {}).conditions || [], by = {};
-    for (const c of cs) by[c.name] = c;
+    const lg = spec.logic || {}, by = {};
+    for (const c of lg.conditions || []) by[c.name] = [c.expr];
+    for (const v of lg.variables || []) by[v.name] = [v.expr, ...(v.rules || []).flatMap(r => [r.when, r.value])];
     const state = {};
+    const names = src => { const r = Expr.check(String(src || "0"), [], {}); return r.ast ? [...Expr.vars(r.ast)] : []; };
     const visit = (n, path) => {
       if (state[n] === 2) return null;
       if (state[n] === 1) return path.concat(n);
       state[n] = 1;
-      const r = Expr.check(String(by[n].expr || "true"), [], {});
-      const refs = r.ast ? [...Expr.vars(r.ast)].filter(v => by[v]) : [];
+      const refs = by[n].flatMap(names).filter(v => by[v]);
       for (const m of refs){ const c = visit(m, path.concat(n)); if (c) return c; }
       state[n] = 2; return null;
     };
-    for (const c of cs){ const cyc = visit(c.name, []); if (cyc) return cyc; }
+    for (const n of Object.keys(by)){ const cyc = visit(n, []); if (cyc) return cyc; }
     return null;
   }
-  const noCycle = spec => { const c = condCycle(spec); if (c) fail(`เงื่อนไขอ้างกันเป็นวง: ${c.join(" → ")}`); };
+  // variable อ้างจุดที่ (ทางตรง / อ้อม) ใช้ variable นั้นในนิพจน์ = วนผ่านจุด
+  function varPointCycle(spec){
+    const vars = (spec.logic || {}).variables || [];
+    const usesName = (p, n) => (Spec.EXPR_FIELDS[p.def.type] || []).some(k => p.def[k] != null && new RegExp(`\\b${n}\\b`).test(String(p.def[k])));
+    const exprsOf = v => [v.expr, ...(v.rules || []).flatMap(r => [r.when, r.value])];
+    const refsOf = v => exprsOf(v).flatMap(e => { const r = Expr.check(String(e || "0"), [], {}); return r.ast ? [...Expr.vars(r.ast)] : []; });
+    // variable ที่พึ่ง v (ทางตรง / อ้อม ผ่าน variable อื่น) รวม v เอง
+    const dependents = v => {
+      const out = new Set([v.name]);
+      for (let more = true; more; ){ more = false; for (const w of vars) if (!out.has(w.name) && refsOf(w).some(n => out.has(n))){ out.add(w.name); more = true; } }
+      return out;
+    };
+    for (const v of vars){
+      const pts = exprsOf(v).flatMap(e => Expr.pointRefsOf(e)), dep = dependents(v);
+      for (const P of pts) for (const q of spec.points)
+        for (const n of dep) if (usesName(q, n) && Spec.dependsOn(spec, P, q.id)) return [v.name, P, ...(P === q.id ? [] : [q.id]), ...(n === v.name ? [] : [n]), v.name];
+    }
+    return null;
+  }
+  const noCycle = spec => { const c = condCycle(spec) || varPointCycle(spec); if (c) fail(`อ้างกันเป็นวง: ${c.join(" → ")}`); };
   // object ในกิ่งเหล่านี้ (Set ของ id กิ่ง)
   const objsIn = (spec, B) => [...spec.points, ...spec.links, ...spec.shapes].filter(o => B.has(o.branch));
   const HOW = { parent: 1, always: 1, remove: 1 };
@@ -303,6 +323,96 @@ const Logic = (() => {
     });
   }
 
+  // ---------- Variables (รอบ 5 M3) ----------
+  // spec.logic.variables = [{ id: "V1", name, kind: "double", unit?, expr, rules: [{ when, value, warn?, error? }], note? }]
+  //   kind "bool" = เงื่อนไขที่ตั้งชื่อ (เก็บใน logic.conditions เดิม — คำตอบ M0 ข้อ 3) · เผื่อ Loop: kind อื่น / scope เพิ่มได้ภายหลัง
+  //   rules = if / elif ตามลำดับ ตัวแรกที่จริงชนะ · warn ใช้ {ชื่อ} แทนค่า · error = CorridorError ของข้อความเตือน (ค่าเริ่ม: มี < = ValueTooSmall, มี > = ValueTooLarge, อื่นๆ = Failure)
+  const VAR_ERRORS = ["ValueTooSmall", "ValueTooLarge", "Failure", "ValueShouldNotBeLessThanOrEqualToZero", "ValueShouldNotBeLessThanZero", "ValueShouldNotBeZero", "ValueInABadPosition"];
+  const guessError = when => /</.test(when || "") ? "ValueTooSmall" : />/.test(when || "") ? "ValueTooLarge" : "Failure";
+  const VARS = s => { const lg = LG(s); lg.variables = lg.variables || []; return lg.variables; };
+  const needVar = (s, name) => VARS(s).find(v => v.name === name) || fail(`ไม่มี variable ${name}`);
+  // ตรวจ + จัดรูป variable (v = ของเดิมใน spec · ch = ค่าที่แก้) — ชื่อ placeholder ใน warn ต้องเป็น parameter / variable
+  function fixVar(s, v, ch, opts){
+    if ("unit" in ch){ if (ch.unit && ch.unit !== "number" && !Spec.UNITS[ch.unit]) fail(`ไม่มีชนิดค่า ${ch.unit}`); if (ch.unit && ch.unit !== "number") v.unit = ch.unit; else delete v.unit; }
+    if ("kind" in ch && ch.kind && ch.kind !== "double") fail(`variable ชนิด ${ch.kind} ยังไม่รองรับ (bool = ใช้ addCondition)`);
+    if ("note" in ch){ if (ch.note) v.note = String(ch.note); else delete v.note; }
+    if ("expr" in ch) v.expr = checkExpr(s, ch.expr, "num", opts, `${v.name} ค่าปกติ`);
+    if ("rules" in ch){
+      const names = new Set(Spec.names(s, (opts || {}).codeParams));
+      v.rules = (ch.rules || []).map((r, i) => {
+        const when = checkExpr(s, r.when, "bool", opts, `${v.name} ถ้า ข้อ ${i + 1}`), value = checkExpr(s, r.value, "num", opts, `${v.name} ค่า ข้อ ${i + 1}`);
+        const o = { when, value };
+        if (r.warn){
+          const w = String(r.warn).trim();
+          for (const m of w.matchAll(/\{([^}]*)\}/g)) if (!names.has(m[1])) fail(`${v.name} ข้อความเตือน ข้อ ${i + 1}: {${m[1]}} ไม่ใช่ชื่อ parameter / variable`);
+          if (/["\\]/.test(w)) fail(`${v.name} ข้อความเตือน ข้อ ${i + 1}: ใช้ " หรือ \\ ไม่ได้`);
+          const e = r.error || guessError(when);
+          if (!VAR_ERRORS.includes(e)) fail(`${v.name}: CorridorError ${e} ไม่มีในรายการ (${VAR_ERRORS.join(", ")})`);
+          o.warn = w; o.error = e;
+        }
+        return o;
+      });
+    }
+    noCycle(s);
+    return v;
+  }
+  // o = { name, kind ("double"), unit?, expr, rules?, note?, index? }
+  function addVariable(spec, o, opts){
+    return tx(spec, s => {
+      o = o || {};
+      if (o.kind === "bool"){
+        if (o.rules && o.rules.length) fail("variable ชนิด bool ยังไม่รองรับ rules — ใช้นิพจน์เดียว");
+        const r = addCondition(s, { name: o.name, expr: o.expr, note: o.note, decision: false }, opts);
+        if (!r.ok) fail(r.error);
+        return { variable: r.cond, name: r.name, kind: "bool" };
+      }
+      const name = String(o.name ?? "").trim();
+      const bad = nameError(s, name, opts); if (bad) fail(bad);
+      const list = VARS(s), v = { id: nextId(list, "V"), name, kind: "double" };
+      list.push(v);                                   // ใส่ก่อนตรวจ: นิพจน์ใน rules อ้างชื่อตัวเองไม่ได้ (วนกัน)
+      fixVar(s, v, { expr: o.expr, rules: o.rules || [], ...(o.unit ? { unit: o.unit } : {}), ...(o.note ? { note: o.note } : {}), kind: o.kind }, opts);
+      if (o.index != null){ list.splice(list.indexOf(v), 1); list.splice(Math.max(0, Math.min(list.length, Math.round(+o.index))), 0, v); }
+      return { variable: v.id, name };
+    });
+  }
+  function editVariable(spec, name, ch, opts){
+    return tx(spec, s => { const v = needVar(s, name); fixVar(s, v, ch || {}, opts); return { variable: v.id }; });
+  }
+  function renameVariable(spec, oldName, name, opts){
+    return tx(spec, s => {
+      needVar(s, oldName); name = String(name ?? "").trim();
+      if (name === oldName) return {};
+      const bad = nameError(s, name, opts, oldName); if (bad) fail(bad);
+      const re = new RegExp(`\\b${oldName}\\b`, "g");
+      for (const sl of Spec.exprSlots(s)) if (typeof sl.obj[sl.key] === "string") sl.obj[sl.key] = sl.obj[sl.key].replace(re, name);
+      needVar(s, oldName).name = name;
+      return { name };
+    });
+  }
+  // ใช้อยู่ = ไม่ยอม (บอกรายการ — คำตอบ M0 ข้อ 8)
+  function variableUses(spec, name){
+    const re = new RegExp(`\\b${name}\\b`), out = [];
+    for (const sl of Spec.exprSlots(spec)) if (sl.id !== name && typeof sl.obj[sl.key] === "string" && re.test(sl.obj[sl.key]) && !out.includes(sl.id)) out.push(sl.id);
+    return out;
+  }
+  function removeVariable(spec, name){
+    return tx(spec, s => {
+      needVar(s, name);
+      const users = variableUses(s, name);
+      if (users.length) fail(`ลบ ${name} ไม่ได้ — ยังใช้อยู่ใน ${users.join(", ")} (แก้ที่ใช้ก่อน)`);
+      LG(s).variables = VARS(s).filter(v => v.name !== name);
+      return {};
+    });
+  }
+  function moveVariable(spec, name, index){
+    return tx(spec, s => {
+      const list = VARS(s), v = needVar(s, name), i = Math.round(+index);
+      if (!isFinite(i)) fail("index ต้องเป็นตัวเลข");
+      list.splice(list.indexOf(v), 1); list.splice(Math.max(0, Math.min(list.length, i)), 0, v);
+      return { index: list.indexOf(v) };
+    });
+  }
+
   // ---------- ห่อฟังก์ชันสร้าง / แก้ของรอบ 4c ให้คืน { ok, error } รูปแบบเดียวกัน ----------
   const wrap = fn => (spec, ...args) => tx(spec, s => {
     const r = fn(s, ...args);
@@ -334,6 +444,7 @@ const Logic = (() => {
     return {
       className: spec.className,
       params: spec.params.map(p => ({ name: p.name, kind: p.kind, default: p.default, unit: Spec.unitOf(p), ...(p.min != null ? { min: p.min } : {}), ...(p.max != null ? { max: p.max } : {}), ...(p.positive ? { positive: true } : {}) })),
+      variables: (lg.variables || []).map(v => ({ name: v.name, kind: v.kind || "double", unit: v.unit || "number", expr: v.expr, ...(v.rules && v.rules.length ? { rules: v.rules } : {}), ...(v.note ? { note: v.note } : {}), ...(L && L.vars ? { value: L.vars[v.name] ?? null } : {}) })),
       conditions: (lg.conditions || []).map(c => ({ name: c.name, expr: c.expr, ...(c.note ? { note: c.note } : {}), ...(L && L.conds ? { value: L.conds[c.name] ?? null } : {}) })),
       decisions: decs,
       always: { points: spec.points.filter(always).map(o => o.id), links: spec.links.filter(always).map(o => o.id), shapes: spec.shapes.filter(always).map(o => o.id) },
@@ -345,6 +456,7 @@ const Logic = (() => {
            addCondition, editCondition, renameCondition, removeCondition,
            addDecision, editDecision, removeDecision, moveDecision,
            addCase, editCase, removeCase, moveCase, renameBranch, setBranch,
+           addVariable, editVariable, renameVariable, removeVariable, moveVariable, variableUses, VAR_ERRORS, guessError,
            addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setParamBounds, setParamUnit,
            describe };
 })();

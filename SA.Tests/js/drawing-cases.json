@@ -2136,5 +2136,516 @@
       "N": 4
     },
     "copySpecFrom": 82
+  },
+  {
+    "name": "Variable DepthUsed (rules if / elif + เตือน): Depth = 3 ค่าปกติ",
+    "surface": [
+      {
+        "x": -30,
+        "y": -5
+      },
+      {
+        "x": 30,
+        "y": -5
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "VarDepth",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "Depth",
+          "kind": "double",
+          "default": 3,
+          "displayName": "Depth",
+          "min": null,
+          "max": null,
+          "unit": "length"
+        },
+        {
+          "name": "Width",
+          "kind": "double",
+          "default": 2,
+          "displayName": "Width",
+          "min": null,
+          "max": null
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "Top"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "Width",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "Bottom"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "Half",
+            "dy": "-DepthUsed"
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P1",
+            "P2"
+          ],
+          "codes": []
+        },
+        {
+          "id": "L2",
+          "points": [
+            "P2",
+            "P3"
+          ],
+          "codes": []
+        }
+      ],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "logic": {
+        "conditions": [],
+        "decisions": [],
+        "branches": [],
+        "variables": [
+          {
+            "id": "V1",
+            "name": "DepthUsed",
+            "kind": "double",
+            "unit": "length",
+            "note": "ลึกขั้นต่ำ 2 m",
+            "expr": "Depth",
+            "rules": [
+              {
+                "when": "Depth < 1",
+                "value": "1.5",
+                "warn": "Depth = {Depth} m < 1 m ใช้ 1.5 m",
+                "error": "ValueTooSmall"
+              },
+              {
+                "when": "Depth < 2",
+                "value": "2",
+                "warn": "Depth = {Depth} m < 2 m ใช้ 2 m แทน",
+                "error": "ValueTooSmall"
+              }
+            ]
+          },
+          {
+            "id": "V2",
+            "name": "Half",
+            "kind": "double",
+            "expr": "DepthUsed / 2",
+            "rules": []
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "Variable DepthUsed: Depth = 1.5 → 2 + เตือน · Side = Left",
+    "surface": [
+      {
+        "x": -30,
+        "y": -5
+      },
+      {
+        "x": 30,
+        "y": -5
+      }
+    ],
+    "values": {
+      "Depth": 1.5,
+      "Side": 1
+    },
+    "copySpecFrom": 84
+  },
+  {
+    "name": "Variable DepthUsed: Depth = 0.5 → ข้อแรกชนะ 1.5 · Layout",
+    "surface": [
+      {
+        "x": -30,
+        "y": -5
+      },
+      {
+        "x": 30,
+        "y": -5
+      }
+    ],
+    "values": {
+      "Depth": 0.5
+    },
+    "layout": true,
+    "copySpecFrom": 84
+  },
+  {
+    "name": "Variable FillH อ้างจุด / ผิวดิน (double?) → Berm ตาม rules + switch Berm: ถม 7 m = 2 + เตือน",
+    "surface": [
+      {
+        "x": -30,
+        "y": -7
+      },
+      {
+        "x": 30,
+        "y": -7
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "VarFill",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "Width",
+          "kind": "double",
+          "default": 3,
+          "displayName": "Width",
+          "min": null,
+          "max": null
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "Shoulder"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "Width",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "Berm"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "Berm",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "Wide"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P3",
+            "dx": "0",
+            "dy": "-1"
+          },
+          "branch": "B1"
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P1",
+            "P2"
+          ],
+          "codes": []
+        },
+        {
+          "id": "L2",
+          "points": [
+            "P2",
+            "P3"
+          ],
+          "codes": []
+        }
+      ],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "logic": {
+        "conditions": [
+          {
+            "id": "C1",
+            "name": "HasBerm",
+            "expr": "Berm > 0"
+          }
+        ],
+        "decisions": [
+          {
+            "id": "D1",
+            "parent": null,
+            "kind": "switch",
+            "test": "Berm",
+            "label": "Berm"
+          }
+        ],
+        "branches": [
+          {
+            "id": "B1",
+            "decision": "D1",
+            "case": 2,
+            "label": "กว้าง"
+          },
+          {
+            "id": "B2",
+            "decision": "D1",
+            "case": "else",
+            "label": "อื่นๆ"
+          }
+        ],
+        "variables": [
+          {
+            "id": "V1",
+            "name": "FillH",
+            "kind": "double",
+            "expr": "P2.y - ground(P2)",
+            "rules": []
+          },
+          {
+            "id": "V2",
+            "name": "Berm",
+            "kind": "double",
+            "expr": "0",
+            "rules": [
+              {
+                "when": "FillH > 6",
+                "value": "2",
+                "warn": "ถมสูง {FillH} m ชานพัก 2 m",
+                "error": "ValueTooLarge"
+              },
+              {
+                "when": "FillH > 3",
+                "value": "1"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "Variable FillH: ถม 4 m = 1 (ไม่เตือน) · Side = Left",
+    "surface": [
+      {
+        "x": -30,
+        "y": -4
+      },
+      {
+        "x": 30,
+        "y": -4
+      }
+    ],
+    "values": {
+      "Side": 1
+    },
+    "copySpecFrom": 87
+  },
+  {
+    "name": "Variable FillH: ไม่มีผิวดิน (ground = ระดับจุดเอง → 0)",
+    "surface": [
+      {
+        "x": -30,
+        "y": -4
+      },
+      {
+        "x": 30,
+        "y": -4
+      }
+    ],
+    "surfaceAssigned": false,
+    "copySpecFrom": 87
+  },
+  {
+    "name": "Variable ไม่รู้ค่า (อ้างจุดในกิ่งที่ไม่เกิด) → จุดที่ใช้ชื่อนี้หาไม่ได้ + เตือน",
+    "surface": [
+      {
+        "x": -30,
+        "y": -4
+      },
+      {
+        "x": 30,
+        "y": -4
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "VarUnknown",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "Off"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "1",
+            "dy": "1"
+          },
+          "branch": "B1"
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "UsesH"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "H",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "Plain"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "2",
+            "dy": "0"
+          }
+        }
+      ],
+      "links": [],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "logic": {
+        "conditions": [
+          {
+            "id": "C1",
+            "name": "Never",
+            "expr": "false"
+          }
+        ],
+        "decisions": [
+          {
+            "id": "D1",
+            "parent": null,
+            "kind": "if",
+            "test": "Never",
+            "label": "Never"
+          }
+        ],
+        "branches": [
+          {
+            "id": "B1",
+            "decision": "D1",
+            "case": true,
+            "label": "Never"
+          },
+          {
+            "id": "B2",
+            "decision": "D1",
+            "case": false,
+            "label": "ไม่ Never"
+          }
+        ],
+        "variables": [
+          {
+            "id": "V1",
+            "name": "H",
+            "kind": "double",
+            "expr": "P2.y",
+            "rules": []
+          }
+        ]
+      }
+    }
   }
 ]

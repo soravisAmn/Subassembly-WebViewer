@@ -163,6 +163,18 @@ body.row-resizing #main,body.row-resizing .pane-sec{pointer-events:none}
 .tn.lg-dec .nm,.tn.lg-br .nm{flex:1 1 auto;max-width:none}
 .tn.lg-dec .meta,.tn.lg-br .meta{flex:none;overflow:visible}
 .tn.drop-over{outline:2px dashed var(--accent);outline-offset:-2px;background:var(--accent-soft)}
+.tn.lg-var .nm b{font-weight:600}
+.tn.lg-var .meta{flex:none;overflow:visible}
+.tn.lg-var .nm{flex:1 1 auto;max-width:none}
+.var-line,.var-rule,.var-warn{display:flex;align-items:center;gap:6px;margin:4px 0}
+.var-line > span,.var-rule .kw{color:var(--muted);font-size:12px;white-space:nowrap}
+.var-line input,.var-rule input{flex:1 1 auto;min-width:0}
+.var-line input.var-name{flex:0 1 130px}
+.var-rules{margin:8px 0;padding:6px 8px;border:1px solid var(--line);border-radius:6px}
+.var-warn{padding-left:28px}
+.var-warn .check{margin:0;flex:none;font-size:12px}
+.var-warn input{flex:1 1 auto;min-width:0}
+.var-warn select{flex:0 1 150px;min-width:0;font-size:11.5px}
 .tn .tn-edit{flex:1 1 auto;min-width:60px;font:12px "IBM Plex Mono",monospace;padding:1px 4px}
 .att{font-size:11.5px;color:var(--muted);padding:0 6px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .att.lost,.att.free{color:var(--warn)}

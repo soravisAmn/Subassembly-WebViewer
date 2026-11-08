@@ -14,6 +14,7 @@
   <!-- Roslyn: ใช้คอมไพล์ไฟล์ .cs ของ subassembly ตอนรัน (ดาวน์โหลดจาก NuGet อัตโนมัติตอน build ครั้งแรก) -->
   <ItemGroup Condition="'$(LocalRoslynDir)' == ''">
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.4.0" />
   </ItemGroup>
   <ItemGroup Condition="'$(LocalRoslynDir)' != ''">
     <Reference Include="Microsoft.CodeAnalysis">

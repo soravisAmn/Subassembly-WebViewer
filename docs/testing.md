@@ -6,12 +6,13 @@ Tests must never read the user's working files at the root (`*.cs`, `*.assembly.
 
 | Command | Tests |
 |---|---|
-| `dotnet run --project SA.Tests` | Trapezoid, code generator (compares JS with the result of running the C#, including Side = Left and link codes; this part needs `node`), SA-DRAWING block, object → code line, redrawn rock-pitching = real files (round 4c + -web.cs round 4e), exact parameter warning text (value types) |
+| `dotnet run --project SA.Tests` | MCP endpoint (initialize, tools/list, tools/call, no page open, foreign Host / Origin, forwarding to a fake page), Trapezoid, code generator (compares JS with the result of running the C#, including Side = Left and link codes; this part needs `node`), SA-DRAWING block, object → code line, redrawn rock-pitching = real files (round 4c + -web.cs round 4e), exact parameter warning text (value types) |
 | `node SA.Tests/js/evaluator.test.js` | Expressions + DrawingSpec (add cases in `SA.Tests/js/drawing-cases.json`) |
 | `node SA.Tests/js/cond.test.js` | Condition expressions / values from geometry (round 4) |
 | `node SA.Tests/js/logic.test.js` | if / switch / nested branches, firstOf, unknown values, branch cloning, cut / fill, show all cases, renaming / deleting conditions (round 4) |
 | `node SA.Tests/js/rockpitching.test.js` | Redrawing base / body rock-pitching with tools = sa-spec in the locked `SA.Tests/fixtures/base_rock-pitching-web.cs` / `body_rock-pitching-web.cs`, computes with no warnings / closed shapes (rounds 4c / 4e). Comparison with the real files is in `dotnet run` |
 | `node SA.Tests/js/logicbatch.test.js` | Logic API drawing functions, `applyBatch` (references, all or nothing, unknown fn / reference), `catalog` = real functions, `docs/logic-api.md` up to date, base rock-pitching redrawn with `applyBatch` only = `buildBase()` (round 6) |
+| `node SA.Tests/js/boundary.test.js` | Bottom boundary (lower envelope of real links): crossings, auxiliary, holes, overlaps, branches, Left, known gaps in `SA.Tests/fixtures/round6/` (round 6) |
 | `node SA.Tests/js/array.test.js` | Array: stairs (shared point), editing dx / dy / parameters, Left, link joining, shape / aux / branch, changing N (blocked), deleting = dissolves the Array, Move (round 4c) |
 | `node SA.Tests/js/slope.test.js` | Parameter value types (Number / Slope 1:x / Length / Percent): display / typing / warning text, ↗ ↘ slope field read / write (old specs unchanged), Daylight Cut/Fill with Slope parameters (round 4e) |
 | `node SA.Tests/js/logicops.test.js` | Logic API: every function, normal + error cases (duplicate name, reserved word, expression type, duplicate case / else, moving a decision into itself, 3 kinds of delete, cycles); spec unchanged after errors, describe (round 5) |

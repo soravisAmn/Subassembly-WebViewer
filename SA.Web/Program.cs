@@ -25,12 +25,15 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 var folder = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath,
     builder.Configuration["SubassemblyFolder"] ?? ".."));
 
+SA.Mcp.McpSetup.AddSaMcp(builder.Services);
 builder.Services.AddSingleton<SubassemblyCompiler>();
 builder.Services.AddSingleton<SubassemblyRunner>();
 builder.Services.AddSingleton(sp => new AssemblyService(
     sp.GetRequiredService<SubassemblyCompiler>(), sp.GetRequiredService<SubassemblyRunner>(), folder));
 
 var app = builder.Build();
+SA.Mcp.McpSetup.UseSaMcpGuard(app);
+SA.Mcp.McpSetup.MapSaMcp(app);
 app.UseDefaultFiles();
 // หน้าเว็บแยกเป็นหลายไฟล์ (css/, js/) -> ให้เบราว์เซอร์ถามทุกครั้งว่าไฟล์เปลี่ยนไหม กันได้ js เก่าปนกับ html ใหม่
 app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = c => c.Context.Response.Headers.CacheControl = "no-cache" });

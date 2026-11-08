@@ -18,8 +18,9 @@ function setSel(sel){
   syncCodeHighlight();       // แถบโค้ดเปิดอยู่: เน้นบรรทัดของ object ที่เลือก
 }
 function renderAll(){
+  aiCheckEdits();
   mapSelected();
-  render(); renderTree(); renderProps(); renderDock(); renderProblem(); applyMarkers(); renderEditBar(); renderDrawer(); renderProjName();
+  render(); renderTree(); renderProps(); renderDock(); renderAi(); renderProblem(); applyMarkers(); renderEditBar(); renderDrawer(); renderProjName();
   refreshGenerated();
 }
 const isSel = selHas;
@@ -1887,7 +1888,7 @@ function removeDecisionsDialog(it, decs, title){
 
 $("dock").querySelector(".dock-tabs").addEventListener("click", e => {
   const b = e.target.closest("[data-tab]");
-  if (b){ state.dock.tab = b.dataset.tab; state.dock.open = true; persist(); renderDock(); }
+  if (b){ state.dock.tab = b.dataset.tab; state.dock.open = true; persist(); renderDock(); renderAi(); }
 });
 $("dock-toggle").onclick = () => { state.dock.open = !state.dock.open; persist(); renderDock(); };
 

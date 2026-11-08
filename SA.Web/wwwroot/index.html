@@ -101,6 +101,7 @@
       <button data-tab="log" role="tab">Log <span class="badge" id="n-log"></span></button>
       <button data-tab="pts" role="tab">Points <span class="badge" id="n-pts"></span></button>
       <button data-tab="logic" role="tab" title="เงื่อนไข / กิ่ง ของส่วนที่วาด (ค่าตอนนี้ + scenario ที่ทดสอบแต่ละกิ่ง)">Logic <span class="badge" id="n-logic"></span></button>
+      <button data-tab="ai" role="tab" title="ข้อเสนอจาก Claude (รับ / ปฏิเสธ)">AI <span class="badge" id="n-ai"></span></button>
       <span class="dock-of" id="dock-of"></span>
       <span class="spacer"></span>
       <button id="dock-toggle" class="ghost" title="ย่อ/ขยายแถบผลลัพธ์">▾</button>
@@ -109,6 +110,7 @@
       <div data-pane="msg" id="issues" class="msgs"></div>
       <pre data-pane="log" id="log" class="log"></pre>
       <div data-pane="logic" id="logic-pane" class="lg-tab"></div>
+      <div data-pane="ai" id="ai-pane" class="ai-tab"></div>
       <div data-pane="pts"><table><thead><tr><th>#</th><th>Codes</th><th class="n">Offset</th><th class="n">Elev</th></tr></thead><tbody id="pt-table"></tbody></table></div>
     </div>
   </div>
@@ -177,6 +179,7 @@
   <button class="tg" data-tg="codes" title="แสดง point code บนรูป">codes</button>
   <label class="lbl">VE <select id="ve"><option>1</option><option>2</option><option>5</option></select></label>
   <button class="tg" id="b-fit" title="ดูทั้งหมด (F)">Fit</button>
+  <span class="ai-status" id="ai-status"></span>
   <span class="srv" id="srv" title=""><span class="dot" id="srv-dot"></span><span id="srv-txt">กำลังเชื่อมต่อ…</span></span>
 </footer>
 
@@ -194,6 +197,7 @@
 <script src="js/spec.js"></script>
 <script src="js/logicops.js"></script>
 <script src="js/boundary.js"></script>
+<script src="js/proposal.js"></script>
 <script src="js/snap.js"></script>
 <script src="js/track.js"></script>
 <script src="js/select.js"></script>
@@ -210,6 +214,7 @@
 <div class="pane-resize" id="lw-resize" title="ลากปรับความกว้างแถบซ้าย · ดับเบิลคลิก = ค่าเริ่มต้น"></div>
 <div class="pane-resize" id="rw-resize" title="ลากปรับความกว้างแถบขวา · ดับเบิลคลิก = ค่าเริ่มต้น"></div>
 <script src="js/panes.js"></script>
+<script src="js/aipanel.js"></script>
 <script src="js/mcp.js"></script>
 <script src="js/main.js"></script>
 </body>

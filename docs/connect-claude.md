@@ -2,7 +2,7 @@
 
 Claude drives the open web page through MCP, using your existing Claude plan (no API key). The server listens on localhost only.
 
-So far the tools only read. Editing through proposals you accept comes in M3.
+Claude never changes your subassembly directly: every edit is a proposal you accept or reject in the web.
 
 ## Claude Code
 
@@ -33,6 +33,21 @@ A stdio bridge is required, because Desktop's custom connectors connect from Ant
 | `sa_render` | PNG of the section. `scenario`: a name from `sa_check` or `{ ground, values, layout }`. `labels`: points, all, none. Default 900 x 500 |
 | `sa_check` | Compile, every scenario Right + Left, branch / Loop coverage, bottom boundary. `code: "Datum"` lists missing stretches. `detail: "full"` lists every stretch |
 | `sa_code_preview` | The generated drawing method. `detail: "full"` gives the whole file (about 40,000 characters) |
+| `sa_new` | Proposes a new subassembly in the current assembly; it exists only after you accept |
+| `sa_apply` | Runs Logic API ops on the proposal, all or nothing. Returns named results, warnings and a diff |
+| `sa_scenarios` | Lists scenarios, or adds one to the proposal (ground + parameter values) |
+| `sa_proposal` | Status of a proposal, or cancels Claude's own. It cannot accept |
+
+Read tools show the pending proposal when there is one; `view: "real"` shows the subassembly as it is.
+
+## Proposals
+
+- The AI tab in the bottom dock lists pending proposals: Claude's summary, a diff, warnings, and the buttons **"รับทั้งหมด"** / **"ปฏิเสธ"**. With more than one op, a slider steps through the result (view only).
+- While a proposal is pending, the drawing shows it instead: green = added, orange = changed, red dashes = removed.
+- Accepting is one Undo step and does not write a file; press **Save (.cs)** yourself.
+- If you edit the subassembly while a proposal is pending, the proposal is cancelled with a notice, and Claude is told to read again.
+- Proposals live in the page: refreshing it drops them. There is at most one pending proposal per subassembly.
+- The footer shows "Claude เชื่อมต่อแล้ว" once a tool has been called in this page session, with the number of pending proposals.
 
 ## Bottom boundary
 

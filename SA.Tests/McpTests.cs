@@ -51,11 +51,11 @@ static class McpTests
             Is(r.GetProperty("serverInfo").GetProperty("name").GetString() == "sa-drawing-studio", "name");
             Is(r.GetProperty("capabilities").TryGetProperty("tools", out _), "tools capability");
         });
-        test("tools/list has the read-only tools and nothing that writes", () =>
+        test("tools/list has exactly the agreed tools", () =>
         {
             var (_, b) = Post("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""").Result;
             var names = b.GetProperty("result").GetProperty("tools").EnumerateArray().Select(t => t.GetProperty("name").GetString()!).OrderBy(n => n, StringComparer.Ordinal).ToArray();
-            var want = new[] { "sa_catalog", "sa_check", "sa_code_preview", "sa_describe", "sa_get_spec", "sa_render", "sa_status" };
+            var want = new[] { "sa_apply", "sa_catalog", "sa_check", "sa_code_preview", "sa_describe", "sa_get_spec", "sa_new", "sa_proposal", "sa_render", "sa_scenarios", "sa_status" };
             Is(names.SequenceEqual(want), string.Join(",", names));
         });
         test("no web page open: an immediate error that says what to do", () =>

@@ -7,7 +7,7 @@ const Mcp = (() => {
 
   // ---------- which subassembly ----------
   function findItem(ref){
-    const items = allItems();
+    const items = allItems().concat(Proposals.pending().filter(p => p.item).map(p => p.item));
     if (ref){
       const hit = items.filter(it => [it.id, itemLabel(it), it.name, it.file, it.fileName, it.spec && it.spec.className].includes(ref));
       if (hit.length === 1) return hit[0];
@@ -17,6 +17,8 @@ const Mcp = (() => {
     const cur = editItem() || selItem();
     if (cur) return cur;
     if (items.length === 1) return items[0];
+    const fresh = Proposals.pending().filter(p => p.item);
+    if (fresh.length === 1) return fresh[0].item;
     throw new Error("Nothing is selected. Pass item (see sa_status).");
   }
   // A project item may hold only a file name: read the spec without changing the workspace
@@ -27,6 +29,12 @@ const Mcp = (() => {
       if (r && r.ok && r.spec) return Spec.normalize(r.spec, []);
     }
     throw new Error(`${itemLabel(it)} has no drawn part (hand-written code only).`);
+  }
+  // Read tools see the pending proposal unless view is "real"
+  async function viewOf(it, a){
+    const p = Proposals.pendingFor(it.id);
+    if (p && a.view !== "real") return { sp: p.spec, note: ` (proposal ${p.id}, not accepted yet)`, p };
+    return { sp: await specOf(it), note: "", p: null };
   }
   const ctxOf = it => ({ ...specCtx(it, itemOrigin(it)), values: { ...(it.params || {}) }, codeParams: codeParamsOf(it) });
 
@@ -48,6 +56,8 @@ const Mcp = (() => {
       out.push({ name: `layout ${name}`, ctx: { ...base, values, layout: true, surface: null } });
       out.push({ name: `no target ${name}`, ctx: { ...base, values, layout: false, surface: null } });
     }
+    const prop = Proposals.pendingFor(it.id);
+    if (prop) for (const c of prop.scenarios) out.push({ name: `proposed: ${c.name}`, ctx: { ...base, values: { ...base.values, ...(c.values || {}) }, layout: !!c.layout, extendEnds: true, surface: c.ground || null } });
     for (const s of scenarios){
       const ws_ = s.ws || s.asm; if (!ws_) continue;
       const si = (ws_.assemblies ? ws_.assemblies.flatMap(a => a.items || []) : (ws_.items || [])).find(x => x.id === it.id);
@@ -128,7 +138,8 @@ const Mcp = (() => {
   // ---------- tools ----------
   const TOOLS = {
     async sa_status(a, msg){
-      const lines = [`Web page open. Tabs: ${msg.tabs}${msg.tabs > 1 ? " (using the most recently active one)" : ""}. Pending proposals: 0.`];
+      const pend = Proposals.pending();
+      const lines = [`Web page open. Tabs: ${msg.tabs}${msg.tabs > 1 ? " (using the most recently active one)" : ""}. Pending proposals: ${pend.length ? pend.map(p => `${p.id} on ${itemLabel(aiOf(p))}`).join(", ") : 0}.`];
       for (const asm of asms()){
         lines.push(`Assembly ${asm.name}:`);
         for (const it of asm.items){
@@ -139,20 +150,20 @@ const Mcp = (() => {
       return { text: lines.join("\n") };
     },
     async sa_describe(a){
-      const it = findItem(a.item), sp = await specOf(it), r = Spec.evaluate(sp, ctxOf(it));
-      return { text: JSON.stringify(Logic.describe(sp, r)) + "\n\n" + Logic.toText(sp, r) };
+      const it = findItem(a.item), { sp, note } = await viewOf(it, a), r = Spec.evaluate(sp, ctxOf(it));
+      return { text: (note ? `Showing${note}.\n` : "") + JSON.stringify(Logic.describe(sp, r)) + "\n\n" + Logic.toText(sp, r) };
     },
-    async sa_get_spec(a){ return { text: JSON.stringify(await specOf(findItem(a.item))) }; },
+    async sa_get_spec(a){ return { text: JSON.stringify((await viewOf(findItem(a.item), a)).sp) }; },
     async sa_catalog(){ return { text: JSON.stringify(Logic.catalog()) }; },
     async sa_render(a){
-      const it = findItem(a.item), sp = await specOf(it), c = renderCtx(it, sp, a.scenario);
+      const it = findItem(a.item), { sp, note } = await viewOf(it, a), c = renderCtx(it, sp, a.scenario);
       const W = Math.min(Math.max(a.width || 900, 200), 1600), H = Math.min(Math.max(a.height || 500, 150), 1200);
       const image = await svgToPng(drawSvg(sp, Spec.evaluate(sp, c), c.surface, a.labels || "points", W, H), W, H);
-      return { text: `${itemLabel(it)}, ${W} x ${H} px.`, image };
+      return { text: `${itemLabel(it)}${note}, ${W} x ${H} px.`, image };
     },
     async sa_code_preview(a){
       const it = findItem(a.item);
-      const lines = (await generated(it, await specOf(it))).split(/\r?\n/).filter(l => !/^\s*\/\/ sa-spec/.test(l));
+      const lines = (await generated(it, (await viewOf(it, a)).sp)).split(/\r?\n/).filter(l => !/^\s*\/\/ sa-spec/.test(l));
       if (a.detail === "full") return { text: lines.join("\n") };
       // Default: only the drawing method. The helpers below it are the same in every generated file.
       const from = lines.findIndex(l => /internal static void Draw\(/.test(l));
@@ -161,8 +172,8 @@ const Mcp = (() => {
       return { text: lines.slice(from, to).join("\n") + `\n// (${lines.length - (to - from)} more lines; detail: "full" shows the whole file)` };
     },
     async sa_check(a){
-      const it = findItem(a.item), sp = await specOf(it), list = scenarioList(it, sp), full = a.detail === "full";
-      const errs = await compileErrors(it, sp), lines = [`${itemLabel(it)}. Compile: ${errs.length ? "FAILED" : "OK"}.`, ...errs.map(e => "  " + e)];
+      const it = findItem(a.item), { sp, note } = await viewOf(it, a), list = scenarioList(it, sp), full = a.detail === "full";
+      const errs = await compileErrors(it, sp), lines = [`${itemLabel(it)}${note}. Compile: ${errs.length ? "FAILED" : "OK"}.`, ...errs.map(e => "  " + e)];
       const entered = new Set(), loops = {}, msgs = new Map(), onBoundary = new Map(), gaps = new Map();
       for (const s of list){
         const r = Spec.evaluate(sp, s.ctx), env = Boundary.lowerEnvelope(sp, r);
@@ -188,9 +199,79 @@ const Mcp = (() => {
     }
   };
 
+  // ---------- proposal tools ----------
+  const aiOf = p => p.item || itemById(p.itemId);
+  function cancelledNotice(itemId){
+    const c = Proposals.takeCancelled(itemId);
+    return c ? `Proposal ${c.id} was cancelled (${c.why}). Read the subassembly again with sa_describe, then propose again.` : null;
+  }
+  function changed(p){ aiFocus(); renderAll(); return p; }
+  function report(p, r){
+    const named = r.results.filter(x => x.as).map(x => `${x.as}=${typeof x.result === "string" ? x.result : JSON.stringify(x.result)}`);
+    return [`Proposal ${p.id} on ${itemLabel(aiOf(p))}: ${Proposals.opCount(p)} ops so far. Nothing is applied until the user accepts in the AI tab; the user saves the file.`,
+            ...(named.length ? ["Results: " + named.join(", ")] : []),
+            ...(r.warnings.length ? ["Warnings: " + [...new Set(r.warnings)].join("; ")] : []),
+            "Diff:", Logic.diffText(JSON.parse(p.base), p.spec)].join("\n");
+  }
+  Object.assign(TOOLS, {
+    async sa_new(a){
+      const n = Logic.newSubassembly(a.name, { targets: a.targets || undefined });
+      if (!n.ok) throw new Error(n.error);
+      const asm = curAsm(), id = "new-" + newId();
+      const item = { id, name: a.name, fileName: a.name + ".cs", className: null, params: {}, spec: n.result, attach: { type: "free", x: asm.baseline.x, y: asm.baseline.y } };
+      const p = Proposals.add(Proposals.make({ itemId: id, base: n.result, isNew: true, asmId: asm.id, item }));
+      item.spec = p.spec;
+      if (a.summary) p.summary = a.summary;
+      changed(p);
+      return { text: `Proposal ${p.id}: new subassembly ${a.name}, item id ${id}. Add to it with sa_apply (item: "${id}"). It exists only after the user accepts.` };
+    },
+    async sa_apply(a){
+      const it = findItem(a.item);
+      const notice = cancelledNotice(it.id);
+      if (notice) throw new Error(notice);
+      if (!Array.isArray(a.ops)) throw new Error("ops must be a list of { fn, args, as? }.");
+      let p = Proposals.pendingFor(it.id), isNew = false;
+      if (!p){ p = Proposals.make({ itemId: it.id, base: await specOf(it) }); isNew = true; }
+      const r = Proposals.apply(p, a.ops, a.summary, { codeParams: codeParamsOf(it) });
+      if (!r.ok) throw new Error(r.error + " Nothing was changed.");
+      if (isNew) Proposals.add(p);
+      changed(p);
+      return { text: report(p, r) };
+    },
+    async sa_scenarios(a){
+      const it = findItem(a.item), sp = (await viewOf(it, a)).sp;
+      if ((a.action || "list") === "list") return { text: "Scenarios: " + scenarioList(it, sp).map(s => s.name).join(", ") + "." };
+      if (a.action !== "add") throw new Error("action must be list or add.");
+      if (!a.name) throw new Error("A scenario needs a name.");
+      if (a.ground != null && !(Array.isArray(a.ground) && a.ground.length >= 2 && a.ground.every(q => isFinite(q.x) && isFinite(q.y)))) throw new Error("ground must be at least 2 points [{x,y}] relative to the subassembly origin.");
+      const notice = cancelledNotice(it.id);
+      if (notice) throw new Error(notice);
+      let p = Proposals.pendingFor(it.id);
+      if (!p) p = Proposals.add(Proposals.make({ itemId: it.id, base: await specOf(it) }));
+      p.scenarios.push({ name: a.name, ground: a.ground || null, values: a.values || {}, layout: !!a.layout });
+      changed(p);
+      return { text: `Scenario "${a.name}" added to proposal ${p.id}; sa_check includes it as "proposed: ${a.name}".` };
+    },
+    async sa_proposal(a){
+      const p = a.id ? Proposals.byId(a.id) : Proposals.pendingFor(findItem(a.item).id) || Proposals.all().filter(x => x.itemId === findItem(a.item).id).pop();
+      if (!p) throw new Error("No proposal found.");
+      if (a.action === "accept") throw new Error("Only the user can accept a proposal, in the AI tab.");
+      if (a.action === "cancel"){
+        if (p.status !== "pending") throw new Error(`Proposal ${p.id} is already ${p.status}.`);
+        Proposals.finish(p, "cancelled", "cancelled by the AI"); p.acked = true;
+        renderAll();
+        return { text: `Proposal ${p.id} cancelled.` };
+      }
+      if (a.action && a.action !== "status") throw new Error("action must be status or cancel.");
+      if (p.status === "cancelled") p.acked = true;
+      return { text: `Proposal ${p.id}: ${p.status}${p.why ? " (" + p.why + ")" : ""}, ${Proposals.opCount(p)} ops.` };
+    }
+  });
+
   async function onMessage(ev){
     let m; try{ m = JSON.parse(ev.data); }catch{ return; }
     const send = o => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ id: m.id, ...o })); };
+    aiLastCall = Date.now(); renderAi();
     try{
       const fn = TOOLS[m.tool];
       if (!fn) return send({ error: `Unknown tool ${m.tool}.` });

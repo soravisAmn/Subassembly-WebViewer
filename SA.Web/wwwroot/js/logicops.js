@@ -623,6 +623,15 @@ const Logic = (() => {
     for (const id of rebuilt) if (ga.has(id) && gb.has(id)) out.push(`~ ${id} สร้างสมาชิกใหม่ (ชุด 2–${gb.get(id).n})`);
     if (added.length) out.push(`+ object ${added.join(", ")}`);
     if (removed.length) out.push(`- object ${removed.join(", ")}`);
+    // Edits to objects that stay: codes, then any other field of the definition (Array members are summarised above)
+    for (const [id, o] of ob){
+      const p = oa.get(id);
+      if (!p || ma.has(id) || mb.has(id)) continue;
+      const cA = (p.codes || []).join(", "), cB = (o.codes || []).join(", ");
+      if (cA !== cB) out.push(`~ ${id} code: ${cA || "(ไม่มี)"} → ${cB || "(ไม่มี)"}`);
+      const rest = x => { const { codes, branch, ...r } = x; return JSON.stringify(r); };
+      if (rest(p) !== rest(o)) out.push(`~ ${id} แก้นิยาม: ${rest(p)} → ${rest(o)}`);
+    }
     const moves = new Map();
     for (const [id, o] of ob){ const p = oa.get(id); if (!p || (p.branch || null) === (o.branch || null)) continue;
       const k = `${brName(la, p.branch || null)} → ${brName(lb, o.branch || null)}`; moves.set(k, (moves.get(k) || []).concat(id)); }

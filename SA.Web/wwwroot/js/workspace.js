@@ -106,6 +106,7 @@ function render(){
   const selIds = new Set(selList().map(x => x.item).filter(Boolean));
   const dragId = drag && drag.type === "item" ? drag.id : null;
   evalAll();
+  for (const p of Proposals.pending()) if (p.item) renderProposal(p.item, p, null, el("g", { class: "item" }, svg));   // new subassembly proposed by the AI
   for (const it of allItems()){
     const rr = asmRes[it.id], dr = drawRes[it.id];
     const res = rr && rr.result ? rr.result : null, P = res ? res.points : [];
@@ -117,7 +118,9 @@ function render(){
     if (!editing && isSel && s.type === "multi") cls += " picked";
     if (dragId === it.id) cls += " drag";
     const grp = el("g", {class: cls}, svg);
-    if (dr) renderSpec(it, dr, grp, isSel);
+    const prop = dr && Proposals.pendingFor(it.id);
+    if (prop) renderProposal(it, prop, dr, grp);
+    else if (dr) renderSpec(it, dr, grp, isSel);
     // โค้ดที่สร้างจาก spec: รูปที่เห็นมาจาก JS (เร็วกว่า) ผล C# ใช้ตรวจ/เกาะจุดเท่านั้น จึงไม่วาดซ้ำ
     if (!res || rr.generated) continue;
     res.shapes.forEach((sh, i) => {

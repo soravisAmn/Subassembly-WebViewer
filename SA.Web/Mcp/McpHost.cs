@@ -102,10 +102,24 @@ public sealed class SaTools(PageHub hub)
     public Task<CallToolResult> Status(CancellationToken ct = default) => Forward("sa_status", new { }, ct);
 
     [McpServerTool(Name = "sa_describe", ReadOnly = true), Description("Parameters, conditions, branches, objects and a text view (with current values) of a subassembly's drawn part.")]
-    public Task<CallToolResult> Describe([Description("Subassembly id, name, file or class. Default: the one being edited or selected.")] string? item = null, CancellationToken ct = default) => Forward("sa_describe", new { item }, ct);
+    public Task<CallToolResult> Describe([Description("Subassembly id, name, file or class. Default: the one being edited or selected.")] string? item = null, [Description("real = ignore a pending proposal.")] string? view = null, CancellationToken ct = default) => Forward("sa_describe", new { item, view }, ct);
 
     [McpServerTool(Name = "sa_get_spec", ReadOnly = true), Description("Full spec JSON. Use only when sa_describe is not enough.")]
-    public Task<CallToolResult> GetSpec(string? item = null, CancellationToken ct = default) => Forward("sa_get_spec", new { item }, ct);
+    public Task<CallToolResult> GetSpec(string? item = null, string? view = null, CancellationToken ct = default) => Forward("sa_get_spec", new { item, view }, ct);
+
+    [McpServerTool(Name = "sa_new"), Description("Propose a new subassembly in the current assembly. It exists only after the user accepts. Ask the user first about anything not stated.")]
+    public Task<CallToolResult> New([Description("C# class name.")] string name, string? summary = null, [Description("Target surface names. Default: TargetSurface.")] string[]? targets = null, CancellationToken ct = default) => Forward("sa_new", new { name, summary, targets }, ct);
+
+    [McpServerTool(Name = "sa_apply"), Description("Apply Logic API ops to a proposal, all or nothing. Never changes the real subassembly: the user accepts in the web. See sa_catalog for functions.")]
+    public Task<CallToolResult> Apply([Description("[{ fn, args, as? }]; \"${name.result}\" in a string reads an earlier op's result.")] JsonElement ops,
+        [Description("One or two sentences for the user, in Thai.")] string summary, string? item = null, CancellationToken ct = default) => Forward("sa_apply", new { item, ops, summary }, ct);
+
+    [McpServerTool(Name = "sa_scenarios"), Description("List scenarios, or add one to the proposal (ground polyline relative to the subassembly origin + parameter values) to cover every branch.")]
+    public Task<CallToolResult> Scenarios([Description("list (default) or add.")] string? action = null, string? name = null,
+        [Description("[{x,y}], at least 2 points, or omit for no ground.")] JsonElement? ground = null, JsonElement? values = null, bool? layout = null, string? item = null, CancellationToken ct = default) => Forward("sa_scenarios", new { item, action, name, ground, values, layout }, ct);
+
+    [McpServerTool(Name = "sa_proposal"), Description("Status of a proposal, or cancel your own. Only the user can accept.")]
+    public Task<CallToolResult> Proposal([Description("status (default) or cancel.")] string? action = null, string? id = null, string? item = null, CancellationToken ct = default) => Forward("sa_proposal", new { action, id, item }, ct);
 
     [McpServerTool(Name = "sa_catalog", ReadOnly = true), Description("Logic API functions, point and link types, op format and key drawing rules.")]
     public Task<CallToolResult> Catalog(CancellationToken ct = default) => Forward("sa_catalog", new { }, ct);
@@ -114,15 +128,15 @@ public sealed class SaTools(PageHub hub)
     public Task<CallToolResult> Render(string? item = null,
         [Description("Scenario name from sa_check, or { ground: [{x,y}], values: {}, layout: false }. Default: the current workspace.")] JsonElement? scenario = null,
         [Description("Labels: points (default), all (points and links), none.")] string? labels = null,
-        int? width = null, int? height = null, CancellationToken ct = default) => Forward("sa_render", new { item, scenario, labels, width, height }, ct);
+        int? width = null, int? height = null, string? view = null, CancellationToken ct = default) => Forward("sa_render", new { item, scenario, labels, width, height, view }, ct);
 
     [McpServerTool(Name = "sa_check", ReadOnly = true), Description("Compiles the generated code (no file written) and evaluates every scenario, Right and Left: messages, branch and Loop coverage, and the bottom boundary (lower envelope of real links). Give code (e.g. Datum) to list offset stretches lacking it.")]
     public Task<CallToolResult> Check(string? item = null,
         [Description("Code the bottom boundary must carry, e.g. Datum.")] string? code = null,
-        [Description("summary (default) or full.")] string? detail = null, CancellationToken ct = default) => Forward("sa_check", new { item, code, detail }, ct);
+        [Description("summary (default) or full.")] string? detail = null, string? view = null, CancellationToken ct = default) => Forward("sa_check", new { item, code, detail, view }, ct);
 
     [McpServerTool(Name = "sa_code_preview", ReadOnly = true), Description("The generated drawing method in C#. No file is written. detail: full gives the whole file (long).")]
-    public Task<CallToolResult> CodePreview(string? item = null, string? detail = null, CancellationToken ct = default) => Forward("sa_code_preview", new { item, detail }, ct);
+    public Task<CallToolResult> CodePreview(string? item = null, string? detail = null, string? view = null, CancellationToken ct = default) => Forward("sa_code_preview", new { item, detail, view }, ct);
 }
 
 public static class McpSetup

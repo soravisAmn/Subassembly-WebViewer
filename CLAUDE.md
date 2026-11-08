@@ -1,129 +1,68 @@
-# CLAUDE.md — อ่านไฟล์นี้ก่อนทำงานทุกครั้ง (Claude Code โหลดไฟล์นี้อัตโนมัติ)
+# CLAUDE.md
 
-## โปรเจกต์
-**SA Drawing Studio (Subassembly Viewer)** — เว็บ localhost (ASP.NET + JS) สำหรับ
-1) ดูรูปร่าง subassembly จากไฟล์ .cs ของ Civil 3D 2027 โดยคอมไพล์ด้วย Roslyn แล้วรันกับตัวจำลอง API (`SA.Civil3DShim`) และลากเส้น surface ทดสอบทุก case
-2) วาด subassembly แบบ AutoCAD / SAC แล้วสร้างไฟล์ .cs ให้ (`SA.Web/Drawing/CodeGenerator.cs`, spec อยู่ใน `SA.Web/wwwroot/js/spec.js`)
-รายละเอียดการใช้งานทั้งหมดอยู่ใน `README.md`
+## Project
 
-ผู้ใช้: Soravis วิศวกรโยธา/แหล่งน้ำ คุ้น AutoCAD / Civil 3D / Subassembly Composer (SAC) มาก ถนัด Python มากกว่า C# — **คุยและรายงานเป็นภาษาไทย**
+**SA Drawing Studio (Subassembly Viewer)**: a localhost web app (ASP.NET + JS).
+1. Shows the shape of a Civil 3D 2027 subassembly from its `.cs` file: compiles with Roslyn, runs against the API simulator `SA.Civil3DShim`, traces test surfaces for every case.
+2. Draws subassemblies AutoCAD / SAC style and generates the `.cs` (`SA.Web/Drawing/CodeGenerator.cs`; spec in `SA.Web/wwwroot/js/spec.js`).
 
-## เครื่องที่ใช้
-**ตั้งแต่ 2026-11-02 ใช้เครื่องบ้านเครื่องเดียว** (ผู้ใช้แจ้ง) — เครื่องนี้ไม่มี Civil 3D · **ติดตั้ง `node` แล้ว** (v26 — พบ 2026-11-08 รัน test ตรงได้)
-ข้อด้านล่างเก็บไว้เผื่อกลับไปใช้สองเครื่อง
+Docs index: `README.md`. Topic docs are in `docs/`.
 
-| เครื่อง | โฟลเดอร์ |
-|---|---|
-| บ้าน (desktop-gk62kqm) — **ใช้อยู่** | `D:\test_cad\Subassembly-WebViewer` |
-| ที่ทำงาน (desktop-3l6r773, มี Civil 3D) — เลิกใช้ชั่วคราว | `D:\Yo\Subassembly-WebViewer` |
+**User:** Soravis, civil / water engineer. Knows AutoCAD, Civil 3D and Subassembly Composer (SAC) very well; Python more than C#. **Talk to him in Thai, briefly.**
 
-- ที่เดียวที่ข้อมูลตรงกันคือ **git (`origin` = github.com/soravisAmn/Subassembly-WebViewer, branch `main`)** — Claude Code แต่ละเครื่องไม่รู้ว่าอีกเครื่องคุยอะไรไป
-- **เริ่ม session**: `git status` + `git fetch` → ถ้า `origin/main` ใหม่กว่า ให้บอกผู้ใช้แล้ว pull ก่อนทำงาน; ถ้ามีไฟล์ค้างแก้ ให้สรุปให้ผู้ใช้ดูก่อน
-- **จบงาน / ก่อนผู้ใช้ย้ายเครื่อง**: เสนอ commit + push (ต้องได้รับอนุญาตทุกครั้ง) และอัปเดตหัวข้อ "สถานะล่าสุด" ด้านล่าง
-- เรื่องที่ตกลงกันในแชทต้องเขียนลงไฟล์ (prompt-*.md / README / ไฟล์นี้) ไม่งั้นอีกเครื่องไม่รู้
+## Machine and git
 
-## กติกา
-- ไฟล์ข้อความใช้ **CRLF**, ข้อความ UI และคอมเมนต์เป็นภาษาไทย
-- server ฟังแค่ localhost; ห้ามทำโหมด/ฟีเจอร์เดิมพัง
-- ห้ามแก้ไฟล์ .cs ของผู้ใช้ (ที่ root เช่น `base_rock-pitching.cs`, `pavement-assembly.cs`) ระหว่างทดสอบ — copy ไปทดสอบที่อื่น
-- ห้าม commit / push / สร้าง branch เองจนกว่าผู้ใช้อนุญาต
-- ทุก milestone: รัน test ทั้งหมด (ด้านล่าง), อัปเดต README, บอกผู้ใช้ว่าต้องเปิด `run-viewer.bat` ใหม่หรือแค่ Ctrl+F5
-- shortcut ใหม่ต้องอยู่ในตาราง `?` และไม่ชนของเดิม; ตัวเลือกระหว่างคำสั่งชนะ shortcut ทั่วไป
+- One machine: `DESKTOP-GK62KQM`, `D:\test_cad\Subassembly-WebViewer`. Civil 3D 2027 at `C:\Program Files\Autodesk\AutoCAD 2027\C3D`. `node` v26 installed.
+- Git is the only sync point: `origin` = github.com/soravisAmn/Subassembly-WebViewer, branch `main`.
+- **Session start:** `git status` + `git fetch`. If `origin/main` is newer, tell the user and pull before working. If files have pending edits, summarise them first.
+- **End of work:** offer commit + push (permission needed every time) and update "Status" below.
+- What is agreed in chat must be written to a file (prompt, design doc, `docs/`, or this file).
+
+## Rules
+
+- Text files use **CRLF**.
+- The server listens on localhost only. Do not break existing modes or features.
+- Never edit the user's `.cs` files at the root during tests; copy them elsewhere.
 - Tests must never read the user's working files at the root (`*.cs`, `*.assembly.json`). Use locked copies in `SA.Tests/fixtures/` instead.
-- ห้ามเพิ่ม API ปลอมใน shim ที่ Civil 3D จริงไม่มี (อ้างอิง: `link-API-Reference.txt`) — link ใน Civil 3D เป็นเส้นตรงเท่านั้น
-- ฟีเจอร์ที่เปลี่ยนข้อมูลใน spec (จุด / เส้น / shape / parameter / เงื่อนไข / variable / Array ฯลฯ) ต้องทำเป็นฟังก์ชันใน Logic API (`js/logicops.js`) ก่อน แล้วให้ UI เรียกใช้ — ห้าม UI แก้ spec ตรงๆ · อัปเดต README หัวข้อ Logic API ทุกครั้งที่เพิ่ม (ฟีเจอร์หน้าจอล้วนๆ เช่น ขนาดแถบ / สี / ซูม ไม่ต้อง)
+- No commit, push or new branch without the user's permission.
+- Every milestone: run all tests, update the relevant `docs/` file, tell the user whether to reopen `run-viewer.bat` or just press Ctrl+F5.
+- New shortcuts go in the `?` table and must not clash. Options inside a command beat general shortcuts.
+- No fake API in the shim that real Civil 3D lacks (reference: `link-API-Reference.txt`). Civil 3D links are straight only.
+- Features that change spec data (points, links, shapes, parameters, conditions, variables, Arrays, etc.) are functions in the Logic API (`js/logicops.js`) first, then the UI calls them. The UI must not edit the spec directly. Update `docs/logic-api.md` each time. (Pure screen features such as panel size, colour, zoom are exempt.)
+- When a round is finished, its prompt + design doc move to `docs/prompts/`.
 
-## ทดสอบ
-- `dotnet run --project SA.Tests` (รวมเทียบผล JS กับ C# ที่สร้าง ต้องมี `node`)
-- `node SA.Tests/js/<ชื่อ>.test.js` ทุกไฟล์ในโฟลเดอร์ `SA.Tests/js`
-- ยังไม่มี node: รัน test JS ในเบราว์เซอร์ (จำลอง `require` ของ fs / path / vm) และป้อนผล `eval-cli.js` ที่คำนวณในเบราว์เซอร์ให้ `dotnet run --project SA.Tests`
-  ผ่านตัวแทน `node.exe` ชั่วคราว — วิธีที่ใช้ใน M0 รอบ 4 (ดู `docs/prompts/prompt-4-design.md`) · ติดตั้ง node แล้วไม่ต้องทำแบบนี้
-- ชุดทดสอบใน Civil 3D จริง: `tests-civil3d/` (ต้องมีเครื่องที่มี Civil 3D)
+## Language
 
-## สถานะล่าสุด (อัปเดตทุกครั้งที่จบ milestone)
-- รอบ 1 (`docs/prompts/prompt.md`), รอบ 2 (`docs/prompts/prompt-2.md`), รอบ 3 + 3b (`docs/prompts/prompt-3.md`, `docs/prompts/prompt-3b.md`) — **เสร็จแล้ว** (commit `ha`)
-- ยังไม่ได้ทดสอบ `tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs`, `round5-demo.cs`, `round5b-demo.cs` ใน Civil 3D จริง (เครื่องนี้ไม่มี Civil 3D · round4b-demo ถูกลบไปพร้อม Max / Min)
-- **รอบ 4 `docs/prompts/prompt-4.md` เสร็จแล้ว** — M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบผู้ใช้อยู่ใน `docs/prompts/prompt-4-design.md` (ตอบ "ตามที่เสนอ" ทุกข้อ), จัดระเบียบ repo แล้ว (เลิก track bin/obj · ยังเหลือของที่ควรลบ ดูไฟล์นั้น)
-  M1 เสร็จ (2026-11-02): นิพจน์เงื่อนไข + P3.x/y, ground(), exists(), hasGround() ใน JS / C# (test: `cond.test.js`, `ExprTests.cs`, drawing-cases 31–35)
-  M2 เสร็จ (2026-11-02): กิ่ง if / switch / ซ้อน + `firstOf` ใน JS / C# + UI ขั้นต่ำ "เกิดเมื่อ" ใน Properties (test: `logic.test.js`, ExprTests "กิ่ง -> C#", drawing-cases 36–44)
-  - ตกลงระหว่างทำ: firstOf เป็น auxiliary → link จริงหลังกิ่งต้องต่อจากจุดในแต่ละกิ่งเอง (ยังไม่มี "จุดแทน" ที่ AddLink ได้)
-    — **รอบ 4c M3 เปลี่ยนแล้ว**: firstOf aux = "ปลายจริง" เป็นปลาย link จริงได้ (ถ้าจุดในรายการเป็นจุดจริงทั้งหมด)
-  - object ที่ไม่เกิดถูกซ่อน (เลือกบนรูปไม่ได้จนกว่าจะเกิด) — "แสดงทุกกรณี" อยู่ M4
-  M3 เสร็จ (2026-11-02): ปุ่ม "ถ้าตัด / ถม" ใน drawer (`Spec.addCutFill` + หน้าต่างใน ui.js; test: `logic.test.js`, drawing-cases 45–49)
-  M4 เสร็จ (2026-11-02): แท็บ Logic (ค่าสด, ต้นไม้กิ่ง, เปลี่ยนชื่อ / ลบ), แสดงทุกกรณี (`evaluate` + `allBranches`), ป้ายกิ่งในต้นไม้, scenario ครอบคลุมกิ่ง, B = วาดลงกิ่ง, เกิดเมื่อหลายชิ้น
-  M5 เสร็จ (2026-11-02): ข้อ 6 (ไฟล์ที่แก้เองนอกช่วง + กิ่ง — test ใน DrawingTests), codelink ของเงื่อนไข / กิ่ง (แท็บ Logic → โค้ด, เคอร์เซอร์บรรทัดกิ่ง → object),
-  `tests-civil3d/round4-demo.cs` + `round4-checklist.md` (+ drawing-cases 50–54) → **รอบ 4 จบ** รอทดสอบใน Civil 3D
-  ข้อเสนอที่ยังไม่ทำ (prompt-4 ข้อ 6): แสดงในแท็บ Logic ว่าโค้ดที่เขียนเองเข้า if บรรทัดไหน — งานแยก ถ้าผู้ใช้ต้องการ
-  รอบ 4b M0 เสร็จ (2026-11-02): ข้อเสนอ + คำตอบใน `docs/prompts/prompt-4b-design.md` (ปุ่มชื่อ "Max / Min" · เลือกได้ว่าคุม ระยะดิ่ง / ตั้งฉากผิวดิน / ความยาว / ระยะราบ · ตัวอย่าง = base_rock-pitching)
-  รอบ 4b M1 เสร็จ (2026-11-02): `p.limit` ใน evaluate (spec.js limitPt / setLimit / limitOptions) + C# `Limit()` + `limited()` + Properties ขั้นต่ำ
-    (test: `limit.test.js`, drawing-cases 55–60, DrawingTests เทียบ base_rock-pitching.cs, ExprTests "Max / Min -> C#")
-  รอบ 4b M2 เสร็จ (2026-11-02): ปุ่ม "Max / Min" ใน drawer + หน้าต่างถามเป็นประโยค (ชิดขวา) + พรีวิวสด (ข้อความ + เส้นประขอบ / ลูกศรบนรูป) — `js/limit.js`
-  รอบ 4b M3 เสร็จ (2026-11-02): ไอคอน ↕ + เส้นขอบตอนเลือกจุด, Properties ประโยคสรุป, แท็บ Logic → Max / Min (สถานะสด + scenario), Delete ถาม, Rotate ไม่ให้หมุนจุดที่มี Max / Min,
-    branchRisks นับจุดที่ Max / Min อ้าง, README ตาราง "ใช้อันไหนเมื่อไร", `tests-civil3d/round4b-demo.cs` + `round4b-checklist.md` (drawing-cases 61–66) → **รอบ 4b จบ** รอทดสอบใน Civil 3D
-  รอบ 4c M0 เสร็จ (2026-11-07): ข้อเสนอ + คำตอบใน `docs/prompts/prompt-4c-design.md` (ชื่อปุ่มเป็นอังกฤษ: Daylight Cut/Fill, Extend to Surface, Clipped Surface Link, Intersect, Offset, Array + เปลี่ยนชื่อปุ่มเดิม · ข้อความอื่นยังไทย · Offset ติ๊ก Aux เอง · Intersect ถามตัด/ไม่ตัดทุกครั้ง)
-  รอบ 4c M1 เสร็จ (2026-11-07): เอา Max / Min ออก (commit แยก `ea9dd1a` — ของเก่าตัดทิ้งตอนโหลด + แจ้งครั้งเดียว · `limited()` = "ไม่มีฟังก์ชัน"),
-    ตาราง Parameter: `positive` (ต้องมากกว่า 0 → Severe + default) + ขั้นต่ำ / ขั้นสูง + เตือน default ขัดขอบเขต + ปุ่ม Parameter บนหัว Properties (`Spec.setParamBounds` / `paramBoundsIssue`),
-    ชื่อปุ่มอังกฤษ (Daylight Cut/Fill, Slope to Surface, Follow Surface, Regular Polygon, Cut at Level, My Shapes) + คำอธิบาย / ภาพในหน้าต่าง Daylight Cut/Fill
-  รอบ 4c M2 เสร็จ (2026-11-07): ชนิดจุด `offset` (JS + C# `Offset()`), `Spec.addOffset` / `addIntersect`, เครื่องมือ Intersect (`I` — หน้าต่าง T ตัด/ยืด · N ไม่ตัด · ไม่มี default)
-    + Offset (`O` — ระยะเป็นนิพจน์ / parameter, คลิกด้าน, ทำซ้ำได้, X = aux), Properties จุด offset (แก้คู่พร้อมกัน), Move ตามเอง
-    (test: `offset.test.js` เทียบ ParallelY ของ body_rock-pitching, drawing-cases 58–60)
-  รอบ 4c M3 เสร็จ (2026-11-07): Extend to Surface — ชนิดจุด `extendToGround` (ไม่ลอย / ไม่มีดิน = off `Spec.GROUND_OFF` เงียบ) + C# `ExtendToGround()`,
-    link `optional` ใน shape (C# `Opt()`), **ปลายจริง** = firstOf aux เป็นปลาย link จริงได้ (`Spec.isAlias` / `auxEnd` · C# alias Point var), `Spec.addExtendToGround`
-    (rewire เส้นที่ต่อที่ปลายไปปลายจริง + แทรกใน shape), ปุ่มกลุ่ม Surface + หน้าต่าง, Properties (test: `extend.test.js`, drawing-cases 61–67)
-  รอบ 4c M4 เสร็จ (2026-11-07): Clipped Surface Link — link `followClipped` (`refLink` | `refLevel` แบบ flat ไม่ใช่ `ref: {}` ตามร่าง, side below/above,
-    codes / codesGround / codesLine) = `Spec.clipPath` + C# `FollowClipped()` (Link[]), `Spec.addFollowClipped`, ปุ่ม + หน้าต่าง + Properties
-    · DrawingTests เทียบ code ของ link แล้ว (test: `clip.test.js` เทียบ BuildBottom, drawing-cases 68–74)
-  รอบ 4c M5 เสร็จ (2026-11-07): Array — `spec.arrays` + `Spec.addArray` / `updateArray` / `rebuildArray` / `arrayOf` (ชุดที่ k = delta จากจุดเดียวกันของชุดก่อน,
-    n = ชุดทั้งหมดรวมต้นฉบับ, join share (จุดร่วม — ขั้นบันได) | link), ปุ่ม Geometry + หน้าต่าง + Properties "Array A1", ลบสมาชิก = ถามแล้วเลิกเป็น Array
-    · ไม่แตะ C# (test: `array.test.js`, drawing-cases 75–76)
-  รอบ 4c M6 เสร็จ (2026-11-07): วาด base / body rock-pitching ใหม่ด้วยเครื่องมือเท่านั้น → `tests-civil3d/round4c-base.cs` / `round4c-body.cs` (+ .assembly.json, `round4c-checklist.md`)
-    ลำดับการกด = `buildBase()` / `buildBody()` ใน `SA.Tests/js/rockpitching.test.js` · `SA.Tests/RockPitchingTests.cs` รันคู่กับไฟล์จริง: 15 ผิวดิน × Right / Left × 4 ชุดค่า
-    = จุด / link / shape / code ตรงกัน (ต่างที่รู้แล้ว: body เส้นปิดปลายชนดินเลย origin — ตาราง "ต่างกันตรงไหน" ใน README)
-    · แก้บั๊ก M2: Offset ระยะเป็นนิพจน์บวก / ลบ ใน C# ขาดวงเล็บ (drawing-case 77) → **รอบ 4c จบ** รอทดสอบใน Civil 3D (`round4c-checklist.md`)
-  รอบ 4d เสร็จ (2026-11-07): ลากปรับความกว้างแถบซ้าย / ขวา (`js/panes.js` · `--lw` / `--rw` · `state.leftW` / `rightW` · ดับเบิลคลิก = 280 / 300 · workspace ≥ 320) + tooltip ชื่อเต็มในต้นไม้
-    + แยกแผง: ซ้าย ต้นไม้ / Scenarios · ขวา Drawer / Properties (เลื่อนแยก, เส้นลากแนวนอน `state.drawerH` / `scH`, คลิกหัว = พับ `drawerFold` / `scFold`)
-  รอบ 4e (`docs/prompts/prompt-4e.md`, ข้อเสนอ + คำตอบ "ตามที่เสนอ" ใน `docs/prompts/prompt-4e-design.md`): M0 เสร็จ (2026-11-08)
-    M1 เสร็จ (2026-11-08): ปุ่มปิด — ต้นเหตุ CSS `.ghost{pointer-events:none}` (ของเส้นพรีวิว SVG) โดน `button.ghost` (× หน้าต่าง, ออกจาก Edit, ▾ แถบผลลัพธ์) → `:where(svg) .ghost`
-      + `cancelDialog()` (ui.js: × / ยกเลิก / Esc / พื้นหลัง = ปิด + จบเครื่องมือ extend / clip / cutfill · มีค่าค้าง = พื้นหลังไม่ปิด `#dlg-note`) + × ในกล่อง `#dyn`
-    M2 เสร็จ (2026-11-08): ชนิดค่า parameter `unit` (number | slope | length | percent — Spec.UNITS / fmtParam / parseUnitValue / setParamUnit, C# `Unit` + `UnitPre` / `UnitSuf`)
-      ข้อความเตือน 1:x / m / % ตรงกันเว็บ = C# (DrawingTests เทียบข้อความ parameter ตรงตัว · eval-cli `paramMsgs`), ช่อง slope ↗ ↘ + 1:x / parameter / % (`Spec.slopeRead` / `slopeWrite` — เก็บนิพจน์เดิม)
-      ตาราง Parameter ช่องชนิดค่า, Daylight Cut/Fill ใช้ parameter Slope ที่มีอยู่ได้ (test: `slope.test.js`, drawing-cases 78–81)
-    M3 เสร็จ (2026-11-08): `base_rock-pitching-web.cs` (`RockPitchingBaseWeb`) / `body_rock-pitching-web.cs` (`RockPitchingBodyWeb`) ที่ root — Save ผ่าน `/api/drawing/save`,
-      parameter ชนิด Slope / Length, body จุดล่างใน = Extend to Surface บนเส้นดิ่ง (แทน min()) · RockPitchingTests เทียบกับไฟล์จริงผ่านทุกกรณี (143 test)
-      + `rock-pitching-compare.assembly.json` (2 assembly เว็บ / ไฟล์จริง · item -web มี spec ฝังไว้) → **รอบ 4e จบ** รอ build / ทดสอบ -web.cs ใน Civil 3D
-      แก้แล้ว (2026-11-08): item ใน project ที่มีแค่ `file` ของไฟล์ที่สร้างจากเว็บ → Edit อ่าน sa-spec ในไฟล์ก่อน (`enterEdit` → `loadSpecFromFile` → `enterEditNow`) เดิมได้ spec ว่าง Save ทับได้
-  รอบ 5 (`docs/prompts/prompt-5.md`, ข้อเสนอ + คำตอบใน `docs/prompts/prompt-5-design.md` — ข้อ 1 ผู้ใช้เลือกแบบ 2: Points / Links / Shapes แสดงทั้งหมด + ป้ายกิ่งสีกิ่ง และแสดงใต้กิ่งด้วย):
-    M0 เสร็จ (2026-11-08) · M1 เสร็จ (2026-11-08): `js/logicops.js` (`Logic.*` คืน { ok, error } · error = spec ไม่เปลี่ยน · ห่อฟังก์ชัน 4c / 4e · describe)
-      UI เดิม (เกิดเมื่อ, แท็บ Logic, Daylight Cut/Fill, Intersect, Offset, Extend, Clipped, Array, ตาราง Parameter, B) เรียก API · `specEdit` แสดง error ใน banner · README "Logic API" (test: `logicops.test.js`)
-      + หน้าต่าง Daylight Cut/Fill: ช่องลาดแบบช่อง slope (`Spec.slopeMagnitude` — 1:x / ดิ่งต่อราบ / % / parameter / นิพจน์, ทิศล็อก ตัด ↗ ถม ↘) · addCutFill รับข้อความ (number = x เดิม) · drawing-cases 82–83
-    M2 เสร็จ (2026-11-08): ต้นไม้ Conditions (`js/condtree.js` — treeConditions / updateTreeLive / condDialog / condCtxItems / ลาก = setBranch) ชิปค่าสด, + Condition / + Switch, elif, case ↑↓, ดับเบิลคลิกแก้นิพจน์
-    M3 เสร็จ (2026-11-08): Variables — `spec.logic.variables` (rules if / elif ตัวแรกชนะ + warn {ชื่อ} + error) evaluate (getter ใน env) + C# `VariableLines` (double + if / else if · อ้างจุด = double? ผ่าน Val + `VN()` เฉพาะเมื่อใช้)
-      Logic.addVariable / edit / rename / remove / move / variableUses (วนกันผ่าน variable / จุด = error) · ต้นไม้ Variables + หน้าต่าง + Variable · drawing-cases 84–90 · RockPitchingTests: base + DepthUsed = ไฟล์จริง
-    M4 เสร็จ (2026-11-08): Logic.toText (pseudo-code ไทย + ค่าตอนนี้ · – = กิ่งแม่ไม่เกิด) / Logic.diffText (+ - ~) · แท็บ Logic ปุ่ม ตาราง / ข้อความ + คัดลอก (ค่าสด) · test: logictext.test.js
-    M5 เสร็จ (2026-11-08): `tests-civil3d/round5-demo.cs` (+ .assembly.json, `round5-checklist.md`) คันดิน switch ProtectionType + ตัด / ถม › elif HighFill ชานพัก + Variable DepthUsed
-      สร้างด้วย Logic API ล้วน (`buildRound5()` ใน `SA.Tests/js/round5demo.test.js`) · drawing-cases 91–95 → **รอบ 5 จบ** รอทดสอบใน Civil 3D (`round5-checklist.md`)
-      ข้อจำกัดที่รู้: ชานพักทำชั้นเดียว (ไม่ใช่ Array หลายขั้น — Loop อยู่ prompt-5b) · branchRisks ยังไม่ไล่จุดที่อ้างผ่าน variable
-  รอบ 5b (`docs/prompts/prompt-5b.md`, ข้อเสนอ + คำตอบใน `docs/prompts/prompt-5b-design.md` — แบบ ก, nMax 10, N < 1 = 1, i ต้นฉบับ 0, ปุ่ม Array + ติ๊ก Loop, C# if ต่อชุด, i เฉพาะ dx / dy, N หาค่าไม่ได้ = 1 + เตือน
-    + ข้อ 9 ปัดเศษ N (`loop.nRound` · round .5 ออกจากศูนย์) + ข้อ 10 ℹ / ⚠ (ℹ เว็บเท่านั้น · รายการที่อื่นที่ใช้ค่าแทน = เสนอไว้ในไฟล์นั้น ยังไม่แก้)):
-    M0 เสร็จ (2026-11-08) · M1 เสร็จ (2026-11-08): `floor / ceil / round` (JS + C#) · `arrays[].loop` evaluate (`loopN` · ชุดที่ k off เมื่อ k ≥ N) + C# (`LoopN` / `N_A1 > k` gate · DrawingSpec.Arrays)
-      Logic `updateArray` (n / nMax / nRound) / `setArrayLoop` / `removeArray` · หน้าต่าง Array ติ๊ก Loop + Properties + ตัวอย่างสด · Messages ℹ / ×n / คลิก = เลือก Array
-      (test: `loop.test.js`, drawing-cases 96–104 เทียบข้อความเตือน loopMsgs)
-    M2 เสร็จ (2026-11-08): ตัวนับ `i` ใน dx / dy (แทนเป็นตัวเลขตอนสร้าง / แก้สมาชิก `Spec.withI` · Expr `allowI` · `i` จองชื่อ),
-      จุด `lastOf` (= firstOf ของรายการ ชุดสุดท้าย → ต้นฉบับ · `refreshLastOf` หลัง build / rebuild · ไม่ขวาง rebuild · C# FirstOf) + Logic.addLastOf + ปุ่มใน Properties Array,
-      `count(A1)` (JS ctx.count · C# `ExprScope.ArrayCount` → N_A1 / ตัวเลข · TopoOrder `LoopDeps`), branchRisks อ้างชุดที่ 2.. ของ Loop (branch "A1#k") + ⚠ ใน Properties ของ object ที่เกิดเสมอด้วย
-      (test: `loop.test.js` 12, drawing-cases 105–108)
-    M3 เสร็จ (2026-11-08): ต้นไม้ Arrays (`treeArrays` ใน condtree.js — ชิป ×N + ℹ / ⚠ สด · ชุด ✓ / – · คลิก = เลือก), ป้าย "A1 ×N" บนรูป (`.arr-lbl`),
-      แสดงทุกกรณีของชุดที่ไม่เกิด (ghost คำนวณเมื่อมี Loop ด้วย · `Spec.offLabel` ป้ายสั้น), scenario: `scenarioEval` / `scenarioLoops` + `logicCoverage().loops / loopMiss` (⚠ ยังไม่มี N = 1 / สูงสุด),
-      Logic.toText หัว Arrays + สมาชิกย่อ · diffText ของ Array · แก้บั๊ก snapshot scenario ที่อ้าง params ของจริง (copy ทั้งก้อน) (test: `loop.test.js` 13)
-    M4 เสร็จ (2026-11-08): `tests-civil3d/round5b-demo.cs` (+ .assembly.json, `round5b-checklist.md`) คันดินถม — Variable FillH + HighFill › Loop A1 ชานพักทุก BermInterval
-      (i ในลาดชั้นล่าง · lastOf → ลาดสุดท้าย 1:(FillSlope + SlopeInc × count(A1))) สร้างด้วย Logic API ล้วน (`buildRound5b()` ใน `SA.Tests/js/round5bdemo.test.js`)
-      · drawing-cases 109–114 · ต้นไม้ / ป้าย: Array ในกิ่งที่ไม่เกิด = – (`arrOff`) → **รอบ 5b จบ** รอทดสอบใน Civil 3D (`round5b-checklist.md`)
-  ถัดไป: prompt-5c (`prompt-5c.md` — จัดไฟล์ลด token: เอกสารเป็นภาษาอังกฤษ, CLAUDE.md สั้นลง, แยก README ไป docs/, ย้าย prompt เก่า, test-all.bat) แล้ว prompt-6 (`prompt-6.md` — MCP: Claude Code / Desktop สั่งเว็บผ่านข้อเสนอที่ผู้ใช้กดรับ + ทดสอบกับ pavement-assembly / base / body rock-pitching-web แล้ว build ลง Civil 3D (วาดตามรูปสเก็ตช์เลื่อนไป prompt ถัดไป); Logic API เพิ่มของวาดพื้นฐาน + applyBatch) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`docs/prompts/prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+| What | Language |
+|---|---|
+| `CLAUDE.md`, `README.md`, `docs/`, prompts, design docs, commit messages | English (the user's Thai answers are recorded in English) |
+| New or edited code comments | English. Do not bulk-translate existing Thai comments |
+| MCP tool descriptions and results | English |
+| Web UI text, web messages, the `?` shortcut table | Thai stays (button / tool names are English) |
+| Chat reports to the user | Thai, short |
 
-## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
-1. prompt-4: Logic ก (ข้างบน)
-2. prompt-5 (ฉบับย่อ): Logic API + มุมมองข้อความ + Switch ในแท็บ Logic — flowchart แบบ SAC เลื่อนไปทำพร้อมเว็บสาธารณะ (ต้องแก้ **ข้อมูลชุดเดียวกับ ก** เสมอ)
-3. prompt-6: MCP server ให้ Claude Desktop / Claude Code สั่งเว็บได้ (อ่าน/แก้ spec, compile, รัน scenario) — AI ช่วยทำ logic ซับซ้อนแทนการวาด flowchart เอง
-4. ทีหลัง: เว็บสาธารณะ (บัญชีผู้ใช้, sandbox การ compile C#, ผู้ใช้ใส่ API key ของ AI เอง, โหมด Chat / Code)
-   — โค้ดจึงต้องแยก **core** (spec, evaluator, CodeGenerator, shim, หน้าเว็บ) ออกจาก **host** (localhost, ไฟล์ในเครื่อง, compile ในเครื่อง) ให้ชัด
-   แต่ **ยังไม่แยก repo** — ใช้ repo เดียว ผู้ใช้ใช้แบบในเครื่องไปก่อน
+## Token rules
+
+- Read `docs/` files by topic. Never read the whole docs folder or old prompts unless the task needs them.
+- Never `cat` or read whole generated `.cs` files: the `// sa-spec:` line is huge. Use grep, line ranges, or load the spec through the web / tests.
+- Prefer `test-all.bat`. Read full logs only when something fails.
+- When updating docs, edit the one relevant file. Do not rewrite unrelated sections.
+- Keep reports to the user short.
+
+## Tests
+
+`test-all.bat` at the root runs the C# suite and every JS suite: one line per suite plus only the failures; full log in `SA.Tests/test-all.log`. Close the viewer first (it locks the build output). Details: `docs/testing.md`. Real Civil 3D test sets: `tests-civil3d/`, see `docs/civil3d-testing.md`.
+
+## Status
+
+- Last finished: round 5c (token housekeeping). History: `docs/history.md`.
+- Next: `prompt-6.md` (MCP: Claude Code / Desktop drive the web through proposals the user accepts, drawing from sketches; Logic API gains basic drawing + applyBatch).
+- Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
+
+## Plan
+
+1. prompt-6: MCP server so Claude can read / edit the spec, compile and run scenarios.
+2. Later: public web (accounts, sandboxed C# compile, user-supplied AI key, Chat / Code modes). Keep **core** (spec, evaluator, CodeGenerator, shim, pages) separate from **host** (localhost, local files, local compile). One repo for now.
+3. SAC-style flowchart comes with the public web and must edit the same data as the current logic (`docs/prompts/prompt-flowchart-later.md`).
+
+Full roadmap: Trello board "SA Drawing Studio".

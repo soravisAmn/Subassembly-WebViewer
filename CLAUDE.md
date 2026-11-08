@@ -30,6 +30,7 @@
 - ทุก milestone: รัน test ทั้งหมด (ด้านล่าง), อัปเดต README, บอกผู้ใช้ว่าต้องเปิด `run-viewer.bat` ใหม่หรือแค่ Ctrl+F5
 - shortcut ใหม่ต้องอยู่ในตาราง `?` และไม่ชนของเดิม; ตัวเลือกระหว่างคำสั่งชนะ shortcut ทั่วไป
 - ห้ามเพิ่ม API ปลอมใน shim ที่ Civil 3D จริงไม่มี (อ้างอิง: `link-API-Reference.txt`) — link ใน Civil 3D เป็นเส้นตรงเท่านั้น
+- ฟีเจอร์ที่เปลี่ยนข้อมูลใน spec (จุด / เส้น / shape / parameter / เงื่อนไข / variable / Array ฯลฯ) ต้องทำเป็นฟังก์ชันใน Logic API (`js/logicops.js`) ก่อน แล้วให้ UI เรียกใช้ — ห้าม UI แก้ spec ตรงๆ · อัปเดต README หัวข้อ Logic API ทุกครั้งที่เพิ่ม (ฟีเจอร์หน้าจอล้วนๆ เช่น ขนาดแถบ / สี / ซูม ไม่ต้อง)
 
 ## ทดสอบ
 - `dotnet run --project SA.Tests` (รวมเทียบผล JS กับ C# ที่สร้าง ต้องมี `node`)
@@ -105,8 +106,12 @@
     + ข้อ 9 ปัดเศษ N (`loop.nRound` · round .5 ออกจากศูนย์) + ข้อ 10 ℹ / ⚠ (ℹ เว็บเท่านั้น · รายการที่อื่นที่ใช้ค่าแทน = เสนอไว้ในไฟล์นั้น ยังไม่แก้)):
     M0 เสร็จ (2026-11-08) · M1 เสร็จ (2026-11-08): `floor / ceil / round` (JS + C#) · `arrays[].loop` evaluate (`loopN` · ชุดที่ k off เมื่อ k ≥ N) + C# (`LoopN` / `N_A1 > k` gate · DrawingSpec.Arrays)
       Logic `updateArray` (n / nMax / nRound) / `setArrayLoop` / `removeArray` · หน้าต่าง Array ติ๊ก Loop + Properties + ตัวอย่างสด · Messages ℹ / ×n / คลิก = เลือก Array
-      (test: `loop.test.js`, drawing-cases 96–104 เทียบข้อความเตือน loopMsgs) — ถัดไป M2 `i` + `lastOf` + `count()`
-  ถัดไป: รอบ 5b M2–M4 → prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+      (test: `loop.test.js`, drawing-cases 96–104 เทียบข้อความเตือน loopMsgs)
+    M2 เสร็จ (2026-11-08): ตัวนับ `i` ใน dx / dy (แทนเป็นตัวเลขตอนสร้าง / แก้สมาชิก `Spec.withI` · Expr `allowI` · `i` จองชื่อ),
+      จุด `lastOf` (= firstOf ของรายการ ชุดสุดท้าย → ต้นฉบับ · `refreshLastOf` หลัง build / rebuild · ไม่ขวาง rebuild · C# FirstOf) + Logic.addLastOf + ปุ่มใน Properties Array,
+      `count(A1)` (JS ctx.count · C# `ExprScope.ArrayCount` → N_A1 / ตัวเลข · TopoOrder `LoopDeps`), branchRisks อ้างชุดที่ 2.. ของ Loop (branch "A1#k") + ⚠ ใน Properties ของ object ที่เกิดเสมอด้วย
+      (test: `loop.test.js` 12, drawing-cases 105–108) — ถัดไป M3 UI (โหนด Arrays, ป้าย ×N, scenario, toText)
+  ถัดไป: รอบ 5b M3–M4 → prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

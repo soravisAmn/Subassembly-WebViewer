@@ -19,7 +19,8 @@ public sealed class ExprScope
     public ISet<string>? Conds { get; init; }             // ชื่อเงื่อนไข (จริง/เท็จ)
     public ISet<string>? Nullable { get; init; }          // variable ที่ไม่รู้ค่าได้ (double?) -> VN(ชื่อ) โยนเมื่อไม่รู้ค่า (รอบ 5)
     public ISet<string>? Targets { get; init; }           // null = ไม่ตรวจชื่อ target
-    public Func<string?, string>? Surface { get; init; }  // ชื่อ target (null = TargetSurface) -> ตัวแปร ObjectId
+    public Func<string?, string>? Surface { get; init; }
+    public Func<string, string?>? ArrayCount { get; init; } // count(A1) -> นิพจน์ C# ของจำนวนชุด (null = ไม่มี Array นี้) (รอบ 5b)  // ชื่อ target (null = TargetSurface) -> ตัวแปร ObjectId
 }
 
 public static class SpecExpr
@@ -30,7 +31,7 @@ public static class SpecExpr
     {
         ["min"] = (1, 99), ["max"] = (1, 99), ["abs"] = (1, 1), ["sqrt"] = (1, 1), ["pow"] = (2, 2),
         ["sin"] = (1, 1), ["cos"] = (1, 1), ["tan"] = (1, 1), ["atan"] = (1, 1),
-        ["floor"] = (1, 1), ["ceil"] = (1, 1), ["round"] = (1, 1),     // รอบ 5b · round = .5 ออกจากศูนย์ (= JS roundAway)
+        ["floor"] = (1, 1), ["ceil"] = (1, 1), ["round"] = (1, 1), ["count"] = (1, 1),   // count(A1) = จำนวนชุดของ Array (รอบ 5b)     // รอบ 5b · round = .5 ออกจากศูนย์ (= JS roundAway)
         ["if"] = (3, 3), ["ground"] = (1, 2), ["exists"] = (1, 1), ["hasground"] = (0, 1)
     };
     public static readonly HashSet<string> Keywords = new(StringComparer.OrdinalIgnoreCase) { "and", "or", "not", "true", "false" };
@@ -78,6 +79,14 @@ public static class SpecExpr
     {
         if (string.IsNullOrWhiteSpace(src)) return new HashSet<string>();
         try { return Walk(Parse(src)).OfType<PtRef>().Select(p => p.Id).ToHashSet(); }
+        catch (FormatException) { return new HashSet<string>(); }
+    }
+
+    // Array ที่ count() อ้าง — ใช้เรียงลำดับ (N ต้องคำนวณก่อน)
+    public static ISet<string> ArrayRefs(string? src)
+    {
+        if (string.IsNullOrWhiteSpace(src)) return new HashSet<string>();
+        try { return Walk(Parse(src)).OfType<Call>().Where(c => c.F == "count" && c.Args.Count > 0 && c.Args[0] is Str).Select(c => ((Str)c.Args[0]).V).ToHashSet(); }
         catch (FormatException) { return new HashSet<string>(); }
     }
 
@@ -205,6 +214,11 @@ public static class SpecExpr
                         if (args[0] is not Var v) throw Err(args[0].At, $"{x.V}() ต้องใส่ชื่อจุด เช่น {x.V}(P3)");
                         args[0] = new PtRef(v.Name, "", v.At);
                     }
+                    if (low == "count")
+                    {
+                        if (args[0] is not Var v) throw Err(args[0].At, "count() ต้องใส่ชื่อ Array เช่น count(A1)");
+                        args[0] = new Str(v.Name, v.At);
+                    }
                     return new Call(low, args, x.At);
                 }
                 return new Var(x.V, x.At);
@@ -290,6 +304,12 @@ public static class SpecExpr
             case Call c:
             {
                 var A = c.Args;
+                if (c.F == "count")
+                {
+                    string id = ((Str)A[0]).V;
+                    if (sc.ArrayCount == null || sc.ArrayCount(id) == null) throw Err(A[0].At, $"ไม่มี Array {id}");
+                    return "num";
+                }
                 if (c.F == "if")
                 {
                     Need(A[0], "bool", "ค่าแรกของ if()");
@@ -360,6 +380,7 @@ public static class SpecExpr
                     case "ground": return $"Ground(cs, {Surf(T(1))}, {Pt(((PtRef)A[0]).Id)})";
                     case "exists": return $"Exists({Pt(((PtRef)A[0]).Id)})";
                     case "hasground": return Wrap($"!{Surf(T(0))}.IsNull", 2, need);
+                    case "count": return sc.ArrayCount!(((Str)A[0]).V)!;
                 }
                 var a = A.Select(x => E(x, 0)).ToList();
                 return c.F switch

@@ -128,5 +128,58 @@ test("แสดงทุกกรณี (allBranches) = ทุกชุดเก
   ok(g.members.every(m => on(r, m.points[0])), "ทุกชุดเกิดในโหมดแสดงทุกกรณี");
 });
 
+console.log("\ni / lastOf / count() (รอบ 5b M2)");
+
+test("i ใน dx / dy: ชุดที่ k แทน i = k (ต้นฉบับ 0) · แก้ dx ทีหลังก็แทนใหม่ · i ที่อื่น = error", () => {
+  const { s, g } = stairs(undefined, { n: 4 });
+  good(Logic.updateArray(s, "A1", { dx: "1 + 0.5 * i" }));
+  eq(["1 + 0.5 * (1)", "1 + 0.5 * (2)", "1 + 0.5 * (3)"], g.members.map(m => Spec.byId(s.points, m.points[0]).def.dx), "dx ของสมาชิก");
+  const r = run(s); eq([2, 3.5, 5.5, 8], [0, 1, 2, 3].map(k => +r.pts[setPt(g, k)].x.toFixed(6)), "x ของจุดล่างแต่ละชุด");
+  ok(Expr.check("i * 2", [], { allowI: true }).ok && /เฉพาะใน dx/.test(Expr.check("i * 2", []).error), "i นอก dx / dy");
+  bad(s, () => Logic.addCondition(s, { name: "Q", expr: "i > 1" }), /เฉพาะใน dx/, "i ในเงื่อนไข");
+  ok(/ตั้งชื่อ i ไม่ได้/.test(Logic.nameError(s, "i") || ""), "ชื่อ i จองไว้");
+  const s2 = stairs({ n: "Height / Step", nMax: 4 }, { dy: "-1 - i" }).s;
+  eq(["-1 - (1)", "-1 - (2)", "-1 - (3)"], s2.arrays[0].members.map(m => Spec.byId(s2.points, m.points[0]).def.dy), "สร้างพร้อม i");
+});
+
+test("lastOf: จุดของชุดสุดท้ายที่เกิด (join share ไล่ถูก) · ต่อ link จริงได้ · ตามจำนวนชุดเมื่อแก้ nMax", () => {
+  const { s, g } = stairs({ n: "Height / Step", nMax: 4 });
+  const toe = g.source.points[1], top = g.source.points[0];
+  const r1 = good(Logic.addLastOf(s, "A1", toe)), L = r1.result;
+  const p = Spec.byId(s.points, L); ok(Spec.isAux(p) && Spec.isAlias(s, L), "aux = ปลายจริง");
+  eq([setPt(g, 3), setPt(g, 2), setPt(g, 1), toe], p.def.points, "รายการ ชุดสุดท้าย → ต้นฉบับ");
+  const T = good(Logic.addLastOf(s, "A1", top)).result;
+  eq([setPt(g, 2), setPt(g, 1), toe, top], Spec.byId(s.points, T).def.points, "top ของชุด k = toe ของชุด k−1 (จุดร่วม)");
+  const end = Spec.addPoint(s, { type: "delta", from: L, dx: "3", dy: "0" }, ["End"]); Spec.addLink(s, L, end, { points: [L, end] });
+  for (const [H, n] of [[3, 1], [7, 2], [30, 4]]){
+    const r = run(s, { Height: H });
+    eq(r.pts[setPt(g, n - 1)].x, r.pts[L].x, `lastOf = ชุดที่ ${n} (Height ${H})`); eq(r.pts[L].x + 3, r.pts[end].x, "จุดหลัง Array");
+  }
+  eq([], Spec.branchRisks(s), "อ้าง lastOf ไม่ใช่ความเสี่ยง");
+  good(Logic.updateArray(s, "A1", { nMax: 6 })); eq(6, Spec.byId(s.points, L).def.points.length, "nMax 6 = รายการยาวขึ้น (lastOf ไม่ขวาง rebuild)");
+  bad(s, () => Logic.addLastOf(s, "A1", "P1"), /ไม่ใช่จุดของชุดต้นฉบับ/, "จุดนอกชุด");
+  bad(s, () => Logic.addLastOf(s, "A9", toe), /ไม่มี Array/, "ไม่มี Array");
+});
+
+test("count(A1): Loop = N ตอนนี้ · Array คงที่ = n · ไม่มี Array = error · i / ชื่อผิด", () => {
+  const { s } = stairs({ n: "Height / Step", nMax: 5 });
+  const c = good(Logic.addCondition(s, { name: "Many", expr: "count(A1) >= 3" }));
+  const q = Spec.addPoint(s, { type: "delta", from: "P1", dx: "count(A1)", dy: "-5" }, ["Cnt"]);
+  for (const [H, n] of [[3, 1], [9, 3], [99, 5]]){ const r = run(s, { Height: H }); eq(n, r.pts[q].x, `count ที่ Height ${H}`); eq(n >= 3, r.logic.conds.Many, "เงื่อนไข"); }
+  const old = stairs(undefined, { n: 4 }).s; const q2 = Spec.addPoint(old, { type: "delta", from: "P1", dx: "count(A1) * 2", dy: "0" }, []);
+  eq(8, run(old).pts[q2].x, "Array คงที่");
+  bad(s, () => Logic.addCondition(s, { name: "X", expr: "count(A7) > 1" }), /ไม่มี Array A7/, "Array ไม่มี");
+  bad(s, () => Logic.addCondition(s, { name: "X", expr: "count(2) > 1" }), /ชื่อ Array/, "ไม่ใช่ชื่อ");
+});
+
+test("branchRisks: ของนอก Array อ้างจุดของชุดที่ 2.. ของ Loop = เตือน (ชุดอาจไม่เกิด) · Array คงที่ไม่เตือน", () => {
+  const { s, g } = stairs({ n: "Height / Step", nMax: 4 });
+  const m = setPt(g, 2), x = Spec.addPoint(s, { type: "delta", from: m, dx: "1", dy: "0" }, []);
+  const rk = Spec.branchRisks(s); eq([{ id: x, kind: "point", ref: m, branch: "A1#2" }], rk.map(o => ({ id: o.id, kind: o.kind, ref: o.ref, branch: o.branch })), "risk");
+  ok(/A1 ชุดที่ 3 .*lastOf/.test(Spec.branchLabel(s, "A1#2")), "ป้าย");
+  const old = stairs(undefined, { n: 4 }); Spec.addPoint(old.s, { type: "delta", from: setPt(old.g, 2), dx: "1", dy: "0" }, []);
+  eq([], Spec.branchRisks(old.s), "Array คงที่");
+});
+
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
 process.exitCode = failed ? 1 : 0;

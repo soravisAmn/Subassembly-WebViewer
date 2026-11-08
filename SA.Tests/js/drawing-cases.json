@@ -4356,5 +4356,573 @@
       "Side": 1
     },
     "copySpecFrom": 103
+  },
+  {
+    "name": "Loop i + lastOf + count(): dx = 1 + 0.5 i · Height 7 → 2 ชุด · link จริงจากปลายจริง",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "LoopLast",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "Height",
+          "kind": "double",
+          "default": 7,
+          "displayName": "Height",
+          "min": null,
+          "max": null
+        },
+        {
+          "name": "Step",
+          "kind": "double",
+          "default": 3,
+          "displayName": "Step",
+          "min": null,
+          "max": null
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "Top"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "2",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "0",
+            "dy": "-1"
+          }
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P3",
+            "dx": "1 + 0.5 * (1)",
+            "dy": "-1"
+          }
+        },
+        {
+          "id": "P5",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P4",
+            "dx": "1 + 0.5 * (2)",
+            "dy": "-1"
+          }
+        },
+        {
+          "id": "P6",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P5",
+            "dx": "1 + 0.5 * (3)",
+            "dy": "-1"
+          }
+        },
+        {
+          "id": "P7",
+          "codes": [
+            "Toe"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P6",
+            "dx": "1 + 0.5 * (4)",
+            "dy": "-1"
+          }
+        },
+        {
+          "id": "P8",
+          "codes": [],
+          "def": {
+            "type": "lastOf",
+            "array": "A1",
+            "point": "P3",
+            "points": [
+              "P7",
+              "P6",
+              "P5",
+              "P4",
+              "P3"
+            ]
+          },
+          "auxiliary": true
+        },
+        {
+          "id": "P9",
+          "codes": [
+            "End"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P8",
+            "dx": "3",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P10",
+          "codes": [
+            "Cnt"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "count(A1)",
+            "dy": "-8"
+          }
+        },
+        {
+          "id": "P11",
+          "codes": [
+            "ManyMark"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P9",
+            "dx": "0",
+            "dy": "1"
+          },
+          "branch": "B1"
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P1",
+            "P2"
+          ],
+          "codes": []
+        },
+        {
+          "id": "L2",
+          "points": [
+            "P2",
+            "P3"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        },
+        {
+          "id": "L3",
+          "points": [
+            "P3",
+            "P4"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        },
+        {
+          "id": "L4",
+          "points": [
+            "P4",
+            "P5"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        },
+        {
+          "id": "L5",
+          "points": [
+            "P5",
+            "P6"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        },
+        {
+          "id": "L6",
+          "points": [
+            "P6",
+            "P7"
+          ],
+          "codes": [
+            "Riser"
+          ]
+        },
+        {
+          "id": "L7",
+          "points": [
+            "P8",
+            "P9"
+          ],
+          "codes": [
+            "Bench"
+          ]
+        }
+      ],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "arrays": [
+        {
+          "id": "A1",
+          "source": {
+            "points": [
+              "P2",
+              "P3"
+            ],
+            "links": [
+              "L2"
+            ],
+            "shapes": []
+          },
+          "n": 5,
+          "dx": "1 + 0.5 * i",
+          "dy": "-1",
+          "join": {
+            "mode": "share",
+            "from": "P3",
+            "to": "P2"
+          },
+          "members": [
+            {
+              "points": [
+                "P4"
+              ],
+              "links": [
+                "L3"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P5"
+              ],
+              "links": [
+                "L4"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P6"
+              ],
+              "links": [
+                "L5"
+              ],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P7"
+              ],
+              "links": [
+                "L6"
+              ],
+              "shapes": []
+            }
+          ],
+          "loop": {
+            "n": "Height / Step",
+            "nMax": 5
+          }
+        }
+      ],
+      "logic": {
+        "conditions": [
+          {
+            "id": "C1",
+            "name": "Many",
+            "expr": "count(A1) >= 3"
+          }
+        ],
+        "decisions": [
+          {
+            "id": "D1",
+            "parent": null,
+            "kind": "if",
+            "test": "Many",
+            "label": "Many"
+          }
+        ],
+        "branches": [
+          {
+            "id": "B1",
+            "decision": "D1",
+            "case": true,
+            "label": "Many"
+          },
+          {
+            "id": "B2",
+            "decision": "D1",
+            "case": false,
+            "label": "ไม่ Many"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "Loop i + lastOf + count(): Height 12 → 4 ชุด (Many จริง) · Left",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "values": {
+      "Height": 12,
+      "Side": 1
+    },
+    "copySpecFrom": 105
+  },
+  {
+    "name": "Loop i + lastOf + count(): Height 1 → 0 ใช้ 1 ชุด · lastOf = ต้นฉบับ · Layout",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "values": {
+      "Height": 1
+    },
+    "layout": true,
+    "copySpecFrom": 105
+  },
+  {
+    "name": "Array คงที่ 4 ชุด: dy = -0.25 i² + lastOf + count(A1) = 4",
+    "surface": [
+      {
+        "x": -30,
+        "y": -10
+      },
+      {
+        "x": 30,
+        "y": -10
+      }
+    ],
+    "spec": {
+      "version": 1,
+      "className": "ArrayI",
+      "namespace": "TestSubassembly",
+      "params": [
+        {
+          "name": "Side",
+          "kind": "long",
+          "default": 0,
+          "displayName": "Side",
+          "min": null,
+          "max": null
+        }
+      ],
+      "targets": [
+        {
+          "name": "TargetSurface",
+          "type": "Surface",
+          "displayName": "Target Surface"
+        }
+      ],
+      "points": [
+        {
+          "id": "P1",
+          "codes": [],
+          "def": {
+            "type": "origin"
+          }
+        },
+        {
+          "id": "P2",
+          "codes": [
+            "S"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P1",
+            "dx": "1",
+            "dy": "0"
+          }
+        },
+        {
+          "id": "P3",
+          "codes": [
+            "S"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P2",
+            "dx": "1",
+            "dy": "-0.25 * (1) * (1)"
+          }
+        },
+        {
+          "id": "P4",
+          "codes": [
+            "S"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P3",
+            "dx": "1",
+            "dy": "-0.25 * (2) * (2)"
+          }
+        },
+        {
+          "id": "P5",
+          "codes": [
+            "S"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P4",
+            "dx": "1",
+            "dy": "-0.25 * (3) * (3)"
+          }
+        },
+        {
+          "id": "P6",
+          "codes": [],
+          "def": {
+            "type": "lastOf",
+            "array": "A1",
+            "point": "P2",
+            "points": [
+              "P5",
+              "P4",
+              "P3",
+              "P2"
+            ]
+          },
+          "auxiliary": true
+        },
+        {
+          "id": "P7",
+          "codes": [
+            "Tail"
+          ],
+          "def": {
+            "type": "delta",
+            "from": "P6",
+            "dx": "count(A1)",
+            "dy": "0"
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "L1",
+          "points": [
+            "P1",
+            "P2"
+          ],
+          "codes": []
+        }
+      ],
+      "shapes": [],
+      "side": {
+        "param": "Side",
+        "mirror": true
+      },
+      "arrays": [
+        {
+          "id": "A1",
+          "source": {
+            "points": [
+              "P2"
+            ],
+            "links": [],
+            "shapes": []
+          },
+          "n": 4,
+          "dx": "1",
+          "dy": "-0.25 * i * i",
+          "join": null,
+          "members": [
+            {
+              "points": [
+                "P3"
+              ],
+              "links": [],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P4"
+              ],
+              "links": [],
+              "shapes": []
+            },
+            {
+              "points": [
+                "P5"
+              ],
+              "links": [],
+              "shapes": []
+            }
+          ]
+        }
+      ]
+    }
   }
 ]

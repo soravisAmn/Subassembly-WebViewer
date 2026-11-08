@@ -15,7 +15,7 @@ const Expr = (() => {
   const FUNCS = {
     min:  { min: 1, max: 99 }, max: { min: 1, max: 99 }, abs: { min: 1, max: 1 }, sqrt: { min: 1, max: 1 },
     pow:  { min: 2, max: 2 },  sin: { min: 1, max: 1 },  cos: { min: 1, max: 1 }, tan: { min: 1, max: 1 }, atan: { min: 1, max: 1 },
-    floor: { min: 1, max: 1 }, ceil: { min: 1, max: 1 }, round: { min: 1, max: 1 },   // รอบ 5b · round = ปัดออกจากศูนย์ที่ .5 (= C# AwayFromZero)
+    floor: { min: 1, max: 1 }, ceil: { min: 1, max: 1 }, round: { min: 1, max: 1 }, count: { min: 1, max: 1 },   // count(A1) = จำนวนชุดของ Array   // รอบ 5b · round = ปัดออกจากศูนย์ที่ .5 (= C# AwayFromZero)
     if: { min: 3, max: 3 }, ground: { min: 1, max: 2 }, exists: { min: 1, max: 1 }, hasground: { min: 0, max: 1 }
   };
   // คำสงวน (ตั้งเป็นชื่อ parameter / เงื่อนไขไม่ได้ — ไม่สนตัวพิมพ์)
@@ -131,6 +131,11 @@ const Expr = (() => {
             if (args[0].t !== "var") fail(args[0].at, `${x.v}() ต้องใส่ชื่อจุด เช่น ${x.v}(P3)`);
             args[0] = { t: "ref", id: args[0].n, at: args[0].at };
           }
+          // count(A1): ค่าแรกเป็นชื่อ Array
+          if (low === "count"){
+            if (args[0].t !== "var") fail(args[0].at, "count() ต้องใส่ชื่อ Array เช่น count(A1)");
+            args[0] = { t: "aref", id: args[0].n, at: args[0].at };
+          }
           return { t: "call", f: low, args, at: x.at };
         }
         return { t: "var", n: x.v, at: x.at };
@@ -181,6 +186,7 @@ const Expr = (() => {
       case "var":
         if (sc.conds && sc.conds.has(n.n)) return "bool";
         if (sc.params && sc.params.has(n.n)) return "num";
+        if (n.n === "i"){ if (sc.allowI) return "num"; fail(n.at, "i (ลำดับชุด) ใช้ได้เฉพาะใน dx / dy ของ Array"); }
         if (sc.points && sc.points.has(n.n)) fail(n.at, `${n.n} เป็นจุด — ใช้ ${n.n}.x / ${n.n}.y / ground(${n.n}) / exists(${n.n})`);
         fail(n.at, `ไม่มี parameter ชื่อ ${n.n}`);
       case "pt": point(n.id, n.at); return "num";
@@ -215,6 +221,7 @@ const Expr = (() => {
           return n.f === "ground" ? "num" : "bool";
         }
         if (n.f === "hasground"){ if (A[0]) target(A[0]); return "bool"; }
+        if (n.f === "count"){ if (sc.arrays && !sc.arrays.has(A[0].id)) fail(A[0].at, `ไม่มี Array ${A[0].id}`); return "num"; }
         A.forEach((x, i) => need(x, "num", `ค่าที่ ${i + 1} ของ ${n.f}()`));
         return "num";
       }
@@ -269,6 +276,7 @@ const Expr = (() => {
           case "ground": return need("ground")(A[0].id, A[1] ? A[1].v : null);
           case "exists": return need("exists")(A[0].id);
           case "hasground": return need("hasGround")(A[0] ? A[0].v : null);
+          case "count": return need("count")(A[0].id);
         }
         const v = A.map(ev);
         switch (ast.f){
@@ -298,7 +306,8 @@ const Expr = (() => {
     try{ ast = parse(src); }catch(e){ return { ok: false, error: e.message }; }
     try{
       const sc = { params: new Set(names || []), points: opts.points ? new Set(opts.points) : null,
-                   conds: opts.conds ? new Set(opts.conds) : null, targets: opts.targets ? new Set(opts.targets) : null };
+                   conds: opts.conds ? new Set(opts.conds) : null, targets: opts.targets ? new Set(opts.targets) : null,
+                   arrays: opts.arrays ? new Set(opts.arrays) : null, allowI: !!opts.allowI };   // allowI: ช่อง dx / dy ของ Array (รอบ 5b)
       const type = typeOf(ast, sc), want = opts.want || "num";
       if (type !== want) return { ok: false, error: `ช่องนี้ต้องเป็น${TYPE_TH[want]} แต่นิพจน์นี้ให้${TYPE_TH[type] || type}`, ast, type };
       return { ok: true, ast, type };

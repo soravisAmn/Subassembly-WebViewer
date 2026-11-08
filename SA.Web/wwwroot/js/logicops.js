@@ -8,7 +8,7 @@ const Logic = (() => {
   // ชื่อที่โค้ด C# ที่สร้างใช้เอง (ตรงกับ CodeGenerator.Reserved) — ตั้งเป็นชื่อ parameter / เงื่อนไข / variable ไม่ได้
   const RESERVED = new Set(("cs F Deg Pt Measure Source surface Math Point Link Shape ObjectId " +
     "Seg Arc Delta Polar SlopeLength SlopeToSurface OnSurface Between Intersect Offset ExtendToGround Opt FollowClipped Tangent Rotate Arc3 ArcR Fillet Join AddPoint AddLink AddShape " +
-    "FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V VN FirstOf Severe abstract as base bool break byte case catch char checked class const continue " +
+    "i FollowSurface Check Warn TargetSurface GetLong GetDouble Elevation Ground Exists PX PY Eq Try Cond Val V VN FirstOf Severe abstract as base bool break byte case catch char checked class const continue " +
     "decimal default delegate do double else enum event explicit extern false finally fixed float for foreach goto if implicit in int interface internal " +
     "is lock long namespace new null object operator out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc " +
     "static string struct switch this throw true try typeof uint ulong unchecked unsafe ushort using virtual void volatile while var").split(" "));
@@ -51,7 +51,7 @@ const Logic = (() => {
   function checkExpr(spec, src, want, opts, what){
     const s = String(src ?? "").trim();
     if (!s) fail(`${what || "นิพจน์"}: ว่าง`);
-    const r = Expr.check(s, Spec.names(spec, (opts || {}).codeParams), { ...Spec.exprOpts(spec), want });
+    const r = Expr.check(s, Spec.names(spec, (opts || {}).codeParams), { ...Spec.exprOpts(spec), want, allowI: what && /^A\d+ d[xy]$/.test(what) });
     if (!r.ok) fail(`${what || "นิพจน์"}: ${r.error}`);
     return s;
   }
@@ -425,6 +425,8 @@ const Logic = (() => {
   const addExtendToGround = wrap((s, id, end, o) => Spec.addExtendToGround(s, id, end, o));
   const addFollowClipped = wrap((s, from, to, o) => Spec.addFollowClipped(s, from, to, o));
   const addArray = wrap((s, sel, o) => Spec.addArray(s, sel, o));
+  // จุด "ชุดสุดท้าย" (lastOf · รอบ 5b) ของจุด pointId ในชุดต้นฉบับของ Array — คืน { result: id ใหม่ }
+  const addLastOf = wrap((s, arrayId, pointId, o) => Spec.addLastOf(s, arrayId, pointId, o));
   const needArr = (s, id) => byId(s.arrays, id) || fail(`ไม่มี Array ${id}`);
   // สร้างสมาชิกใหม่ (n / nMax / Loop เปิด-ปิด) — มีของนอก Array อ้างสมาชิกอยู่ = ไม่ยอม (บอกรายการ)
   const rebuild = (s, g, o) => { const r = Spec.rebuildArray(s, g, o); if (r.error) fail(r.error); if (r.block && r.block.length) fail(`เปลี่ยนจำนวนชุดของ ${g.id} ไม่ได้ — มีของนอก Array อ้างสมาชิกอยู่: ${r.block.join(", ")}`); return r; };
@@ -602,7 +604,7 @@ const Logic = (() => {
            addDecision, editDecision, removeDecision, moveDecision,
            addCase, editCase, removeCase, moveCase, renameBranch, setBranch,
            addVariable, editVariable, renameVariable, removeVariable, moveVariable, variableUses, VAR_ERRORS, guessError,
-           addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setArrayLoop, removeArray, setParamBounds, setParamUnit,
+           addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setArrayLoop, removeArray, addLastOf, setParamBounds, setParamUnit,
            describe };
 })();
 if (typeof module !== "undefined") module.exports = { Logic };

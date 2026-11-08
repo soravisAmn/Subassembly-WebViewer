@@ -236,7 +236,14 @@ link ใน Civil 3D เป็น**เส้นตรงเท่านั้น
 - C#: `int N_A1 = LoopN(cs, "A1", () => Height / BermInterval, 10, 0);` ครั้งเดียว แล้วทุกบรรทัดของชุด k = `N_A1 > k ? … : null` (shape = `if (N_A1 > k) AddShape…`)
   → Points / Links / Shapes ใน Civil 3D มีเฉพาะชุดที่เกิด · ไฟล์ที่ไม่มี Loop ได้โค้ดเหมือนเดิมทุกตัวอักษร
 - spec: `arrays[].loop = { n: "นิพจน์", nMax: 10, nRound?: "floor" | "ceil" | "round" }` (ไม่มี = Array N คงที่แบบเดิม) · Logic API: `addArray(…, { loop })` / `updateArray(spec, id, { n, nMax, nRound, dx, dy })` / `setArrayLoop(spec, id, loop | null)` / `removeArray`
-- ยังไม่มี (M2–M3 รอบ 5b): ตัวนับ `i` ใน dx / dy, `lastOf`, `count(A1)`, โหนด Arrays ในต้นไม้
+- **ตัวนับ `i`** (เฉพาะช่อง dx / dy ของ Array): ลำดับของชุดที่กำลังวาง — ต้นฉบับ 0, ชุดถัดไป 1, 2, … เช่น `dx = 1 + 0.5 * i` = ขั้นกว้างขึ้นทีละ 0.5
+  (แทนเป็นตัวเลขในจุดของแต่ละชุด: `1 + 0.5 * (2)` · ใช้ `i` ที่อื่น = error · ตั้งชื่อ parameter ว่า `i` ไม่ได้)
+- **จุด "ชุดสุดท้าย" (`lastOf`)**: เลือกจุดของชุดต้นฉบับ → Properties "Array A1" → **สร้างจุด "ชุดสุดท้าย" ของ P3**
+  = จุด Auxiliary ที่อยู่ตรงจุดเดียวกันของชุดสุดท้ายที่เกิด (ไล่ ชุดสุดท้าย → … → ต้นฉบับ แบบ firstOf) — **เป็นปลาย link จริงได้** ใช้ต่อของหลัง Array
+  (รายการตามจำนวนชุดเอง · แก้สูงสุดได้แม้มี lastOf อ้าง · C#: `FirstOf(cs, "P8", P7, P6, P5, P4, P3)`)
+- **`count(A1)`** ในนิพจน์ทุกช่อง = จำนวนชุดตอนนี้ (Loop = N หลังปัด / บีบ · Array คงที่ = n) เช่น เงื่อนไข `count(A1) >= 3` · C# = `N_A1` (หรือตัวเลข)
+- **อ้างจุดของชุดที่ 2 ขึ้นไปของ Loop จากนอก Array** = ⚠ ใน Properties "อ้าง P5 ของ A1 ชุดที่ 3 (Loop — อาจไม่เกิดถ้า N น้อย ใช้ lastOf)" (แบบอ้างจุดในกิ่ง) · Logic API `addLastOf(spec, "A1", "P3")` → `{ result: "P8" }`
+- ยังไม่มี (M3 รอบ 5b): โหนด Arrays ในต้นไม้ + ไอคอน ℹ / ⚠, ป้าย "A1 ×3", scenario N = 1 / สูงสุด, toText / diffText ของ Loop
 
 ### Extend to Surface (รอบ 4c)
 
@@ -789,7 +796,7 @@ Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่�
 | `node SA.Tests/js/variables.test.js` | Variables: rules ตัวแรกที่จริงชนะ + ข้อความเตือน, อ้างจุด / ผิวดิน (ไม่รู้ค่า), ใช้ใน slope / Offset / Array / เงื่อนไข, วนกัน, rename / ลบ / เรียง, bool = เงื่อนไข (รอบ 5) — JS = C# ใน drawing-cases 84–90 + RockPitchingTests (DepthUsed) |
 | `node SA.Tests/js/logictext.test.js` | มุมมองข้อความ: toText (if / elif / switch / ซ้อน 3 ชั้น / กิ่งว่าง / variable มี-ไม่มี rules / มี-ไม่มีค่าตอนนี้) · diffText (เพิ่ม / แก้ / เปลี่ยนชื่อ / ลบ / ย้าย / ไม่เปลี่ยน) (รอบ 5) |
 | `node SA.Tests/js/round5demo.test.js` | round5-demo สร้างด้วย Logic API ล้วน: โครง / ไม่มี branchRisks, ตัด / ถมปกติ / ถมสูง (ชานพัก) / Layout, switch 3 กิ่ง, DepthUsed เตือน, Left · spec = sa-spec ใน `tests-civil3d/round5-demo.cs` (รอบ 5) |
-| `node SA.Tests/js/loop.test.js` | Array แบบ Loop: floor / ceil / round (.5 / ค่าลบ), N = 1 / 2 / nMax, ⚠ เกิน / น้อยกว่า 1 / หาค่าไม่ได้, ℹ ปัดลงค่าเริ่ม, ปัดเศษ 3 แบบ, join link + shape + กิ่ง, แปลง Array ↔ Loop, แก้ nMax (ถูกขวางเมื่อมีของนอกอ้าง), removeArray, แสดงทุกกรณี (รอบ 5b) — JS = C# ใน drawing-cases 96–104 |
+| `node SA.Tests/js/loop.test.js` | Array แบบ Loop: floor / ceil / round (.5 / ค่าลบ), N = 1 / 2 / nMax, ⚠ เกิน / น้อยกว่า 1 / หาค่าไม่ได้, ℹ ปัดลงค่าเริ่ม, ปัดเศษ 3 แบบ, join link + shape + กิ่ง, แปลง Array ↔ Loop, แก้ nMax (ถูกขวางเมื่อมีของนอกอ้าง), removeArray, แสดงทุกกรณี (รอบ 5b) + ตัวนับ i, lastOf (join share / ตามสูงสุด), count(A1) (Loop / คงที่ / ชื่อผิด), เตือนอ้างชุดกลาง (M2) — JS = C# ใน drawing-cases 96–108 |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |

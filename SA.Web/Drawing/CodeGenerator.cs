@@ -221,7 +221,7 @@ public static class CodeGenerator
             {
                 Params = _names.Concat(_logic.Variables.Select(v => v.Name)).ToHashSet(), Points = s.Points.Select(p => p.Id).ToHashSet(), AllowMissingPoints = true,
                 Conds = _logic.Conditions.Select(c => c.Name).ToHashSet(), Nullable = _runtimeVars,
-                Targets = s.Imported ? null : s.Targets.Select(t => t.Name).ToHashSet(), Surface = SurfVar
+                Targets = s.Imported ? null : s.Targets.Select(t => t.Name).ToHashSet(), Surface = SurfVar, ArrayCount = ArrayCountCs
             };
             foreach (var p in s.Params)
                 if (IsReservedName(p.Name)) throw new FormatException($"ตั้งชื่อ parameter ว่า {p.Name} ไม่ได้ (ชื่อนี้โค้ดใช้เอง)");
@@ -492,7 +492,7 @@ public static class CodeGenerator
 
         private bool Exists(string id) => _s.Points.Any(p => p.Id == id);
         // ปลายจริง = จุด firstOf ที่เป็น auxiliary (ตรงกับ isAlias / auxEnd ใน spec.js)
-        private bool IsAlias(string id) => _s.Points.FirstOrDefault(p => p.Id == id) is { Auxiliary: true } p && p.Def.Type == "firstOf";
+        private bool IsAlias(string id) => _s.Points.FirstOrDefault(p => p.Id == id) is { Auxiliary: true } p && p.Def.Type is "firstOf" or "lastOf";
         private string? AuxEnd(string id) => AuxEnd(id, new HashSet<string>());
         private string? AuxEnd(string id, HashSet<string> seen)
         {
@@ -543,6 +543,7 @@ public static class CodeGenerator
                                      $"{id} ต่อเส้น {d.Along}→{d.From} ลงถึงดิน (ไม่ลอย / ไม่มีดิน = ไม่เกิด)"),
                 "tangent" => ($"Tangent(cs, {Q}, {From(d.Corner)}, {From(d.Toward)}, {From(d.Other)}, {Ex(d.Radius, "radius")})", $"{id} จุดสัมผัสของ Fillet ที่มุม {d.Corner}"),
                 "firstOf" => ($"FirstOf(cs, {Q}{string.Concat((d.Points ?? new()).Select(x => ", " + From(x)))})", $"{id} จุดแรกที่เกิดใน {string.Join(", ", d.Points ?? new())}"),
+                "lastOf" => ($"FirstOf(cs, {Q}{string.Concat((d.Points ?? new()).Select(x => ", " + From(x)))})", $"{id} จุด {d.Point} ของชุดสุดท้ายของ {d.Array} (ไล่ {string.Join(", ", d.Points ?? new())})"),
                 "external" => throw new FormatException($"{id}: จุดจากโค้ดเดิม (external) ใช้ได้กับไฟล์ที่เขียนเองเท่านั้น — รองรับใน Milestone 4"),
                 _ => throw new FormatException($"{id}: ไม่รู้จักชนิดจุด {d.Type}")
             };
@@ -602,7 +603,7 @@ public static class CodeGenerator
                 if (done.Contains(key)) return true;
                 if (state.GetValueOrDefault(key) == 1) return false;
                 state[key] = 1;
-                bool ok = SpecExpr.PointRefs(c.Expr).All(r => NeedPt(r, null)) & CondDeps(c.Expr).All(VisitCond) & VarDeps(c.Expr).All(VisitVar);
+                bool ok = SpecExpr.PointRefs(c.Expr).All(r => NeedPt(r, null)) & CondDeps(c.Expr).All(VisitCond) & VarDeps(c.Expr).All(VisitVar) & LoopDeps(c.Expr).All(VisitLoop);
                 state[key] = 2;
                 if (ok) { done.Add(key); order.Add(c); } else if (!cyc.Contains(key)) cyc.Add(key);
                 return ok;
@@ -615,7 +616,7 @@ public static class CodeGenerator
                 if (state.GetValueOrDefault(key) == 1) return false;
                 state[key] = 1;
                 bool ok = true;
-                foreach (var e in v.Exprs()) ok &= SpecExpr.PointRefs(e).All(r => NeedPt(r, null)) & CondDeps(e).All(VisitCond) & VarDeps(e).All(VisitVar);
+                foreach (var e in v.Exprs()) ok &= SpecExpr.PointRefs(e).All(r => NeedPt(r, null)) & CondDeps(e).All(VisitCond) & VarDeps(e).All(VisitVar) & LoopDeps(e).All(VisitLoop);
                 state[key] = 2;
                 if (ok) { done.Add(key); order.Add(v); } else if (!cyc.Contains(key)) cyc.Add(key);
                 return ok;
@@ -627,7 +628,7 @@ public static class CodeGenerator
                 if (done.Contains(key)) return true;
                 if (state.GetValueOrDefault(key) == 1) return false;
                 state[key] = 1;
-                bool ok = SpecExpr.PointRefs(d.Test).All(r => NeedPt(r, null)) & CondDeps(d.Test).All(VisitCond) & VarDeps(d.Test).All(VisitVar);
+                bool ok = SpecExpr.PointRefs(d.Test).All(r => NeedPt(r, null)) & CondDeps(d.Test).All(VisitCond) & VarDeps(d.Test).All(VisitVar) & LoopDeps(d.Test).All(VisitLoop);
                 if (d.Parent != null && DecOf(d.Parent) is { } pd && !VisitDec(pd)) ok = false;
                 state[key] = 2;
                 if (ok) { done.Add(key); order.Add(d); } else if (!cyc.Contains(key)) cyc.Add(key);
@@ -642,7 +643,7 @@ public static class CodeGenerator
                 if (state.GetValueOrDefault(key) == 1) return false;
                 state[key] = 1;
                 string? e = g.Loop!.N;
-                bool ok = SpecExpr.PointRefs(e).All(r => NeedPt(r, null)) & CondDeps(e).All(VisitCond) & VarDeps(e).All(VisitVar);
+                bool ok = SpecExpr.PointRefs(e).All(r => NeedPt(r, null)) & CondDeps(e).All(VisitCond) & VarDeps(e).All(VisitVar) & LoopDeps(e).All(VisitLoop);
                 state[key] = 2;
                 if (ok) { done.Add(key); order.Add(g); } else if (!cyc.Contains(key)) cyc.Add(key);
                 return ok;
@@ -671,7 +672,7 @@ public static class CodeGenerator
                 if (state.GetValueOrDefault(p.Id) == 1) return false;
                 state[p.Id] = 1;
                 // อ้างสมาชิกกลุ่มหมุนแบบเห็นค่าที่หมุนแล้ว = ต้องอยู่หลังบรรทัดหมุนของกลุ่มนั้น (NeedPt) · อยู่ในกิ่ง = หลังบรรทัดกิ่ง
-                bool ok = p.Def.Refs().All(r => NeedPt(r, p.Id)) & VisitBranch(p.Branch) & VisitLoopOf(p.Id) & p.Def.Exprs().SelectMany(CondDeps).All(VisitCond) & p.Def.Exprs().SelectMany(VarDeps).All(VisitVar);
+                bool ok = p.Def.Refs().All(r => NeedPt(r, p.Id)) & VisitBranch(p.Branch) & VisitLoopOf(p.Id) & p.Def.Exprs().SelectMany(CondDeps).All(VisitCond) & p.Def.Exprs().SelectMany(VarDeps).All(VisitVar) & p.Def.Exprs().SelectMany(LoopDeps).All(VisitLoop);
                 state[p.Id] = 2;
                 if (ok) { done.Add(p.Id); order.Add(p); } else if (!cyc.Contains(p.Id)) cyc.Add(p.Id);
                 return ok;
@@ -718,6 +719,12 @@ public static class CodeGenerator
         // variable ที่นิพจน์ใช้
         private IEnumerable<SpecVariable> VarDeps(string? expr) =>
             SpecExpr.NamesOf(expr).Select(n => _logic.Variables.FirstOrDefault(v => v.Name == n)).Where(v => v != null)!;
+
+        // Loop ที่ count() ในนิพจน์อ้าง (N ต้องคำนวณก่อน) — Array N คงที่ไม่ต้องรอ
+        private IEnumerable<SpecArray> LoopDeps(string? expr) =>
+            SpecExpr.ArrayRefs(expr).Select(id => Loops.FirstOrDefault(g => g.Id == id)).Where(g => g != null)!;
+        // count(A1) -> N_A1 (Loop) / จำนวนชุดคงที่ / null = ไม่มี Array นี้
+        private string? ArrayCountCs(string id) => _s.Arrays.FirstOrDefault(g => g.Id == id) is { } g ? g.Loop != null ? $"N_{g.Id}" : (g.Members.Count + 1).ToString() : null;
 
         // Array แบบ Loop (รอบ 5b): จำนวนชุดครั้งเดียว — ปัดเศษ (0 ลง · 1 ขึ้น · 2 ใกล้สุด) แล้วบีบ 1..nMax (LoopN เตือนเอง)
         private void LoopLine(SpecArray g)

@@ -60,7 +60,7 @@ const Spec = (() => {
     origin: "Origin", delta: "ห่างจากจุด (dx, dy)", polar: "ระยะ + มุม (polar)", slopeLength: "ลาด + ความยาว", slopeToSurface: "ลาดจนชนดิน",
     onSurface: "บนผิวดิน", between: "บนเส้นระหว่าง 2 จุด", intersect: "จุดตัดของ 2 เส้น", offset: "Offset (เส้นขนาน)",
     extendToGround: "ต่อลงถึงดิน (Extend to Surface)", external: "จุดจากโค้ดเดิม (point code)",
-    tangent: "จุดสัมผัส (Fillet)", firstOf: "จุดแรกที่เกิด (หลังกิ่ง)"
+    tangent: "จุดสัมผัส (Fillet)", firstOf: "จุดแรกที่เกิด (หลังกิ่ง)", lastOf: "จุดของชุดสุดท้าย (Loop)"
   };
   const LINK_TYPES = { straight: "เส้นตรง", followSurface: "วิ่งตามผิวดิน", followClipped: "ตามดิน ไม่เกินเส้น (Clipped Surface Link)", arc3: "โค้งผ่าน 3 จุด", arcR: "โค้ง เริ่ม-ปลาย-รัศมี", fillet: "โค้ง Fillet" };
   const ARC_TYPES = ["arc3", "arcR", "fillet"];
@@ -93,7 +93,7 @@ const Spec = (() => {
   const REF_KEYS = ["from", "a", "b", "a1", "a2", "b1", "b2", "corner", "toward", "other", "along"];
   const refs = def => {
     const r = REF_KEYS.map(k => def[k]).filter(Boolean);
-    if (def.type === "firstOf") for (const id of def.points || []) if (id && !r.includes(id)) r.push(id);
+    if (def.type === "firstOf" || def.type === "lastOf") for (const id of def.points || []) if (id && !r.includes(id)) r.push(id);
     for (const k of EXPR_FIELDS[def.type] || []) for (const id of Expr.pointRefsOf(def[k])) if (!r.includes(id)) r.push(id);
     return r;
   };
@@ -104,7 +104,7 @@ const Spec = (() => {
   const isAux = o => !!(o && (o.auxiliary || o.construction));
   const isAuxPoint = (spec, id) => isAux(byId(spec.points, id));
   // "ปลายจริง": จุด firstOf ที่เป็น auxiliary — เป็นปลาย link จริงได้ (ใช้จุดแรกในรายการที่เกิด)
-  const isAlias = (spec, id) => { const p = byId(spec.points, id); return !!p && p.def.type === "firstOf" && isAux(p); };
+  const isAlias = (spec, id) => { const p = byId(spec.points, id); return !!p && (p.def.type === "firstOf" || p.def.type === "lastOf") && isAux(p); };
   // ปลาย link จริงที่ใช้ไม่ได้เพราะเป็น auxiliary: จุด aux ทั่วไป / ปลายจริงที่มีจุด aux ในรายการ — คืน id ของปลายนั้น หรือ null
   function auxEnd(spec, id, seen){
     const p = byId(spec.points, id);
@@ -148,7 +148,7 @@ const Spec = (() => {
     }
     return v === (b.case === true || b.case === "true");
   }
-  const branchLabel = (spec, id) => { const b = byId((spec.logic || {}).branches || [], id); return b ? b.label || b.id : id; };
+  const branchLabel = (spec, id) => { const lp = /^(A\d+)#(\d+)$/.exec(id || ""); if (lp) return `${lp[1]} ชุดที่ ${+lp[2] + 1} (Loop — อาจไม่เกิดถ้า N น้อย ใช้ lastOf)`; const b = byId((spec.logic || {}).branches || [], id); return b ? b.label || b.id : id; };
   // กิ่งนี้ + กิ่งแม่ทุกชั้น (กิ่งเกิด = กิ่งเหล่านี้เกิดทั้งหมด)
   function branchChain(spec, id){
     const lg = spec.logic || {}, out = [];
@@ -170,7 +170,7 @@ const Spec = (() => {
       if (!p || busy.has(id)) return new Set();
       busy.add(id);
       const s = new Set(p.branch ? branchChain(spec, p.branch) : []);
-      if (p.def.type !== "firstOf") for (const r of strictRefs(p.def)) for (const b of need(r)) s.add(b);
+      if (p.def.type !== "firstOf" && p.def.type !== "lastOf") for (const r of strictRefs(p.def)) for (const b of need(r)) s.add(b);
       busy.delete(id);
       return (req[id] = s);
     }
@@ -179,7 +179,16 @@ const Spec = (() => {
       const mine = new Set(o.branch ? branchChain(spec, o.branch) : []);
       for (const r of ids) for (const b of need(r)) if (!mine.has(b)){ out.push({ id: o.id, kind, ref: r, branch: b }); return; }
     };
-    for (const p of spec.points) if (p.def.type !== "firstOf") check(p, "point", strictRefs(p.def));
+    for (const p of spec.points) if (p.def.type !== "firstOf" && p.def.type !== "lastOf") check(p, "point", strictRefs(p.def));
+    // Loop (รอบ 5b): ของนอก Array อ้างจุดของชุดที่ 2.. = อาจไม่เกิดถ้า N น้อย (lastOf ของ Array นั้นไม่นับ) · branch = "A1#k"
+    for (const g of spec.arrays || []){
+      if (!g.loop) continue;
+      const mine = new Set([...g.source.points, ...g.source.links, ...g.source.shapes, ...g.members.flatMap(m => [...m.points, ...m.links, ...m.shapes])]);
+      const setOf = {}; g.members.forEach((m, i) => { for (const id of m.points) setOf[id] = i + 1; });
+      const look = (o, kind, ids) => { if (mine.has(o.id) || out.some(x => x.id === o.id)) return; const r = ids.find(id => setOf[id]); if (r) out.push({ id: o.id, kind, ref: r, branch: `${g.id}#${setOf[r]}` }); };
+      for (const p of spec.points) if (!(p.def.type === "lastOf" && p.def.array === g.id) && p.def.type !== "firstOf") look(p, "point", strictRefs(p.def));
+      for (const l of spec.links) look(l, "link", linkRefs(l));
+    }
     for (const l of spec.links) check(l, "link", linkRefs(l));
     for (const s of spec.shapes){
       const mine = new Set(s.branch ? branchChain(spec, s.branch) : []);
@@ -199,7 +208,7 @@ const Spec = (() => {
   //   self = id ของ object ที่ช่องนี้เป็นของ (อ้างตัวเองไม่ได้)
   function exprOpts(spec, self){
     return { points: spec.points.map(p => p.id).filter(id => id !== self), targets: spec.imported ? null : spec.targets.map(t => t.name),
-             conds: ((spec.logic && spec.logic.conditions) || []).map(c => c.name) };
+             conds: ((spec.logic && spec.logic.conditions) || []).map(c => c.name), arrays: (spec.arrays || []).map(g => g.id) };
   }
   // ช่องนิพจน์ของ def แต่ละชนิด
   const EXPR_FIELDS = { delta: ["dx", "dy"], polar: ["length", "angle"], slopeLength: ["slope", "length"], slopeToSurface: ["slope", "maxDistance", "layoutLength"],
@@ -253,6 +262,7 @@ const Spec = (() => {
       exists: id => { try{ needFrom(viewer, id); return true; }catch{ return false; } },
       hasGround: () => !!ground,
       isCond: name => name in condByName,
+      count: id => { const g = byId(spec.arrays || [], id); if (!g) throw new Error(`ไม่มี Array ${id}`); return g.loop ? loopN(g) : g.n; },
       cond: name => { const v = cond(name); if (v === null) throw new Error(`เงื่อนไข ${name} ไม่รู้ค่า`); return v; }
     });
 
@@ -490,6 +500,7 @@ const Spec = (() => {
           if (r.warn) warn(p.id, `${p.id} จุดสัมผัส: ${r.warn} — ใช้มุมแหลมเดิม`);
           return { x: r.x, y: r.y };
         }
+        case "lastOf":                    // จุดของชุดสุดท้ายที่เกิด (รอบ 5b) = จุดแรกที่เกิดในรายการ [ชุดสุดท้าย … ต้นฉบับ] (spec ดูแลรายการให้)
         case "firstOf": {
           // จุดแรกในรายการที่เกิด (ไว้ต่อเรขาคณิตหลังกิ่ง) · ไม่มีสักจุด = หาไม่ได้ + เตือน
           for (const id of d.points || []){ try{ return need(id); }catch{} }
@@ -1317,6 +1328,33 @@ const Spec = (() => {
     }
     return null;
   }
+  // ตัวนับ i (รอบ 5b) = ลำดับของชุดที่กำลังวาง (ต้นฉบับ 0, ชุดถัดไป 1, 2, …) — แทนเป็นตัวเลขในนิยามของสมาชิก (evaluate / C# ไม่ต้องรู้จัก i)
+  const withI = (e, k) => String(e).replace(/\bi\b/g, `(${k})`);
+  // จุด p (ของชุดต้นฉบับ) ในชุดที่ k (join share: จุด to ของชุด k = จุด from ของชุด k−1)
+  function arraySetPoint(spec, g, p, k){
+    if (k === 0) return p;
+    const j = g.join, share = j && j.mode === "share";
+    if (share && p === j.to) return arraySetPoint(spec, g, j.from, k - 1);
+    const src = g.source.points.filter(id => !(share && id === j.to));
+    const i = src.indexOf(p);
+    return i < 0 || !g.members[k - 1] ? null : g.members[k - 1].points[i];
+  }
+  // lastOf ของ Array นี้: รายการ = จุดเดียวกันจากชุดสุดท้ายย้อนถึงต้นฉบับ (เรียกหลังสร้าง / แก้จำนวนชุด)
+  function refreshLastOf(spec, g){
+    for (const p of spec.points) if (p.def.type === "lastOf" && p.def.array === g.id){
+      const list = []; for (let k = g.n - 1; k >= 0; k--){ const id = arraySetPoint(spec, g, p.def.point, k); if (id && !list.includes(id)) list.push(id); }
+      p.def.points = list;
+    }
+  }
+  // สร้างจุด "ชุดสุดท้าย" ของจุด p ใน Array (aux = ปลายจริง ต่อ link จริงได้แบบ firstOf) · คืน id หรือ { error }
+  function addLastOf(spec, arrayId, p, opt){
+    const g = byId(spec.arrays || [], arrayId);
+    if (!g) return { error: `ไม่มี Array ${arrayId}` };
+    if (!g.source.points.includes(p)) return { error: `${p} ไม่ใช่จุดของชุดต้นฉบับของ ${arrayId}` };
+    const id = addPoint(spec, { type: "lastOf", array: arrayId, point: p, points: [] }, (opt && opt.codes) || [], !(opt && opt.aux === false));
+    refreshLastOf(spec, g);
+    return id;
+  }
   // สร้างสมาชิกชุดที่ 2..n (ต่อท้าย spec)
   function buildArray(spec, g){
     const src = g.source, j = g.join, share = j && j.mode === "share";
@@ -1328,7 +1366,7 @@ const Spec = (() => {
       if (share) map[j.to] = prev[j.from];
       for (const p of P){
         if (share && p.id === j.to) continue;
-        const id = addPoint(spec, { type: "delta", from: prev[p.id], dx: g.dx, dy: g.dy }, p.codes.slice(), isAux(p));
+        const id = addPoint(spec, { type: "delta", from: prev[p.id], dx: withI(g.dx, k), dy: withI(g.dy, k) }, p.codes.slice(), isAux(p));
         if (p.branch) byId(spec.points, id).branch = p.branch;
         map[p.id] = id; mem.points.push(id);
       }
@@ -1355,18 +1393,19 @@ const Spec = (() => {
       g.members.push(mem);
       prev = { ...prev, ...map };
     }
+    refreshLastOf(spec, g);
     return g;
   }
   // แก้ dx / dy: แก้นิยามจุดของสมาชิกทุกชุด (id เดิม — ของที่อ้างสมาชิกไม่หลุด)
   function updateArray(spec, g, o){
     if ("dx" in o) g.dx = String(o.dx).trim() || "0";
     if ("dy" in o) g.dy = String(o.dy).trim() || "0";
-    for (const mem of g.members) for (const id of mem.points){ const p = byId(spec.points, id); if (p && p.def.type === "delta"){ p.def.dx = g.dx; p.def.dy = g.dy; } }
+    g.members.forEach((mem, i) => { for (const id of mem.points){ const p = byId(spec.points, id); if (p && p.def.type === "delta"){ p.def.dx = withI(g.dx, i + 1); p.def.dy = withI(g.dy, i + 1); } } });
   }
   // เปลี่ยน N / วิธีต่อชุด: ลบสมาชิกแล้วสร้างใหม่ — มีของนอก array อ้างสมาชิกอยู่ = ไม่ทำ คืนรายการที่ขวาง
   function rebuildArray(spec, g, o){
     const P = new Set(g.members.flatMap(m => m.points)), L = new Set(g.members.flatMap(m => m.links)), S = new Set(g.members.flatMap(m => m.shapes));
-    const block = spec.points.filter(p => !P.has(p.id) && refs(p.def).some(r => P.has(r))).map(p => p.id)
+    const block = spec.points.filter(p => !P.has(p.id) && !(p.def.type === "lastOf" && p.def.array === g.id) && refs(p.def).some(r => P.has(r))).map(p => p.id)
       .concat(spec.links.filter(l => !L.has(l.id) && (linkRefs(l).some(r => P.has(r)) || L.has(l.refLink))).map(l => l.id))
       .concat(spec.shapes.filter(s => !S.has(s.id) && s.links.some(l => L.has(l))).map(s => s.id));
     if (block.length) return { block };
@@ -1480,7 +1519,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
+           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, addLastOf, arraySetPoint, withI, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();

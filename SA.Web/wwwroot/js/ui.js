@@ -638,7 +638,7 @@ function exprRow(parent, it, label, small, value, onValid, opts = {}){
   const inp = document.createElement("input"); inp.type = "text"; inp.value = value ?? ""; inp.disabled = !canEdit(it);
   inp.className = "expr";
   const err = div("expr-err", "", parent);
-  const names = specNames(it), xo = { ...(it.spec ? Spec.exprOpts(it.spec) : {}), ...(opts.want ? { want: opts.want } : {}) };   // อ้างจุดได้ (P3.y, ground(P3), ...) · want: "bool" = ช่องเงื่อนไข
+  const names = specNames(it), xo = { ...(it.spec ? Spec.exprOpts(it.spec) : {}), ...(opts.want ? { want: opts.want } : {}), ...(opts.allowI ? { allowI: true } : {}) };   // อ้างจุดได้ (P3.y, ground(P3), ...) · want: "bool" = ช่องเงื่อนไข
   const check = () => {
     const v = inp.value.trim();
     const r = opts.optional && !v ? { ok: true } : Expr.check(opts.slope ? v.replace(/^(-?)1:/, "$11/") : v, names, xo);
@@ -747,7 +747,7 @@ function propsDrawn(box, it, s){
   const pg = Spec.polygonOf(sp, DRAWN_KIND[s.type], s.id, true);
   if (pg) propsPolygon(box, it, pg);
   const ag = Spec.arrayOf(sp, DRAWN_KIND[s.type], s.id);
-  if (ag) propsArray(box, it, ag);
+  if (ag) propsArray(box, it, ag, s);
   for (const rg of rotationsFor(sp, s)) propsRotation(box, it, rg);
   propsCode(box, it, s);
 }
@@ -816,7 +816,7 @@ function propsDrawnPoint(box, it, p, r){
   const others = sp.points.filter(o => o.id !== p.id && !Spec.dependsOn(sp, o.id, p.id));
   const ptOpts = others.map(o => [o.id, `${o.id}${o.codes.length ? " " + o.codes.join(",") : ""}`]);
   // จุดสัมผัสเกิดจาก Fillet เท่านั้น (เปลี่ยนเป็นชนิดอื่นได้ แต่เปลี่ยนกลับไม่ได้)
-  selectRow(g, it, "ชนิด", Object.entries(Spec.POINT_TYPES).filter(([k]) => k !== "tangent" || d.type === "tangent"), d.type, t => convertPoint(it, p, t, r));
+  selectRow(g, it, "ชนิด", Object.entries(Spec.POINT_TYPES).filter(([k]) => !["tangent", "lastOf"].includes(k) || d.type === k), d.type, t => convertPoint(it, p, t, r));
   const refRow = (key, label, small, allowOrigin) =>
     selectRow(g, it, label, (allowOrigin ? [["", "(origin)"]] : []).concat(ptOpts), d[key] || "", v => { if (v) d[key] = v; else delete d[key]; }, small);
   const ex = (key, label, small, opts) => exprRow(g, it, label, small, d[key], v => { d[key] = v; }, opts);
@@ -831,6 +831,7 @@ function propsDrawnPoint(box, it, p, r){
     case "onSurface": refRow("from", "จาก", "", true); ex("dx", "dx", "ไปทางนอก +"); break;
     case "between": refRow("a", "จุด a"); refRow("b", "จุด b"); ex("t", "t", "0 = a, 1 = b, 0.5 = กึ่งกลาง"); break;
     case "firstOf": firstOfRow(g, it, p, others); break;
+    case "lastOf": div("hint", `จุด ${esc(d.point)} ของชุดสุดท้ายที่เกิดของ Array ${esc(d.array)} — ไล่ ${esc((d.points || []).join(" → "))} (แก้ไม่ได้ · ตามจำนวนชุดเอง)`, g); break;
     case "intersect": refRow("a1", "เส้น A จาก"); refRow("a2", "เส้น A ถึง"); refRow("b1", "เส้น B จาก"); refRow("b2", "เส้น B ถึง"); break;
     case "offset": {
       // คู่ที่สร้างพร้อมกัน (ปลายอีกข้างของเส้นขนาน): แก้ระยะ / ด้านที่ไหนก็แก้ทั้งคู่ ให้ยังขนานกัน
@@ -1040,7 +1041,12 @@ function branchRow(g, it, objs, r){
   }, objs.length > 1 ? `ทุกชิ้นที่เลือก (${objs.length})` : "กิ่งของเงื่อนไข (ไม่เกิด = ไม่มีใน Civil 3D)");
   if (objs.length > 1) return;
   const obj = objs[0];
-  if (!obj.branch) return;
+  // อ้างจุดที่อาจไม่เกิด: กิ่ง หรือชุดที่ 2.. ของ Loop (รอบ 5b — branch = "A1#k")
+  const risk = Spec.branchRisks(sp).find(x => x.id === obj.id);
+  const riskNote = () => { if (risk) div("expr-err", /#/.test(risk.branch)
+    ? `⚠ อ้าง ${esc(risk.ref)} ของ ${esc(Spec.branchLabel(sp, risk.branch))} — ต่อหลัง Array ให้ใช้จุด "ชุดสุดท้าย" (ปุ่มใน Properties ของจุดต้นฉบับ)`
+    : `⚠ อ้าง ${esc(risk.ref)} ที่เกิดเฉพาะกิ่ง ${esc(Spec.branchLabel(sp, risk.branch))} — กรณีอื่นจะหาไม่ได้ (ใช้ firstOf หรือ exists() ถ้าตั้งใจ)`, g); };
+  if (!obj.branch){ riskNote(); return; }
   const b = Spec.byId(brs, obj.branch), d = b && Spec.byId(lg.decisions || [], b.decision);
   if (!d){ div("expr-err", `⚠ ไม่มีกิ่ง ${esc(obj.branch)} แล้ว — object นี้จะไม่เกิด`, g); return; }
   const c = d.kind !== "switch" && (lg.conditions || []).find(x => x.name === d.test);
@@ -1048,8 +1054,7 @@ function branchRow(g, it, objs, r){
   if (c){ const cn = c.name; exprRow(g, it, `เงื่อนไข ${cn}`, "จริง / เท็จ เช่น ground(P1) > P1.y", c.expr, x => condExprEdit(it, cn, x), { want: "bool" }); }
   kv(g, [["กิ่ง", `<i class="brdot" style="background:${branchColor(sp, b.id)}"></i>${esc(branchPath(sp, b.id))} (case ${esc(String(b.case))})`, true],
          ["ตอนนี้", v == null ? "ไม่รู้ค่า → ไม่เข้ากิ่งไหน" : `${d.test} = ${v} → ${on ? "เกิด" : "ไม่เกิด"}`]]);
-  const risk = Spec.branchRisks(sp).find(x => x.id === obj.id);
-  if (risk) div("expr-err", `⚠ อ้าง ${esc(risk.ref)} ที่เกิดเฉพาะกิ่ง ${esc(Spec.branchLabel(sp, risk.branch))} — กรณีอื่นจะหาไม่ได้ (ใช้ firstOf หรือ exists() ถ้าตั้งใจ)`, g);
+  riskNote();
 }
 // สร้างเงื่อนไข + decision + กิ่ง ใช่ / ไม่ใช่ — คืน id ของกิ่ง "ใช่" (ยกเลิก = null)
 //   ผ่าน Logic API (รอบ 5) — ชื่อเริ่มต้น Cond1, Cond2 … · it = item (ใช้ parameter ของโค้ดเดิมตรวจชื่อ / นิพจน์)
@@ -1238,7 +1243,7 @@ function openArray(it){
   openDialog(`Array: ${sel.points.length} จุด · ${sel.links.length} link · ${sel.shapes.length} shape`, b => {
     div("cf-explain", `<p>ทำซ้ำชุดที่เลือก — ชุดที่ k = ชุด k−1 เลื่อนไป dx, dy (แก้ dx / dy ทีหลังได้ใน Properties แล้วขยับทั้งแถว)</p>`, b);
     const row = (label, small) => div("row", `<label>${esc(label)}${small ? `<small>${esc(small)}</small>` : ""}</label>`, b);
-    const names = specNames(it), xo = Spec.exprOpts(sp);
+    const names = specNames(it), xo = { ...Spec.exprOpts(sp), allowI: true };   // i = ลำดับชุด (dx / dy เท่านั้น)
     const field = (label, small, key, expr) => {
       const rr = row(label, small), inp = document.createElement("input"); inp.value = o[key];
       inp.oninput = () => { o[key] = inp.value.trim(); if (expr){ const c = Expr.check(o[key] || "0", names, xo); inp.classList.toggle("bad", !c.ok); inp.title = c.ok ? "" : c.error; } };
@@ -1258,8 +1263,8 @@ function openArray(it){
       else o.loop = null;
     };
     lbox.hidden = true;
-    field("dx", "ไปทางนอก + (ฝั่ง Right = ขวา) · นิพจน์ / parameter ได้", "dx", true);
-    field("dy", "ขึ้น + · นิพจน์ / parameter ได้", "dy", true);
+    field("dx", "ไปทางนอก + (ฝั่ง Right = ขวา) · นิพจน์ / parameter ได้ · i = ลำดับชุด (0, 1, 2, …)", "dx", true);
+    field("dy", "ขึ้น + · นิพจน์ / parameter ได้ · i = ลำดับชุด", "dy", true);
     const sel_ = (label, small, key, opts) => {
       const s = document.createElement("select"); s.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(""); s.value = o[key];
       s.onchange = () => { o[key] = s.value; sync(); }; row(label, small).appendChild(s); return s;
@@ -1292,7 +1297,7 @@ function openArray(it){
   });
 }
 // Properties: กลุ่ม Array ของ object ที่เลือก — แก้ dx / dy (ขยับทั้งแถว) / N / วิธีต่อชุด (สร้างใหม่) / เลิกเป็น array
-function propsArray(box, it, g){
+function propsArray(box, it, g, s){
   const sp = it.spec;
   const gr = group(box, `Array ${g.id}`, canEdit(it) ? { label: "เลิกเป็น Array", title: "เลิกจับกลุ่ม — ทุกชิ้นยังอยู่ (เป็นจุด / link ธรรมดา)",
     cmd: () => { const r = specEdit(s => Logic.removeArray(s, g.id), it, `เลิกเป็น Array ${g.id}`); if (r && r.ok && r.warnings.length) flashBanner(r.warnings[0]); renderProps(true); } } : null);
@@ -1332,7 +1337,7 @@ function propsArray(box, it, g){
   };
   row.appendChild(n);
   for (const k of ["dx", "dy"]){
-    const inp = exprRow(gr, it, k, k === "dx" ? "ไปทางนอก + · ทุกชุด" : "ขึ้น + · ทุกชุด", g[k], v => Logic.updateArray(it.spec, g.id, { [k]: v }));
+    const inp = exprRow(gr, it, k, k === "dx" ? "ไปทางนอก + · ทุกชุด · i = ลำดับชุด" : "ขึ้น + · ทุกชุด · i = ลำดับชุด", g[k], v => Logic.updateArray(it.spec, g.id, { [k]: v }), { allowI: true });
     if (canEdit(it)){
       const b = btn("+", () => {
         const name = newParamFromValue(it, inp.value.trim() || g[k], k === "dx" ? "StepX" : "StepY");
@@ -1340,6 +1345,15 @@ function propsArray(box, it, g){
       }, false, "สร้าง parameter ใหม่จากช่องนี้ (default = ค่าตอนนี้)");
       b.classList.add("par-btn"); inp.parentElement.appendChild(b);
     }
+  }
+  // จุดของชุดต้นฉบับ: สร้างจุด "ชุดสุดท้าย" (lastOf) — ต่อของหลัง Array ที่นี่ (ชุดกลางอาจไม่เกิดถ้า N น้อย)
+  if (canEdit(it) && s && s.type === "dpt" && src.points.includes(s.id)){
+    const have = sp.points.filter(p => p.def.type === "lastOf" && p.def.array === g.id && p.def.point === s.id).map(p => p.id);
+    div("btns", null, gr).append(btn(`สร้างจุด "ชุดสุดท้าย" ของ ${s.id}`, () => {
+      const r = specEdit(x => Logic.addLastOf(x, g.id, s.id), it, `สร้างจุดชุดสุดท้ายของ ${s.id} (${g.id})`);
+      if (r && r.ok){ setSelList([{ type: "dpt", item: it.id, id: r.result }]); flashBanner(`${r.result} = ${s.id} ของชุดสุดท้ายของ ${g.id} (Auxiliary = ปลายจริง ต่อ link ได้)`); }
+    }, false, "จุด Auxiliary ที่ตามจุดนี้ของชุดสุดท้ายที่เกิด (lastOf) — ใช้ต่อ link / จุดหลัง Array"));
+    if (have.length) div("hint", `มีแล้ว: ${have.join(", ")}`, gr);
   }
   if (canEdit(it)) div("btns", null, gr).append(btn("เลือกทั้ง Array", () => {
     const all = [src, ...g.members];

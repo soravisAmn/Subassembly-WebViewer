@@ -123,7 +123,7 @@ function fileSpec(f){
   return b ? JSON.parse(decodeURIComponent(escape(atob(b[1].trim())))) : null;
 }
 
-for (const [name, build, file] of [["base", buildBase, "base_rock-pitching-web.cs"], ["body", buildBody, "body_rock-pitching-web.cs"]]){
+for (const [name, build, file] of [["base", buildBase, "SA.Tests/fixtures/base_rock-pitching-web.cs"], ["body", buildBody, "SA.Tests/fixtures/body_rock-pitching-web.cs"]]){
   test(`${name}: คำนวณได้ไม่เตือน รูปปิดทุก shape — ดินสูง / ดินต่ำ / ขรุขระ / Layout · Right / Left`, () => {
     const s = build();
     for (const [k, sf] of Object.entries(SURF)) for (const values of [{}, { Side: 1 }]){

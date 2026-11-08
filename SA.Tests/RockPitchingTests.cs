@@ -57,18 +57,18 @@ static class RockPitchingTests
 
         foreach (var (name, real, drawn, cases, ps) in new[]
         {
-            ("base", "base_rock-pitching.cs", Path.Combine("tests-civil3d", "round4c-base.cs"), baseCases, baseParams),
-            ("body", "body_rock-pitching.cs", Path.Combine("tests-civil3d", "round4c-body.cs"), bodyCases, bodyParams),
+            ("base", Path.Combine("SA.Tests", "fixtures", "base_rock-pitching.cs"), Path.Combine("tests-civil3d", "round4c-base.cs"), baseCases, baseParams),
+            ("body", Path.Combine("SA.Tests", "fixtures", "body_rock-pitching.cs"), Path.Combine("tests-civil3d", "round4c-body.cs"), bodyCases, bodyParams),
             // รอบ 4e: ไฟล์ที่ Save จากเว็บไว้ข้างไฟล์จริง — parameter ชนิด Slope / Length · body จุดล่างในด้วย Extend to Surface (ไม่ใช่ min())
-            ("base-web", "base_rock-pitching.cs", "base_rock-pitching-web.cs", baseCases, baseParams),
-            ("body-web", "body_rock-pitching.cs", "body_rock-pitching-web.cs", bodyCases, bodyParams),
+            ("base-web", Path.Combine("SA.Tests", "fixtures", "base_rock-pitching.cs"), Path.Combine("SA.Tests", "fixtures", "base_rock-pitching-web.cs"), baseCases, baseParams),
+            ("body-web", Path.Combine("SA.Tests", "fixtures", "body_rock-pitching.cs"), Path.Combine("SA.Tests", "fixtures", "body_rock-pitching-web.cs"), bodyCases, bodyParams),
         })
         {
             CompiledSubassembly? a = null, b = null;
             string? err = null;
             try
             {
-                a = compiler.Compile(File.ReadAllText(Path.Combine(root, real)), real);
+                a = compiler.Compile(File.ReadAllText(Path.Combine(root, real)), Path.GetFileName(real));
                 b = compiler.Compile(File.ReadAllText(Path.Combine(root, drawn)), Path.GetFileName(drawn));
                 if (!a.Success || !b.Success) err = "คอมไพล์ไม่ผ่าน: " + string.Join(" | ", a.Diagnostics.Concat(b.Diagnostics).Where(d => d.Severity == "Error").Select(d => d.Message));
             }
@@ -111,7 +111,7 @@ static class RockPitchingTests
         // รอบ 5 M3: base แบบใช้ Variable DepthUsed (ถ้า Depth < 2 → 2 + เตือน) แทนขั้นต่ำในตาราง Parameter → ต้องได้ผลเหมือนไฟล์จริง
         test("base-web + Variable DepthUsed แทนขั้นต่ำ Depth (ทุกผิวดิน × Right / Left × 4 ชุดค่า)", () =>
         {
-            var blk = CodeGenerator.FindBlock(File.ReadAllText(Path.Combine(root, "base_rock-pitching-web.cs"))) ?? throw new Exception("ไม่มีช่วง SA-DRAWING");
+            var blk = CodeGenerator.FindBlock(File.ReadAllText(Path.Combine(root, Path.Combine("SA.Tests", "fixtures", "base_rock-pitching-web.cs")))) ?? throw new Exception("ไม่มีช่วง SA-DRAWING");
             var spec = System.Text.Json.Nodes.JsonNode.Parse(blk.SpecJson!)!;
             spec["className"] = "RockPitchingBaseVar";
             foreach (var p in spec["params"]!.AsArray()) if ((string)p!["name"]! == "Depth") p["min"] = null;
@@ -127,7 +127,7 @@ static class RockPitchingTests
             string src = CodeGenerator.GenerateFile(DrawingSpec.Parse(json), json, "RockPitchingBaseVar.cs");
             if (!src.Contains("double DepthUsed = Depth;") || !src.Contains("if (Depth < 2.0) { Warn(cs, CorridorError.ValueTooSmall, \"Depth = \" + Depth + \" m < 2 m ใช้ 2 m แทน\"); DepthUsed = 2.0; }"))
                 throw new Exception("โค้ด C# ของ DepthUsed ไม่เป็นบล็อก if อ่านง่ายตามที่ตกลง");
-            var a = compiler.Compile(File.ReadAllText(Path.Combine(root, "base_rock-pitching.cs")), "base_rock-pitching.cs");
+            var a = compiler.Compile(File.ReadAllText(Path.Combine(root, Path.Combine("SA.Tests", "fixtures", "base_rock-pitching.cs"))), "base_rock-pitching.cs");
             var b = compiler.Compile(src, "RockPitchingBaseVar.cs");
             if (!a.Success || !b.Success) throw new Exception("คอมไพล์ไม่ผ่าน: " + string.Join(" | ", b.Diagnostics.Where(d => d.Severity == "Error").Select(d => d.Message)));
             foreach (var c in baseCases)
@@ -181,7 +181,7 @@ static class RockPitchingTests
     static string FindRoot()
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
-        while (d != null && !File.Exists(Path.Combine(d.FullName, "base_rock-pitching.cs"))) d = d.Parent;
+        while (d != null && !File.Exists(Path.Combine(d.FullName, "SubassemblyViewer.sln"))) d = d.Parent;
         return d?.FullName ?? throw new Exception("หาโฟลเดอร์โปรเจกต์ไม่เจอ");
     }
 }

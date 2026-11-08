@@ -29,6 +29,7 @@
 - ห้าม commit / push / สร้าง branch เองจนกว่าผู้ใช้อนุญาต
 - ทุก milestone: รัน test ทั้งหมด (ด้านล่าง), อัปเดต README, บอกผู้ใช้ว่าต้องเปิด `run-viewer.bat` ใหม่หรือแค่ Ctrl+F5
 - shortcut ใหม่ต้องอยู่ในตาราง `?` และไม่ชนของเดิม; ตัวเลือกระหว่างคำสั่งชนะ shortcut ทั่วไป
+- Tests must never read the user's working files at the root (`*.cs`, `*.assembly.json`). Use locked copies in `SA.Tests/fixtures/` instead.
 - ห้ามเพิ่ม API ปลอมใน shim ที่ Civil 3D จริงไม่มี (อ้างอิง: `link-API-Reference.txt`) — link ใน Civil 3D เป็นเส้นตรงเท่านั้น
 - ฟีเจอร์ที่เปลี่ยนข้อมูลใน spec (จุด / เส้น / shape / parameter / เงื่อนไข / variable / Array ฯลฯ) ต้องทำเป็นฟังก์ชันใน Logic API (`js/logicops.js`) ก่อน แล้วให้ UI เรียกใช้ — ห้าม UI แก้ spec ตรงๆ · อัปเดต README หัวข้อ Logic API ทุกครั้งที่เพิ่ม (ฟีเจอร์หน้าจอล้วนๆ เช่น ขนาดแถบ / สี / ซูม ไม่ต้อง)
 

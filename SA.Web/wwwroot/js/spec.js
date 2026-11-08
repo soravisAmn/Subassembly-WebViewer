@@ -148,6 +148,8 @@ const Spec = (() => {
     }
     return v === (b.case === true || b.case === "true");
   }
+  // ป้ายสั้นของสิ่งที่ทำให้ไม่เกิด (บนรูป / snap): กิ่ง = ชื่อกิ่ง · Loop = "A1 ชุดที่ 3" (รอบ 5b)
+  const offLabel = (spec, id) => { const lp = /^(A\d+)#(\d+)$/.exec(id || ""); return lp ? `${lp[1]} ชุดที่ ${+lp[2] + 1}` : branchLabel(spec, id); };
   const branchLabel = (spec, id) => { const lp = /^(A\d+)#(\d+)$/.exec(id || ""); if (lp) return `${lp[1]} ชุดที่ ${+lp[2] + 1} (Loop — อาจไม่เกิดถ้า N น้อย ใช้ lastOf)`; const b = byId((spec.logic || {}).branches || [], id); return b ? b.label || b.id : id; };
   // กิ่งนี้ + กิ่งแม่ทุกชั้น (กิ่งเกิด = กิ่งเหล่านี้เกิดทั้งหมด)
   function branchChain(spec, id){
@@ -1517,7 +1519,7 @@ const Spec = (() => {
     return g;
   }
 
-  return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
+  return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, offLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
            UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, addLastOf, arraySetPoint, withI, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,

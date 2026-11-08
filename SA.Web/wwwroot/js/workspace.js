@@ -230,7 +230,7 @@ function renderSpec(it, r, grp, isSel){
     if (editingThis){
       const a = q.path[0], b = q.path[q.path.length - 1], m = q.arc ? q.path[q.path.length >> 1] : { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       const t = el("text", {x: X(m) + 4, y: Y(m) - 4, class:"d-lbl" + (aux ? " cons" : "") + (q.ghost ? " ghost-lbl" : "")}, grp);
-      t.textContent = l.id + (q.ghost ? ` ‹${Spec.branchLabel(spec, q.ghost)}›` : "");
+      t.textContent = l.id + (q.ghost ? ` ‹${Spec.offLabel(spec, q.ghost)}›` : "");
       if (q.ghost) t.setAttribute("fill", branchColor(spec, q.ghost));
     }
   }
@@ -245,6 +245,13 @@ function renderSpec(it, r, grp, isSel){
     } else el("rect", {x:X(q)-4, y:Y(q)-4, width:8, height:8, class:"dpt" + (ob ? " ghost" : ""), ...gs, "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
     const lbl = [editingThis ? p.id : "", state.showCodes && (isSel || editingThis) ? p.codes.join(", ") : ""].filter(Boolean).join(" ");
     if (lbl) el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl" + (Spec.isAux(p) ? " cons" : "") + (ob ? " ghost-lbl" : "")}, grp).textContent = lbl;
+  }
+  // ป้าย "A1 ×3" ที่จุดแรกของชุดต้นฉบับของ Loop (ตัวที่แก้อยู่) — ×N = จำนวนชุดตอนนี้ (รอบ 5b)
+  if (editingThis) for (const g of spec.arrays || []){
+    const n = g.loop && r.logic && r.logic.loops ? r.logic.loops[g.id] : null, q = n != null && geo("pts", g.source.points[0]);
+    if (!q) continue;
+    const t = el("text", {x: X(q) - 8, y: Y(q) - 10, class: "arr-lbl", "text-anchor": "end"}, grp);
+    t.textContent = `${g.id} ×${n}`;
   }
   if (!isSel) return;
   for (const o of selList()){

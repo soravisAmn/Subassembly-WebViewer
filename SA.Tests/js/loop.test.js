@@ -181,5 +181,22 @@ test("branchRisks: ของนอก Array อ้างจุดของชุ
   eq([], Spec.branchRisks(old.s), "Array คงที่");
 });
 
+test("toText / diffText (M3): บรรทัด ทำซ้ำ + ค่าตอนนี้ · สมาชิกย่อ · diff N / สูงสุด / ปัดเศษ / dx / Loop เปิด-ปิด / สร้างสมาชิกใหม่", () => {
+  const { s } = stairs({ n: "Height / Step", nMax: 4 }, { dx: "1 + 0.5 * i" });
+  const txt = Logic.toText(s, run(s, { Height: 7 }));
+  const line = txt.split("\n").find(l => l.startsWith("  ทำซ้ำ A1")) || "";
+  ok(txt.includes("Arrays:") && line.startsWith("  ทำซ้ำ A1 (P2, P3, L2): N = Height / Step สูงสุด 4 ปัดลง (ค่าเริ่ม) · dx = 1 + 0.5 * i · dy = -1 · ต่อชุด จุดร่วม P3 → P2") && line.endsWith("← ตอนนี้: 2 ชุด"), txt);
+  ok(txt.includes("เกิดเสมอ: P1, P2, P3, L1, L2, สมาชิก A1 (ชุด 2–4)"), "สมาชิกย่อ: " + txt);
+  const before = JSON.parse(JSON.stringify(s));
+  good(Logic.updateArray(s, "A1", { n: "Height / Step + 1", nRound: "ceil", dx: "2", nMax: 5 }));
+  const d = Logic.diffText(before, s);
+  for (const x of ["~ A1 N: Height / Step → Height / Step + 1", "~ A1 สูงสุด: 4 → 5", "~ A1 ปัดเศษ: ค่าเริ่ม (ปัดลง) → ปัดขึ้น", "~ A1 dx: 1 + 0.5 * i → 2", "~ A1 สร้างสมาชิกใหม่ (ชุด 2–5)"]) ok(d.includes(x), x + " ใน\n" + d);
+  ok(!d.includes("+ object") && !d.includes("- object"), "สมาชิกไม่ขึ้นเป็น object: " + d);
+  const b2 = JSON.parse(JSON.stringify(s)); good(Logic.setArrayLoop(s, "A1", null));
+  ok(Logic.diffText(b2, s).includes("~ A1: เลิก Loop → "), Logic.diffText(b2, s));
+  const plain = Spec.newSpec("T"); ok(!/Arrays:/.test(Logic.toText(plain)), "ไม่มี Array = ไม่มีหัว Arrays");
+  eq("A1 ชุดที่ 3", Spec.offLabel(s, "A1#2"), "ป้ายสั้นบนรูป");
+});
+
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
 process.exitCode = failed ? 1 : 0;

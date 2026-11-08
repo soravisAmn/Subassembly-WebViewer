@@ -126,7 +126,7 @@ function evalItem(it){
   const o = itemOrigin(it), c = specCtx(it, o);
   const r = Spec.evaluate(it.spec, c);
   // มีกิ่ง: คำนวณแบบทุกกิ่งเกิดอีกรอบ ไว้วาด object ที่ไม่เกิดตอนนี้ ("แสดงทุกกรณี")
-  if (((it.spec.logic || {}).branches || []).length) r.ghost = Spec.evaluate(it.spec, { ...c, allBranches: true });
+  if (((it.spec.logic || {}).branches || []).length || (it.spec.arrays || []).some(g => g.loop)) r.ghost = Spec.evaluate(it.spec, { ...c, allBranches: true });
   r.ox = o.x; r.oy = o.y;
   return r;
 }
@@ -382,7 +382,7 @@ function editSnapList(m, A, withRay){
   const vis = o => auxShown() || !Spec.isAux(o);
   for (const p of spec.points){
     const q = ptOf(it, r, p.id), off = q && r.pts[p.id].err;
-    if (q && vis(p)) points.push({ x: q.x, y: q.y, label: p.id + (p.codes.length ? " " + p.codes.join(",") : "") + (Spec.isAux(p) ? " (aux)" : "") + (off ? ` (ไม่เกิดตอนนี้ · กิ่ง ${Spec.branchLabel(spec, r.pts[p.id].off)})` : ""),
+    if (q && vis(p)) points.push({ x: q.x, y: q.y, label: p.id + (p.codes.length ? " " + p.codes.join(",") : "") + (Spec.isAux(p) ? " (aux)" : "") + (off ? ` (ไม่เกิดตอนนี้ · ${/#/.test(r.pts[p.id].off || "") ? "" : "กิ่ง "}${Spec.offLabel(spec, r.pts[p.id].off)})` : ""),
                                    make: () => p.id, ref: { type:"pt", id: p.id } });
   }
   const rr = asmRes[it.id];

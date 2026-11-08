@@ -157,6 +157,7 @@ function treeItem(node, h, a, it, depth, editing){
            name: dname(o, kind === "dpt" ? dupP : kind === "dlink" ? dupL : dupS), meta, metaCls: q && q.err && !q.off ? "warn" : "" });
   });
   if (sp) treeVariables(node, h, it, ik, d2);                       // Variables (รอบ 5 M3 — condtree.js)
+  if (sp) treeArrays(node, h, it, ik, d2);                          // Arrays / Loop (รอบ 5b M3 — condtree.js)
   const np = (res ? res.params.length : 0) + (sp ? sp.params.length : 0);
   node({ depth: d2, s:{type:"params", item:it.id}, sel: isSel("params", it.id), name: `Parameters <small>(${np})</small>` });
 }
@@ -1718,7 +1719,7 @@ function updateLogicLive(){
   for (const e of box.querySelectorAll("[data-br]")){ const on = !!r.logic.branches[e.dataset.br]; lgChip(e, on, "br"); const row = e.closest(".lg-br"); if (row) row.classList.toggle("off", !on); }
 }
 // กิ่งที่เกิดใน scenario s (ใช้ spec ปัจจุบันของ it กับผิวดิน / parameter / Layout ของ scenario) — null = scenario ไม่มีตัวนี้
-function scenarioBranches(s, it){
+function scenarioEval(s, it){
   const ws = s.ws || s.asm;
   if (!ws) return null;
   const items = ws.assemblies ? ws.assemblies.flatMap(a => a.items || []) : (ws.items || []);
@@ -1730,15 +1731,35 @@ function scenarioBranches(s, it){
   c.values = si.params || {};
   c.surface = ws.surfaceOn !== false && sf.length >= 2 ? sf.map(p => ({ x: p.x - o.x, y: p.y - o.y })) : null;
   c.layout = !!ws.layout; c.extendEnds = ws.extendEnds !== false;
-  try{ const r = Spec.evaluate(it.spec, c); return new Set(Object.keys(r.logic.branches).filter(k => r.logic.branches[k])); }
+  try{ return Spec.evaluate(it.spec, c); }
   catch{ return null; }
 }
-function logicCoverage(it){
-  const brs = ((it.spec.logic || {}).branches || []), by = {};
-  for (const b of brs) by[b.id] = [];
-  for (const s of scenarios){ const on = scenarioBranches(s, it); if (on) for (const id of on) if (by[id]) by[id].push(s.name); }
-  return { by, untested: brs.filter(b => !by[b.id].length).map(b => b.id) };
+function scenarioBranches(s, it){
+  const r = scenarioEval(s, it);
+  return r ? new Set(Object.keys(r.logic.branches).filter(k => r.logic.branches[k])) : null;
 }
+// Loop (รอบ 5b): N ของแต่ละ Loop ใน scenario นี้ { A1: 3 } (null = ไม่มี Loop / หาไม่ได้)
+function scenarioLoops(s, it){
+  if (!(it.spec.arrays || []).some(g => g.loop)) return null;
+  const r = scenarioEval(s, it); return r && r.logic.loops ? r.logic.loops : null;
+}
+function logicCoverage(it){
+  const brs = ((it.spec.logic || {}).branches || []), by = {}, loops = {};
+  for (const b of brs) by[b.id] = [];
+  for (const g of it.spec.arrays || []) if (g.loop) loops[g.id] = { nMax: g.loop.nMax, ns: [] };
+  const anyLoop = Object.keys(loops).length;
+  for (const s of scenarios){
+    const r = brs.length || anyLoop ? scenarioEval(s, it) : null; if (!r) continue;
+    for (const id of Object.keys(r.logic.branches)) if (r.logic.branches[id] && by[id]) by[id].push(s.name);
+    for (const id in loops) if (r.logic.loops && r.logic.loops[id] != null) loops[id].ns.push({ name: s.name, n: r.logic.loops[id] });
+  }
+  // ขอบของ Loop ที่ควรทดสอบ: N = 1 และ N = สูงสุด
+  for (const id in loops){ const L = loops[id]; L.one = L.ns.some(x => x.n === 1); L.max = L.ns.some(x => x.n === L.nMax); }
+  return { by, untested: brs.filter(b => !by[b.id].length).map(b => b.id), loops,
+           loopMiss: Object.keys(loops).filter(id => !loops[id].one || !loops[id].max) };
+}
+// ข้อความ "ยังไม่มี scenario ที่ A1 N = 1 / N = สูงสุด (5)"
+const loopMissText = (cov, id) => { const L = cov.loops[id]; return [!L.one ? "N = 1" : "", !L.max ? `N = สูงสุด (${L.nMax})` : ""].filter(Boolean).join(" / "); };
 function renderLogic(){
   const box = $("logic-pane"), it = logicItem();
   const lg = it ? it.spec.logic || {} : {}, nC = (lg.conditions || []).length;
@@ -1795,7 +1816,8 @@ function renderLogic(){
   if (!decs.length) div("empty", "ยังไม่มีกิ่ง", s2);
   if (cov.untested.length && scenarios.length)
     div("lg-row lg-miss", `⚠ ยังไม่มี scenario ไหนเข้ากิ่ง: ${cov.untested.map(id => esc(branchPath(sp, id))).join(", ")}`, s2);
-  else if (decs.length && !scenarios.length) div("hint", "ยังไม่มี scenario — ตั้งผิวดิน / parameter ให้เข้าแต่ละกิ่ง แล้วกด + บันทึกกรณีนี้ (แผงซ้าย) เพื่อทดสอบให้ครบทุกกิ่ง", s2);
+  if (scenarios.length) for (const id of cov.loopMiss) div("lg-row lg-miss", `⚠ ยังไม่มี scenario ที่ Loop ${esc(id)} ${loopMissText(cov, id)} (ขอบของ Loop ที่ควรทดสอบ)`, s2);
+  if (!(cov.untested.length && scenarios.length) && decs.length && !scenarios.length) div("hint", "ยังไม่มี scenario — ตั้งผิวดิน / parameter ให้เข้าแต่ละกิ่ง แล้วกด + บันทึกกรณีนี้ (แผงซ้าย) เพื่อทดสอบให้ครบทุกกิ่ง", s2);
   const walk = (parent, depth) => {
     for (const d of decs.filter(x => (x.parent || null) === parent)){
       const dr = div("lg-row", `<span style="padding-left:${depth * 16}px">◇ <b>${esc(d.label || d.id)}</b> <small>${esc(d.kind === "switch" ? "switch " : "")}${esc(d.test || "")}</small></span>`, s2);
@@ -2192,7 +2214,8 @@ function newProject(){
 // กรณีที่บันทึกจากเว็บรุ่นก่อน (ไฟล์เดียว / assembly) โหลดได้ โดยแปลงเป็น workspace
 let scenarios = store.get("sav2.scenarios", []);
 const saveScenarios = () => store.set("sav2.scenarios", scenarios);
-const snapshot = name => ({ name, ws: projContent(), file: `${allItems().length} subassembly` });
+// copy ทั้งก้อน: projContent อ้าง params / attach ของ item ตัวจริง — ไม่ copy = แก้ค่าทีหลังแล้ว scenario ที่บันทึกไว้เปลี่ยนตาม (จนกว่าจะโหลดหน้าใหม่)
+const snapshot = name => ({ name, ws: JSON.parse(JSON.stringify(projContent())), file: `${allItems().length} subassembly` });
 function loadScenario(s){
   if (s.ws) return loadProjContent(JSON.parse(JSON.stringify(s.ws)), WS().name);
   if (s.asm) return loadProjContent(JSON.parse(JSON.stringify(s.asm)), WS().name);
@@ -2207,7 +2230,8 @@ function renderScenarios(){
     const row = document.createElement("div");
     const name = document.createElement("span");
     const li = logicItem(), on = li && ((li.spec.logic || {}).branches || []).length ? scenarioBranches(s, li) : null;
-    const brTxt = on ? " · กิ่ง: " + ([...on].map(id => Spec.branchLabel(li.spec, id)).join(", ") || "—") : "";
+    const lp = li ? scenarioLoops(s, li) : null;
+    const brTxt = (on ? " · กิ่ง: " + ([...on].map(id => Spec.branchLabel(li.spec, id)).join(", ") || "—") : "") + (lp ? " · " + Object.entries(lp).map(([id, n]) => `${id} ×${n}`).join(", ") : "");
     name.innerHTML = `${esc(s.name)}<small>${esc((s.file || "") + brTxt)}</small>`; name.title = "โหลดกรณีนี้ (แทนที่ workspace)" + (on ? `\nกิ่งของ ${itemLabel(li)} ที่เกิดในกรณีนี้ (spec ตอนนี้)` : "");
     name.onclick = () => loadScenario(s);
     const del = document.createElement("button"); del.textContent = "×"; del.title = "ลบ";

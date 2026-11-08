@@ -243,7 +243,13 @@ link ใน Civil 3D เป็น**เส้นตรงเท่านั้น
   (รายการตามจำนวนชุดเอง · แก้สูงสุดได้แม้มี lastOf อ้าง · C#: `FirstOf(cs, "P8", P7, P6, P5, P4, P3)`)
 - **`count(A1)`** ในนิพจน์ทุกช่อง = จำนวนชุดตอนนี้ (Loop = N หลังปัด / บีบ · Array คงที่ = n) เช่น เงื่อนไข `count(A1) >= 3` · C# = `N_A1` (หรือตัวเลข)
 - **อ้างจุดของชุดที่ 2 ขึ้นไปของ Loop จากนอก Array** = ⚠ ใน Properties "อ้าง P5 ของ A1 ชุดที่ 3 (Loop — อาจไม่เกิดถ้า N น้อย ใช้ lastOf)" (แบบอ้างจุดในกิ่ง) · Logic API `addLastOf(spec, "A1", "P3")` → `{ result: "P8" }`
-- ยังไม่มี (M3 รอบ 5b): โหนด Arrays ในต้นไม้ + ไอคอน ℹ / ⚠, ป้าย "A1 ×3", scenario N = 1 / สูงสุด, toText / diffText ของ Loop
+- **ต้นไม้ซ้าย → Arrays** (ใต้ Variables · มีเมื่อมี Array): แต่ละ Array = `A1 Loop N = … · สูงสุด 10` + ชิป **×N ตอนนี้** (อัปเดตสดตอนแก้ parameter / ลากดิน) + ⚠ / ℹ (ชี้ = ข้อความ)
+  ใต้ Array = ชุด 1 (ต้นฉบับ), ชุด 2, … พร้อม object ของชุด · ✓ = เกิดตอนนี้ · จาง – = ไม่เกิด · คลิก Array = เลือกทั้ง Array · คลิกชุด = เลือกชุดนั้น
+- **บนรูป** (ตัวที่แก้อยู่): ป้ายสีฟ้า **"A1 ×3"** ที่จุดแรกของชุดต้นฉบับ · **แสดงทุกกรณี** = ชุดที่ไม่เกิดวาดเป็นเส้นประจาง ป้าย ‹A1 ชุดที่ 5› (แบบ object ในกิ่ง)
+- **Scenario**: รายการกรณีบอก `A1 ×N` ของแต่ละกรณี · แท็บ Logic + ต้นไม้ Arrays เตือน ⚠ "ยังไม่มี scenario ที่ Loop A1 N = 1 / N = สูงสุด (10)" (ขอบของ Loop ที่ควรทดสอบ)
+- **มุมมองข้อความ** (แท็บ Logic → ข้อความ / `Logic.toText`): หัว `Arrays:` + `ทำซ้ำ A1 (P6, P7, L5): N = floor(Height / BermInterval) สูงสุด 10 ปัดลง (ค่าเริ่ม) · dx = … · dy = … ← ตอนนี้: 3 ชุด`
+  สมาชิกชุด 2.. ย่อเป็น "สมาชิก A1 (ชุด 2–10)" · `Logic.diffText` บอก + / - Array, ~ N / สูงสุด / ปัดเศษ / dx / dy / ต่อชุด / Loop เปิด-ปิด, "~ A1 สร้างสมาชิกใหม่" (ไม่ไล่ id สมาชิกทีละตัว)
+- แก้บั๊กเดิม: **+ บันทึกกรณีนี้** เก็บ parameter แบบอ้างถึงของจริง → แก้ค่าทีหลังแล้วกรณีที่เพิ่งบันทึกเปลี่ยนตาม (จนโหลดหน้าใหม่) — ตอนนี้ copy ค่าตอนบันทึก
 
 ### Extend to Surface (รอบ 4c)
 
@@ -796,7 +802,7 @@ Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่�
 | `node SA.Tests/js/variables.test.js` | Variables: rules ตัวแรกที่จริงชนะ + ข้อความเตือน, อ้างจุด / ผิวดิน (ไม่รู้ค่า), ใช้ใน slope / Offset / Array / เงื่อนไข, วนกัน, rename / ลบ / เรียง, bool = เงื่อนไข (รอบ 5) — JS = C# ใน drawing-cases 84–90 + RockPitchingTests (DepthUsed) |
 | `node SA.Tests/js/logictext.test.js` | มุมมองข้อความ: toText (if / elif / switch / ซ้อน 3 ชั้น / กิ่งว่าง / variable มี-ไม่มี rules / มี-ไม่มีค่าตอนนี้) · diffText (เพิ่ม / แก้ / เปลี่ยนชื่อ / ลบ / ย้าย / ไม่เปลี่ยน) (รอบ 5) |
 | `node SA.Tests/js/round5demo.test.js` | round5-demo สร้างด้วย Logic API ล้วน: โครง / ไม่มี branchRisks, ตัด / ถมปกติ / ถมสูง (ชานพัก) / Layout, switch 3 กิ่ง, DepthUsed เตือน, Left · spec = sa-spec ใน `tests-civil3d/round5-demo.cs` (รอบ 5) |
-| `node SA.Tests/js/loop.test.js` | Array แบบ Loop: floor / ceil / round (.5 / ค่าลบ), N = 1 / 2 / nMax, ⚠ เกิน / น้อยกว่า 1 / หาค่าไม่ได้, ℹ ปัดลงค่าเริ่ม, ปัดเศษ 3 แบบ, join link + shape + กิ่ง, แปลง Array ↔ Loop, แก้ nMax (ถูกขวางเมื่อมีของนอกอ้าง), removeArray, แสดงทุกกรณี (รอบ 5b) + ตัวนับ i, lastOf (join share / ตามสูงสุด), count(A1) (Loop / คงที่ / ชื่อผิด), เตือนอ้างชุดกลาง (M2) — JS = C# ใน drawing-cases 96–108 |
+| `node SA.Tests/js/loop.test.js` | Array แบบ Loop: floor / ceil / round (.5 / ค่าลบ), N = 1 / 2 / nMax, ⚠ เกิน / น้อยกว่า 1 / หาค่าไม่ได้, ℹ ปัดลงค่าเริ่ม, ปัดเศษ 3 แบบ, join link + shape + กิ่ง, แปลง Array ↔ Loop, แก้ nMax (ถูกขวางเมื่อมีของนอกอ้าง), removeArray, แสดงทุกกรณี (รอบ 5b) + ตัวนับ i, lastOf (join share / ตามสูงสุด), count(A1) (Loop / คงที่ / ชื่อผิด), เตือนอ้างชุดกลาง (M2), toText / diffText ของ Array + ป้ายสั้นบนรูป (M3) — JS = C# ใน drawing-cases 96–108 |
 | `node SA.Tests/js/clip.test.js` | Clipped Surface Link: เทียบ BuildBottom ของ base_rock-pitching (จุด + code), ไม่ต่ำกว่า, เส้นเอียง, ไม่มีดิน, ระดับนิพจน์, Left, กิ่ง, Copy, ลบ (รอบ 4c) |
 | `node SA.Tests/js/extend.test.js` | Extend to Surface: ลอย / จม / Layout / ไม่ชนภายในระยะ, ปลายจริงเป็นปลาย link, link optional ใน shape, Side = Left, กิ่ง, ลบ (รอบ 4c) |
 | `node SA.Tests/js/offset.test.js` | Offset (เทียบ ParallelY ของ body_rock-pitching, Left, ระยะติดลบ) / Intersect ตัด / ยืด / ไม่ตัด, Move / ลบ (รอบ 4c) |

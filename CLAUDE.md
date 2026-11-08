@@ -110,8 +110,11 @@
     M2 เสร็จ (2026-11-08): ตัวนับ `i` ใน dx / dy (แทนเป็นตัวเลขตอนสร้าง / แก้สมาชิก `Spec.withI` · Expr `allowI` · `i` จองชื่อ),
       จุด `lastOf` (= firstOf ของรายการ ชุดสุดท้าย → ต้นฉบับ · `refreshLastOf` หลัง build / rebuild · ไม่ขวาง rebuild · C# FirstOf) + Logic.addLastOf + ปุ่มใน Properties Array,
       `count(A1)` (JS ctx.count · C# `ExprScope.ArrayCount` → N_A1 / ตัวเลข · TopoOrder `LoopDeps`), branchRisks อ้างชุดที่ 2.. ของ Loop (branch "A1#k") + ⚠ ใน Properties ของ object ที่เกิดเสมอด้วย
-      (test: `loop.test.js` 12, drawing-cases 105–108) — ถัดไป M3 UI (โหนด Arrays, ป้าย ×N, scenario, toText)
-  ถัดไป: รอบ 5b M3–M4 → prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
+      (test: `loop.test.js` 12, drawing-cases 105–108)
+    M3 เสร็จ (2026-11-08): ต้นไม้ Arrays (`treeArrays` ใน condtree.js — ชิป ×N + ℹ / ⚠ สด · ชุด ✓ / – · คลิก = เลือก), ป้าย "A1 ×N" บนรูป (`.arr-lbl`),
+      แสดงทุกกรณีของชุดที่ไม่เกิด (ghost คำนวณเมื่อมี Loop ด้วย · `Spec.offLabel` ป้ายสั้น), scenario: `scenarioEval` / `scenarioLoops` + `logicCoverage().loops / loopMiss` (⚠ ยังไม่มี N = 1 / สูงสุด),
+      Logic.toText หัว Arrays + สมาชิกย่อ · diffText ของ Array · แก้บั๊ก snapshot scenario ที่อ้าง params ของจริง (copy ทั้งก้อน) (test: `loop.test.js` 13) — ถัดไป M4 round5b-demo
+  ถัดไป: รอบ 5b M4 → prompt-6 (MCP: ห่อ Logic API + describe / toText / diffText) · flowchart เลื่อนไปทำพร้อมเว็บสาธารณะ (`prompt-flowchart-later.md`) · แผนงานรวมอยู่ใน Trello บอร์ด "SA Drawing Studio"
 
 ## แผนต่อจากนี้ (ตกลงกับผู้ใช้แล้ว)
 1. prompt-4: Logic ก (ข้างบน)

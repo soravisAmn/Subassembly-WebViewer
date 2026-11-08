@@ -509,3 +509,8 @@ body.editing #ed{display:flex}
   .pane-body{overflow:visible}
   .pane-hsplit{display:none}
 }
+/* Loop (รอบ 5b M3): ป้าย "A1 ×3" บนรูป + โหนด Arrays ในต้นไม้ */
+.arr-lbl{fill:#3b8fd9;font:600 11px "IBM Plex Mono",monospace;paint-order:stroke;stroke:var(--paper);stroke-width:3px;pointer-events:none}
+.tn.lg-set.off{opacity:.5}
+.lg-ic.i{color:#3b8fd9}
+.lg-ic.w{color:#d97a1f}

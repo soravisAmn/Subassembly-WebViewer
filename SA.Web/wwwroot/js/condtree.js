@@ -88,6 +88,42 @@ function treeVariables(node, h, it, ik, depth){
            metaHtml: `<span data-tcond="${esc(c.name)}" data-it="${esc(it.id)}">${varChipHtml(L ? L.conds[c.name] : undefined, "", true)}</span>` });
 }
 
+// ---------------- Arrays (รอบ 5b M3) ----------------
+// Array แต่ละตัว: N (นิพจน์ / คงที่) · สูงสุด · ชิป ×N ตอนนี้ · ℹ / ⚠ จาก Messages · ⚠ ยังไม่มี scenario ที่ N = 1 / สูงสุด
+//   ใต้ Array: ชุด 1 (ต้นฉบับ), ชุด 2, … ✓ = เกิดตอนนี้ (จาง = ไม่เกิด) · คลิก Array = เลือกทั้ง Array · คลิกชุด = เลือกชุดนั้น
+const arrNow = (r, g) => !g.loop ? g.n : r && r.logic && r.logic.loops ? r.logic.loops[g.id] : undefined;
+function arrIconHtml(r, id){
+  const ms = r ? (r.issues || []).filter(x => x.msg.startsWith(`Array ${id}:`)) : [];
+  const w = ms.filter(x => x.level !== "i"), i = ms.filter(x => x.level === "i");
+  return (w.length ? `<span class="lg-ic w" title="${esc(w.map(x => x.msg).join("\n"))}">⚠</span> ` : "") + (i.length ? `<span class="lg-ic i" title="${esc(i.map(x => x.msg).join("\n"))}">ℹ</span> ` : "");
+}
+const arrChipHtml = (r, g) => { const n = arrNow(r, g); return n == null ? '<span class="lg-val u">?</span>' : `<span class="lg-val t">×${n}</span>`; };
+function arrSetObjs(g, k){ const m = k === 0 ? g.source : g.members[k - 1]; return m ? [...m.points.map(id => ["dpt", id]), ...m.links.map(id => ["dlink", id]), ...m.shapes.map(id => ["dshape", id])] : []; }
+function treeArrays(node, h, it, ik, depth){
+  const sp = it.spec, arrs = sp.arrays || []; if (!arrs.length) return;
+  const r = drawRes[it.id], key = ik + ":arrs", cov = scenarios.length ? logicCoverage(it) : null;
+  node({ key, depth, cls: "lg-root", s: { type: "lg", item: it.id, k: "arrs" }, name: `Arrays <small>(${arrs.length})</small>` });
+  if (!isOpen(key)) return;
+  for (const g of arrs){
+    const gk = ik + ":a:" + g.id, miss = cov && cov.loops[g.id] && cov.loopMiss.includes(g.id);
+    const sub = g.loop ? `N = ${g.loop.n} · สูงสุด ${g.loop.nMax}` : `${g.n} ชุด (คงที่)`;
+    node({ key: gk, depth: depth + 1, cls: "lg-dec", icon: '<span class="ic dec">⋯</span>', s: { type: "lg", item: it.id, k: "arr", id: g.id },
+           name: `<b>${esc(g.id)}</b>${g.loop ? ' <small class="kw">Loop</small>' : ""}<small>${esc(sub)}</small>`,
+           title: "คลิก = เลือกทั้ง Array · ตั้งค่าใน Properties \"Array " + g.id + "\"" + (miss ? `\n⚠ ยังไม่มี scenario ที่ ${loopMissText(cov, g.id)}` : ""),
+           metaHtml: (miss ? `<span class="miss" title="ยังไม่มี scenario ที่ ${esc(loopMissText(cov, g.id))}">⚠</span> ` : "")
+                     + `<span data-tarr="${esc(g.id)}" data-it="${esc(it.id)}">${arrIconHtml(r, g.id)}${arrChipHtml(r, g)}</span>` });
+    if (!isOpen(gk)) continue;
+    const n = arrNow(r, g);
+    for (let k = 0; k < g.n; k++){
+      const objs = arrSetObjs(g, k), on = n == null || k < n;
+      node({ depth: depth + 2, cls: "lg-br lg-set" + (on ? " on" : " off"), s: { type: "lg", item: it.id, k: "aset", id: g.id, n: k },
+             name: `ชุด ${k + 1}${k === 0 ? " <small>(ต้นฉบับ)</small>" : ""} <small>${esc(objs.map(o => o[1]).join(", "))}</small>`,
+             title: "คลิก = เลือกชุดนี้" + (g.loop && !on ? " · ไม่เกิดตอนนี้ (k ≥ N)" : ""),
+             metaHtml: `<span class="tick" data-tset="${k}" data-arr="${esc(g.id)}" data-it="${esc(it.id)}">${on ? "✓" : "–"}</span>` });
+    }
+  }
+}
+
 // หน้าต่าง + Variable / แก้ variable — ถามเป็นประโยค: ชื่อ = [ค่าปกติ] · ถ้า [เงื่อนไข] → [ค่า] ☐ เตือน [ข้อความ] [CorridorError] · + ถ้า อีกข้อ (elif)
 function varDialog(it, name){
   const sp = it.spec, opts = lgOpts(it), old = name ? ((sp.logic || {}).variables || []).find(v => v.name === name) : null;
@@ -172,6 +208,15 @@ function updateTreeLive(){
   for (const e of box.querySelectorAll("[data-tdec]")){
     const r = drawRes[e.dataset.it]; if (!r || !r.logic) continue;
     e.innerHTML = condChipHtml(r.logic.decisions[e.dataset.tdec], e.dataset.sw ? "switch" : "");
+  }
+  for (const e of box.querySelectorAll("[data-tarr]")){
+    const r = drawRes[e.dataset.it], it = itemById(e.dataset.it), g = it && it.spec && Spec.byId(it.spec.arrays || [], e.dataset.tarr); if (!r || !g) continue;
+    e.innerHTML = arrIconHtml(r, g.id) + arrChipHtml(r, g);
+  }
+  for (const e of box.querySelectorAll("[data-tset]")){
+    const r = drawRes[e.dataset.it], it = itemById(e.dataset.it), g = it && it.spec && Spec.byId(it.spec.arrays || [], e.dataset.arr); if (!r || !g) continue;
+    const n = arrNow(r, g), on = n == null || +e.dataset.tset < n;
+    e.textContent = on ? "✓" : "–"; const row = e.closest(".tn"); if (row){ row.classList.toggle("on", on); row.classList.toggle("off", !on); }
   }
   for (const e of box.querySelectorAll("[data-tbr]")){
     const r = drawRes[e.dataset.it]; if (!r || !r.logic) continue;
@@ -366,6 +411,12 @@ function condTreeClick(e){
   const s = JSON.parse(n.dataset.sel);
   if (s.type !== "lg") return false;
   if (state.editing && s.item !== state.editing) return true;
+  if (s.k === "arr" || s.k === "aset"){
+    const it = itemById(s.item), g = it && it.spec && Spec.byId(it.spec.arrays || [], s.id);
+    if (g && s.k === "arr") selectArray(it, g);
+    else if (g) setSelList(arrSetObjs(g, s.n).map(([type, id]) => ({ type, item: s.item, id })));
+    return true;
+  }
   if (s.k === "br"){
     const it = itemById(s.item), objs = it && it.spec ? Spec.branchObjects(it.spec, s.id) : [];
     if (objs.length) setSelList(objs.map(o => ({ type: o.kind, item: s.item, id: o.id })));

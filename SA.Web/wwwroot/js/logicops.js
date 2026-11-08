@@ -498,12 +498,23 @@ const Logic = (() => {
   // toText: pseudo-code ภาษาไทยของ variables / เงื่อนไข / object เกิดเสมอ / decision → กิ่ง (ซ้อน = elif) · evalResult (ผลของ Spec.evaluate) = ต่อท้าย "← ตอนนี้: …"
   const COL = 44;
   const pad = (s, note) => note ? (s.length < COL ? s + " ".repeat(COL - s.length) : s + "  ") + note : s;
+  // สมาชิกชุดที่ 2.. ของ Array = ย่อเป็น "สมาชิก A1 (ชุด 2–5)" (รอบ 5b)
+  const memberIds = spec => { const m = new Map(); for (const g of spec.arrays || []) for (const mem of g.members) for (const id of [...mem.points, ...mem.links, ...mem.shapes]) m.set(id, g.id); return m; };
   const objList = (spec, b) => {
-    const o = [...spec.points.filter(x => (x.branch || null) === b).map(x => x.id + (Spec.isAux(x) ? " (aux)" : "")),
-               ...spec.links.filter(x => (x.branch || null) === b).map(x => x.id + (Spec.isAux(x) ? " (aux)" : "")),
-               ...spec.shapes.filter(x => (x.branch || null) === b).map(x => x.id)];
+    const mem = memberIds(spec), arr = new Set();
+    const pick = (list, aux) => list.filter(x => (x.branch || null) === b).filter(x => !(mem.has(x.id) && arr.add(mem.get(x.id)))).map(x => x.id + (aux && Spec.isAux(x) ? " (aux)" : ""));
+    const o = [...pick(spec.points, true), ...pick(spec.links, true), ...pick(spec.shapes, false)];
+    for (const id of arr){ const g = byId(spec.arrays, id); o.push(`สมาชิก ${id} (ชุด 2–${g.n})`); }
     return o.length ? o.join(", ") : "(ว่าง)";
   };
+  const ROUND_TH = { floor: "ปัดลง", ceil: "ปัดขึ้น", round: "ปัดใกล้สุด" };
+  // Array / Loop เป็นบรรทัดเดียว (toText / diffText)
+  function arrText(g){
+    const src = [...g.source.points, ...g.source.links, ...g.source.shapes].join(", ");
+    const n = g.loop ? `N = ${g.loop.n} สูงสุด ${g.loop.nMax} ${ROUND_TH[g.loop.nRound || "floor"]}${g.loop.nRound ? "" : " (ค่าเริ่ม)"}` : `${g.n} ชุด (คงที่)`;
+    const j = g.join ? ` · ต่อชุด ${g.join.mode === "share" ? "จุดร่วม" : "link"} ${g.join.from} → ${g.join.to}` : "";
+    return `ทำซ้ำ ${g.id} (${src}): ${n} · dx = ${g.dx} · dy = ${g.dy}${j}`;
+  }
   const fmtVal = (v, unit) => v === undefined ? "– (กิ่งแม่ไม่เกิด)" : v === null ? "ไม่รู้ค่า" : typeof v === "boolean" ? (v ? "จริง" : "เท็จ") : Spec.fmtUnit(unit || "number", Expr.num(v));
   function varText(v){
     const rs = v.rules || [];
@@ -518,6 +529,10 @@ const Logic = (() => {
     for (const v of lg.variables || []) out.push(pad("  " + varText(v), L && L.vars ? now(fmtVal(L.vars[v.name], v.unit)) : ""));
     out.push("Conditions:" + ((lg.conditions || []).length ? "" : " (ไม่มี)"));
     for (const c of lg.conditions || []) out.push(pad(`  ${c.name} = ${c.expr}`, L ? now(fmtVal(L.conds[c.name])) : ""));
+    if ((spec.arrays || []).length){
+      out.push("Arrays:");
+      for (const g of spec.arrays) out.push(pad("  " + arrText(g), g.loop && L && L.loops && L.loops[g.id] != null ? now(`${L.loops[g.id]} ชุด`) : ""));
+    }
     out.push(`เกิดเสมอ: ${objList(spec, null)}`);
     const walk = (parent, ind) => {
       const sp = " ".repeat(ind);
@@ -586,10 +601,26 @@ const Logic = (() => {
     for (const [id, b] of bb){ const o = ba.get(id); if (!o) continue;
       if ((o.label || "") !== (b.label || "")) out.push(`~ กิ่ง ${id} ชื่อ: ${o.label || "-"} → ${b.label || "-"}`);
       if (JSON.stringify(o.case) !== JSON.stringify(b.case)) out.push(`~ กิ่ง ${id} case: ${caseText(da.get(o.decision), o)} → ${caseText(db.get(b.decision), b)}`); }
-    // object: เพิ่ม / ลบ / ย้ายกิ่ง (รวมเป็นกลุ่มตามทางที่ย้าย)
+    // Array / Loop (รอบ 5b): สร้าง / เลิก / แก้ N, สูงสุด, ปัดเศษ, dx, dy, วิธีต่อ, Loop เปิด-ปิด
+    const ga = by(A.arrays, "id"), gb = by(B.arrays, "id");
+    for (const [id, g] of gb) if (!ga.has(id)) out.push(`+ ${arrText(g)}`);
+    for (const [id] of ga) if (!gb.has(id)) out.push(`- Array ${id} (object ยังอยู่)`);
+    for (const [id, g] of gb){ const o = ga.get(id); if (!o) continue;
+      if (!o.loop !== !g.loop) out.push(`~ ${id}: ${g.loop ? `เป็น Loop N = ${g.loop.n} สูงสุด ${g.loop.nMax}` : `เลิก Loop → ${g.n} ชุด (คงที่)`}`);
+      else if (g.loop){
+        for (const [k, name] of [["n", "N"], ["nMax", "สูงสุด"]]) if (o.loop[k] !== g.loop[k]) out.push(`~ ${id} ${name}: ${o.loop[k]} → ${g.loop[k]}`);
+        if ((o.loop.nRound || "") !== (g.loop.nRound || "")) out.push(`~ ${id} ปัดเศษ: ${ROUND_TH[o.loop.nRound] || "ค่าเริ่ม (ปัดลง)"} → ${ROUND_TH[g.loop.nRound] || "ค่าเริ่ม (ปัดลง)"}`);
+      }
+      else if (o.n !== g.n) out.push(`~ ${id} จำนวนชุด: ${o.n} → ${g.n}`);
+      for (const k of ["dx", "dy"]) if (o[k] !== g[k]) out.push(`~ ${id} ${k}: ${o[k]} → ${g[k]}`);
+      if (JSON.stringify(o.join || null) !== JSON.stringify(g.join || null)) out.push(`~ ${id} ต่อชุด: ${o.join ? o.join.mode + " " + o.join.from + " → " + o.join.to : "ไม่ต่อ"} → ${g.join ? g.join.mode + " " + g.join.from + " → " + g.join.to : "ไม่ต่อ"}`);
+    }
+    // object: เพิ่ม / ลบ / ย้ายกิ่ง (รวมเป็นกลุ่มตามทางที่ย้าย) · สมาชิก Array ที่สร้างใหม่ = บรรทัดเดียว
     const all = s => [...(s.points || []), ...(s.links || []), ...(s.shapes || [])];
-    const oa = by(all(A), "id"), ob = by(all(B), "id");
-    const added = [...ob.keys()].filter(k => !oa.has(k)), removed = [...oa.keys()].filter(k => !ob.has(k));
+    const oa = by(all(A), "id"), ob = by(all(B), "id"), ma = memberIds(A), mb = memberIds(B), rebuilt = new Set();
+    const isMem = k => (ma.has(k) || mb.has(k)) && rebuilt.add(mb.get(k) || ma.get(k));
+    const added = [...ob.keys()].filter(k => !oa.has(k) && !isMem(k)), removed = [...oa.keys()].filter(k => !ob.has(k) && !isMem(k));
+    for (const id of rebuilt) if (ga.has(id) && gb.has(id)) out.push(`~ ${id} สร้างสมาชิกใหม่ (ชุด 2–${gb.get(id).n})`);
     if (added.length) out.push(`+ object ${added.join(", ")}`);
     if (removed.length) out.push(`- object ${removed.join(", ")}`);
     const moves = new Map();

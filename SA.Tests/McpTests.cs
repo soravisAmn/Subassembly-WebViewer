@@ -58,6 +58,16 @@ static class McpTests
             var want = new[] { "sa_apply", "sa_catalog", "sa_check", "sa_code_preview", "sa_describe", "sa_get_spec", "sa_new", "sa_proposal", "sa_render", "sa_scenarios", "sa_status" };
             Is(names.SequenceEqual(want), string.Join(",", names));
         });
+        test("guide: instructions, prompts and resources", () =>
+        {
+            Is(Post(Init).Result.Body.GetProperty("result").GetProperty("instructions").GetString()!.Contains("sa_catalog"), "instructions");
+            var p = Post("""{"jsonrpc":"2.0","id":4,"method":"prompts/list"}""").Result.Body.GetProperty("result").GetProperty("prompts").EnumerateArray().Select(x => x.GetProperty("name").GetString()).ToArray();
+            Is(p.Contains("sa_guide") && p.Contains("edit_logic"), string.Join(",", p));
+            var g = Post("""{"jsonrpc":"2.0","id":5,"method":"prompts/get","params":{"name":"sa_guide"}}""").Result.Body.GetProperty("result").GetProperty("messages")[0].GetProperty("content").GetProperty("text").GetString()!;
+            Is(g.Contains("Ask the user"), g[..40]);
+            var r = Post("""{"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"sa://edit_logic"}}""").Result.Body.GetProperty("result").GetProperty("contents")[0].GetProperty("text").GetString()!;
+            Is(r.Contains("Loop"), r[..40]);
+        });
         test("no web page open: an immediate error that says what to do", () =>
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();

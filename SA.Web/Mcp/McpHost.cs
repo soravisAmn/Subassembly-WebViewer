@@ -121,8 +121,13 @@ public sealed class SaTools(PageHub hub)
     [McpServerTool(Name = "sa_proposal"), Description("Status of a proposal, or cancel your own. Only the user can accept.")]
     public Task<CallToolResult> Proposal([Description("status (default) or cancel.")] string? action = null, string? id = null, string? item = null, CancellationToken ct = default) => Forward("sa_proposal", new { action, id, item }, ct);
 
-    [McpServerTool(Name = "sa_catalog", ReadOnly = true), Description("Logic API functions, point and link types, op format and key drawing rules.")]
-    public Task<CallToolResult> Catalog(CancellationToken ct = default) => Forward("sa_catalog", new { }, ct);
+    [McpServerTool(Name = "sa_catalog", ReadOnly = true), Description("Logic API functions, point and link types, op format and the drawing guide. Read this before the first edit.")]
+    public async Task<CallToolResult> Catalog(CancellationToken ct = default)
+    {
+        var r = await Forward("sa_catalog", new { }, ct);
+        if (r.IsError != true) r.Content.Add(new TextContentBlock { Text = McpGuide.Read("sa_guide.md") });
+        return r;
+    }
 
     [McpServerTool(Name = "sa_render", ReadOnly = true), Description("PNG of the cross-section with ground, point names and dimensions. Use when the shape matters, not after every edit.")]
     public Task<CallToolResult> Render(string? item = null,
@@ -139,14 +144,49 @@ public sealed class SaTools(PageHub hub)
     public Task<CallToolResult> CodePreview(string? item = null, string? detail = null, string? view = null, CancellationToken ct = default) => Forward("sa_code_preview", new { item, detail, view }, ct);
 }
 
+// The drawing guide, for clients that read MCP prompts or resources
+public static class McpGuide
+{
+    public const string Instructions = "Drives SA Drawing Studio, a web app for Civil 3D subassemblies. Call sa_status, then sa_catalog (it includes the drawing guide) before the first edit. Edits are proposals: only the user can accept them, and the user saves the file. Ask the user when dimensions, parameters or codes are not stated. Answer the user in Thai.";
+
+    public static string Read(string name)
+    {
+        using var s = typeof(McpGuide).Assembly.GetManifestResourceStream(name) ?? throw new InvalidOperationException("Missing resource " + name);
+        using var r = new StreamReader(s);
+        return r.ReadToEnd();
+    }
+}
+
+[McpServerPromptType]
+public sealed class SaPrompts
+{
+    [McpServerPrompt(Name = "sa_guide"), Description("Rules for drawing and editing subassemblies. Read before working.")]
+    public static string Guide() => McpGuide.Read("sa_guide.md");
+
+    [McpServerPrompt(Name = "edit_logic"), Description("Guide for conditions, variables and Loop.")]
+    public static string EditLogic() => McpGuide.Read("edit_logic.md");
+}
+
+[McpServerResourceType]
+public sealed class SaResources
+{
+    [McpServerResource(UriTemplate = "sa://guide", Name = "sa_guide", MimeType = "text/markdown"), Description("Rules for drawing and editing subassemblies.")]
+    public static string Guide() => McpGuide.Read("sa_guide.md");
+
+    [McpServerResource(UriTemplate = "sa://edit_logic", Name = "edit_logic", MimeType = "text/markdown"), Description("Guide for conditions, variables and Loop.")]
+    public static string EditLogic() => McpGuide.Read("edit_logic.md");
+}
+
 public static class McpSetup
 {
     public static void AddSaMcp(this IServiceCollection services)
     {
         services.AddSingleton<PageHub>();
-        services.AddMcpServer(o => o.ServerInfo = new Implementation { Name = "sa-drawing-studio", Version = "1.0" })
+        services.AddMcpServer(o => { o.ServerInfo = new Implementation { Name = "sa-drawing-studio", Version = "1.0" }; o.ServerInstructions = McpGuide.Instructions; })
                 .WithHttpTransport(o => o.Stateless = true)
-                .WithTools<SaTools>();
+                .WithTools<SaTools>()
+                .WithPrompts<SaPrompts>()
+                .WithResources<SaResources>();
     }
 
     static bool IsLoopback(string host) => host is "localhost" or "127.0.0.1" or "[::1]" or "::1";

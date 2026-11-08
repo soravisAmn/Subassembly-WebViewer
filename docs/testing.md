@@ -14,6 +14,7 @@ Tests must never read the user's working files at the root (`*.cs`, `*.assembly.
 | `node SA.Tests/js/logicbatch.test.js` | Logic API drawing functions, `applyBatch` (references, all or nothing, unknown fn / reference), `catalog` = real functions, `docs/logic-api.md` up to date, base rock-pitching redrawn with `applyBatch` only = `buildBase()` (round 6) |
 | `node SA.Tests/js/boundary.test.js` | Bottom boundary (lower envelope of real links): crossings, auxiliary, holes, overlaps, branches, Left, known gaps in `SA.Tests/fixtures/round6/` (round 6) |
 | `node SA.Tests/js/proposal.test.js` | AI proposals: real spec untouched, failure midway, added / changed / removed, diffText of codes and definitions, step replay, cancellation reported once (round 6) |
+| `node SA.Tests/js/bridge.test.js` | Claude Desktop stdio bridge against a fake `/mcp`: JSON and SSE, notifications, HTTP errors, viewer off (round 6) |
 | `node SA.Tests/js/array.test.js` | Array: stairs (shared point), editing dx / dy / parameters, Left, link joining, shape / aux / branch, changing N (blocked), deleting = dissolves the Array, Move (round 4c) |
 | `node SA.Tests/js/slope.test.js` | Parameter value types (Number / Slope 1:x / Length / Percent): display / typing / warning text, ↗ ↘ slope field read / write (old specs unchanged), Daylight Cut/Fill with Slope parameters (round 4e) |
 | `node SA.Tests/js/logicops.test.js` | Logic API: every function, normal + error cases (duplicate name, reserved word, expression type, duplicate case / else, moving a decision into itself, 3 kinds of delete, cycles); spec unchanged after errors, describe (round 5) |
@@ -35,5 +36,7 @@ Tests must never read the user's working files at the root (`*.cs`, `*.assembly.
 | `node SA.Tests/js/select.test.js` | Window / Crossing |
 | `node SA.Tests/js/history.test.js` | Undo / Redo |
 | `node SA.Tests/js/ops.test.js` | Move / Copy / Paste of drawn parts |
+
+End-to-end (not in `test-all.bat`; needs a viewer with a page open and the copies from `SA.Tests/fixtures/round6/` imported): `node SA.Tests/e2e/mcp-e2e.js http://localhost:5050/mcp`.
 
 Without `node`: the JS comparison in `dotnet run` shows FAIL "รัน node ไม่ได้" (the rest runs) · snap / select / history / ops tests can run in the web page's console (set `globalThis.SA_LIB = { Expr, Spec, Snap, Select, makeHistory, Ops }`, then eval the file in a function; the method used to test round 2).

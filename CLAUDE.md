@@ -56,7 +56,7 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 ## Status
 
 - Last finished: round 5c (token housekeeping). History: `docs/history.md`.
-- In progress: round 6, M0-M3 done (`prompt-6-design.md`, `docs/connect-claude.md`). Next: M4 (`sa_guide`, Claude Desktop bridge, full test).
+- In progress: round 6, M0-M4 done (`prompt-6-design.md`, `docs/connect-claude.md`). Next: the user adds `Datum` through the web, then M5 (DLL build, checklist).
 - `prompt-6.md` (MCP: Claude Code / Desktop drive the web through proposals the user accepts, drawing from sketches; Logic API gains basic drawing + applyBatch).
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
 

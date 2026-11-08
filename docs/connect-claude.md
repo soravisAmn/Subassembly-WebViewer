@@ -20,7 +20,32 @@ The web page must be open; otherwise tools answer "Open http://localhost:5050 fi
 
 ## Claude Desktop
 
-A stdio bridge is required, because Desktop's custom connectors connect from Anthropic's cloud and cannot reach localhost. It arrives in M4.
+Desktop's custom connectors connect from Anthropic's cloud and cannot reach localhost, so Desktop uses the small bridge `SA.Mcp/bridge.js` (needs Node 18 or later, no packages).
+
+1. In Claude Desktop: Settings → Developer → Edit Config. This opens `%APPDATA%\Claude\claude_desktop_config.json`.
+2. Add this entry inside `mcpServers`, keeping anything already there:
+
+   ```json
+   "sa-studio": {
+     "command": "node",
+     "args": ["D:\\test_cad\\Subassembly-WebViewer\\SA.Mcp\\bridge.js"]
+   }
+   ```
+
+3. Quit Claude Desktop completely and reopen it.
+4. Start `run-viewer.bat`, open the web page, then ask Claude. If it does not connect, see `%APPDATA%\Claude\logs\mcp*.log`.
+
+With the viewer off, tools answer that `run-viewer.bat` must be started.
+
+## Example requests
+
+1. **Main task:** "ไฟล์ pavement-assembly / base_rock-pitching-web / body_rock-pitching-web: ขอบล่างสุดต้องมี code Datum ทุกกรณี เช็ก sa_check แล้วเสนอการแก้ทีละไฟล์"
+2. "subassembly ที่เลือกอยู่ทำอะไร อธิบายเงื่อนไขทั้งหมด"
+3. "pavement นี้ไม่มี code: ช่วยตั้ง code ให้ครบ และเปลี่ยนความหนาที่เขียนเป็นตัวเลขให้เป็น parameter"
+4. "สร้าง subassembly ใหม่: คางหมู กว้างบน 2 m ลึก 2 m ลาด 1:1.5 ถ้าดินต่ำกว่าให้ต่อลงถึงดิน"
+5. "body มีเงื่อนไข IsCut กับ IsCut2 เหมือนกัน ช่วยดูว่าเอาอันไหนออกได้ แล้วเสนอการแก้"
+
+For each: review the AI tab, press "รับทั้งหมด", then Save (.cs).
 
 ## Tools
 
@@ -48,6 +73,8 @@ Read tools show the pending proposal when there is one; `view: "real"` shows the
 - If you edit the subassembly while a proposal is pending, the proposal is cancelled with a notice, and Claude is told to read again.
 - Proposals live in the page: refreshing it drops them. There is at most one pending proposal per subassembly.
 - The footer shows "Claude เชื่อมต่อแล้ว" once a tool has been called in this page session, with the number of pending proposals.
+
+MCP prompts `sa_guide` and `edit_logic`, and resources `sa://guide` and `sa://edit_logic`, hold the drawing rules (source: `SA.Web/Mcp/*.md`). `sa_catalog` includes `sa_guide`.
 
 ## Bottom boundary
 

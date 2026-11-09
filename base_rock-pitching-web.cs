@@ -83,7 +83,7 @@ namespace TestSubassembly
     }
 
     // ===== SA-DRAWING BEGIN (สร้างโดย SA Drawing Studio — แก้ด้วยการวาดในเว็บ อย่าแก้ช่วงนี้ด้วยมือ) =====
-    // sa-spec: {"version":1,"className":"RockPitchingBaseWeb","namespace":"TestSubassembly","params":[{"name":"Side","kind":"long","default":0,"displayName":"Side","min":null,"max":null},{"name":"TopWidth","kind":"double","default":2,"displayName":"Top Width","min":null,"max":null,"positive":true,"unit":"length"},{"name":"SideSlope","kind":"double","default":1.5,"displayName":"Side Slope (1:x)","min":null,"max":null,"positive":true,"unit":"slope"},{"name":"Depth","kind":"double","default":2,"displayName":"Depth","min":2,"max":null,"unit":"length"}],"targets":[{"name":"TargetSurface","type":"Surface","displayName":"Target Surface"}],"points":[{"id":"P1","codes":["TrapTopInside"],"def":{"type":"origin"}},{"id":"P2","codes":["TrapTopOutside"],"def":{"type":"delta","from":"P1","dx":"TopWidth","dy":"0"}},{"id":"P3","codes":["TrapBaseOutside"],"def":{"type":"delta","from":"P2","dx":"Depth * SideSlope","dy":"-Depth"}},{"id":"P4","codes":["TrapBaseInside"],"def":{"type":"delta","from":"P1","dx":"-Depth * SideSlope","dy":"-Depth"}},{"id":"P5","codes":["TrapToeOutside"],"def":{"type":"extendToGround","from":"P3","along":"P2","target":"TargetSurface","maxDistance":"50"}},{"id":"P6","codes":[],"def":{"type":"firstOf","points":["P5","P3"]},"auxiliary":true},{"id":"P7","codes":["TrapToeInside"],"def":{"type":"extendToGround","from":"P4","along":"P1","target":"TargetSurface","maxDistance":"50"}},{"id":"P8","codes":[],"def":{"type":"firstOf","points":["P7","P4"]},"auxiliary":true}],"links":[{"id":"L1","points":["P1","P2"],"codes":["Top"]},{"id":"L2","points":["P2","P3"],"codes":["TrapSide"]},{"id":"L5","points":["P3","P5"],"codes":["TrapSide"],"optional":true},{"id":"L3","points":["P4","P1"],"codes":["TrapSide"]},{"id":"L6","points":["P4","P7"],"codes":["TrapSide"],"optional":true},{"id":"L4","points":["P3","P4"],"auxiliary":true,"codes":[]},{"id":"L7","type":"followClipped","from":"P6","to":"P8","target":"TargetSurface","refLink":"L4","side":"below","codes":["Datum"],"codesGround":["TrapOnSurface"],"codesLine":["TrapBase"]}],"shapes":[{"id":"S1","links":["L1","L2","L5","L7","L6","L3"],"codes":["Trapezoid"]}],"side":{"param":"Side","mirror":true}}
+    // sa-spec: {"version":1,"className":"RockPitchingBaseWeb","namespace":"TestSubassembly","params":[{"name":"Side","kind":"long","default":0,"displayName":"Side","min":null,"max":null},{"name":"TopWidth","kind":"double","default":2,"displayName":"Top Width","min":null,"max":null,"positive":true,"unit":"length"},{"name":"SideSlope","kind":"double","default":1.5,"displayName":"Side Slope (1:x)","min":null,"max":null,"positive":true,"unit":"slope"},{"name":"Depth","kind":"double","default":2,"displayName":"Depth","min":2,"max":null,"unit":"length"}],"targets":[{"name":"TargetSurface","type":"Surface","displayName":"Target Surface"}],"points":[{"id":"P1","codes":["TrapTopInside"],"def":{"type":"origin"}},{"id":"P2","codes":["TrapTopOutside"],"def":{"type":"delta","from":"P1","dx":"TopWidth","dy":"0"}},{"id":"P3","codes":["TrapBaseOutside"],"def":{"type":"delta","from":"P2","dx":"Depth * SideSlope","dy":"-Depth"}},{"id":"P4","codes":["TrapBaseInside"],"def":{"type":"delta","from":"P1","dx":"-Depth * SideSlope","dy":"-Depth"}},{"id":"P5","codes":["TrapToeOutside"],"def":{"type":"extendToGround","from":"P3","along":"P2","target":"TargetSurface","maxDistance":"50"}},{"id":"P6","codes":[],"def":{"type":"firstOf","points":["P5","P3"]},"auxiliary":true},{"id":"P7","codes":["TrapToeInside"],"def":{"type":"extendToGround","from":"P4","along":"P1","target":"TargetSurface","maxDistance":"50"}},{"id":"P8","codes":[],"def":{"type":"firstOf","points":["P7","P4"]},"auxiliary":true},{"id":"P9","codes":[],"def":{"type":"slopeToSurface","from":"P2","slope":"-1/SideSlope","dir":1,"target":"TargetSurface","maxDistance":"Depth * SideSlope","layoutLength":"Depth * SideSlope / 2"},"branch":"B1"},{"id":"P10","codes":[],"def":{"type":"slopeToSurface","from":"P1","slope":"-1/SideSlope","dir":-1,"target":"TargetSurface","maxDistance":"Depth * SideSlope","layoutLength":"Depth * SideSlope / 2"},"branch":"B7"}],"links":[{"id":"L1","points":["P1","P2"],"codes":["Top"]},{"id":"L2","points":["P2","P3"],"codes":["TrapSide"],"optional":true,"branch":"B6"},{"id":"L5","points":["P3","P5"],"codes":["TrapSide"],"optional":true},{"id":"L3","points":["P4","P1"],"codes":["TrapSide"],"optional":true,"branch":"B12"},{"id":"L6","points":["P4","P7"],"codes":["TrapSide"],"optional":true},{"id":"L4","points":["P3","P4"],"auxiliary":true,"codes":[]},{"id":"L7","type":"followClipped","from":"P6","to":"P8","target":"TargetSurface","refLink":"L4","side":"below","codes":["Datum"],"codesGround":["TrapOnSurface"],"codesLine":["TrapBase"]},{"id":"L8","points":["P2","P9"],"optional":true,"codes":["TrapSide"],"branch":"B3"},{"id":"L9","points":["P9","P3"],"optional":true,"codes":["TrapSide","Datum"],"branch":"B3"},{"id":"L10","points":["P2","P9"],"optional":true,"codes":["TrapSide","Datum"],"branch":"B4"},{"id":"L11","points":["P9","P3"],"optional":true,"codes":["TrapSide"],"branch":"B4"},{"id":"L12","points":["P2","P3"],"optional":true,"codes":["TrapSide","Datum"],"branch":"B5"},{"id":"L13","points":["P4","P10"],"optional":true,"codes":["TrapSide","Datum"],"branch":"B9"},{"id":"L14","points":["P10","P1"],"optional":true,"codes":["TrapSide"],"branch":"B9"},{"id":"L15","points":["P4","P10"],"optional":true,"codes":["TrapSide"],"branch":"B10"},{"id":"L16","points":["P10","P1"],"optional":true,"codes":["TrapSide","Datum"],"branch":"B10"},{"id":"L17","points":["P4","P1"],"optional":true,"codes":["TrapSide","Datum"],"branch":"B11"}],"shapes":[{"id":"S1","links":["L1","L2","L12","L8","L9","L10","L11","L5","L7","L6","L3","L17","L13","L14","L15","L16"],"codes":["Trapezoid"]}],"side":{"param":"Side","mirror":true},"logic":{"conditions":[{"id":"C1","name":"RTopUnder","expr":"ground(P2) > P2.y","note":"ปลายบนด้านขวา (P2) อยู่ใต้ดิน"},{"id":"C2","name":"RBotUnder","expr":"ground(P3) > P3.y","note":"ปลายล่างด้านขวา (P3) อยู่ใต้ดิน"},{"id":"C3","name":"LTopUnder","expr":"ground(P1) > P1.y","note":"ปลายบนด้านซ้าย (P1) อยู่ใต้ดิน"},{"id":"C4","name":"LBotUnder","expr":"ground(P4) > P4.y","note":"ปลายล่างด้านซ้าย (P4) อยู่ใต้ดิน"},{"id":"C5","name":"RCross","expr":"RTopUnder != RBotUnder","note":"ผิวดินตัดผ่าน L2"},{"id":"C6","name":"LCross","expr":"LTopUnder != LBotUnder","note":"ผิวดินตัดผ่าน L3"}],"decisions":[{"id":"D1","parent":null,"kind":"if","test":"RCross","label":"ดินตัดผ่านด้านขวา?"},{"id":"D2","parent":"B1","kind":"if","test":"RBotUnder","label":"ส่วนไหนใต้ดิน? (ขวา)"},{"id":"D3","parent":"B2","kind":"if","test":"RBotUnder","label":"ใต้ดินทั้งเส้น? (ขวา)"},{"id":"D4","parent":null,"kind":"if","test":"LCross","label":"ดินตัดผ่านด้านซ้าย?"},{"id":"D5","parent":"B7","kind":"if","test":"LBotUnder","label":"ส่วนไหนใต้ดิน? (ซ้าย)"},{"id":"D6","parent":"B8","kind":"if","test":"LBotUnder","label":"ใต้ดินทั้งเส้น? (ซ้าย)"}],"branches":[{"id":"B1","decision":"D1","case":true,"label":"ขวา ดินตัดผ่าน"},{"id":"B2","decision":"D1","case":false,"label":"ขวา ดินไม่ตัดผ่าน"},{"id":"B3","decision":"D2","case":true,"label":"ขวา ส่วนล่างใต้ดิน"},{"id":"B4","decision":"D2","case":false,"label":"ขวา ส่วนบนใต้ดิน"},{"id":"B5","decision":"D3","case":true,"label":"ขวา ใต้ดินทั้งเส้น"},{"id":"B6","decision":"D3","case":false,"label":"ขวา เหนือดินทั้งเส้น"},{"id":"B7","decision":"D4","case":true,"label":"ซ้าย ดินตัดผ่าน"},{"id":"B8","decision":"D4","case":false,"label":"ซ้าย ดินไม่ตัดผ่าน"},{"id":"B9","decision":"D5","case":true,"label":"ซ้าย ส่วนล่างใต้ดิน"},{"id":"B10","decision":"D5","case":false,"label":"ซ้าย ส่วนบนใต้ดิน"},{"id":"B11","decision":"D6","case":true,"label":"ซ้าย ใต้ดินทั้งเส้น"},{"id":"B12","decision":"D6","case":false,"label":"ซ้าย เหนือดินทั้งเส้น"}]}}
     internal static class SaDrawing_RockPitchingBaseWeb
     {
         private const string Source = "RockPitchingBaseWeb";
@@ -121,14 +121,41 @@ namespace TestSubassembly
             ObjectId surface = TargetSurface(cs, "TargetSurface");
 
             // ---- พิกัดของจุด (เทียบ origin; null = หาจุดนี้ไม่ได้ ส่วนที่พึ่งจุดนี้จะถูกข้าม) ----
+            // (เงื่อนไข / กิ่ง: bool? = null คือไม่รู้ค่า เพราะหาจุดที่อ้างไม่ได้ -> ไม่เข้ากิ่งไหน · object ในกิ่งที่ไม่เกิด = null ไม่เพิ่มลง Civil 3D)
             Pt? P1 = Pt.Origin;   // P1 origin
             Pt? P2 = Delta(cs, "P2", P1, F * TopWidth, 0.0);   // P2 ห่างจาก P1
+            bool? RTopUnder = Cond(cs, "RTopUnder", () => Ground(cs, surface, P2) > PY(P2));   // C1 RTopUnder: ปลายบนด้านขวา (P2) อยู่ใต้ดิน
             Pt? P3 = Delta(cs, "P3", P2, F * Depth * SideSlope, -Depth);   // P3 ห่างจาก P2
+            bool? RBotUnder = Cond(cs, "RBotUnder", () => Ground(cs, surface, P3) > PY(P3));   // C2 RBotUnder: ปลายล่างด้านขวา (P3) อยู่ใต้ดิน
+            bool? LTopUnder = Cond(cs, "LTopUnder", () => Ground(cs, surface, P1) > PY(P1));   // C3 LTopUnder: ปลายบนด้านซ้าย (P1) อยู่ใต้ดิน
             Pt? P4 = Delta(cs, "P4", P1, F * -Depth * SideSlope, -Depth);   // P4 ห่างจาก P1
+            bool? LBotUnder = Cond(cs, "LBotUnder", () => Ground(cs, surface, P4) > PY(P4));   // C4 LBotUnder: ปลายล่างด้านซ้าย (P4) อยู่ใต้ดิน
+            bool? RCross = Cond(cs, "RCross", () => V(RTopUnder) != V(RBotUnder));   // C5 RCross: ผิวดินตัดผ่าน L2
+            bool? LCross = Cond(cs, "LCross", () => V(LTopUnder) != V(LBotUnder));   // C6 LCross: ผิวดินตัดผ่าน L3
             Pt? P5 = ExtendToGround(cs, "P5", surface, P3, P2, 50.0);   // P5 ต่อเส้น P2→P3 ลงถึงดิน (ไม่ลอย / ไม่มีดิน = ไม่เกิด)
             Pt? P6 = FirstOf(cs, "P6", P5, P3);   // P6 จุดแรกที่เกิดใน P5, P3
             Pt? P7 = ExtendToGround(cs, "P7", surface, P4, P1, 50.0);   // P7 ต่อเส้น P1→P4 ลงถึงดิน (ไม่ลอย / ไม่มีดิน = ไม่เกิด)
             Pt? P8 = FirstOf(cs, "P8", P7, P4);   // P8 จุดแรกที่เกิดใน P7, P4
+            // D1 decision ดินตัดผ่านด้านขวา?
+            bool B1 = RCross == true;   // กิ่ง "ขวา ดินตัดผ่าน"
+            bool B2 = RCross == false;   // กิ่ง "ขวา ดินไม่ตัดผ่าน"
+            Pt? P9 = B1 ? SlopeToSurface(cs, "P9", surface, P2, -1.0 / SideSlope, F, Depth * SideSlope, Depth * SideSlope / 2.0) : null;   // P9 ลาดจนชนดิน [กิ่ง ขวา ดินตัดผ่าน]
+            // D4 decision ดินตัดผ่านด้านซ้าย?
+            bool B7 = LCross == true;   // กิ่ง "ซ้าย ดินตัดผ่าน"
+            bool B8 = LCross == false;   // กิ่ง "ซ้าย ดินไม่ตัดผ่าน"
+            Pt? P10 = B7 ? SlopeToSurface(cs, "P10", surface, P1, -1.0 / SideSlope, -F, Depth * SideSlope, Depth * SideSlope / 2.0) : null;   // P10 ลาดจนชนดิน [กิ่ง ซ้าย ดินตัดผ่าน]
+            // D2 decision ส่วนไหนใต้ดิน? (ขวา) (ในกิ่ง ขวา ดินตัดผ่าน)
+            bool B3 = B1 && RBotUnder == true;   // กิ่ง "ขวา ส่วนล่างใต้ดิน"
+            bool B4 = B1 && RBotUnder == false;   // กิ่ง "ขวา ส่วนบนใต้ดิน"
+            // D3 decision ใต้ดินทั้งเส้น? (ขวา) (ในกิ่ง ขวา ดินไม่ตัดผ่าน)
+            bool B5 = B2 && RBotUnder == true;   // กิ่ง "ขวา ใต้ดินทั้งเส้น"
+            bool B6 = B2 && RBotUnder == false;   // กิ่ง "ขวา เหนือดินทั้งเส้น"
+            // D5 decision ส่วนไหนใต้ดิน? (ซ้าย) (ในกิ่ง ซ้าย ดินตัดผ่าน)
+            bool B9 = B7 && LBotUnder == true;   // กิ่ง "ซ้าย ส่วนล่างใต้ดิน"
+            bool B10 = B7 && LBotUnder == false;   // กิ่ง "ซ้าย ส่วนบนใต้ดิน"
+            // D6 decision ใต้ดินทั้งเส้น? (ซ้าย) (ในกิ่ง ซ้าย ดินไม่ตัดผ่าน)
+            bool B11 = B8 && LBotUnder == true;   // กิ่ง "ซ้าย ใต้ดินทั้งเส้น"
+            bool B12 = B8 && LBotUnder == false;   // กิ่ง "ซ้าย เหนือดินทั้งเส้น"
 
             // ---- เพิ่มจุด / link / shape ลง CorridorState ----
             Point p1 = AddPoint(cs, P1, "TrapTopInside");
@@ -139,16 +166,28 @@ namespace TestSubassembly
             // P6 auxiliary: ใช้คำนวณอย่างเดียว ไม่เพิ่มลง Civil 3D
             Point p7 = AddPoint(cs, P7, "TrapToeInside");
             // P8 auxiliary: ใช้คำนวณอย่างเดียว ไม่เพิ่มลง Civil 3D
+            Point p9 = B1 ? AddPoint(cs, P9) : null;   // [กิ่ง ขวา ดินตัดผ่าน]
+            Point p10 = B7 ? AddPoint(cs, P10) : null;   // [กิ่ง ซ้าย ดินตัดผ่าน]
             Point p6 = P6 == null ? null : (P5 != null ? p5 : P3 != null ? p3 : null);   // P6 ปลายจริง = จุดแรกที่เกิดใน P5, P3
             Point p8 = P8 == null ? null : (P7 != null ? p7 : P4 != null ? p4 : null);   // P8 ปลายจริง = จุดแรกที่เกิดใน P7, P4
             Link l1 = AddLink(cs, "L1", p1, p2, "Top");
-            Link l2 = AddLink(cs, "L2", p2, p3, "TrapSide");
+            Link l2 = B6 ? AddLink(cs, "L2", p2, p3, "TrapSide") : null;   // [กิ่ง ขวา เหนือดินทั้งเส้น]
             Link l5 = AddLink(cs, "L5", p3, p5, "TrapSide");
-            Link l3 = AddLink(cs, "L3", p4, p1, "TrapSide");
+            Link l3 = B12 ? AddLink(cs, "L3", p4, p1, "TrapSide") : null;   // [กิ่ง ซ้าย เหนือดินทั้งเส้น]
             Link l6 = AddLink(cs, "L6", p4, p7, "TrapSide");
             // L4 auxiliary: ใช้อ้างอิงอย่างเดียว ไม่เพิ่มลง Civil 3D
             Link[] l7 = FollowClipped(cs, "L7", surface, P6, p6, P8, p8, P3, P4, true, new[] { "Datum" }, new[] { "TrapOnSurface" }, new[] { "TrapBase" });   // L7 ตามดิน ไม่สูงกว่าเส้น L4
-            AddShape(cs, "S1", Join(new[] { l1 }, new[] { l2 }, Opt(l5), l7, Opt(l6), new[] { l3 }), "Trapezoid");
+            Link l8 = B3 ? AddLink(cs, "L8", p2, p9, "TrapSide") : null;   // [กิ่ง ขวา ส่วนล่างใต้ดิน]
+            Link l9 = B3 ? AddLink(cs, "L9", p9, p3, "TrapSide", "Datum") : null;   // [กิ่ง ขวา ส่วนล่างใต้ดิน]
+            Link l10 = B4 ? AddLink(cs, "L10", p2, p9, "TrapSide", "Datum") : null;   // [กิ่ง ขวา ส่วนบนใต้ดิน]
+            Link l11 = B4 ? AddLink(cs, "L11", p9, p3, "TrapSide") : null;   // [กิ่ง ขวา ส่วนบนใต้ดิน]
+            Link l12 = B5 ? AddLink(cs, "L12", p2, p3, "TrapSide", "Datum") : null;   // [กิ่ง ขวา ใต้ดินทั้งเส้น]
+            Link l13 = B9 ? AddLink(cs, "L13", p4, p10, "TrapSide", "Datum") : null;   // [กิ่ง ซ้าย ส่วนล่างใต้ดิน]
+            Link l14 = B9 ? AddLink(cs, "L14", p10, p1, "TrapSide") : null;   // [กิ่ง ซ้าย ส่วนล่างใต้ดิน]
+            Link l15 = B10 ? AddLink(cs, "L15", p4, p10, "TrapSide") : null;   // [กิ่ง ซ้าย ส่วนบนใต้ดิน]
+            Link l16 = B10 ? AddLink(cs, "L16", p10, p1, "TrapSide", "Datum") : null;   // [กิ่ง ซ้าย ส่วนบนใต้ดิน]
+            Link l17 = B11 ? AddLink(cs, "L17", p4, p1, "TrapSide", "Datum") : null;   // [กิ่ง ซ้าย ใต้ดินทั้งเส้น]
+            AddShape(cs, "S1", Join(new[] { l1 }, Opt(l2), Opt(l12), Opt(l8), Opt(l9), Opt(l10), Opt(l11), Opt(l5), l7, Opt(l6), Opt(l3), Opt(l17), Opt(l13), Opt(l14), Opt(l15), Opt(l16)), "Trapezoid");
         }
 
         // ------------------------------------------------------------------

@@ -17,6 +17,12 @@ Test sets live in `tests-civil3d/`. Thai labels in quotes are the text shown in 
 - Needs a target surface where the corridor passes through both cut and fill; then follow `tests-civil3d/round4-checklist.md` (10 items + coordinates on flat ground).
 - The same spec is in `drawing-cases.json` (JS vs C# in 5 cases: cut, normal fill, high fill + no curb, Left, Layout).
 
+## Round 6: the 3 files edited through the web
+
+`build-c3d.bat` at the root builds `pavement-assembly.cs`, `base_rock-pitching-web.cs` and `body_rock-pitching-web.cs` into `tests-civil3d\build\out\SaRound6.dll` against the installed Civil 3D 2027 (.NET 10, project `tests-civil3d/build/Round6.csproj`; set the MSBuild property `C3DInstall` for another install path). It prints only a short summary; "ปิด Civil 3D ก่อน" means the DLL is locked. Autodesk DLLs are referenced in place and never copied or committed.
+
+Load it as in the guide `Subassembly C# สู่ Civil 3D 2027.html`: Trusted Location, then one Tool Palette tool per class. No NETLOAD needed. Then follow `tests-civil3d/round6-checklist.md`, which compares against commit `7162b14`.
+
 ## Round 5b: round5b-demo, fill embankment with a berm every BermInterval (Loop)
 
 `tests-civil3d/round5b-demo.cs` = subassembly `TestSubassembly.Round5bDemo` built with the web's tools only (sequence = `buildRound5b()` in `SA.Tests/js/round5bdemo.test.js`, every step through the Logic API), saved through `/api/drawing/save` · view in the web: "ไฟล์ ▾" → Open project → `round5b-demo.assembly.json` (drag the ground point at the shoulder up / down and the number of benches changes live).

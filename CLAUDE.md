@@ -51,18 +51,17 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 
 ## Tests
 
-`test-all.bat` at the root runs the C# suite and every JS suite: one line per suite plus only the failures; full log in `SA.Tests/test-all.log`. Close the viewer first (it locks the build output). Details: `docs/testing.md`. Real Civil 3D test sets: `tests-civil3d/`, see `docs/civil3d-testing.md`.
+`build-c3d.bat` builds the round 6 subassemblies against real Civil 3D. `test-all.bat` at the root runs the C# suite and every JS suite: one line per suite plus only the failures; full log in `SA.Tests/test-all.log`. Close the viewer first (it locks the build output). Details: `docs/testing.md`. Real Civil 3D test sets: `tests-civil3d/`, see `docs/civil3d-testing.md`.
 
 ## Status
 
-- Last finished: round 5c (token housekeeping). History: `docs/history.md`.
-- In progress: round 6, M0-M4 done (`prompt-6-design.md`, `docs/connect-claude.md`). Next: the user adds `Datum` through the web, then M5 (DLL build, checklist).
-- `prompt-6.md` (MCP: Claude Code / Desktop drive the web through proposals the user accepts, drawing from sketches; Logic API gains basic drawing + applyBatch).
+- Last finished: round 6 (MCP), M0-M5. History: `docs/history.md`. Setup: `docs/connect-claude.md`.
+- Next: the user runs `tests-civil3d/round6-checklist.md` in Civil 3D. Then a new prompt: drawing from a CAD screenshot (postponed from round 6).
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
 
 ## Plan
 
-1. prompt-6: MCP server so Claude can read / edit the spec, compile and run scenarios.
+1. Next prompt: drawing from a CAD screenshot through MCP.
 2. Later: public web (accounts, sandboxed C# compile, user-supplied AI key, Chat / Code modes). Keep **core** (spec, evaluator, CodeGenerator, shim, pages) separate from **host** (localhost, local files, local compile). One repo for now.
 3. SAC-style flowchart comes with the public web and must edit the same data as the current logic (`docs/prompts/prompt-flowchart-later.md`).
 

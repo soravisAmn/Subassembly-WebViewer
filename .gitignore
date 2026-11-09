@@ -11,3 +11,7 @@ obj/
 
 # Full output of test-all.bat
 SA.Tests/test-all.log
+
+# Civil 3D build output
+tests-civil3d/build/out/
+tests-civil3d/build/out-build.log

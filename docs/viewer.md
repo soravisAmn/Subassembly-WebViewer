@@ -85,6 +85,8 @@ Only the parts subassemblies commonly use:
 | `Autodesk.AutoCAD.DatabaseServices` | `ObjectId`, `OpenMode`, `Transaction`, `TransactionManager.GetObject`, `HostApplicationServices.WorkingDatabase` |
 | `Autodesk.AutoCAD.Geometry` | `Point2d`, `Point3d` |
 
+The simulator must never be more lenient than real Civil 3D. Shapes: the fill outline is built by walking the links in the order given to `Shapes.Add`, as Civil 3D does (`SA.Civil3DShim/ShapeWalk.cs`); links that do not chain give the same crossed fill as in Civil 3D plus the web warning `ShapeLinksNotChained`. `Link.Points` is a `PointCollection` (`Count`, indexer) as in the real API; `Link.StartPoint` / `EndPoint` do not exist in the real API and were removed.
+
 If a `.cs` calls an API not present yet, the web shows a compile error such as `'CorridorState' does not contain a definition for 'XYZ'` → add it to the `SA.Civil3DShim` files (dotnet watch restarts by itself) or give Claude the function name to add.
 
 Not supported yet: offset/elevation targets, several surfaces at once, superelevation, real profiles.

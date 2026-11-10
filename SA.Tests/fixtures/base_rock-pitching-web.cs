@@ -763,9 +763,36 @@ namespace TestSubassembly
             {
                 if (l == null) { Warn(cs, CorridorError.Failure, id + ": ข้ามเพราะมี link ที่วาดไม่ได้"); return; }
             }
-            Shape shape = cs.Shapes.Add(links, "");
+            Shape shape = cs.Shapes.Add(ChainLinks(cs, id, links), "");
             foreach (string code in codes)
                 shape.Codes.TryAdd(code);
+        }
+
+        // Civil 3D walks the links of Shapes.Add in array order: each link must touch the end of the previous one
+        // (a reversed link is turned around), otherwise the fill is drawn crossed. So sort them into one closed chain.
+        // Not possible (open outline, more than two links at a point) = warn and keep the order given.
+        private static Link[] ChainLinks(CorridorState cs, string id, Link[] links)
+        {
+            var rest = new List<Link>(links);
+            var chain = new List<Link> { rest[0] };
+            rest.RemoveAt(0);
+            Point start = links[0].Points[0];
+            Point end = links[0].Points[links[0].Points.Count - 1];
+            while (rest.Count > 0)
+            {
+                int k = rest.FindIndex(l => ReferenceEquals(l.Points[0], end) || ReferenceEquals(l.Points[l.Points.Count - 1], end));
+                if (k < 0) break;
+                Link next = rest[k];
+                rest.RemoveAt(k);
+                end = ReferenceEquals(next.Points[0], end) ? next.Points[next.Points.Count - 1] : next.Points[0];
+                chain.Add(next);
+            }
+            if (rest.Count > 0 || !ReferenceEquals(end, start))
+            {
+                Warn(cs, CorridorError.Failure, id + ": link ต่อกันไม่เป็นรูปปิด — Civil 3D จะระบายสีผิด");
+                return links;
+            }
+            return chain.ToArray();
         }
 
         private static PointInMem Abs(CorridorState cs, Pt p)

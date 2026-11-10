@@ -126,7 +126,21 @@ test("shape: ต่อ link เป็นรูปปิด (ทิศ link ส�
   const r = Spec.evaluate(s, {});
   eq(3, r.shapes.S1.poly.length, "จุดของรูป");
   s.links.pop(); s.shapes[0].links.pop();
-  ok(!Spec.evaluate(s, {}).shapes.S1.poly, "ไม่ปิด = ไม่มี polygon");
+  const r2 = Spec.evaluate(s, {});
+  ok(r2.shapes.S1.broken, "ไม่ปิด = broken (Civil 3D ระบายสีผิด)");
+  ok(r2.issues.some(i => i.msg.includes("ต่อกันไม่เป็นรูปปิด")), "เตือน");
+});
+test("shape: เรียง link ให้ต่อเป็นวงเหมือน ChainLinks (spec สลับลำดับได้) · walkShape = แบบ Civil 3D", () => {
+  const P = (x, y) => ({ x, y });
+  // body S2 แบบเดิม: L11 P9→P10, L13 P9→P14, L14 P14→P16, L15 P16→P10
+  const L11 = [P(5, -2), P(0, -1)], L13 = [P(5, -2), P(6, -4)], L14 = [P(6, -4), P(3, -5), P(0, -5)], L15 = [P(0, -5), P(0, -1)];
+  const w = Spec.walkShape([L11, L13, L14, L15]);
+  ok(!w.chained, "ลำดับเดิม = Civil 3D ต่อไม่เป็นวง");
+  const order = Spec.chainOrder([L11, L13, L14, L15]);
+  ok(order, "เรียงใหม่ได้");
+  const w2 = Spec.walkShape(order.map(i => [L11, L13, L14, L15][i]));
+  ok(w2.chained, "เรียงแล้ว = ต่อเป็นวง"); eq(5, w2.poly.length, "จุดของรูป");
+  ok(Spec.walkShape([[P(0, 0), P(1, 0)], [P(1, 1), P(1, 0)], [P(1, 1), P(0, 0)]]).chained, "link กลับทิศ = Civil 3D กลับให้");
 });
 test("ขอบเขต parameter: ต่ำกว่า min ใช้ค่าขอบ + เตือน", () => {
   const r = Spec.evaluate(spec([["P2", { type: "delta", dx: "Width", dy: "0" }]]), { values: { Width: 0.2 } });

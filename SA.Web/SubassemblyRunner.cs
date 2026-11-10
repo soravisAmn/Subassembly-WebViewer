@@ -268,27 +268,15 @@ public class SubassemblyRunner
         foreach (var l in cs.Links)
             o.Links.Add(new { pts = l.Points.Select(p => p.Index).ToArray(), codes = l.Codes.ToArray(), sites = CallSites.Of(l) });
         foreach (var s in cs.Shapes)
-            o.Shapes.Add(new { links = s.Links.Select(l => l.Index).ToArray(), codes = s.Codes.ToArray(), polygon = ChainPolygon(s), sites = CallSites.Of(s) });
-    }
-
-    // เรียง link ของ shape ให้ต่อกันเป็นรูปปิด (สำหรับระบายสี) ถ้าต่อไม่ได้คืน null
-    private static int[]? ChainPolygon(Shape s)
-    {
-        var rest = s.Links.Select(l => l.Points.Select(p => p.Index).ToList()).ToList();
-        if (rest.Count == 0) return null;
-        var chain = new List<int>(rest[0]);
-        rest.RemoveAt(0);
-        while (rest.Count > 0)
         {
-            int end = chain[^1];
-            int k = rest.FindIndex(r => r[0] == end || r[^1] == end);
-            if (k < 0) return null;
-            var seg = rest[k]; rest.RemoveAt(k);
-            if (seg[0] != end) seg.Reverse();
-            chain.AddRange(seg.Skip(1));
+            // Fill outline exactly as Civil 3D builds it (links walked in the order given, see ShapeWalk)
+            var (outline, chained) = ShapeWalk.Walk(s);
+            int[]? polygon = outline.Count >= 3 ? outline.Select(p => p.Index).ToArray() : null;
+            o.Shapes.Add(new { links = s.Links.Select(l => l.Index).ToArray(), codes = s.Codes.ToArray(), polygon, chained, sites = CallSites.Of(s) });
+            if (!chained)
+                o.Issues.Add(new SimIssue { Error = "ShapeLinksNotChained", Level = "Warning", Source = "SA Drawing Studio",
+                    Message = $"shape #{s.Index}{(s.Codes.Any() ? " (" + string.Join(", ", s.Codes) + ")" : "")}: link ไม่ต่อกันเป็นวงตามลำดับที่ส่งให้ Shapes.Add — Civil 3D จะระบายสีไขว้แบบที่เห็นนี้" });
         }
-        if (chain.Count > 1 && chain[0] == chain[^1]) chain.RemoveAt(chain.Count - 1);
-        return chain.Count >= 3 ? chain.ToArray() : null;
     }
 
     // เก็บเฉพาะบรรทัด stack trace ที่อยู่ในไฟล์ของผู้ใช้ (ตัดส่วนของเว็บ/ตัวจำลองออก)

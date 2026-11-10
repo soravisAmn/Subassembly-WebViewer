@@ -174,11 +174,10 @@ namespace Autodesk.Civil.Runtime
 
     public class Link
     {
-        internal Link(int index, Point[] points) { Index = index; Points = points; }
+        internal Link(int index, Point[] points) { Index = index; Points = new PointCollection(points); }
         public int Index { get; }
-        public Point[] Points { get; }
-        public Point StartPoint => Points[0];
-        public Point EndPoint => Points[Points.Length - 1];
+        // Real API: Link.Points is a PointCollection (Count + indexer). There is no Link.StartPoint / EndPoint.
+        public PointCollection Points { get; }
         public CodeCollection Codes { get; } = new CodeCollection();
     }
 
@@ -193,11 +192,18 @@ namespace Autodesk.Civil.Runtime
     public class PointCollection : IEnumerable<Point>
     {
         private readonly List<Point> _items = new List<Point>();
+        private readonly bool _readOnly;
         public int Count => _items.Count;
         public Point this[int index] => _items[index];
 
+        internal PointCollection() { }
+        // The points of one link (read-only in the simulator)
+        internal PointCollection(IEnumerable<Point> points) { _items.AddRange(points); _readOnly = true; }
+
         public Point Add(double offset, double elevation, string code)
         {
+            if (_readOnly)
+                throw new NotSupportedException("Link.Points.Add: ตัวจำลองไม่รองรับการเพิ่มจุดเข้า link ที่สร้างแล้ว");
             if (double.IsNaN(offset) || double.IsNaN(elevation) || double.IsInfinity(offset) || double.IsInfinity(elevation))
                 throw new ArgumentException($"Points.Add: ค่าพิกัดไม่ถูกต้อง ({offset}, {elevation})");
             var p = new Point(_items.Count, offset, elevation);

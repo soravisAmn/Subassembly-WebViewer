@@ -23,6 +23,13 @@ Test sets live in `tests-civil3d/`. Thai labels in quotes are the text shown in 
 
 Load it as in the guide `Subassembly C# สู่ Civil 3D 2027.html`: Trusted Location, then one Tool Palette tool per class. No NETLOAD needed. Then follow `tests-civil3d/round6-checklist.md`, which compares against commit `7162b14`.
 
+**Result of the first run (corridor on `test_corridor.dwg`):** links in the right place, but body S2 and pavement S2 / S3 filled as crossed triangles; base S1 filled correctly. Cause: Civil 3D walks the links of `Shapes.Add` in array order (see [code-generation.md](code-generation.md), "Shape link order"); the API reference says nothing about it. The rule was inferred from these four shapes: a "any order" rule would have filled body S2 correctly, and a "strict head-to-tail direction" rule would have broken base S1 (its L6 is reversed). Fixed in the generator (`ChainLinks`) and in the simulator (`ShapeWalk`). The 3 root files must be Saved again from the web, then rebuilt with `build-c3d.bat`. Still to confirm in Civil 3D: body S1 and pavement S1 (predicted correct before the fix).
+
+Also found with the stricter simulator:
+
+- The hand-written `body_rock-pitching.cs` passes its soil links as `RockBase (PR→B0), PR→PE, …`, which does not chain: by the same rule Civil 3D fills `CompactedSoil` crossed there too. `RockPitchingTests` compares its shapes by points only.
+- `pavement-assembly.cs` (locked copy in `SA.Tests/fixtures/round6/`): shape `sand` (S3 there) crosses itself on flat ground at the top level and on rising / falling ground although its links chain: the slope from P35 / P5 and the Follow Surface link cross. This is a limit of the drawing, listed in `KnownCrossings` in `SA.Tests/ShapeChainTests.cs`.
+
 ## Round 5b: round5b-demo, fill embankment with a berm every BermInterval (Loop)
 
 `tests-civil3d/round5b-demo.cs` = subassembly `TestSubassembly.Round5bDemo` built with the web's tools only (sequence = `buildRound5b()` in `SA.Tests/js/round5bdemo.test.js`, every step through the Logic API), saved through `/api/drawing/save` · view in the web: "ไฟล์ ▾" → Open project → `round5b-demo.assembly.json` (drag the ground point at the shoulder up / down and the number of benches changes live).

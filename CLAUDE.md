@@ -28,6 +28,7 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 - Every milestone: run all tests, update the relevant `docs/` file, tell the user whether to reopen `run-viewer.bat` or just press Ctrl+F5.
 - New shortcuts go in the `?` table and must not clash. Options inside a command beat general shortcuts.
 - No fake API in the shim that real Civil 3D lacks (reference: `link-API-Reference.txt`). Civil 3D links are straight only.
+- The web must render exactly like Civil 3D. The shim must never be more lenient than the real API (order, direction, missing links, etc.). Any difference found in Civil 3D is fixed in the shim first (so the web shows the same problem), with a test, then in the generator. To check that an API member exists, compile a probe against the real DLLs in `C:\Program Files\Autodesk\AutoCAD 2027`.
 - Features that change spec data (points, links, shapes, parameters, conditions, variables, Arrays, etc.) are functions in the Logic API (`js/logicops.js`) first, then the UI calls them. The UI must not edit the spec directly. Update `docs/logic-api.md` each time. (Pure screen features such as panel size, colour, zoom are exempt.)
 - When a round is finished, its prompt + design doc move to `docs/prompts/`.
 
@@ -56,6 +57,7 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 ## Status
 
 - Last finished: round 6 (MCP), M0-M5. History: `docs/history.md`. Setup: `docs/connect-claude.md`.
+- Round 6 M5 Civil 3D run: shapes filled crossed (link order in `Shapes.Add`). Fixed in shim + generator (`docs/civil3d-testing.md`). The user re-Saves the 3 root files from the web, then `build-c3d.bat` and re-test.
 - Next: the user runs `tests-civil3d/round6-checklist.md` in Civil 3D. Then a new prompt: drawing from a CAD screenshot (postponed from round 6).
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
 

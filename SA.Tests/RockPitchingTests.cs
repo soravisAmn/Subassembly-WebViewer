@@ -169,13 +169,18 @@ static class RockPitchingTests
         List<string> Shapes(RunOutput o) => o.Shapes.Select(s =>
         {
             var poly = Get<int[]?>(s, "polygon");
-            return C(Get<string[]>(s, "codes")) + ":" + (poly == null ? "ไม่ปิด" : string.Join(" ", poly.Select(i => P(o.Points[i])).OrderBy(x => x, StringComparer.Ordinal)));
+            // distinct points: the hand-written body file passes its soil links unchained, so the Civil 3D walk visits
+            // some points twice (crossed fill, see ShapeChainTests); the geometry is still compared here
+            return C(Get<string[]>(s, "codes")) + ":" + (poly == null ? "ไม่ปิด" : string.Join(" ", poly.Select(i => P(o.Points[i])).Distinct().OrderBy(x => x, StringComparer.Ordinal)));
         }).ToList();
         Diff("shape", Shapes(real), Shapes(drawn));
         bool Sev(RunOutput o) => o.Issues.Any(i => i.Level == "Severe");
         if (Sev(real) != Sev(drawn)) throw new Exception($"{where}: error (Severe) ไฟล์จริง {Sev(real)} / ที่วาด {Sev(drawn)}");
-        if (real.Issues.Count > 0 != drawn.Issues.Count > 0)
-            throw new Exception($"{where}: เตือน ไฟล์จริง [{string.Join(" | ", real.Issues.Select(i => i.Message))}] / ที่วาด [{string.Join(" | ", drawn.Issues.Select(i => i.Message))}]");
+        // the web's own "links not chained" warning on the hand-written file is not a Civil 3D warning: left out here
+        List<SA.Shim.SimIssue> Iss(RunOutput o) => o.Issues.Where(i => i.Error != "ShapeLinksNotChained").ToList();
+        if (Iss(real).Count > 0 != Iss(drawn).Count > 0)
+            throw new Exception($"{where}: เตือน ไฟล์จริง [{string.Join(" | ", Iss(real).Select(i => i.Message))}] / ที่วาด [{string.Join(" | ", Iss(drawn).Select(i => i.Message))}]");
+        if (drawn.Issues.Any(i => i.Error == "ShapeLinksNotChained")) throw new Exception($"{where}: ไฟล์ที่วาด link ของ shape ต่อกันไม่เป็นวง");
     }
 
     static string FindRoot()

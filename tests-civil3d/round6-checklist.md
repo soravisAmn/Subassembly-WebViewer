@@ -35,6 +35,7 @@ Body L13 lost `Datum` in the edit above. Check section 3 with this in mind; a ho
    - `TestSubassembly.PavementAssembly`
    - `TestSubassembly.RockPitchingBaseWeb`
    - `TestSubassembly.RockPitchingBodyWeb`
+   A tool copied from another palette item keeps that item's parameter list. Parameters it does not have show blank in Subassembly Properties, and shared names keep the old value (BasicLane gives `Depth` = 0.2). Blank values drew a diagonal line instead of the section. Fill them in Subassembly Properties (double-click the value; do not press Enter, it closes the dialog).
 4. Open the drawing used before round 6 (or any with a target surface passing through both cut and fill).
 
 To compare against the baseline, build `7162b14` too: `git worktree add ..\sa-7162b14 7162b14`, set the three `Compile` paths in a copy of `Round6.csproj` to it, and use a different AssemblyName. Class names are the same, so load the two DLLs in separate drawings. Remove the worktree afterwards with `git worktree remove ..\sa-7162b14`.

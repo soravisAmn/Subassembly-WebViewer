@@ -597,9 +597,12 @@ const Spec = (() => {
       // shape ใน Civil 3D ประกอบจาก link จริงเท่านั้น
       const ax = s.links.find(id => links[id] && links[id].aux);
       if (ax){ shapes[s.id] = { err: `ใช้ link auxiliary ${ax} ไม่ได้ (ไม่อยู่ใน Civil 3D)`, auxLink: ax }; warn(s.id, `${s.id}: ${shapes[s.id].err}`); continue; }
-      const poly = chain(use.map(id => links[id].path));
-      if (!poly) warn(s.id, `${s.id}: link ต่อกันไม่เป็นรูปปิด`);
-      shapes[s.id] = { poly };
+      // generated C# sorts the links into a closed chain (ChainLinks), then Civil 3D walks them in that order
+      const paths = use.map(id => links[id].path);
+      const order = chainOrder(paths);
+      if (!order) warn(s.id, `${s.id}: link ต่อกันไม่เป็นรูปปิด — Civil 3D จะระบายสีผิด`);
+      const w = walkShape(order ? order.map(i => paths[i]) : paths);
+      shapes[s.id] = order ? { poly: w.poly } : { poly: w.poly, broken: true };
     }
     for (const b of BRS) branchOn(b.id);
     // variable ที่ยังไม่มีใครใช้ก็คำนวณ (เตือนครบเหมือน C#) · vars = ค่าตอนนี้ (null = ไม่รู้ค่า)
@@ -687,23 +690,41 @@ const Spec = (() => {
     return out;
   }
 
-  // เรียง path ของ link ให้ต่อกันเป็นรูปปิด (เทียบจุดด้วยพิกัด)
-  function chain(paths){
-    const same = (p, q) => Math.abs(p.x - q.x) < 1e-7 && Math.abs(p.y - q.y) < 1e-7;
-    const rest = paths.map(p => p.slice());
-    if (!rest.length) return null;
-    const out = rest.shift();
+  const samePt = (p, q) => Math.abs(p.x - q.x) < 1e-7 && Math.abs(p.y - q.y) < 1e-7;
+
+  // Same as ChainLinks in the generated C#: order of the link paths that makes one closed chain,
+  // starting from the first link (greedy, first link that touches the current end) · null = not possible
+  function chainOrder(paths){
+    if (!paths.length) return null;
+    const rest = paths.map((p, i) => i).slice(1), order = [0];
+    const start = paths[0][0];
+    let end = paths[0][paths[0].length - 1];
     while (rest.length){
-      const end = out[out.length - 1];
-      const k = rest.findIndex(r => same(r[0], end) || same(r[r.length - 1], end));
+      const k = rest.findIndex(i => samePt(paths[i][0], end) || samePt(paths[i][paths[i].length - 1], end));
       if (k < 0) return null;
-      const seg = rest.splice(k, 1)[0];
-      if (!same(seg[0], end)) seg.reverse();
-      out.push(...seg.slice(1));
+      const i = rest.splice(k, 1)[0], p = paths[i];
+      end = samePt(p[0], end) ? p[p.length - 1] : p[0];
+      order.push(i);
     }
-    if (out.length > 1 && same(out[0], out[out.length - 1])) out.pop();
-    else return null;
-    return out.length >= 3 ? out : null;
+    return samePt(end, start) ? order : null;
+  }
+
+  // Same as Civil 3D (ShapeWalk in the shim): walk the links in the order given · first link keeps its direction,
+  // a link touching the current end is turned around if needed, a link that does not touch is appended as is (crossed fill)
+  // → { poly (closed implicitly, null below 3 points), chained }
+  function walkShape(paths){
+    const out = [];
+    let chained = true;
+    for (const p of paths){
+      if (!out.length){ out.push(...p); continue; }
+      const end = out[out.length - 1];
+      if (samePt(p[0], end)) out.push(...p.slice(1));
+      else if (samePt(p[p.length - 1], end)) out.push(...p.slice().reverse().slice(1));
+      else { chained = false; out.push(...p); }
+    }
+    if (out.length > 1 && samePt(out[0], out[out.length - 1])) out.pop();
+    else chained = false;
+    return { poly: out.length >= 3 ? out : null, chained };
   }
 
   // Clipped Surface Link: เส้นทางจาก A ถึง B ตามผิวดิน แต่ไม่เกินเส้นอ้างอิง R1–R2 (ต่อออกไปได้) — ตรงกับ FollowClipped ใน CodeGenerator.cs
@@ -1522,7 +1543,7 @@ const Spec = (() => {
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, offLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
            UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, addLastOf, arraySetPoint, withI, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
-           polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
+           chainOrder, walkShape, polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();
 if (typeof module !== "undefined") module.exports = Spec;

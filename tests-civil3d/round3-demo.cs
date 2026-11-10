@@ -113,7 +113,7 @@ namespace TestSubassembly
 
         internal static void Draw(CorridorState cs)
         {
-            // ---- parameter (นอกขอบเขต = ใช้ค่าขอบแทน + เตือน) ----
+            // ---- parameter (≤ 0 ที่ต้องมากกว่า 0 = error + ใช้ default · นอกขอบเขต = ใช้ค่าขอบแทน + เตือน) ----
             long Side = GetLong(cs, "Side", 0);
             double W = GetDouble(cs, "W", 3.0);
             if (W < 1.0) { Warn(cs, CorridorError.ValueTooSmall, "W = " + W + " < 1, ใช้ 1 แทน"); W = 1.0; }
@@ -317,6 +317,158 @@ namespace TestSubassembly
             return Check(cs, id, new Pt(p.X + t * (q.X - p.X), p.Y + t * (q.Y - p.Y)));
         }
 
+        // Offset: จุด e (ปลายของเส้น a→b) เลื่อนตั้งฉากไป k (+ = ซ้ายของทิศ a→b บนจอจริง — ตัวเรียกคูณ F ให้แล้ว) — เส้นขนาน
+        private static Pt? Offset(CorridorState cs, string id, Pt? a, Pt? b, Pt? e, double k)
+        {
+            if (a == null || b == null || e == null) return null;
+            double dx = b.Value.X - a.Value.X, dy = b.Value.Y - a.Value.Y, n = Math.Sqrt(dx * dx + dy * dy);
+            if (n < 1e-9) { Warn(cs, CorridorError.Failure, id + ": เส้นยาวเป็นศูนย์ หาทิศ offset ไม่ได้"); return null; }
+            return Check(cs, id, new Pt(e.Value.X - dy * k / n, e.Value.Y + dx * k / n));
+        }
+
+        // Extend to Surface: ต่อเส้น along→from เลย from ออกไป (ทิศเดิม) จนชนดิน — เฉพาะเมื่อปลาย from ลอยเหนือดิน
+        //   ไม่ลอย / ไม่มีดิน (Layout / ไม่มี target) = null เงียบๆ (link / shape ที่ใช้ = ไม่เกิด) · ไม่ชนดินภายใน maxDistance (ระยะราบ) = เตือน + null
+        private static Pt? ExtendToGround(CorridorState cs, string id, ObjectId surface, Pt? from, Pt? along, double maxDistance)
+        {
+            if (from == null || along == null || surface.IsNull) return null;
+            Pt f = from.Value;
+            double gy;
+            try
+            {
+                gy = Elevation(cs, surface, cs.CurrentOffset + f.X) - cs.CurrentElevation;
+            }
+            catch (Exception e)
+            {
+                Warn(cs, CorridorError.Failure, id + " ต่อลงถึงดิน: " + e.Message);
+                return null;
+            }
+            if (!(gy < f.Y - 1e-9)) return null;
+            double dx = f.X - along.Value.X, dy = f.Y - along.Value.Y;
+            if (Math.Abs(dx) < 1e-12 && Math.Abs(dy) < 1e-12) { Warn(cs, CorridorError.Failure, id + " ต่อลงถึงดิน: เส้นยาวเป็นศูนย์"); return null; }
+            Pt? hit = null;
+            if (Math.Abs(dx) < 1e-12)
+            {
+                if (dy < 0) hit = new Pt(f.X, gy);
+            }
+            else
+            {
+                try
+                {
+                    IPoint h = cs.IntersectSurface(surface, cs.CurrentAlignmentId, Abs(cs, f), dx > 0, dy / Math.Abs(dx));
+                    if (h != null) hit = new Pt(h.Offset - cs.CurrentOffset, h.Elevation - cs.CurrentElevation);
+                }
+                catch
+                {
+                    hit = null;
+                }
+            }
+            if (hit == null || Math.Abs(hit.Value.X - f.X) > maxDistance + 1e-9)
+            {
+                Warn(cs, CorridorError.NoSideslopeIntersectFound, id + " ต่อลงถึงดิน: ไม่ชนผิวดินภายใน " + maxDistance + " m");
+                return null;
+            }
+            return Check(cs, id, hit.Value);
+        }
+
+        // Clipped Surface Link: ตามผิวดินจาก a ถึง b แต่ไม่สูงกว่า (below) / ไม่ต่ำกว่า เส้นอ้างอิง r1–r2 (ต่อออกไปได้)
+        //   แบบ BuildBottom ของ base_rock-pitching.cs — ตรงกับ clipPath ใน wwwroot/js/spec.js
+        //   ช่วงที่ปลายทั้งสองอยู่บนเส้น = codes + codesLine · นอกนั้น = codes + codesGround · ไม่มีดิน / เส้นอ้างอิงแนวดิ่ง = เส้นตรง + codesLine
+        private static Link[] FollowClipped(CorridorState cs, string id, ObjectId surface, Pt? pa, Point a, Pt? pb, Point b, Pt? r1, Pt? r2, bool below,
+                                            string[] codes, string[] codesGround, string[] codesLine)
+        {
+            if (a == null || b == null || r1 == null || r2 == null) return null;
+            Pt A = pa.Value, B = pb.Value, R1 = r1.Value, R2 = r2.Value;
+            var lineCodes = new List<string>(codes); lineCodes.AddRange(codesLine);
+            var gndCodes = new List<string>(codes); gndCodes.AddRange(codesGround);
+            var path = new List<Pt> { A, B };
+            bool clipped = false;
+            Func<double, double> line = x => R1.Y + (R2.Y - R1.Y) * (x - R1.X) / (R2.X - R1.X);
+            string fail = null;
+            if (Math.Abs(R2.X - R1.X) < 1e-9) fail = "เส้นอ้างอิงเป็นแนวดิ่ง";
+            else if (surface.IsNull)
+            {
+                if (cs.Mode != CorridorMode.Layout) fail = "ไม่ได้กำหนด Target Surface";
+            }
+            else
+            {
+                try
+                {
+                    // ผิวดิน: ปลายทั้งสอง + จุดหักระหว่างทาง (แบบ FollowSurface)
+                    var prof = new List<(double X, double Y)> { (A.X, Elevation(cs, surface, cs.CurrentOffset + A.X) - cs.CurrentElevation) };
+                    double lo = Math.Min(A.X, B.X), hi = Math.Max(A.X, B.X);
+                    var mids = new List<(double X, double Y)>();
+                    SampledSectionLinkCollection sampled = cs.SampleSection(surface, cs.CurrentAlignmentId, Abs(cs, A), Abs(cs, B));
+                    foreach (SampledSectionLink s in sampled)
+                    {
+                        double x = s.EndPointOffset - cs.CurrentOffset;
+                        if (x > lo + 1e-9 && x < hi - 1e-9)
+                            mids.Add((x, s.EndPointElevation - cs.CurrentElevation));
+                    }
+                    mids.Sort((p, q) => p.X.CompareTo(q.X));
+                    if (A.X > B.X) mids.Reverse();
+                    prof.AddRange(mids);
+                    prof.Add((B.X, Elevation(cs, surface, cs.CurrentOffset + B.X) - cs.CurrentElevation));
+
+                    Func<double, double, double> clip = (x, y) => below ? Math.Min(y, line(x)) : Math.Max(y, line(x));
+                    var raw = new List<Pt> { new Pt(prof[0].X, clip(prof[0].X, prof[0].Y)) };
+                    for (int i = 0; i < prof.Count - 1; i++)
+                    {
+                        var p = prof[i];
+                        var q = prof[i + 1];
+                        double da = p.Y - line(p.X), db = q.Y - line(q.X);
+                        if (da * db < 0)
+                        {
+                            double t = da / (da - db), x = p.X + t * (q.X - p.X);
+                            raw.Add(new Pt(x, line(x)));
+                        }
+                        raw.Add(new Pt(q.X, clip(q.X, q.Y)));
+                    }
+                    // ตัดจุดซ้ำ (ระยะราบ < 0.0001) และจุดกลางของช่วงที่อยู่บนเส้น
+                    var c = new List<Pt>();
+                    foreach (Pt p in raw)
+                    {
+                        if (c.Count > 0 && Math.Abs(p.X - c[c.Count - 1].X) < 1e-4) continue;
+                        if (c.Count >= 2 && Math.Abs(p.Y - line(p.X)) < 1e-4 && Math.Abs(c[c.Count - 1].Y - line(c[c.Count - 1].X)) < 1e-4
+                            && Math.Abs(c[c.Count - 2].Y - line(c[c.Count - 2].X)) < 1e-4)
+                        {
+                            c[c.Count - 1] = p;
+                            continue;
+                        }
+                        c.Add(p);
+                    }
+                    if (c.Count >= 2)
+                    {
+                        path = new List<Pt> { A };
+                        for (int i = 1; i < c.Count - 1; i++) path.Add(c[i]);
+                        path.Add(B);
+                    }
+                    clipped = true;
+                }
+                catch (Exception e)
+                {
+                    fail = e.Message;
+                }
+            }
+            if (fail != null) Warn(cs, CorridorError.Failure, id + " ตามดิน ไม่เกินเส้น: " + fail + " — ใช้เส้นตรงแทน");
+            var pts = new Point[path.Count];
+            pts[0] = a;
+            pts[path.Count - 1] = b;
+            for (int i = 1; i < path.Count - 1; i++) pts[i] = cs.Points.Add(path[i].X, path[i].Y, "");
+            var links = new Link[path.Count - 1];
+            for (int i = 0; i < links.Length; i++)
+            {
+                links[i] = cs.Links.Add(new[] { pts[i], pts[i + 1] }, "");
+                bool on = clipped && Math.Abs(path[i].Y - line(path[i].X)) < 1e-4 && Math.Abs(path[i + 1].Y - line(path[i + 1].X)) < 1e-4;
+                foreach (string code in (on || !clipped ? lineCodes : gndCodes))
+                    links[i].Codes.TryAdd(code);
+            }
+            return links;
+        }
+
+        // link optional ใน shape (ต่อลงถึงดิน): ไม่เกิด / วาดไม่ได้ (null) = ข้ามไป
+        private static Link[] Opt(Link l) => l == null ? new Link[0] : new[] { l };
+        private static Link[] Opt(Link[] l) => l ?? new Link[0];
+
         // หมุนจุด p รอบ pivot ด้วยมุม angle (องศา ทวนเข็ม +) — สมาชิกกลุ่มหมุน
         private static Pt? Rotate(CorridorState cs, string id, Pt? p, Pt? pivot, double angle)
         {
@@ -324,6 +476,112 @@ namespace TestSubassembly
             if (pivot == null) { Warn(cs, CorridorError.Failure, id + ": ข้ามเพราะหาจุดหมุนไม่ได้"); return null; }
             double r = angle * Deg, c = Math.Cos(r), s = Math.Sin(r), dx = p.Value.X - pivot.Value.X, dy = p.Value.Y - pivot.Value.Y;
             return Check(cs, id, new Pt(pivot.Value.X + dx * c - dy * s, pivot.Value.Y + dx * s + dy * c));
+        }
+
+        // ---- ค่าจากเรขาคณิตในนิพจน์ (P3.x / P3.y / ground / exists) ----
+        // จุดที่อ้างหาไม่ได้ = โยน InvalidOperationException -> Try ข้างล่างเตือน แล้วให้ object นี้หาไม่ได้ (ตรงกับตัวคำนวณในเว็บ)
+
+        private static double PX(Pt? p)
+        {
+            if (p == null) throw new InvalidOperationException("ข้ามเพราะหาจุดที่นิพจน์อ้างไม่ได้");
+            return p.Value.X;
+        }
+
+        private static double PY(Pt? p)
+        {
+            if (p == null) throw new InvalidOperationException("ข้ามเพราะหาจุดที่นิพจน์อ้างไม่ได้");
+            return p.Value.Y;
+        }
+
+        private static bool Exists(Pt? p)
+        {
+            return p != null;
+        }
+
+        // == / != ของตัวเลขเทียบด้วย tolerance เดียวกับเว็บ
+        private static bool Eq(double a, double b)
+        {
+            return Math.Abs(a - b) <= 1e-6;
+        }
+
+        // ระดับผิวดินที่ offset ของจุด (เทียบ origin) · ไม่มีผิวดิน (Layout mode / ไม่ได้กำหนด target) = ระดับของจุดเอง + เตือน
+        private static double Ground(CorridorState cs, ObjectId surface, Pt? p)
+        {
+            double y = PY(p);
+            if (surface.IsNull)
+            {
+                if (cs.Mode != CorridorMode.Layout)
+                    Warn(cs, CorridorError.LogicalNameNotFound, "ground(): ไม่ได้กำหนด Target Surface — ใช้ระดับของจุดเอง");
+                return y;
+            }
+            try
+            {
+                return Elevation(cs, surface, cs.CurrentOffset + p.Value.X) - cs.CurrentElevation;
+            }
+            catch (Exception e)
+            {
+                throw new InvalidOperationException("ground(): " + e.Message);
+            }
+        }
+
+        // ---- เงื่อนไข / กิ่ง ----
+        // เงื่อนไขคำนวณไม่ได้ (อ้างจุดที่หาไม่ได้ / เงื่อนไขที่ไม่รู้ค่า) = null + เตือน -> ไม่เข้ากิ่งไหน (ตรงกับตัวคำนวณในเว็บ)
+
+        private static bool? Cond(CorridorState cs, string name, Func<bool> test)
+        {
+            try
+            {
+                return test();
+            }
+            catch (InvalidOperationException e)
+            {
+                Warn(cs, CorridorError.Failure, "เงื่อนไข " + name + ": " + e.Message);
+                return null;
+            }
+        }
+
+        private static double? Val(CorridorState cs, string name, Func<double> value)
+        {
+            try
+            {
+                return value();
+            }
+            catch (InvalidOperationException e)
+            {
+                Warn(cs, CorridorError.Failure, name + ": " + e.Message);
+                return null;
+            }
+        }
+
+        // ค่าของเงื่อนไขที่ใช้ในนิพจน์อื่น — ไม่รู้ค่า = โยน (ให้ Cond / Try ข้างนอกจัดการ)
+        private static bool V(bool? b)
+        {
+            if (b == null) throw new InvalidOperationException("เงื่อนไขที่อ้างไม่รู้ค่า");
+            return b.Value;
+        }
+
+        // จุดแรกในรายการที่เกิด (ไว้ต่อเรขาคณิตหลังกิ่ง) · ไม่มีสักจุด = หาไม่ได้ + เตือน
+        private static Pt? FirstOf(CorridorState cs, string id, params Pt?[] points)
+        {
+            foreach (Pt? p in points)
+            {
+                if (p != null) return p;
+            }
+            Warn(cs, CorridorError.Failure, id + ": ไม่มีจุดในรายการที่เกิด");
+            return null;
+        }
+
+        private static T Try<T>(CorridorState cs, string id, Func<T> calc)
+        {
+            try
+            {
+                return calc();
+            }
+            catch (InvalidOperationException e)
+            {
+                Warn(cs, CorridorError.Failure, id + ": " + e.Message);
+                return default(T);
+            }
         }
 
         private static Pt? Check(CorridorState cs, string id, Pt p)
@@ -566,9 +824,36 @@ namespace TestSubassembly
             {
                 if (l == null) { Warn(cs, CorridorError.Failure, id + ": ข้ามเพราะมี link ที่วาดไม่ได้"); return; }
             }
-            Shape shape = cs.Shapes.Add(links, "");
+            Shape shape = cs.Shapes.Add(ChainLinks(cs, id, links), "");
             foreach (string code in codes)
                 shape.Codes.TryAdd(code);
+        }
+
+        // Civil 3D walks the links of Shapes.Add in array order: each link must touch the end of the previous one
+        // (a reversed link is turned around), otherwise the fill is drawn crossed. So sort them into one closed chain.
+        // Not possible (open outline, more than two links at a point) = warn and keep the order given.
+        private static Link[] ChainLinks(CorridorState cs, string id, Link[] links)
+        {
+            var rest = new List<Link>(links);
+            var chain = new List<Link> { rest[0] };
+            rest.RemoveAt(0);
+            Point start = links[0].Points[0];
+            Point end = links[0].Points[links[0].Points.Count - 1];
+            while (rest.Count > 0)
+            {
+                int k = rest.FindIndex(l => ReferenceEquals(l.Points[0], end) || ReferenceEquals(l.Points[l.Points.Count - 1], end));
+                if (k < 0) break;
+                Link next = rest[k];
+                rest.RemoveAt(k);
+                end = ReferenceEquals(next.Points[0], end) ? next.Points[next.Points.Count - 1] : next.Points[0];
+                chain.Add(next);
+            }
+            if (rest.Count > 0 || !ReferenceEquals(end, start))
+            {
+                Warn(cs, CorridorError.Failure, id + ": link ต่อกันไม่เป็นรูปปิด — Civil 3D จะระบายสีผิด");
+                return links;
+            }
+            return chain.ToArray();
         }
 
         private static PointInMem Abs(CorridorState cs, Pt p)
@@ -609,6 +894,12 @@ namespace TestSubassembly
         private static void Warn(CorridorState cs, CorridorError error, string message)
         {
             cs.RecordError(error, CorridorErrorLevel.AsWarning, message, Source, true);
+        }
+
+        // error ระดับ Severe (parameter ≤ 0 ที่ต้องมากกว่า 0 — แบบ RecordError ใน base_rock-pitching.cs)
+        private static void Severe(CorridorState cs, CorridorError error, string message)
+        {
+            cs.RecordError(error, CorridorErrorLevel.Severe, message, Source, true);
         }
     }
 

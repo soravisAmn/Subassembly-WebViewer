@@ -7,7 +7,8 @@ Tests must never read the user's working files at the root (`*.cs`, `*.assembly.
 | Command | Tests |
 |---|---|
 | `dotnet run --project SA.Tests` | MCP endpoint (initialize, tools/list, tools/call, no page open, foreign Host / Origin, forwarding to a fake page), Trapezoid, code generator (compares JS with the result of running the C#, including Side = Left and link codes; this part needs `node`), SA-DRAWING block, object → code line, redrawn rock-pitching = real files (round 4c + -web.cs round 4e), exact parameter warning text (value types) |
-| `node SA.Tests/js/evaluator.test.js` | Expressions + DrawingSpec (add cases in `SA.Tests/js/drawing-cases.json`) |
+| `dotnet run --project SA.Tests` (ShapeChainTests) | Shapes fill like Civil 3D: the old round 6 body S2 (links in spec order) shows the broken fill + `ShapeLinksNotChained`; every fixture and `tests-civil3d` demo regenerated from its sa-spec gives closed shapes, chained, not self-crossing, on 14 grounds × Right / Left. Known crossings that are limits of a drawing are listed in `KnownCrossings` (see [civil3d-testing.md](civil3d-testing.md)) |
+| `node SA.Tests/js/evaluator.test.js` | Expressions + DrawingSpec (add cases in `SA.Tests/js/drawing-cases.json`), shape chaining (`chainOrder` / `walkShape`) |
 | `node SA.Tests/js/cond.test.js` | Condition expressions / values from geometry (round 4) |
 | `node SA.Tests/js/logic.test.js` | if / switch / nested branches, firstOf, unknown values, branch cloning, cut / fill, show all cases, renaming / deleting conditions (round 4) |
 | `node SA.Tests/js/rockpitching.test.js` | Redrawing base / body rock-pitching with tools = sa-spec in the locked `SA.Tests/fixtures/base_rock-pitching-web.cs` / `body_rock-pitching-web.cs`, computes with no warnings / closed shapes (rounds 4c / 4e). Comparison with the real files is in `dotnet run` |

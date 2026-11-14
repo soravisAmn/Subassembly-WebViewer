@@ -311,6 +311,9 @@ app.MapPost("/api/build/plan", (SA.Build.BuildRequest req, SA.Build.BuildEngine 
 
 app.MapPost("/api/build", (SA.Build.BuildRequest req, SA.Build.BuildEngine eng) => eng.Build(req));
 
+// source package (zip for a machine with Civil 3D): build\<DLL>\<DLL>-source.zip next to the project, no build here
+app.MapPost("/api/build/source", (SA.Build.BuildRequest req, SA.Build.BuildEngine eng) => eng.SourcePackage(req));
+
 // pre-build checks for the dialog (simulator runs, codes, locked / same-name DLL, parameter changes); no build
 app.MapPost("/api/build/check", (SA.Build.CheckRequest req, SA.Build.BuildEngine eng) => eng.Check(req));
 

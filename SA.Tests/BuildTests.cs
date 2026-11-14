@@ -376,12 +376,91 @@ static class BuildTests
             True(runParams.StartsWith("Side,"), "ลำดับเดียวกับ GetInputParameters: " + runParams);
         });
 
+        // ---------- M4: report, Copy-to, source package ----------
+
+        test("รายงาน: class, ตาราง parameter, code จากตัวจำลอง, คำเตือน, ขั้นต่อใน Civil 3D · ไฟล์เขียนเอง = ไม่มีคำอธิบาย", () =>
+        {
+            var dir = Project(fixtures, "R", Fixtures.Take(1));
+            File.WriteAllText(Path.Combine(dir, "hand.cs"), SubassemblyTemplate.Create("Hand"));
+            File.WriteAllText(Path.Combine(dir, "R.assembly.json"), "{\"version\":1,\"items\":[{\"file\":\"pavement-assembly.cs\"},{\"file\":\"hand.cs\"}]}");
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"), () => new List<C3DInstall>());
+            var plan = eng.Plan(new BuildRequest("R", null, null, null));
+            var check = eng.Check(new CheckRequest("R", null, null, null, null));
+            var cat = eng.MakeCatalog("R", plan.Classes, plan.Files.Select(f => Path.Combine(dir, f)), "R.dll");
+            var md = ReportWriter.Build(new ReportData("R", "R.assembly.json", null, null, cat, check, plan.Classes, new DateTime(2026, 11, 14, 9, 0, 0), "Source package: R.dll"));
+            foreach (var want in new[] { "# Source package: R.dll", "## Classes", "- `TestSubassembly.PavementAssembly` (pavement-assembly.cs)", "## TestSubassembly.Hand",
+                                         "| Name | Display name | Type | Default | Unit | Description | Min / Max | Options |", "| `Side` |", "0=Right, 1=Left",
+                                         "ไม่มีคำอธิบาย (ไฟล์เขียนเอง)", "- Links: ", "`Top`", "## Warnings and errors", "link ที่ไม่มี code", "## ขั้นต่อใน Civil 3D", "CONTENTBROWSER", "2026-11-14 09:00" })
+                True(md.Contains(want), "ไม่มี: " + want);
+            True(md.Contains("\r\n") && !md.Replace("\r\n", "").Contains('\n'), "CRLF");
+        });
+
+        test("Copy-to: เลือกหลายปี = คัดลอกเฉพาะปีล่าสุด · ปิดไว้ / โฟลเดอร์ไม่มี = ไม่คัดลอก · DLL ใน Copy-to ถูกล็อก = error ก่อน build", () =>
+        {
+            var dir = Project(fixtures, "T", Fixtures.Take(1));
+            var fake = Temp(); var copy = Temp();
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"),
+                () => new List<C3DInstall> { new(2026, fake, "net8.0-windows", true, true, null), new(2027, fake, "net10.0-windows", true, true, null) });
+            Eq(null, eng.CopyDirFor(2027, new[] { 2027 }), "ปิดไว้");
+            new MachineSettings { CopyTo = copy, CopyToOn = true }.Save(eng.MachineDir);
+            Eq(copy, eng.CopyDirFor(2027, new[] { 2026, 2027 }), "ปีล่าสุด");
+            Eq(null, eng.CopyDirFor(2026, new[] { 2026, 2027 }), "ปีอื่นไม่คัดลอก");
+            Eq(copy, eng.CopyDirFor(2026, new[] { 2026 }), "ปีเดียว");
+            new MachineSettings { CopyTo = Path.Combine(copy, "nope"), CopyToOn = true }.Save(eng.MachineDir);
+            Eq(null, eng.CopyDirFor(2027, new[] { 2027 }), "โฟลเดอร์ไม่มี");
+            new MachineSettings { CopyTo = copy, CopyToOn = true }.Save(eng.MachineDir);
+            File.WriteAllText(Path.Combine(copy, "T.dll"), "");
+            using (new FileStream(Path.Combine(copy, "T.dll"), FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                True(eng.Check(new CheckRequest("T", null, new[] { 2027 }, null, null)).Issues.Any(i => i.Kind == "locked" && i.Message.Contains(copy)), "check: ล็อกใน Copy-to");
+                var y = eng.Build(new BuildRequest("T", null, new[] { 2027 }, null)).Builds.Single();
+                True(y.Status == "locked" && y.Message!.Contains(copy), $"build: {y.Status} {y.Message}");
+            }
+        });
+
+        bool sdk10 = C3DVersions.SdkMajors().Any(m => m >= 10);
+        test(!sdk10 ? "build ไม่ผ่าน: skipped (ไม่มี .NET SDK 10)" : "build ไม่ผ่าน (Civil 3D ปลอม ไม่มี DLL ของ Autodesk): สรุป error + report.md บอกว่าไม่สำเร็จ, ไม่มี .atc", () =>
+        {
+            if (!sdk10) return;
+            var dir = Project(fixtures, "F", Fixtures.Take(1));
+            var fake = Temp();
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"), () => new List<C3DInstall> { new(2027, fake, "net10.0-windows", true, true, null) });
+            var y = eng.Build(new BuildRequest("F", null, new[] { 2027 }, null)).Builds.Single();
+            True(y.Status == "failed" && y.Errors.Count > 0, $"{y.Status}: {y.Message}");
+            True(y.Report != null && y.Report.Contains("✖ ไม่สำเร็จ") && File.Exists(y.ReportPath!), "report.md");
+            True(!File.Exists(Path.Combine(y.OutDir, "F.atc")) && y.Atc == null, "ไม่เขียน .atc เมื่อ build ไม่ผ่าน");
+        });
+
+        test("Source package: zip มี .cs, .csproj (path สัมพัทธ์), build.bat, .atc, icons, report, README · ไม่มี DLL", () =>
+        {
+            var dir = Project(fixtures, "T7", Fixtures);
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"), () => new List<C3DInstall>());
+            var r = eng.SourcePackage(new BuildRequest("T7", null, new[] { 2027 }, null));
+            True(r.Ok && File.Exists(r.Zip!) && r.Zip == Path.Combine(dir, "build", "T7", "T7-source.zip"), "zip " + r.Zip);
+            using var z = System.IO.Compression.ZipFile.OpenRead(r.Zip!);
+            var names = z.Entries.Select(e => e.FullName.Replace('\\', '/')).OrderBy(n => n, StringComparer.Ordinal).ToList();
+            foreach (var want in Fixtures.Concat(new[] { "T7.csproj", "build.bat", "T7.atc", "T7_tools.atc", "report.md", "README.txt", "icons/T7/PavementAssembly.png" }))
+                True(names.Contains(want), "ไม่มี " + want + ": " + string.Join(", ", names));
+            True(!names.Any(n => n.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)), "ไม่มี DLL");
+            string Read(string n) { using var s = new StreamReader(z.GetEntry(n)!.Open()); return s.ReadToEnd(); }
+            var x = XDocument.Parse(Read("T7.csproj")).Root!;
+            Eq(string.Join("|", Fixtures), string.Join("|", x.Descendants("Compile").Select(c => c.Attribute("Include")!.Value)), "ไฟล์ .cs แบบสัมพัทธ์");
+            Eq("$(MSBuildProjectDirectory)\\", x.Descendants("OutputPath").Single().Value, "DLL ข้าง .atc");
+            True(x.Descendants("TargetFramework").Single().Attribute("Condition") != null, "TFM override ได้");
+            var bat = Read("build.bat");
+            True(bat.StartsWith("@echo off\r\n") && bat.Contains("chcp 65001") && bat.Contains("AeccDbMgd.dll") && bat.Contains("T7.csproj"), "build.bat");
+            True(Read("README.txt").Contains("TestSubassembly.RockPitchingBodyWeb"), "README");
+            True(XDocument.Parse(Read("T7_tools.atc")).Descendants("DotNetClass").All(d => (string?)d.Attribute("Assembly") == "T7.dll"), ".atc อ้างชื่อไฟล์");
+        });
+
         var c3d = C3DVersions.DetectThisMachine().Where(i => i.CanBuild).OrderByDescending(i => i.Year).FirstOrDefault();
-        test(c3d == null ? "build จริง: skipped (ไม่พบ Civil 3D ที่ build ได้)" : $"build จริงกับ Civil 3D {c3d.Year}: DLL + manifest + build ซ้ำไม่มีการเปลี่ยน + ชื่อซ้ำที่อื่นต้องยืนยัน", () =>
+        test(c3d == null ? "build จริง: skipped (ไม่พบ Civil 3D ที่ build ได้)" : $"build จริงกับ Civil 3D {c3d.Year}: DLL + .atc + report + Copy-to + manifest + build ซ้ำไม่มีการเปลี่ยน + ชื่อซ้ำที่อื่นต้องยืนยัน", () =>
         {
             if (c3d == null) return;
             var dir = Project(fixtures, "T7", Fixtures);
             var machine = Path.Combine(dir, "machine");
+            var copy = Temp();
+            new MachineSettings { CopyTo = copy, CopyToOn = true }.Save(machine);
             var eng = new BuildEngine(compiler, runner, dir, machine, () => new List<C3DInstall> { c3d });
             var r = eng.Build(new BuildRequest("T7", null, new[] { c3d.Year }, null));
             var y = r.Builds.Single();
@@ -389,23 +468,45 @@ static class BuildTests
             var outDir = Path.Combine(dir, "build", "T7", c3d.Year.ToString());
             Eq(outDir, y.OutDir, "โฟลเดอร์ output");
             True(File.Exists(Path.Combine(outDir, "T7.dll")), "มี DLL");
-            True(File.Exists(Path.Combine(outDir, "T7.atc")) && File.Exists(Path.Combine(outDir, "T7_tools.atc")) && Directory.GetFiles(Path.Combine(outDir, "icons"), "*.png").Length == 3 && y.Atc == Path.Combine(outDir, "T7.atc"), ".atc + ไอคอน");
+            True(File.Exists(Path.Combine(outDir, "T7.atc")) && File.Exists(Path.Combine(outDir, "T7_tools.atc")) && Directory.GetFiles(Path.Combine(outDir, "icons", "T7"), "*.png").Length == 3 && y.Atc == Path.Combine(outDir, "T7.atc"), ".atc + ไอคอน");
             True(File.Exists(Path.Combine(outDir, "build.log")) && File.Exists(Path.Combine(outDir, "obj", "T7.csproj")), "log + csproj");
+            True(File.Exists(Path.Combine(outDir, "report.md")) && y.Report!.Contains("✓ สำเร็จ") && y.Report.Contains("`T7.dll`") && y.Report.Contains(copy), "report.md");
+            // Copy-to
+            Eq(copy, y.CopiedTo, "คัดลอกไป");
+            True(new[] { "T7.dll", "T7.atc", "T7_tools.atc" }.All(f => File.Exists(Path.Combine(copy, f))) && Directory.GetFiles(Path.Combine(copy, "icons", "T7"), "*.png").Length == 3, "ไฟล์ใน Copy-to");
             var m = BuildManifest.Load(Path.Combine(outDir, "build-manifest.json"))!;
             Eq(3, m.Classes.Count, "class ใน manifest");
             True(m.Classes.All(c => c.Params.Any(p => p.Name == "Side")), "parameter จากตัวจำลอง");
+            True(m.CopiedTo.Contains(copy), "manifest จำ Copy-to");
+            True(eng.History.Load().Any(e => e.Path == Path.Combine(copy, "T7.dll")), "ประวัติมี DLL ใน Copy-to");
             Eq(0, y.Changes.Count, "build แรกไม่มีการเปลี่ยน");
             True(!Directory.GetFiles(outDir).Any(f => Path.GetFileName(f).StartsWith("Acdb", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(f).StartsWith("Aecc", StringComparison.OrdinalIgnoreCase)), "ไม่มี DLL ของ Autodesk ใน output");
 
-            // the same DLL name built in another project folder (same machine history) -> must be confirmed
+            // the same DLL name built in another project folder (same machine history, Copy-to off) -> must be confirmed
+            var machine2 = Path.Combine(dir, "machine");
+            new MachineSettings { CopyTo = copy, CopyToOn = false }.Save(machine2);
             var dir2 = Project(fixtures, "T7", Fixtures.Take(1));
-            var eng2 = new BuildEngine(compiler, runner, dir2, machine, () => new List<C3DInstall> { c3d });
+            var eng2 = new BuildEngine(compiler, runner, dir2, machine2, () => new List<C3DInstall> { c3d });
             var r2 = eng2.Build(new BuildRequest("T7", null, new[] { c3d.Year }, null));
             Eq("same-name", r2.Builds.Single().Status, "ชื่อซ้ำต้องถาม");
-            True(r2.Builds.Single().SameName.Contains(Path.Combine(outDir, "T7.dll"), StringComparer.OrdinalIgnoreCase), "บอกที่อยู่ DLL เดิม");
-            var r3 = eng.Build(new BuildRequest("T7", null, new[] { c3d.Year }, null));
-            Eq("ok", r3.Builds.Single().Status, "build ซ้ำที่เดิม (ไม่ถามชื่อซ้ำ)");
+            True(r2.Builds.Single().SameName.Contains(Path.Combine(outDir, "T7.dll"), StringComparer.OrdinalIgnoreCase) && r2.Builds.Single().SameName.Contains(Path.Combine(copy, "T7.dll"), StringComparer.OrdinalIgnoreCase), "บอกที่อยู่ DLL เดิมทั้งสองที่");
+            var r2b = eng2.Build(new BuildRequest("T7", null, new[] { c3d.Year }, null, AllowSameName: true));
+            Eq("ok", r2b.Builds.Single().Status, "กด OK = build ได้");
+            new MachineSettings { CopyTo = copy, CopyToOn = true }.Save(machine2);
+            var r3 = eng.Build(new BuildRequest("T7", null, new[] { c3d.Year }, null, AllowSameName: true));
+            Eq("ok", r3.Builds.Single().Status, "build ซ้ำที่เดิม");
             Eq(0, r3.Builds.Single().Changes.Count, "build ซ้ำ ไม่มีการเปลี่ยน");
+
+            // source package built with its own build.bat, from another folder
+            var src = eng.SourcePackage(new BuildRequest("T7", null, new[] { c3d.Year }, null));
+            var unpack = Temp();
+            System.IO.Compression.ZipFile.ExtractToDirectory(src.Zip!, unpack);
+            var psi = new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c \"{Path.Combine(unpack, "build.bat")}\"") { WorkingDirectory = unpack, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+            psi.Environment["DOTNET_CLI_UI_LANGUAGE"] = "en";
+            using var p = System.Diagnostics.Process.Start(psi)!;
+            var outText = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
+            p.WaitForExit(300000);
+            True(p.ExitCode == 0 && outText.Contains("OK:") && File.Exists(Path.Combine(unpack, "T7.dll")), $"build.bat: exit {p.ExitCode} {outText}");
         });
     }
 

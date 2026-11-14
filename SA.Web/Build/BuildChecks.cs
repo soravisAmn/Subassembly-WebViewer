@@ -34,6 +34,13 @@ public class CheckYear
     public bool HasManifest { get; set; }
 }
 
+public class ClassCodes
+{
+    public SortedSet<string> Points { get; set; } = new(StringComparer.Ordinal);
+    public SortedSet<string> Links { get; set; } = new(StringComparer.Ordinal);
+    public SortedSet<string> Shapes { get; set; } = new(StringComparer.Ordinal);
+}
+
 public class CheckResult
 {
     public bool Ok { get; set; }                       // no blocking error (the years ticked included)
@@ -45,6 +52,7 @@ public class CheckResult
     public List<CheckIssue> Issues { get; set; } = new();
     public List<CheckYear> Years { get; set; } = new();
     public int ScenarioRuns { get; set; }
+    public Dictionary<string, ClassCodes> Codes { get; set; } = new();   // full class name -> codes seen in its runs (report)
     public double Ms { get; set; }
 }
 
@@ -110,6 +118,9 @@ public partial class BuildEngine
             y.Changes = ManifestDiff.Diff(old, new BuildManifest { Classes = current });
             if (!ticked) continue;
             if (y.Locked) r.Issues.Add(new("error", "locked", null, $"Civil 3D {inst.Year}: ปิด Civil 3D ก่อน — {r.DllName}.dll ถูกโปรแกรมอื่นใช้อยู่"));
+            var copyDir = CopyDirFor(inst.Year, req.Years);
+            if (copyDir != null && IsLocked(Path.Combine(copyDir, r.DllName + ".dll")))
+                r.Issues.Add(new("error", "locked", null, $"Civil 3D {inst.Year}: ปิด Civil 3D ก่อน — {r.DllName}.dll ในโฟลเดอร์ Copy to ({copyDir}) ถูกใช้อยู่"));
             if (y.SameName.Count > 0)
                 r.Issues.Add(new("warning", "same-name", null, $"Civil 3D {inst.Year}: มี {r.DllName}.dll อยู่แล้วที่ {string.Join(", ", y.SameName)} — Civil 3D โหลด DLL ชื่อเดียวกันจาก 2 ที่ใน session เดียวไม่ได้"));
             if (y.Changes.Count > 0)
@@ -164,6 +175,7 @@ public partial class BuildEngine
             if (string.Equals(s.File, file, StringComparison.OrdinalIgnoreCase))
                 runs.Add(($"saved: {s.Name}", s.Values, new WorldInput { Surface = s.Surface, LayoutMode = s.Layout, SurfaceAssigned = s.Surface is { Count: >= 2 } }));
 
+        var cc = r.Codes[fullName] = new ClassCodes();
         var errors = new Dictionary<string, List<string>>();
         var messages = new Dictionary<string, List<string>>();
         var noCodeLinks = new SortedDictionary<int, string>();
@@ -174,19 +186,19 @@ public partial class BuildEngine
             r.ScenarioRuns++;
             if (o.Exception != null) Add(errors, $"{fullName}: {ExceptionText(o)}", name);
             foreach (var i in o.Issues) Add(messages, $"{fullName}: {i.Message}", name);
-            foreach (var p in o.Points) foreach (var c in p.Codes) codes.Add((c, file));
+            foreach (var p in o.Points) foreach (var c in p.Codes) { codes.Add((c, file)); cc.Points.Add(c); }
             var links = o.Links.Select(l => JsonSerializer.SerializeToElement(l)).ToList();
             var shapes = o.Shapes.Select(s => JsonSerializer.SerializeToElement(s)).ToList();
             for (int k = 0; k < links.Count; k++)
             {
                 var lc = links[k].GetProperty("codes").EnumerateArray().Select(e => e.GetString() ?? "").ToList();
-                foreach (var c in lc) codes.Add((c, file));
+                foreach (var c in lc) { codes.Add((c, file)); cc.Links.Add(c); }
                 if (lc.Count == 0 && spec == null) noCodeLinks.TryAdd(k, $"link #{k}{SiteText(links[k])}");
             }
             for (int k = 0; k < shapes.Count; k++)
             {
                 var sc = shapes[k].GetProperty("codes").EnumerateArray().Select(e => e.GetString() ?? "").ToList();
-                foreach (var c in sc) codes.Add((c, file));
+                foreach (var c in sc) { codes.Add((c, file)); cc.Shapes.Add(c); }
                 if (sc.Count == 0 && spec == null) noCodeShapes.TryAdd(k, $"shape #{k}{SiteText(shapes[k])}");
             }
         }

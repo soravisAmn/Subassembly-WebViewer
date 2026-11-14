@@ -1,8 +1,11 @@
-// Round 7 M1: builds the subassemblies of one project (*.assembly.json) into one DLL per Civil 3D version.
+// Round 7: builds the subassemblies of one project (*.assembly.json) into one DLL per Civil 3D version.
 //   1. files of the project (items[].file, in order) -> classes (Roslyn) -> checks (errors stop here)
-//   2. per ticked Civil 3D year: locked DLL? same-named DLL in another folder? -> write obj\<DLL>.csproj -> dotnet build
-//   3. success: parameters of every class from the simulator (GetInputParameters) -> build-manifest.json + diff with the
-//      previous build -> build history (machine folder)
+//   2. pre-build checks (BuildChecks.cs) for the report
+//   3. per ticked Civil 3D year: locked DLL (output / Copy-to)? same-named DLL in another folder? -> write
+//      obj\<DLL>.csproj -> dotnet build
+//   4. success: .atc + icons (parameters from the simulator) -> build-manifest.json + diff with the previous build ->
+//      Copy-to (newest ticked year only) -> build history (machine folder)
+//   5. report.md for every year that was tried (success or failure)
 // The user's .cs files are only read (compiled in place by dotnet build). One build at a time.
 
 using System.Diagnostics;
@@ -13,7 +16,9 @@ using System.Text.RegularExpressions;
 namespace SA.Build;
 
 // AtcFullPath: the .atc names the DLL by full path (fallback if Civil 3D does not accept the bare file name, see M5)
-public record BuildRequest(string? Project, string? DllName, int[]? Years, string[]? Files, bool AllowSameName = false, bool AtcFullPath = false);
+// Scenarios: the page's saved scenarios, as for the checks (they go into the report)
+public record BuildRequest(string? Project, string? DllName, int[]? Years, string[]? Files, bool AllowSameName = false, bool AtcFullPath = false,
+                           List<CheckScenario>? Scenarios = null);
 
 public class BuildYearResult
 {
@@ -29,6 +34,10 @@ public class BuildYearResult
     public List<BuildIssue> Warnings { get; set; } = new();
     public string? Atc { get; set; }                // <DLL>.atc (Content Browser → Add Catalog)
     public int Icons { get; set; }
+    public string? CopiedTo { get; set; }           // Copy-to folder the DLL + .atc + icons went to
+    public string? CopyError { get; set; }
+    public string? Report { get; set; }             // report.md text (the dialog shows it)
+    public string? ReportPath { get; set; }
     public double Ms { get; set; }
 }
 
@@ -152,15 +161,18 @@ public partial class BuildEngine
         var files = r.Files.Select(f => Path.Combine(_folder, f)).ToList();
         lock (Gate)
         {
+            var check = Check(new CheckRequest(req.Project, r.DllName, years.ToArray(), req.Files, req.Scenarios));
             foreach (var year in years)
-                r.Builds.Add(BuildYear(r, installs.FirstOrDefault(i => i.Year == year) ?? new C3DInstall(year, null, C3DVersions.FallbackTfm(year), false, false, "ไม่ได้ติดตั้ง"),
-                                       proj, files, req.AllowSameName, req.AtcFullPath));
+            {
+                var c3d = installs.FirstOrDefault(i => i.Year == year) ?? new C3DInstall(year, null, C3DVersions.FallbackTfm(year), false, false, "ไม่ได้ติดตั้ง");
+                r.Builds.Add(BuildYear(r, c3d, proj, files, req, CopyDirFor(year, years), check));
+            }
         }
         r.Ok = r.Builds.All(b => b.Status == "ok");
         return r;
     }
 
-    BuildYearResult BuildYear(BuildResult plan, C3DInstall c3d, string proj, List<string> files, bool allowSameName, bool atcFullPath)
+    BuildYearResult BuildYear(BuildResult plan, C3DInstall c3d, string proj, List<string> files, BuildRequest req, string? copyDir, CheckResult check)
     {
         var sw = Stopwatch.StartNew();
         var dllName = plan.DllName;
@@ -169,15 +181,21 @@ public partial class BuildEngine
         var y = new BuildYearResult { Year = c3d.Year, OutDir = outDir, Tfm = c3d.Tfm };
         if (!c3d.CanBuild) { y.Status = "skipped"; y.Message = c3d.Reason; return y; }
 
-        if (IsLocked(dll)) { y.Status = "locked"; y.Message = $"ปิด Civil 3D ก่อน: {dllName}.dll ถูกโปรแกรมอื่นใช้อยู่"; return y; }
+        string Locked(string what) => $"ปิด Civil 3D ก่อน: {dllName}.dll {what}ถูกโปรแกรมอื่นใช้อยู่";
+        if (IsLocked(dll)) { y.Status = "locked"; y.Message = Locked(""); return y; }
+        if (copyDir != null && IsLocked(Path.Combine(copyDir, dllName + ".dll"))) { y.Status = "locked"; y.Message = Locked($"ใน {copyDir} "); return y; }
 
         y.SameName = History.SameNameElsewhere(dllName, c3d.Year, TargetDirs(outDir));
-        if (y.SameName.Count > 0 && !allowSameName)
+        if (y.SameName.Count > 0 && !req.AllowSameName)
         {
             y.Status = "same-name";
             y.Message = $"มี {dllName}.dll อยู่แล้วในโฟลเดอร์อื่น";
             return y;
         }
+
+        // parameters / icons / .atc text first: the report needs them even when the build fails
+        var cat = MakeCatalog(dllName, plan.Classes, files, req.AtcFullPath ? Path.Combine(copyDir ?? outDir, dllName + ".dll") : dllName + ".dll");
+        y.Warnings.AddRange(cat.Warnings);
 
         Directory.CreateDirectory(BuildPaths.ObjDir(outDir));
         var csproj = BuildPaths.Csproj(outDir, dllName);
@@ -190,7 +208,7 @@ public partial class BuildEngine
             if (Regex.IsMatch(output, "being used by another process|locked by|MSB3027|MSB3021"))
             {
                 y.Status = "locked";
-                y.Message = $"ปิด Civil 3D ก่อน: {dllName}.dll ถูกโปรแกรมอื่นใช้อยู่";
+                y.Message = Locked("");
             }
             else
             {
@@ -199,13 +217,11 @@ public partial class BuildEngine
                 y.Message = code == -1 ? "build ใช้เวลานานเกินไป (หยุดแล้ว)" : $"build ไม่ผ่าน: {y.Errors.Count} error";
             }
             y.Ms = sw.Elapsed.TotalMilliseconds;
+            WriteReport(y, plan, c3d, cat, check);
             return y;
         }
 
-        // .atc + icons (M3): the DLL is referenced by file name (next to the .atc) or by the full path where it is loaded from
-        var targets = TargetDirs(outDir);
-        var cat = MakeCatalog(dllName, plan.Classes, files, atcFullPath ? Path.Combine(targets[^1], dllName + ".dll") : dllName + ".dll");
-        y.Warnings.AddRange(cat.Warnings);
+        // .atc + icons: the DLL is referenced by file name (next to the .atc) or by the full path where it is loaded from
         WriteCatalog(outDir, dllName, cat);
         y.Atc = Path.Combine(outDir, dllName + ".atc");
         y.Icons = cat.Icons.Count;
@@ -223,14 +239,50 @@ public partial class BuildEngine
         var old = BuildManifest.Load(BuildPaths.Manifest(outDir));
         if (old != null) manifest.CopiedTo = old.CopiedTo;
         y.Changes = ManifestDiff.Diff(old, manifest);
-        manifest.Save(BuildPaths.Manifest(outDir));
         History.Record(dll, c3d.Year);
+
+        if (copyDir != null)
+        {
+            try
+            {
+                CopyOut(outDir, copyDir, dllName);
+                y.CopiedTo = copyDir;
+                if (!manifest.CopiedTo.Contains(copyDir, StringComparer.OrdinalIgnoreCase)) manifest.CopiedTo.Add(copyDir);
+                History.Record(Path.Combine(copyDir, dllName + ".dll"), c3d.Year);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                y.CopyError = $"คัดลอกไป {copyDir} ไม่ได้: {e.Message}";
+            }
+        }
+        manifest.Save(BuildPaths.Manifest(outDir));
 
         y.Status = "ok";
         y.Dll = dll;
         y.Message = "build สำเร็จ";
         y.Ms = sw.Elapsed.TotalMilliseconds;
+        WriteReport(y, plan, c3d, cat, check);
         return y;
+    }
+
+    // Copy-to: the DLL, both .atc files and icons\<DLL>\ (that subfolder is replaced; nothing else in the folder is touched)
+    static void CopyOut(string outDir, string copyDir, string dllName)
+    {
+        foreach (var f in new[] { dllName + ".dll", dllName + ".atc", AtcWriter.CategoryFile(dllName) })
+            File.Copy(Path.Combine(outDir, f), Path.Combine(copyDir, f), true);
+        var src = Path.Combine(outDir, "icons", dllName);
+        var dst = Path.Combine(copyDir, "icons", dllName);
+        if (Directory.Exists(dst)) foreach (var f in Directory.GetFiles(dst, "*.png")) File.Delete(f);
+        Directory.CreateDirectory(dst);
+        foreach (var f in Directory.GetFiles(src, "*.png")) File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), true);
+    }
+
+    void WriteReport(BuildYearResult y, BuildResult plan, C3DInstall c3d, CatalogOutput cat, CheckResult check)
+    {
+        y.Report = ReportWriter.Build(new ReportData(plan.DllName, plan.Project, y, c3d, cat, check, plan.Classes, DateTime.Now));
+        y.ReportPath = BuildPaths.Report(y.OutDir);
+        Directory.CreateDirectory(y.OutDir);
+        File.WriteAllText(y.ReportPath, y.Report);
     }
 
     public record CatalogOutput(string Catalog, string Category, Dictionary<string, byte[]> Icons, List<AtcTool> Tools,
@@ -258,7 +310,7 @@ public partial class BuildEngine
             var compiled = _compiler.Compile(src, name);
             foreach (var c in classes.Where(c => c.File == name))
             {
-                var icon = "icons\\" + (dupNames.Contains(c.Name) ? c.FullName.Replace('.', '_') : c.Name) + ".png";
+                var icon = "icons\\" + dllName + "\\" + (dupNames.Contains(c.Name) ? c.FullName.Replace('.', '_') : c.Name) + ".png";
                 var type = compiled.Success ? compiled.Classes.FirstOrDefault(t => t.FullName == c.FullName) : null;
                 var prms = new List<AtcParam>();
                 byte[]? png = null;
@@ -274,7 +326,8 @@ public partial class BuildEngine
                         var options = sp?.Options is { Count: > 0 } ? sp.Options
                             : p.Kind == "long" && isSide ? new List<SA.Drawing.SpecOption> { new() { Value = 0, Label = "Right" }, new() { Value = 1, Label = "Left" } } : null;
                         prms.Add(new AtcParam(p.Name, p.Kind, BuildManifest.FormatDefault(p.Default), sp?.DisplayName ?? p.DisplayName,
-                                              !string.IsNullOrWhiteSpace(sp?.Description) ? sp!.Description : p.Description, sp?.Unit, options, sp != null));
+                                              !string.IsNullOrWhiteSpace(sp?.Description) ? sp!.Description : p.Description, sp?.Unit, options, sp != null)
+                                 { Min = sp?.Min, Max = sp?.Max, Positive = sp?.Positive ?? false });
                     }
                     if (run.Exception == null) png = IconRenderer.Render(run);
                 }
@@ -290,12 +343,13 @@ public partial class BuildEngine
         return new CatalogOutput(catalog, category, icons, tools, fileOf, warnings);
     }
 
-    // <DLL>.atc, <DLL>_tools.atc, icons\ (old icons removed: a renamed class leaves no stale image)
-    static void WriteCatalog(string outDir, string dllName, CatalogOutput cat)
+    // <DLL>.atc, <DLL>_tools.atc, icons\<DLL>\ (old icons removed: a renamed class leaves no stale image). The DLL
+    // subfolder keeps icons of different DLLs apart in a shared Copy-to folder.
+    public static void WriteCatalog(string outDir, string dllName, CatalogOutput cat)
     {
         File.WriteAllText(Path.Combine(outDir, dllName + ".atc"), cat.Catalog);
         File.WriteAllText(Path.Combine(outDir, AtcWriter.CategoryFile(dllName)), cat.Category);
-        var iconDir = Path.Combine(outDir, "icons");
+        var iconDir = Path.Combine(outDir, "icons", dllName);
         if (Directory.Exists(iconDir)) foreach (var f in Directory.GetFiles(iconDir, "*.png")) File.Delete(f);
         Directory.CreateDirectory(iconDir);
         foreach (var (rel, png) in cat.Icons) File.WriteAllBytes(Path.Combine(outDir, rel), png);
@@ -308,6 +362,17 @@ public partial class BuildEngine
         var s = MachineSettings.Load(MachineDir);
         if (s.CopyToOn && MachineSettings.CopyToError(s.CopyTo) == null) list.Add(s.CopyTo!);
         return list;
+    }
+
+    // Copy-to folder for this year, or null. With several years ticked only the newest is copied: one folder cannot hold
+    // two DLLs of the same name, and moving between Copy-to subfolders would itself make same-named DLLs in two paths.
+    public string? CopyDirFor(int year, IEnumerable<int>? years)
+    {
+        var s = MachineSettings.Load(MachineDir);
+        if (!s.CopyToOn || MachineSettings.CopyToError(s.CopyTo) != null) return null;
+        var buildable = Installs().Where(i => i.CanBuild).Select(i => i.Year).ToHashSet();
+        var ticked = (years ?? Array.Empty<int>()).Where(buildable.Contains).ToList();
+        return ticked.Count > 0 && ticked.Max() == year ? s.CopyTo : null;
     }
 
     // A loaded DLL (Civil 3D open) cannot be opened for writing

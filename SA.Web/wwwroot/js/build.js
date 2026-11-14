@@ -5,7 +5,7 @@
 "use strict";
 const Build = (() => {
   const st = { project: null, versions: [], years: new Set(), files: null, allFiles: [], dllName: "", check: null, settings: { copyTo: "", copyToOn: false },
-               busy: false, result: null, checking: false, seq: 0, atcFullPath: false };
+               busy: false, result: null, checking: false, seq: 0, atcFullPath: false, mode: "build", source: null, showReport: {} };
   const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     .then(r => r.json()).catch(() => ({ ok: false, message: NO_SERVER }));
   const get = url => fetch(url).then(r => r.json()).catch(() => null);
@@ -107,9 +107,10 @@ const Build = (() => {
     // export mode + DLL name
     const g = div("bd-grid", null, b);
     div("bd-l", "Export", g);
-    div("bd-v", `<label><input type="radio" name="bd-mode" checked> Build (DLL package)</label>
-      <label class="dis" title="มาใน M4"><input type="radio" name="bd-mode" disabled> Source package</label>
+    const mv = div("bd-v", `<label title="build DLL บนเครื่องนี้ + .atc + icons + report"><input type="radio" name="bd-mode" value="build"> Build (DLL package)</label>
+      <label title="zip ของไฟล์ .cs + .csproj + build.bat + .atc + icons + report ให้คนที่มี Civil 3D build เอง (ไม่มี DLL ของ Autodesk)"><input type="radio" name="bd-mode" value="source"> Source package</label>
       <label class="dis" title="ทดลองภายหลัง"><input type="radio" name="bd-mode" disabled> .pkt (ทดลองภายหลัง)</label>`, g);
+    for (const r of mv.querySelectorAll("input[value]")){ r.checked = r.value === st.mode; r.onchange = () => { st.mode = r.value; render(); }; }
     div("bd-l", ".atc", g);
     const av = div("bd-v", null, g), al = document.createElement("label"), ac = document.createElement("input");
     ac.type = "checkbox"; ac.checked = st.atcFullPath; ac.onchange = () => { st.atcFullPath = ac.checked; };
@@ -158,7 +159,7 @@ const Build = (() => {
     cPath.onchange = save;
     const lab = document.createElement("label"); lab.append(cOn, " คัดลอก DLL + .atc + icons ไปที่ ");
     cv.append(lab, cPath);
-    cv.insertAdjacentHTML("beforeend", "<small>ค่าของเครื่องนี้ (ไม่อยู่ในไฟล์ project) · การคัดลอกจริงมาใน M4</small>");
+    cv.insertAdjacentHTML("beforeend", "<small>ค่าของเครื่องนี้ (ไม่อยู่ในไฟล์ project) · คัดลอกหลัง build สำเร็จ · เลือกหลายปี = คัดลอกเฉพาะปีล่าสุด</small>");
 
     // checks
     const head = div("pg-h", `ตรวจก่อน build <small>${st.checking ? "กำลังตรวจ…" : `${c.scenarioRuns} scenario run · ${(c.ms / 1000).toFixed(1)} s`}</small>`, b);
@@ -173,15 +174,18 @@ const Build = (() => {
         + (i.scenarios && i.scenarios.length ? `<small>${esc(i.scenarios.slice(0, 6).join(", "))}${i.scenarios.length > 6 ? ` … (${i.scenarios.length} กรณี)` : ""}</small>` : "");
     }
 
-    // result of the last build
-    if (st.result) renderResult(div("bd-result", null, b), st.result);
-    if (st.busy) div("bd-busy", `<span class="spin"></span> กำลัง build… <span id="bd-sec">0</span> s (ครั้งแรกใช้เวลานานกว่า)`, b);
+    // result of the last build / source package
+    if (st.result && st.mode === "build") renderResult(div("bd-result", null, b), st.result);
+    if (st.source && st.mode === "source") renderSource(div("bd-result", null, b), st.source);
+    if (st.busy) div("bd-busy", `<span class="spin"></span> ${st.mode === "source" ? "กำลังสร้าง source package" : "กำลัง build"}… <span id="bd-sec">0</span> s${st.mode === "source" ? "" : " (ครั้งแรกใช้เวลานานกว่า)"}`, b);
 
     // buttons
     const errs = c.issues.some(i => i.severity === "error");
-    const reason = st.busy ? "กำลัง build" : st.checking ? "กำลังตรวจ" : !st.years.size ? "เลือก Civil 3D ก่อน" : !(st.files || []).length ? "ไม่ได้เลือกไฟล์" : errs ? "แก้ error ก่อน" : "";
+    const src = st.mode === "source";
+    const reason = st.busy ? "กำลังทำงาน" : st.checking ? "กำลังตรวจ" : !src && !st.years.size ? "เลือก Civil 3D ก่อน" : !(st.files || []).length ? "ไม่ได้เลือกไฟล์" : errs ? "แก้ error ก่อน" : "";
     const bb = div("btns bd-btns", null, b);
-    const go = btn("Build", doBuild, !!reason, reason || "build DLL ตาม Civil 3D ที่เลือก");
+    const go = src ? btn("สร้าง Source package", doSource, !!reason, reason || "zip สำหรับเครื่องที่มี Civil 3D (build.bat build เอง)")
+                   : btn("Build", doBuild, !!reason, reason || "build DLL ตาม Civil 3D ที่เลือก");
     go.classList.add("primary");
     bb.append(go, btn("ปิด", () => closeDialog()));
     if (reason && !st.busy && !st.checking) bb.insertAdjacentHTML("beforeend", `<span class="hint">${esc(reason)}</span>`);
@@ -196,9 +200,13 @@ const Build = (() => {
       d.innerHTML = `<b>${okY ? "✓" : "✖"}</b> Civil 3D ${y.year}: ${esc(y.message || y.status)}${okY ? ` <span class="mono">${esc(y.dll)}</span> · ${(y.ms / 1000).toFixed(1)} s` : ""}`;
       if (okY) d.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(y.dll)));
       if (okY && y.atc){
-        const a = div("bd-sub", `Tool Catalog: <span class="mono">${esc(y.atc)}</span> · ไอคอน ${y.icons} รูป — Civil 3D: CONTENTBROWSER → Add Catalog → เลือกไฟล์นี้`, box);
-        a.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(y.atc)));
+        const atc = y.copiedTo ? y.copiedTo.replace(/\\?$/, "\\") + y.atc.split("\\").pop() : y.atc;
+        const a = div("bd-sub", `Tool Catalog: <span class="mono">${esc(atc)}</span> · ไอคอน ${y.icons} รูป — Civil 3D: CONTENTBROWSER → Add Catalog → เลือกไฟล์นี้`, box);
+        a.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(atc)));
       }
+      if (y.copiedTo) div("bd-sub", `คัดลอก DLL + .atc + icons ไป <span class="mono">${esc(y.copiedTo)}</span> แล้ว`, box);
+      if (y.copyError) div("bd-i e", "✖ " + esc(y.copyError), box);
+      if (y.report) reportToggle(box, "y" + y.year, y.report, y.reportPath);
       for (const e of (y.errors || []).slice(0, 30)) div("bd-sub mono", esc(e), box);
       if ((y.errors || []).length > 30) div("bd-sub", `… อีก ${y.errors.length - 30} (ดู build.log ใน ${esc(y.outDir)})`, box);
       if ((y.changes || []).length){
@@ -208,6 +216,63 @@ const Build = (() => {
       for (const w of y.warnings || []) div("bd-sub", "⚠ " + esc(w.message), box);
     }
     for (const i of (r.issues || []).filter(i => i.severity === "error")) div("bd-i e", "✖ " + esc(i.message), box);
+  }
+
+  // ---------- report (report.md shown in the dialog) ----------
+  function reportToggle(box, key, md, path){
+    const row = div("bd-sub", null, box);
+    row.appendChild(btn(st.showReport[key] ? "ซ่อนรายงาน" : "ดูรายงาน", () => { st.showReport[key] = !st.showReport[key]; render(); }));
+    if (path){ row.insertAdjacentHTML("beforeend", ` <span class="mono">${esc(path)}</span>`); row.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(path))); }
+    if (st.showReport[key]) div("bd-report", mdHtml(md), box);
+  }
+  // Markdown of ReportWriter only: # headings, | tables |, - lists, 1. lists, `code`
+  function mdHtml(md){
+    const inl = s => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>');
+    const out = []; let table = null, list = null;
+    const flush = () => { if (table){ out.push("<table>" + table.join("") + "</table>"); table = null; } if (list){ out.push(`<${list.tag}>` + list.items.join("") + `</${list.tag}>`); list = null; } };
+    for (const line of md.split(/\r?\n/)){
+      if (/^\|/.test(line)){
+        if (list) flush();
+        if (/^\|[-| ]+\|$/.test(line)) continue;
+        const cells = line.replace(/^\||\|$/g, "").split(/(?<!\\)\|/).map(c => c.trim().replace(/\\\|/g, "|"));
+        (table = table || []).push("<tr>" + cells.map(c => (table.length ? "<td>" : "<th>") + inl(c) + (table.length ? "</td>" : "</th>")).join("") + "</tr>");
+        continue;
+      }
+      const li = /^(-|\d+\.) (.*)$/.exec(line);
+      if (li){
+        if (table) flush();
+        const tag = li[1] === "-" ? "ul" : "ol";
+        if (list && list.tag !== tag) flush();
+        (list = list || { tag, items: [] }).items.push("<li>" + inl(li[2]) + "</li>");
+        continue;
+      }
+      flush();
+      const h = /^(#{1,3}) (.*)$/.exec(line);
+      if (h) out.push(`<h${h[1].length + 2}>${inl(h[2])}</h${h[1].length + 2}>`);
+      else if (line.trim()) out.push("<p>" + inl(line) + "</p>");
+    }
+    flush();
+    return out.join("");
+  }
+
+  function renderSource(box, r){
+    if (!r.ok){ for (const i of r.issues || []) if (i.severity === "error") div("bd-i e", "✖ " + esc(i.message), box); if (r.message) div("bd-i e", "✖ " + esc(r.message), box); return; }
+    const d = div("bd-i ok", `<b>✓</b> Source package: <span class="mono">${esc(r.zip)}</span>`, box);
+    d.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(r.zip)));
+    div("bd-sub", "ส่ง zip นี้ให้คนที่มี Civil 3D: แตกไฟล์ → ดับเบิลคลิก build.bat → Add Catalog (ขั้นตอนอยู่ใน README.txt)", box);
+    for (const w of r.warnings || []) div("bd-sub", "⚠ " + esc(w.message), box);
+    if (r.report) reportToggle(box, "source", r.report, null);
+  }
+
+  async function doSource(){
+    if (st.busy) return;
+    st.busy = true; st.source = null; render();
+    const t0 = Date.now(), timer = setInterval(() => { const s = $("bd-sec"); if (s) s.textContent = Math.round((Date.now() - t0) / 1000); }, 500);
+    const r = await post("/api/build/source", { project: st.project, dllName: st.dllName, years: [...st.years], files: st.files, scenarios: savedScenarios() });
+    clearInterval(timer);
+    st.busy = false; st.source = r;
+    setStatus(r.ok ? "ok" : "err", r.ok ? `สร้าง ${st.dllName}-source.zip แล้ว` : "สร้าง source package ไม่สำเร็จ");
+    render();
   }
 
   // ---------- Build ----------
@@ -224,7 +289,7 @@ const Build = (() => {
     }
     st.busy = true; st.result = null; render();
     const t0 = Date.now(), timer = setInterval(() => { const s = $("bd-sec"); if (s) s.textContent = Math.round((Date.now() - t0) / 1000); }, 500);
-    const r = await post("/api/build", { project: st.project, dllName: st.dllName, years: [...st.years], files: st.files, allowSameName: allow, atcFullPath: st.atcFullPath });
+    const r = await post("/api/build", { project: st.project, dllName: st.dllName, years: [...st.years], files: st.files, allowSameName: allow, atcFullPath: st.atcFullPath, scenarios: savedScenarios() });
     clearInterval(timer);
     st.busy = false; st.result = r;
     const okAll = r.ok && (r.builds || []).length;

@@ -13,7 +13,13 @@ using SA.Drawing;
 
 namespace SA.Build;
 
-public record AtcParam(string Name, string Kind, string? Default, string? DisplayName, string? Description, string? Unit, List<SpecOption>? Options, bool FromSpec);
+public record AtcParam(string Name, string Kind, string? Default, string? DisplayName, string? Description, string? Unit, List<SpecOption>? Options, bool FromSpec)
+{
+    // spec limits, only for the report (Civil 3D has no place for them in the .atc)
+    public double? Min { get; init; }
+    public double? Max { get; init; }
+    public bool Positive { get; init; }
+}
 public record AtcTool(string FullName, string ClassName, string Icon, List<AtcParam> Params);
 
 public static class AtcWriter

@@ -4,7 +4,7 @@
   <Properties>
     <ItemName>T7</ItemName>
     <Images option="0">
-      <Image cx="93" cy="123" src=".\icons\PavementAssembly.png" />
+      <Image cx="93" cy="123" src=".\icons\T7\PavementAssembly.png" />
     </Images>
     <Description>Subassemblies in T7.dll (SA Drawing Studio)</Description>
     <AccessRight>1</AccessRight>
@@ -19,7 +19,7 @@
       <Properties>
         <ItemName>PavementAssembly</ItemName>
         <Images>
-          <Image cx="64" cy="64" src=".\icons\PavementAssembly.png" />
+          <Image cx="64" cy="64" src=".\icons\T7\PavementAssembly.png" />
         </Images>
         <Description>TestSubassembly.PavementAssembly (T7.dll)</Description>
         <Keywords>_pavementassembly subassembly</Keywords>
@@ -43,7 +43,7 @@
       <Properties>
         <ItemName>RockPitchingBaseWeb</ItemName>
         <Images>
-          <Image cx="64" cy="64" src=".\icons\RockPitchingBaseWeb.png" />
+          <Image cx="64" cy="64" src=".\icons\T7\RockPitchingBaseWeb.png" />
         </Images>
         <Description>TestSubassembly.RockPitchingBaseWeb (T7.dll)</Description>
         <Keywords>_rockpitchingbaseweb subassembly</Keywords>
@@ -69,7 +69,7 @@
       <Properties>
         <ItemName>RockPitchingBodyWeb</ItemName>
         <Images>
-          <Image cx="64" cy="64" src=".\icons\RockPitchingBodyWeb.png" />
+          <Image cx="64" cy="64" src=".\icons\T7\RockPitchingBodyWeb.png" />
         </Images>
         <Description>TestSubassembly.RockPitchingBodyWeb (T7.dll)</Description>
         <Keywords>_rockpitchingbodyweb subassembly</Keywords>

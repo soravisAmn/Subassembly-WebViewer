@@ -146,3 +146,11 @@ Whether a single-file `<Category>` root (XAML style) works with Add Catalog is u
 - `TypeInfo`: length 16, slope (x of 1:x) 10, number / percent 0, hand-written 16. Percent is not 9, because 9 stores a grade (0.02) while our percent stores 2.
 - The `.atc` is UTF-8 with an XML declaration (Thai descriptions). Check in M5 that Content Browser shows Thai text.
 - No `<Time>` elements, so the locked expected files stay stable.
+
+## 9. M4 notes
+
+- Copy-to with several Civil 3D years ticked (open point from M1): only the **newest** ticked year is copied. One folder cannot hold two same-named DLLs, and per-year subfolders would themselves create same-named DLLs in two paths. Copy-to copies the DLL, both `.atc` files and `icons\<DLL>\`. Icons now live in `icons\<DLL>\` in every folder, so catalogs of different DLLs can share a Copy-to folder.
+- A locked DLL in the Copy-to folder blocks like a locked output DLL (check and build).
+- Build runs the pre-build checks again (with the page's saved scenarios) for the report. `report.md` is written for failed builds too. The `.atc` is written only on success.
+- Source package: one zip for Civil 3D 2025–2027. `build.bat` picks the TFM from the install folder's year. `C3DInstall` goes to MSBuild as an environment variable, because `-p:C3DInstall="...\"` breaks on the trailing backslash (found when the test ran build.bat). The `find` command is avoided, because a Unix `find` on PATH (Git) shadows the Windows one.
+- The report is Markdown. The dialog renders the small subset that ReportWriter writes (headings, tables, lists, code).

@@ -12,7 +12,8 @@ using System.Text.RegularExpressions;
 
 namespace SA.Build;
 
-public record BuildRequest(string? Project, string? DllName, int[]? Years, string[]? Files, bool AllowSameName = false);
+// AtcFullPath: the .atc names the DLL by full path (fallback if Civil 3D does not accept the bare file name, see M5)
+public record BuildRequest(string? Project, string? DllName, int[]? Years, string[]? Files, bool AllowSameName = false, bool AtcFullPath = false);
 
 public class BuildYearResult
 {
@@ -26,6 +27,8 @@ public class BuildYearResult
     public List<ParamChange> Changes { get; set; } = new();
     public List<string> SameName { get; set; } = new();
     public List<BuildIssue> Warnings { get; set; } = new();
+    public string? Atc { get; set; }                // <DLL>.atc (Content Browser → Add Catalog)
+    public int Icons { get; set; }
     public double Ms { get; set; }
 }
 
@@ -151,13 +154,13 @@ public partial class BuildEngine
         {
             foreach (var year in years)
                 r.Builds.Add(BuildYear(r, installs.FirstOrDefault(i => i.Year == year) ?? new C3DInstall(year, null, C3DVersions.FallbackTfm(year), false, false, "ไม่ได้ติดตั้ง"),
-                                       proj, files, req.AllowSameName));
+                                       proj, files, req.AllowSameName, req.AtcFullPath));
         }
         r.Ok = r.Builds.All(b => b.Status == "ok");
         return r;
     }
 
-    BuildYearResult BuildYear(BuildResult plan, C3DInstall c3d, string proj, List<string> files, bool allowSameName)
+    BuildYearResult BuildYear(BuildResult plan, C3DInstall c3d, string proj, List<string> files, bool allowSameName, bool atcFullPath)
     {
         var sw = Stopwatch.StartNew();
         var dllName = plan.DllName;
@@ -199,11 +202,23 @@ public partial class BuildEngine
             return y;
         }
 
+        // .atc + icons (M3): the DLL is referenced by file name (next to the .atc) or by the full path where it is loaded from
+        var targets = TargetDirs(outDir);
+        var cat = MakeCatalog(dllName, plan.Classes, files, atcFullPath ? Path.Combine(targets[^1], dllName + ".dll") : dllName + ".dll");
+        y.Warnings.AddRange(cat.Warnings);
+        WriteCatalog(outDir, dllName, cat);
+        y.Atc = Path.Combine(outDir, dllName + ".atc");
+        y.Icons = cat.Icons.Count;
+
         var manifest = new BuildManifest
         {
             DllName = dllName, Year = c3d.Year, Tfm = c3d.Tfm, C3DInstall = c3d.Path!, BuiltAt = DateTime.Now,
             Files = plan.Files.ToList(),
-            Classes = ReadParams(plan, files, y.Warnings),
+            Classes = cat.Tools.Select(tl => new ManifestClass
+            {
+                FullName = tl.FullName, File = cat.FileOf[tl.FullName],
+                Params = tl.Params.Select(p => new ManifestParam { Name = p.Name, Kind = p.Kind, Default = p.Default }).ToList()
+            }).ToList(),
         };
         var old = BuildManifest.Load(BuildPaths.Manifest(outDir));
         if (old != null) manifest.CopiedTo = old.CopiedTo;
@@ -218,28 +233,72 @@ public partial class BuildEngine
         return y;
     }
 
-    // Parameters as GetInputParameters gives them, read by running each class in the simulator with default values.
-    // A file the simulator cannot compile (API it lacks) still builds; its classes get no parameter list + a warning.
-    List<ManifestClass> ReadParams(BuildResult plan, List<string> files, List<BuildIssue> warnings)
+    public record CatalogOutput(string Catalog, string Category, Dictionary<string, byte[]> Icons, List<AtcTool> Tools,
+                                Dictionary<string, string> FileOf, List<BuildIssue> Warnings);
+
+    // .atc text + icons for the classes of these files. Parameters as GetInputParameters gives them (order included), read by
+    // running each class in the simulator with default values (Side = Right, layout mode: also the run the icon is drawn from).
+    // Web files add description, unit and options from the sa-spec. A file the simulator cannot compile (API it lacks)
+    // still builds: its classes get no parameter list, a plain icon and a warning.
+    public CatalogOutput MakeCatalog(string dllName, IReadOnlyList<ClassInfo> classes, IEnumerable<string> files, string assemblyRef)
     {
-        var list = new List<ManifestClass>();
+        var tools = new List<AtcTool>();
+        var icons = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        var fileOf = new Dictionary<string, string>();
+        var warnings = new List<BuildIssue>();
+        var dupNames = classes.GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var path in files)
         {
             var name = Path.GetFileName(path);
-            var compiled = _compiler.Compile(FileUtil.ReadShared(path), name);
-            foreach (var c in plan.Classes.Where(c => c.File == name))
+            var src = FileUtil.ReadShared(path);
+            SA.Drawing.DrawingSpec? spec = null;
+            var block = SA.Drawing.CodeGenerator.FindBlock(src);
+            if (block?.SpecJson != null)
+                try { spec = SA.Drawing.DrawingSpec.Parse(block.SpecJson); } catch (Exception e) when (e is JsonException or FormatException) { }
+            var compiled = _compiler.Compile(src, name);
+            foreach (var c in classes.Where(c => c.File == name))
             {
-                var mc = new ManifestClass { FullName = c.FullName, File = name };
+                var icon = "icons\\" + (dupNames.Contains(c.Name) ? c.FullName.Replace('.', '_') : c.Name) + ".png";
                 var type = compiled.Success ? compiled.Classes.FirstOrDefault(t => t.FullName == c.FullName) : null;
+                var prms = new List<AtcParam>();
+                byte[]? png = null;
                 if (type == null)
-                    warnings.Add(new("warning", name, $"อ่าน parameter ของ {c.FullName} จากตัวจำลองไม่ได้ (ตัวจำลองคอมไพล์ไฟล์นี้ไม่ผ่าน)"));
+                    warnings.Add(new("warning", name, $"อ่าน parameter ของ {c.FullName} จากตัวจำลองไม่ได้ (ตัวจำลองคอมไพล์ไฟล์นี้ไม่ผ่าน) — .atc ไม่มีรายการ parameter"));
                 else
-                    mc.Params = _runner.Run(type, null, new WorldInput()).Params
-                        .Select(p => new ManifestParam { Name = p.Name, Kind = p.Kind, Default = BuildManifest.FormatDefault(p.Default) }).ToList();
-                list.Add(mc);
+                {
+                    var run = _runner.Run(type, null, new WorldInput { LayoutMode = true });
+                    foreach (var p in run.Params)
+                    {
+                        var sp = spec?.Params.FirstOrDefault(x => x.Name == p.Name);
+                        bool isSide = spec != null ? spec.Side?.Param == p.Name : p.Name == "Side";
+                        var options = sp?.Options is { Count: > 0 } ? sp.Options
+                            : p.Kind == "long" && isSide ? new List<SA.Drawing.SpecOption> { new() { Value = 0, Label = "Right" }, new() { Value = 1, Label = "Left" } } : null;
+                        prms.Add(new AtcParam(p.Name, p.Kind, BuildManifest.FormatDefault(p.Default), sp?.DisplayName ?? p.DisplayName,
+                                              !string.IsNullOrWhiteSpace(sp?.Description) ? sp!.Description : p.Description, sp?.Unit, options, sp != null));
+                    }
+                    if (run.Exception == null) png = IconRenderer.Render(run);
+                }
+                if (png == null) warnings.Add(new("warning", name, $"วาดรูปของ {c.FullName} ไม่ได้ — ใช้รูปทั่วไปแทน"));
+                icons[icon] = png ?? IconRenderer.Generic();
+                tools.Add(new AtcTool(c.FullName, c.Name, icon, prms));
+                fileOf[c.FullName] = name;
             }
         }
-        return list;
+        var (catalog, category) = AtcWriter.Write(dllName, assemblyRef, tools);
+        foreach (var e in AtcWriter.Validate(catalog, category, dllName, tools.Select(t => t.FullName)))
+            warnings.Add(new("warning", null, e));
+        return new CatalogOutput(catalog, category, icons, tools, fileOf, warnings);
+    }
+
+    // <DLL>.atc, <DLL>_tools.atc, icons\ (old icons removed: a renamed class leaves no stale image)
+    static void WriteCatalog(string outDir, string dllName, CatalogOutput cat)
+    {
+        File.WriteAllText(Path.Combine(outDir, dllName + ".atc"), cat.Catalog);
+        File.WriteAllText(Path.Combine(outDir, AtcWriter.CategoryFile(dllName)), cat.Category);
+        var iconDir = Path.Combine(outDir, "icons");
+        if (Directory.Exists(iconDir)) foreach (var f in Directory.GetFiles(iconDir, "*.png")) File.Delete(f);
+        Directory.CreateDirectory(iconDir);
+        foreach (var (rel, png) in cat.Icons) File.WriteAllBytes(Path.Combine(outDir, rel), png);
     }
 
     // Folders this build writes the DLL to: the output folder + the Copy-to folder when it is on (M4 copies there)

@@ -249,5 +249,47 @@ test("setClassName (รอบ 7, หน้าต่าง Build): เปลี�
   eq("Rock_3", s.className, "applyBatch");
 });
 
+test("setParamInfo (รอบ 7, .atc): คำอธิบาย + ตัวเลือกของ long · ลบได้ · double มีตัวเลือกไม่ได้ · ค่าซ้ำ = error", () => {
+  const s = Spec.newSpec("Body");
+  good(Logic.addParam(s, { name: "Width", default: 3.5 }), "เพิ่ม Width");
+  good(Logic.addParam(s, { name: "Mode", kind: "long", default: 2 }), "เพิ่ม Mode");
+  const r = good(Logic.setParamInfo(s, "Width", { description: "  ความกว้าง\n ช่องจราจร " }), "คำอธิบาย");
+  eq("ความกว้าง ช่องจราจร", s.params[1].description, "ช่องว่างหลายตัว / ขึ้นบรรทัด = ช่องเดียว");
+  eq({ description: "ความกว้าง ช่องจราจร", options: null }, r.result, "ผล");
+  good(Logic.setParamInfo(s, "Width", { description: "" }), "ลบคำอธิบาย");
+  ok(!("description" in s.params[1]), "ไม่มี field ค้าง");
+  const m = good(Logic.setParamInfo(s, "Mode", { options: [{ value: 1, label: "Cut" }, { value: 2, label: "Fill" }] }), "ตัวเลือก");
+  eq([{ value: 1, label: "Cut" }, { value: 2, label: "Fill" }], s.params[2].options, "options");
+  ok(!m.warnings, "default 2 อยู่ในตัวเลือก");
+  const w = good(Logic.setParamInfo(s, "Mode", { options: [{ value: 5, label: "X" }] }), "default ไม่อยู่ในตัวเลือก");
+  ok(w.warnings && /not one of the options/.test(w.warnings[0]), "เตือน default");
+  good(Logic.setParamInfo(s, "Mode", { options: null }), "ลบตัวเลือก");
+  ok(!("options" in s.params[2]), "ไม่มี options ค้าง");
+  bad(s, () => Logic.setParamInfo(s, "Width", { options: [{ value: 0, label: "A" }] }), /long/, "double มีตัวเลือกไม่ได้");
+  bad(s, () => Logic.setParamInfo(s, "Mode", { options: [{ value: 0, label: "A" }, { value: 0, label: "B" }] }), /twice/, "ค่าซ้ำ");
+  bad(s, () => Logic.setParamInfo(s, "Mode", { options: [{ value: 0, label: "A" }, { value: 1, label: "a" }] }), /twice/, "ชื่อซ้ำ (ตัวพิมพ์)");
+  bad(s, () => Logic.setParamInfo(s, "Mode", { options: [{ value: 0.5, label: "A" }] }), /whole number/, "ไม่ใช่จำนวนเต็ม");
+  bad(s, () => Logic.setParamInfo(s, "Mode", { options: [{ value: 1, label: " " }] }), /label/, "ไม่มีชื่อ");
+  bad(s, () => Logic.setParamInfo(s, "Nope", { description: "x" }), /No parameter/, "ไม่มี parameter");
+  good(Logic.applyBatch(s, [{ fn: "setParamInfo", args: ["Width", { description: "w" }] }]), "applyBatch");
+  eq("w", s.params[1].description, "applyBatch ได้ผล");
+});
+
+test("ตัวเลือก: parseOptions / optionsText / paramOptions (Side = Right / Left เมื่อไม่ได้ตั้ง) · spec เก่าไม่มี field ใหม่ใช้ได้", () => {
+  eq({ ok: true, options: [{ value: 0, label: "Right" }, { value: 1, label: "Left ซ้าย" }] }, Spec.parseOptions(" 0=Right, 1 : Left ซ้าย "), "อ่าน");
+  eq({ ok: true, options: null }, Spec.parseOptions("  "), "ว่าง");
+  ok(!Spec.parseOptions("Right").ok, "ไม่มีเลข = error");
+  eq("0=Right, 1=Left", Spec.optionsText(Spec.SIDE_OPTIONS), "ข้อความ");
+  const s = Spec.newSpec("X");
+  eq(Spec.SIDE_OPTIONS, Spec.paramOptions(s, s.params[0]), "Side ค่าเริ่มต้น");
+  good(Logic.setParamInfo(s, "Side", { options: [{ value: 0, label: "R" }, { value: 1, label: "L" }] }), "ตั้งเอง");
+  eq("0=R, 1=L", Spec.optionsText(Spec.paramOptions(s, s.params[0])), "ของที่ตั้งเอง");
+  good(Logic.addParam(s, { name: "W", default: 1 }), "double");
+  eq(null, Spec.paramOptions(s, s.params[1]), "double ไม่มีตัวเลือก");
+  const old = demo();
+  ok(old.params.every(p => !("description" in p) && !("options" in p)), "spec เก่าไม่มี field ใหม่");
+  good(Logic.setParamInfo(old, old.params[0].name, { description: "ok" }), "spec เก่าแก้ได้");
+});
+
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
 process.exitCode = failed ? 1 : 0;

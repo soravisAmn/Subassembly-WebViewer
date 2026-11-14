@@ -1547,7 +1547,7 @@ function propsParamTable(box, it){
     const kl = document.createElement("label"); kl.textContent = "ชนิด";
     const k = document.createElement("select"); k.disabled = !ed_ || isSide;
     k.innerHTML = '<option value="double">double</option><option value="long">long</option>'; k.value = p.kind;
-    k.onchange = () => specEdit(() => { p.kind = k.value; if (k.value === "long") p.default = Math.round(+p.default || 0); }, it);
+    k.onchange = () => specEdit(() => { p.kind = k.value; if (k.value === "long") p.default = Math.round(+p.default || 0); else delete p.options; }, it);
     kl.appendChild(k); r1.appendChild(kl);
     const x = document.createElement("button"); x.textContent = "×"; x.title = isSide ? "parameter Side ใช้กลับด้าน ลบไม่ได้" : "ลบ parameter"; x.disabled = !ed_ || isSide;
     x.onclick = () => {
@@ -1577,6 +1577,24 @@ function propsParamTable(box, it){
     bound("max", "ขั้นสูง").placeholder = "ไม่จำกัด";
     if (unit === "slope") card.insertBefore(div("hint","1:x = ดิ่ง 1 ราบ x · x น้อย = ชัน → ขั้นต่ำ = ชันสุดที่ยอม · ขั้นสูง = ลาดสุดที่ยอม · ช่อง slope ของเครื่องมือใส่ชื่อนี้ได้เลย", card), r3);
     txt(r3, "display name", p.displayName, v => specEdit(() => { p.displayName = v || p.name; }, it));
+    // Round 7: description + options for the .atc (Civil 3D Subassembly Properties) — Logic API setParamInfo
+    const r5 = div("pc1", null, card);
+    const di = txt(r5, "คำอธิบาย", p.description, v => {
+      const r = specEdit(s => Logic.setParamInfo(s, p.name, { description: v }), it, `${p.name} คำอธิบาย`);
+      if (r && !r.ok) renderProps(true);          // specEdit shows the error
+    });
+    di.placeholder = "แสดงใน Civil 3D (Subassembly Properties)";
+    if (p.kind === "long"){
+      const r6 = div("pc1", null, card), def = Spec.paramOptions(sp, p);
+      const oi = txt(r6, "ตัวเลือก", p.options && p.options.length ? Spec.optionsText(p.options) : "", v => {
+        const o = Spec.parseOptions(v);
+        if (!o.ok){ alert(o.error); oi.value = p.options ? Spec.optionsText(p.options) : ""; return; }
+        const r = specEdit(s => Logic.setParamInfo(s, p.name, { options: o.options }), it, `${p.name} ตัวเลือก`);
+        if (r && !r.ok) renderProps(true);
+        else if (r && r.warnings) flashBanner(r.warnings.join(" · "));
+      }, "mono");
+      oi.placeholder = def && !(p.options && p.options.length) ? Spec.optionsText(def) + " (ค่าเริ่มต้น)" : "เช่น 0=Right, 1=Left — เป็นรายการให้เลือกใน Civil 3D";
+    }
     // ต้องมากกว่า 0: ≤ 0 = error + ใช้ default (แบบ base / body_rock-pitching.cs) — Side ใช้ 0 = Right จึงตั้งไม่ได้
     const r4 = div("pc1", null, card), cl = document.createElement("label"); cl.className = "check";
     cl.innerHTML = `<input type="checkbox"${p.positive ? " checked" : ""}> ต้องมากกว่า 0 <small>(≤ 0 = error + ใช้ default)</small>`;

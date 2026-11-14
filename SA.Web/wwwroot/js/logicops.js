@@ -688,6 +688,39 @@ const Logic = (() => {
     if (o.targets) s.targets = asList(o.targets).map(t => typeof t === "string" ? { name: t, type: "Surface", displayName: t } : { type: "Surface", displayName: t.name, ...t });
     return { ok: true, result: s };
   }
+  // Round 7 (.atc): description and options (list in Civil 3D) of a parameter. Empty description / null options = remove.
+  function setParamInfo(spec, name, o){
+    return tx(spec, s => {
+      o = o || {};
+      const p = s.params.find(x => x.name === name);
+      if (!p) fail(`No parameter ${name}.`);
+      const warnings = [];
+      if ("description" in o){
+        const d = String(o.description ?? "").replace(/\s+/g, " ").trim();
+        if (d.length > 300) fail("Description is longer than 300 characters.");
+        if (d) p.description = d; else delete p.description;
+      }
+      if ("options" in o){
+        const list = o.options == null ? [] : asList(o.options);
+        if (list.length && p.kind !== "long") fail(`Options need a long parameter; ${name} is ${p.kind}.`);
+        const seenV = new Set(), seenL = new Set();
+        const clean = list.map(x => {
+          const value = Number(x && x.value), label = String((x && x.label) ?? "").trim();
+          if (!Number.isInteger(value)) fail(`Option value must be a whole number, got ${x && x.value}.`);
+          if (!label) fail(`Option ${value} needs a label.`);
+          if (seenV.has(value)) fail(`Option value ${value} is used twice.`);
+          if (seenL.has(label.toLowerCase())) fail(`Option label ${label} is used twice.`);
+          seenV.add(value); seenL.add(label.toLowerCase());
+          return { value, label };
+        });
+        if (clean.length){
+          p.options = clean;
+          if (!clean.some(x => x.value === Math.round(+p.default))) warnings.push(`Default ${p.default} of ${name} is not one of the options.`);
+        } else delete p.options;
+      }
+      return { result: { description: p.description || "", options: p.options || null }, ...(warnings.length ? { warnings } : {}) };
+    });
+  }
   // Round 7 (Build dialog): rename the C# class / namespace of a drawn subassembly. Save (.cs) with rename renames them in the file.
   const CS_KEYWORDS = new Set(("abstract as base bool break byte case catch char checked class const continue decimal default delegate do double else enum " +
     "event explicit extern false finally fixed float for foreach goto if implicit in int interface internal is lock long namespace new null object operator " +
@@ -1018,6 +1051,7 @@ const Logic = (() => {
     M("Parameters", "editParam", "name, { name?, kind?, default?, displayName?, unit?, positive?, min?, max? }", 2, "Edit a parameter. Renaming updates every expression.", "As addParam"),
     M("Parameters", "removeParam", "name", 1, "Delete a parameter.", "Still used by expressions (lists them), Side parameter"),
     M("Parameters", "setParamBounds", "name, { positive, min, max }", 2, "Parameter limits."),
+    M("Parameters", "setParamInfo", "name, { description?, options?: [{ value, label }] }", 2, "Description and options (a list in Civil 3D, long parameters only) for the .atc. Empty description / null options remove them. Warns when the default is not an option.", "Missing parameter, options on a double, duplicate value / label"),
     M("Parameters", "setParamUnit", "name, unit", 2, "Parameter value type."),
     M("Objects", "addPoint", "def, codes?, { aux?, branch? }", 3, "Add a point. def.type: delta, polar, slopeLength, slopeToSurface, onSurface, between, intersect, offset, extendToGround, firstOf, external (fields: catalog pointTypes). Returns the id in result.", "Unknown type, missing field / point, bad expression"),
     M("Objects", "editPoint", "id, patch", 2, "Merge fields into a point definition (a different type replaces it).", "As addPoint, circular reference, origin / tangent / lastOf"),
@@ -1064,12 +1098,12 @@ const Logic = (() => {
     rules: ["Coordinates are in the Side = Right frame; Left is mirrored automatically.", "x outward +, y up +, relative to the origin point P1.", "slope fields are rise / run expressions, down = negative, e.g. -1/SideSlope.", "A real link cannot end on an auxiliary point, except a real end (firstOf / lastOf).", "Define points from parameters and other points, not fixed coordinates."]
   });
 
-  const API = { setClassName, addCondition, editCondition, renameCondition, removeCondition, addDecision, editDecision, removeDecision, moveDecision,
+  const API = { setClassName, setParamInfo, addCondition, editCondition, renameCondition, removeCondition, addDecision, editDecision, removeDecision, moveDecision,
                 addCase, editCase, removeCase, moveCase, renameBranch, setBranch, addVariable, editVariable, renameVariable, removeVariable, moveVariable,
                 addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setArrayLoop, removeArray, addLastOf, setParamBounds, setParamUnit,
                 addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects };
 
-  return { META, catalog, applyBatch, newSubassembly, setClassName, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects,
+  return { META, catalog, applyBatch, newSubassembly, setClassName, setParamInfo, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects,
            RESERVED, nameError, freeCondName, toText, diffText,
            addCondition, editCondition, renameCondition, removeCondition,
            addDecision, editDecision, removeDecision, moveDecision,

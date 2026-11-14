@@ -71,6 +71,7 @@ Logic.applyBatch(spec, [
 | `editParam(name, { name?, kind?, default?, displayName?, unit?, positive?, min?, max? })` | Edit a parameter. Renaming updates every expression. | As addParam |
 | `removeParam(name)` | Delete a parameter. | Still used by expressions (lists them), Side parameter |
 | `setParamBounds(name, { positive, min, max })` | Parameter limits. |  |
+| `setParamInfo(name, { description?, options?: [{ value, label }] })` | Description and options (a list in Civil 3D, long parameters only) for the .atc. Empty description / null options remove them. Warns when the default is not an option. | Missing parameter, options on a double, duplicate value / label |
 | `setParamUnit(name, unit)` | Parameter value type. |  |
 
 ### Objects

@@ -910,6 +910,26 @@ const Spec = (() => {
     return p;
   }
 
+  // ---------- description / options of a parameter (round 7, for the .atc) ----------
+  // p.description = text shown in Civil 3D Subassembly Properties · p.options = [{ value, label }] for a long parameter
+  // (a list in Civil 3D). The Side parameter has Right = 0 / Left = 1 when it has no options of its own.
+  const SIDE_OPTIONS = [{ value: 0, label: "Right" }, { value: 1, label: "Left" }];
+  const paramOptions = (spec, p) => p.kind !== "long" ? null
+    : (p.options && p.options.length ? p.options : spec.side && spec.side.param === p.name ? SIDE_OPTIONS : null);
+  const optionsText = opts => (opts || []).map(o => `${o.value}=${o.label}`).join(", ");
+  // "0=Right, 1=Left" → { ok, options } · empty text = { ok, options: null } · wrong = { ok: false, error }
+  function parseOptions(text){
+    const t = String(text ?? "").trim();
+    if (!t) return { ok: true, options: null };
+    const options = [];
+    for (const part of t.split(/[,;\n]/).map(s => s.trim()).filter(Boolean)){
+      const m = /^(-?\d+)\s*[=:]\s*(.+)$/.exec(part);
+      if (!m) return { ok: false, error: `"${part}" ต้องเป็น เลข=ชื่อ เช่น 0=Right` };
+      options.push({ value: +m[1], label: m[2].trim() });
+    }
+    return { ok: true, options };
+  }
+
   // ---------- ช่อง slope (ลาด + ความยาว, ลาดจนชนดิน) ----------
   // เก็บแบบเดิมเสมอ = นิพจน์ดิ่งต่อราบมีเครื่องหมาย (ลง = ลบ) เช่น "-1/SideSlope" → evaluator / C# / spec เก่าไม่เปลี่ยน
   // หน้าตาในเว็บ = ทิศ ↗ / ↘ + ข้อความ: 1:1.5 · ชื่อ parameter ชนิด Slope · 2% · ชื่อ parameter ชนิด Percent · นิพจน์ (เครื่องหมายอยู่ในนิพจน์เอง)
@@ -1549,7 +1569,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, offLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, addLastOf, arraySetPoint, withI, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
+           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, SIDE_OPTIONS, paramOptions, optionsText, parseOptions, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, addLastOf, arraySetPoint, withI, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
            chainOrder, walkShape, polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();

@@ -68,7 +68,7 @@ public static class CodeGenerator
         {
             sb.AppendLine("//");
             sb.AppendLine("// Parameter:");
-            foreach (var p in s.Params) sb.AppendLine($"//   {p.Name} ({p.Kind}, default {UnitNum(p, p.Default)}{Bounds(p)}){(string.IsNullOrEmpty(p.DisplayName) || p.DisplayName == p.Name ? "" : " — " + p.DisplayName)}");
+            foreach (var p in s.Params) sb.AppendLine($"//   {p.Name} ({p.Kind}, default {UnitNum(p, p.Default)}{Bounds(p)}){(string.IsNullOrEmpty(p.DisplayName) || p.DisplayName == p.Name ? "" : " — " + p.DisplayName)}{ParamNote(p)}");
         }
         sb.AppendLine();
         sb.AppendLine("using System;");
@@ -297,7 +297,7 @@ public static class CodeGenerator
             foreach (var p in _s.Params)
             {
                 var add = p.Kind == "long" ? $"cs.ParamsLong.Add(\"{p.Name}\", {Math.Round(p.Default):0})" : $"cs.ParamsDouble.Add(\"{p.Name}\", {SpecExpr.Lit(p.Default)})";
-                L($"        {add}.DisplayName = {Str(string.IsNullOrEmpty(p.DisplayName) ? p.Name : p.DisplayName!)};");
+                L($"        {add}.DisplayName = {Str(string.IsNullOrEmpty(p.DisplayName) ? p.Name : p.DisplayName!)};{(ParamNote(p) is { Length: > 0 } n ? "   //" + n[2..] : "")}");
             }
             L("    }");
             L();
@@ -1693,6 +1693,17 @@ public static class CodeGenerator
         }
         catch { return false; }
     }
+    // Round 7: description / options of a parameter as comment text (" · text · 0=Right, 1=Left"), one line. Empty = "".
+    // Only comments: Civil 3D reads them from the .atc, the code does not change.
+    internal static string ParamNote(SpecParam p)
+    {
+        static string One(string s) => string.Join(" ", s.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(p.Description)) parts.Add(One(p.Description));
+        if (p.Kind == "long" && p.Options is { Count: > 0 }) parts.Add(string.Join(", ", p.Options.Select(o => $"{o.Value}={One(o.Label)}")));
+        return parts.Count == 0 ? "" : " · " + string.Join(" · ", parts);
+    }
+
     private static string Norm(string s) => string.Join("\n", s.Replace("\r\n", "\n").Split('\n').Select(l => l.TrimEnd()));
 
     // Round 7 Build dialog: rename the namespace / class of a web file outside SA-DRAWING (the block is regenerated after).

@@ -5,7 +5,7 @@
 "use strict";
 const Build = (() => {
   const st = { project: null, versions: [], years: new Set(), files: null, allFiles: [], dllName: "", check: null, settings: { copyTo: "", copyToOn: false },
-               busy: false, result: null, checking: false, seq: 0 };
+               busy: false, result: null, checking: false, seq: 0, atcFullPath: false };
   const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     .then(r => r.json()).catch(() => ({ ok: false, message: NO_SERVER }));
   const get = url => fetch(url).then(r => r.json()).catch(() => null);
@@ -110,6 +110,13 @@ const Build = (() => {
     div("bd-v", `<label><input type="radio" name="bd-mode" checked> Build (DLL package)</label>
       <label class="dis" title="มาใน M4"><input type="radio" name="bd-mode" disabled> Source package</label>
       <label class="dis" title="ทดลองภายหลัง"><input type="radio" name="bd-mode" disabled> .pkt (ทดลองภายหลัง)</label>`, g);
+    div("bd-l", ".atc", g);
+    const av = div("bd-v", null, g), al = document.createElement("label"), ac = document.createElement("input");
+    ac.type = "checkbox"; ac.checked = st.atcFullPath; ac.onchange = () => { st.atcFullPath = ac.checked; };
+    al.append(ac, " path แบบเต็ม");
+    al.title = "ปกติ .atc อ้าง DLL ด้วยชื่อไฟล์ (อยู่โฟลเดอร์เดียวกัน) · ติ๊ก = อ้างด้วย path เต็มของโฟลเดอร์ที่ Civil 3D โหลด (Copy-to ถ้าเปิดไว้) — ใช้เมื่อ Civil 3D หา DLL ไม่เจอ";
+    av.appendChild(al);
+    av.insertAdjacentHTML("beforeend", "<small>ไม่ติ๊ก = ชื่อไฟล์ DLL อย่างเดียว (อยู่ข้าง .atc)</small>");
     div("bd-l", "ชื่อ DLL", g);
     const dv = div("bd-v", null, g);
     const dn = input(st.dllName, "ชื่อ DLL"); dn.classList.add("bd-dll");
@@ -188,6 +195,10 @@ const Build = (() => {
       const d = div("bd-i " + (okY ? "ok" : y.status === "skipped" ? "w" : "e"), null, box);
       d.innerHTML = `<b>${okY ? "✓" : "✖"}</b> Civil 3D ${y.year}: ${esc(y.message || y.status)}${okY ? ` <span class="mono">${esc(y.dll)}</span> · ${(y.ms / 1000).toFixed(1)} s` : ""}`;
       if (okY) d.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(y.dll)));
+      if (okY && y.atc){
+        const a = div("bd-sub", `Tool Catalog: <span class="mono">${esc(y.atc)}</span> · ไอคอน ${y.icons} รูป — Civil 3D: CONTENTBROWSER → Add Catalog → เลือกไฟล์นี้`, box);
+        a.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(y.atc)));
+      }
       for (const e of (y.errors || []).slice(0, 30)) div("bd-sub mono", esc(e), box);
       if ((y.errors || []).length > 30) div("bd-sub", `… อีก ${y.errors.length - 30} (ดู build.log ใน ${esc(y.outDir)})`, box);
       if ((y.changes || []).length){
@@ -213,7 +224,7 @@ const Build = (() => {
     }
     st.busy = true; st.result = null; render();
     const t0 = Date.now(), timer = setInterval(() => { const s = $("bd-sec"); if (s) s.textContent = Math.round((Date.now() - t0) / 1000); }, 500);
-    const r = await post("/api/build", { project: st.project, dllName: st.dllName, years: [...st.years], files: st.files, allowSameName: allow });
+    const r = await post("/api/build", { project: st.project, dllName: st.dllName, years: [...st.years], files: st.files, allowSameName: allow, atcFullPath: st.atcFullPath });
     clearInterval(timer);
     st.busy = false; st.result = r;
     const okAll = r.ok && (r.builds || []).length;

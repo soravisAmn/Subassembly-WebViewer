@@ -138,3 +138,11 @@ Whether a single-file `<Category>` root (XAML style) works with Add Catalog is u
 - Same-name box (answer 4): a browser confirm (OK / Cancel) with the paths and the advice.
 - Default ticked version: the newest that can be built.
 - Project version 2 (`assemblies[].items`) is read too.
+
+## 8. M3 notes
+
+- The Logic API gets `setParamInfo(spec, name, { description?, options? })`. The Parameter card gets "คำอธิบาย" and, for long parameters, "ตัวเลือก" (`0=Right, 1=Left`). The Side parameter defaults to Right / Left (`Spec.paramOptions`, and the same rule on the server).
+- Icons are drawn on the **server** from a simulator run (`IconRenderer`), not through `sa_render` in the page: the build runs on the server, the page may be closed, and hand-written files have no spec. Same look as `sa_render` (light blue shapes, dark links, white).
+- `TypeInfo`: length 16, slope (x of 1:x) 10, number / percent 0, hand-written 16. Percent is not 9, because 9 stores a grade (0.02) while our percent stores 2.
+- The `.atc` is UTF-8 with an XML declaration (Thai descriptions). Check in M5 that Content Browser shows Thai text.
+- No `<Time>` elements, so the locked expected files stay stable.

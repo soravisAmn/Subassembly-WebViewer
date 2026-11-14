@@ -300,6 +300,82 @@ static class BuildTests
             Eq(n0 + 1, eng.Check(new CheckRequest("T", null, null, null, sc)).ScenarioRuns, "รันเพิ่ม 1");
         });
 
+        // ---------- M3: .atc + icons ----------
+
+        test(".atc: GUID คงที่ทุกครั้งที่ build (จากชื่อ DLL + class), ต่างชื่อ = ต่าง GUID", () =>
+        {
+            var a = AtcWriter.StableGuid("tool|SR03|TestSubassembly.A");
+            Eq(a, AtcWriter.StableGuid("tool|SR03|TestSubassembly.A"), "เหมือนเดิม");
+            True(a != AtcWriter.StableGuid("tool|SR04|TestSubassembly.A"), "ต่าง DLL");
+            True(System.Text.RegularExpressions.Regex.IsMatch(a, @"^\{[0-9A-F]{8}-[0-9A-F]{4}-5[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}\}$"), "รูปแบบ " + a);
+        });
+
+        test(".atc ของ fixture 3 ไฟล์ ตรงกับไฟล์ที่ล็อกไว้ (fixtures/round7/T7.atc, T7_tools.atc) + ไอคอน PNG", () =>
+        {
+            var dir = Project(fixtures, "T7", Fixtures);
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"), () => new List<C3DInstall>());
+            var plan = eng.Plan(new BuildRequest("T7", null, null, null));
+            var cat = eng.MakeCatalog("T7", plan.Classes, plan.Files.Select(f => Path.Combine(dir, f)), "T7.dll");
+            Eq(0, cat.Warnings.Count, "warning: " + string.Join(" | ", cat.Warnings.Select(w => w.Message)));
+            var exp = Path.Combine(root, "SA.Tests", "fixtures", "round7");
+            foreach (var (file, text) in new[] { ("T7.atc", cat.Catalog), ("T7_tools.atc", cat.Category) })
+            {
+                var want = File.Exists(Path.Combine(exp, file)) ? File.ReadAllText(Path.Combine(exp, file)) : null;
+                if (want?.Replace("\r\n", "\n") != text.Replace("\r\n", "\n"))
+                {
+                    File.WriteAllText(Path.Combine(TempRoot, "actual_" + file), text);
+                    throw new Exception($"{file} ไม่ตรง — ฉบับที่ได้อยู่ที่ {Path.Combine(TempRoot, "actual_" + file)}");
+                }
+            }
+            Eq(3, cat.Icons.Count, "ไอคอน");
+            foreach (var (rel, png) in cat.Icons)
+            {
+                var size = IconRenderer.Size(png);
+                True(size is { } s && s.W >= 32 && s.H >= 32 && s.W <= 256 && s.H <= 256 && (s.W == 256 || s.H == 256), $"{rel}: ขนาด {size}");
+                True(rel.StartsWith("icons\\") && rel.EndsWith(".png"), rel);
+            }
+            True(IconRenderer.Size(IconRenderer.Generic()) != null, "รูปทั่วไป");
+        });
+
+        test(".atc จาก spec: คำอธิบาย, ตัวเลือก (Enum), TypeInfo ตามชนิดค่า, comment ในโค้ดที่สร้าง · ไฟล์เขียนเอง: Side = Right / Left", () =>
+        {
+            var src = File.ReadAllText(Path.Combine(fixtures, "pavement-assembly.cs"));
+            var raw = System.Text.Json.Nodes.JsonNode.Parse(SA.Drawing.CodeGenerator.FindBlock(src)!.SpecJson!)!;
+            var ps = raw["params"]!.AsArray();
+            ps[0]!["options"] = System.Text.Json.Nodes.JsonNode.Parse("""[{"value":0,"label":"ขวา Right"},{"value":1,"label":"Left"}]""");
+            ps[0]!["description"] = "ด้านที่วาง";
+            ps[1]!["description"] = "ระยะลด\nขั้นต่ำ";
+            ps[1]!["unit"] = "length";
+            var spec = SA.Drawing.DrawingSpec.Parse(raw.ToJsonString());
+            var gen = SA.Drawing.CodeGenerator.GenerateFile(spec, raw.ToJsonString(), "pave.cs");
+            True(gen.Contains("// ด้านที่วาง · 0=ขวา Right, 1=Left") && gen.Contains("// ระยะลด ขั้นต่ำ"), "comment ในโค้ด");
+            True(gen.Contains("//   MinDrop (double, default 2 m) · ระยะลด ขั้นต่ำ") || gen.Contains("· ระยะลด ขั้นต่ำ"), "comment หัวไฟล์");
+            var dir = Project(fixtures, "D", Array.Empty<string>());
+            File.WriteAllText(Path.Combine(dir, "pave.cs"), gen);
+            File.WriteAllText(Path.Combine(dir, "hand.cs"), SubassemblyTemplate.Create("Hand"));
+            File.WriteAllText(Path.Combine(dir, "D.assembly.json"), "{\"version\":1,\"items\":[{\"file\":\"pave.cs\"},{\"file\":\"hand.cs\"}]}");
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"), () => new List<C3DInstall>());
+            var plan = eng.Plan(new BuildRequest("D", null, null, null));
+            var cat = eng.MakeCatalog("D", plan.Classes, plan.Files.Select(f => Path.Combine(dir, f)), @"C:\full\D.dll");
+            var x = XDocument.Parse(cat.Category);
+            var side = x.Descendants("Side").First();
+            Eq("ด้านที่วาง", (string?)side.Attribute("Description"), "คำอธิบาย Side");
+            Eq("Long", (string?)side.Attribute("DataType"), "DataType");
+            Eq("Right,Left", string.Join(",", side.Element("Enum")!.Elements().Select(e => e.Name.LocalName)), "ชื่อ Enum (ตัดอักษรที่ไม่ใช่ A-Z 0-9 _)");
+            Eq("ขวา Right", (string?)side.Element("Enum")!.Elements().First().Attribute("DisplayName"), "DisplayName ของตัวเลือก");
+            var md = x.Descendants("MinDrop").Single();
+            Eq("16", (string?)md.Attribute("TypeInfo"), "length = 16");
+            Eq("ระยะลด ขั้นต่ำ", (string?)md.Attribute("Description"), "คำอธิบายบรรทัดเดียว");
+            Eq("2", md.Value, "default");
+            True(x.Descendants("DotNetClass").All(d => (string?)d.Attribute("Assembly") == @"C:\full\D.dll"), "path แบบเต็ม");
+            var hand = x.Descendants("Tool").Single(t => t.Descendants("DotNetClass").Single().Value == "TestSubassembly.Hand");
+            var hs = hand.Descendants("Side").Single();
+            Eq("Right,Left", string.Join(",", hs.Element("Enum")!.Elements().Select(e => e.Name.LocalName)), "Side ของไฟล์เขียนเอง");
+            True(hand.Descendants("Params").Single().Elements().Where(e => (string?)e.Attribute("DataType") == "Double").All(e => (string?)e.Attribute("TypeInfo") == "16"), "double ของไฟล์เขียนเอง = 16");
+            var runParams = string.Join(",", hand.Descendants("Params").Single().Elements().Select(e => e.Name.LocalName));
+            True(runParams.StartsWith("Side,"), "ลำดับเดียวกับ GetInputParameters: " + runParams);
+        });
+
         var c3d = C3DVersions.DetectThisMachine().Where(i => i.CanBuild).OrderByDescending(i => i.Year).FirstOrDefault();
         test(c3d == null ? "build จริง: skipped (ไม่พบ Civil 3D ที่ build ได้)" : $"build จริงกับ Civil 3D {c3d.Year}: DLL + manifest + build ซ้ำไม่มีการเปลี่ยน + ชื่อซ้ำที่อื่นต้องยืนยัน", () =>
         {
@@ -313,6 +389,7 @@ static class BuildTests
             var outDir = Path.Combine(dir, "build", "T7", c3d.Year.ToString());
             Eq(outDir, y.OutDir, "โฟลเดอร์ output");
             True(File.Exists(Path.Combine(outDir, "T7.dll")), "มี DLL");
+            True(File.Exists(Path.Combine(outDir, "T7.atc")) && File.Exists(Path.Combine(outDir, "T7_tools.atc")) && Directory.GetFiles(Path.Combine(outDir, "icons"), "*.png").Length == 3 && y.Atc == Path.Combine(outDir, "T7.atc"), ".atc + ไอคอน");
             True(File.Exists(Path.Combine(outDir, "build.log")) && File.Exists(Path.Combine(outDir, "obj", "T7.csproj")), "log + csproj");
             var m = BuildManifest.Load(Path.Combine(outDir, "build-manifest.json"))!;
             Eq(3, m.Classes.Count, "class ใน manifest");

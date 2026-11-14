@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Catalog FileRevision="18.0.0" Revision="18.0.0" option="0">
+  <ItemID idValue="{DC3F7DF2-D843-5D9C-A966-DB9FBF7D96B5}" />
+  <Properties>
+    <ItemName>T7</ItemName>
+    <Images option="0">
+      <Image cx="93" cy="123" src=".\icons\PavementAssembly.png" />
+    </Images>
+    <Description>Subassemblies in T7.dll (SA Drawing Studio)</Description>
+    <AccessRight>1</AccessRight>
+  </Properties>
+  <Source>
+    <Publisher>
+      <PublisherName>SA Drawing Studio</PublisherName>
+    </Publisher>
+  </Source>
+  <Tools />
+  <Palettes />
+  <Packages />
+  <Categories>
+    <Category Revision="18.0.0" option="0">
+      <ItemID idValue="{A040A136-12DA-53D6-8A33-74C7206558C1}" />
+      <Url href=".\\T7_tools.atc" />
+      <Properties>
+        <ItemName>T7</ItemName>
+        <Images option="0">
+          <Image cx="93" cy="123" src=".\icons\PavementAssembly.png" />
+        </Images>
+        <Description>Subassemblies in T7.dll (SA Drawing Studio)</Description>
+        <AccessRight>1</AccessRight>
+      </Properties>
+      <Source />
+    </Category>
+  </Categories>
+</Catalog>

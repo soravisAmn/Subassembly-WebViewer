@@ -43,6 +43,14 @@ public class SpecParam
     public double? Max { get; set; }
     public bool Positive { get; set; }                // ต้องมากกว่า 0: ≤ 0 = error (Severe) + ใช้ default (แบบ base_rock-pitching.cs)
     public string? Unit { get; set; }                 // ชนิดค่า (รอบ 4e): null / number · slope (1:x) · length (m) · percent (%) — มีผลแค่ข้อความเตือน
+    public string? Description { get; set; }          // round 7: shown in Civil 3D (.atc); in the generated C# only as a comment
+    public List<SpecOption>? Options { get; set; }    // round 7: long parameter as a list in Civil 3D (.atc)
+}
+
+public class SpecOption
+{
+    public long Value { get; set; }
+    public string Label { get; set; } = "";
 }
 
 public class SpecTarget

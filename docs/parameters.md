@@ -13,6 +13,15 @@ Thai labels in quotes are the text shown in the web.
 
 Renaming a parameter updates expressions using it · imported files can use the original file's parameters in expressions directly.
 
+## Description and options (round 7)
+
+Two more fields per parameter in the card, used by the `.atc` (what Civil 3D shows in Subassembly Properties). Both go through the Logic API `setParamInfo`:
+
+- **คำอธิบาย** (description): one line of text, at most 300 characters. In the generated C# it is only a comment (on the `AddParams` line and in the header). An empty field removes it.
+- **ตัวเลือก** (options), long parameters only: `0=Right, 1=Left` (number=label, separated by commas). Civil 3D shows a list. Empty = none. When the default is not one of the values, the page warns. The Side parameter gets `0=Right, 1=Left` when it has no options of its own (shown as the placeholder). Changing a parameter to double drops its options.
+
+Old specs without these fields work as before.
+
 ## Value types
 
 A column of the Parameter table, separate from double / long (round 4e). The stored value / the value in expressions / C# is always the same number; only the display and warning text differ.

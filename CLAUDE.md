@@ -57,15 +57,24 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 ## Status
 
 - Last finished: round 6 (MCP), M0-M5. History: `docs/history.md`. Setup: `docs/connect-claude.md`.
-- Round 6 M5 Civil 3D run: shapes filled crossed (link order in `Shapes.Add`). Fixed in shim + generator (`docs/civil3d-testing.md`). The user re-Saves the 3 root files from the web, then `build-c3d.bat` and re-test.
-- Second Civil 3D run: every shape warned "not chained" (`Link.Points` gives new Point wrappers; reference compare failed). Fixed: compare by position, shim returns new wrappers too, test added. 3 root files re-Saved. All tests pass (485).
-- Next: the user rebuilds (`build-c3d.bat`, close Civil 3D first) and runs `tests-civil3d/round6-checklist.md` in Civil 3D. Then round 7: `prompt-7.md` (Build dialog, build report, .atc, source package) is written. Idea list: `docs/ideas/IDEA#1.md`.
+- Round 6 M5 Civil 3D run: shapes filled crossed (link order in `Shapes.Add`). Fixed in shim + generator (`docs/civil3d-testing.md`).
+- Next: round 7 (`prompt-7.md`): Build dialog, report, auto `.atc`, source package.
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
 
 ## Plan
 
-1. Next prompt: drawing from a CAD screenshot through MCP.
-2. Later: public web (accounts, sandboxed C# compile, user-supplied AI key, Chat / Code modes). Keep **core** (spec, evaluator, CodeGenerator, shim, pages) separate from **host** (localhost, local files, local compile). One repo for now.
-3. SAC-style flowchart comes with the public web and must edit the same data as the current logic (`docs/prompts/prompt-flowchart-later.md`).
+Decided ideas: `docs/ideas/IDEA#1.md` (Thai). Read only the item for the current round, not the whole file. UI wireframes: Design canvas "SA Drawing Studio — UI wireframe" on claude.ai (the user shares screenshots).
+
+| Round | Work (IDEA#1 item) |
+|---|---|
+| 7 | Build + report + `.atc` + source package (3–4) |
+| 8 | Project-folder storage: relative paths, spec only in `.cs`, scenarios in the project file, Pack, relink (8) |
+| 9 | New UI shell: ribbon, contextual Edit tabs, dockable palettes (7) — after the Figma pass |
+| 10 | Web display: style by code (`.style.json`), notes, dimensions, Civil 3D preview mode (1) |
+| 11 | Icon generator (5) |
+| 12 | Browser palette: folder roots, thumbnails, copy into `lib\` (2) |
+| 13 | In-app AI chat (6) |
+
+Any time: `.pkt` experiment, app settings page. Later: public web; keep **core** (spec, evaluator, CodeGenerator, shim, pages) separate from **host** (localhost, local files, local compile). Postponed: drawing from a CAD screenshot via MCP. SAC-style flowchart: `docs/prompts/prompt-flowchart-later.md`.
 
 Full roadmap: Trello board "SA Drawing Studio".

@@ -7,6 +7,7 @@ Tests must never read the user's working files at the root (`*.cs`, `*.assembly.
 | Command | Tests |
 |---|---|
 | `dotnet run --project SA.Tests` | MCP endpoint (initialize, tools/list, tools/call, no page open, foreign Host / Origin, forwarding to a fake page), Trapezoid, code generator (compares JS with the result of running the C#, including Side = Left and link codes; this part needs `node`), SA-DRAWING block, object → code line, redrawn rock-pitching = real files (round 4c + -web.cs round 4e), exact parameter warning text (value types) |
+| `dotnet run --project SA.Tests` (BuildTests) | Build engine (round 7): csproj, Civil 3D detection with a fake install folder, class checks, manifest diff, same-name DLL, locked DLL, plan; a real `dotnet build` of the round 6 fixtures when Civil 3D is installed (else "skipped"). See [build.md](build.md) |
 | `dotnet run --project SA.Tests` (ShapeChainTests) | Shapes fill like Civil 3D: the old round 6 body S2 (links in spec order) shows the broken fill + `ShapeLinksNotChained`; every fixture and `tests-civil3d` demo regenerated from its sa-spec gives closed shapes, chained, not self-crossing, on 14 grounds × Right / Left. Known crossings that are limits of a drawing are listed in `KnownCrossings` (see [civil3d-testing.md](civil3d-testing.md)) |
 | `node SA.Tests/js/evaluator.test.js` | Expressions + DrawingSpec (add cases in `SA.Tests/js/drawing-cases.json`), shape chaining (`chainOrder` / `walkShape`) |
 | `node SA.Tests/js/cond.test.js` | Condition expressions / values from geometry (round 4) |

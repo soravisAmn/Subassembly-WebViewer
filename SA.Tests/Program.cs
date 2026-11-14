@@ -114,6 +114,7 @@ ExprTests.Run(Test);
 RockPitchingTests.Run(Test);
 McpTests.Run(Test);
 ShapeChainTests.Run(Test);
+BuildTests.Run(Test);
 
 Console.WriteLine($"\n{passed} ผ่าน, {failed} ไม่ผ่าน");
 return failed == 0 ? 0 : 1;

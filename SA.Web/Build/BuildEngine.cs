@@ -1,0 +1,286 @@
+// Round 7 M1: builds the subassemblies of one project (*.assembly.json) into one DLL per Civil 3D version.
+//   1. files of the project (items[].file, in order) -> classes (Roslyn) -> checks (errors stop here)
+//   2. per ticked Civil 3D year: locked DLL? same-named DLL in another folder? -> write obj\<DLL>.csproj -> dotnet build
+//   3. success: parameters of every class from the simulator (GetInputParameters) -> build-manifest.json + diff with the
+//      previous build -> build history (machine folder)
+// The user's .cs files are only read (compiled in place by dotnet build). One build at a time.
+
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+
+namespace SA.Build;
+
+public record BuildRequest(string? Project, string? DllName, int[]? Years, string[]? Files, bool AllowSameName = false);
+
+public class BuildYearResult
+{
+    public int Year { get; set; }
+    public string Status { get; set; } = "";     // ok | failed | locked | same-name | skipped
+    public string? Message { get; set; }
+    public string OutDir { get; set; } = "";
+    public string? Dll { get; set; }
+    public string Tfm { get; set; } = "";
+    public List<string> Errors { get; set; } = new();
+    public List<ParamChange> Changes { get; set; } = new();
+    public List<string> SameName { get; set; } = new();
+    public List<BuildIssue> Warnings { get; set; } = new();
+    public double Ms { get; set; }
+}
+
+public class BuildResult
+{
+    public bool Ok { get; set; }
+    public string DllName { get; set; } = "";
+    public string? Project { get; set; }
+    public List<string> Files { get; set; } = new();
+    public List<ClassInfo> Classes { get; set; } = new();
+    public List<BuildIssue> Issues { get; set; } = new();
+    public List<BuildYearResult> Builds { get; set; } = new();
+}
+
+public class BuildEngine
+{
+    readonly SubassemblyCompiler _compiler;
+    readonly SubassemblyRunner _runner;
+    readonly string _folder;
+    readonly Func<List<C3DInstall>> _installs;
+    public BuildHistory History { get; }
+
+    static readonly object Gate = new();
+    public static TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(5);
+
+    public BuildEngine(SubassemblyCompiler compiler, SubassemblyRunner runner, string folder, string? machineDir = null, Func<List<C3DInstall>>? installs = null)
+    {
+        _compiler = compiler;
+        _runner = runner;
+        _folder = Path.GetFullPath(folder);
+        History = new BuildHistory(machineDir ?? BuildPaths.DefaultMachineDir());
+        _installs = installs ?? (() => C3DVersions.DetectThisMachine());
+    }
+
+    public List<C3DInstall> Installs() => _installs();
+
+    // DLL name = a file name Civil 3D and MSBuild both accept: letters, digits, _ - . (no spaces, no Thai)
+    public static bool ValidDllName(string? s) => !string.IsNullOrEmpty(s) && s.Length <= 100 && Regex.IsMatch(s, @"^[A-Za-z0-9_][A-Za-z0-9_.-]*$") && !s.EndsWith('.');
+
+    public static string DefaultDllName(string projectFile)
+    {
+        var n = Path.GetFileName(projectFile);
+        if (n.EndsWith(".assembly.json", StringComparison.OrdinalIgnoreCase)) n = n[..^".assembly.json".Length];
+        n = Regex.Replace(n, @"[^A-Za-z0-9_.-]", "_").Trim('.');
+        return n.Length == 0 ? "Subassemblies" : n;
+    }
+
+    public string? ProjectPath(string? project)
+    {
+        var name = FileUtil.AssemblyFileName(project);
+        return name == null ? null : Path.Combine(_folder, name);
+    }
+
+    // .cs files of the project in item order (a file used by several items counts once)
+    public static List<string> ProjectFiles(string projectJson)
+    {
+        using var doc = JsonDocument.Parse(projectJson);
+        var list = new List<string>();
+        if (doc.RootElement.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+            foreach (var it in items.EnumerateArray())
+                if (it.TryGetProperty("file", out var f) && f.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(f.GetString())
+                    && !list.Contains(f.GetString()!, StringComparer.OrdinalIgnoreCase))
+                    list.Add(f.GetString()!);
+        return list;
+    }
+
+    // Steps 1 only: files, classes, checks. Used by Build and by the dialog / sa_build_check (no build).
+    public BuildResult Plan(BuildRequest req)
+    {
+        var r = new BuildResult();
+        var proj = ProjectPath(req.Project);
+        if (proj == null || !File.Exists(proj)) { r.Issues.Add(new("error", null, $"ไม่พบไฟล์ project {req.Project}")); return r; }
+        r.Project = Path.GetFileName(proj);
+        r.DllName = string.IsNullOrWhiteSpace(req.DllName) ? DefaultDllName(proj) : req.DllName.Trim();
+        if (!ValidDllName(r.DllName)) r.Issues.Add(new("error", null, $"ชื่อ DLL '{r.DllName}' ใช้ไม่ได้ (ใช้ได้เฉพาะ A-Z a-z 0-9 _ - .)"));
+
+        List<string> files;
+        try { files = ProjectFiles(FileUtil.ReadShared(proj)); }
+        catch (JsonException e) { r.Issues.Add(new("error", r.Project, $"อ่าน project ไม่ได้: {e.Message}")); return r; }
+        if (req.Files != null) files = files.Where(f => req.Files.Contains(f, StringComparer.OrdinalIgnoreCase)).ToList();
+        if (files.Count == 0) r.Issues.Add(new("error", r.Project, "ไม่มีไฟล์ .cs ให้ build"));
+
+        var empty = new List<string>();
+        foreach (var f in files)
+        {
+            var path = SafeFile(f);
+            if (path == null || !File.Exists(path)) { r.Issues.Add(new("error", f, $"ไม่พบไฟล์ {f}")); continue; }
+            r.Files.Add(Path.GetFileName(path));
+            var cls = ClassReader.Read(FileUtil.ReadShared(path), Path.GetFileName(path));
+            if (cls.Count == 0) empty.Add(Path.GetFileName(path));
+            r.Classes.AddRange(cls);
+        }
+        r.Issues.AddRange(ClassReader.Check(r.Classes, empty));
+        r.Ok = !r.Issues.Any(i => i.Severity == "error");
+        return r;
+    }
+
+    public BuildResult Build(BuildRequest req)
+    {
+        var r = Plan(req);
+        if (!r.Ok) return r;
+        var years = (req.Years ?? Array.Empty<int>()).Distinct().ToList();
+        if (years.Count == 0) { r.Ok = false; r.Issues.Add(new("error", null, "ยังไม่ได้เลือก Civil 3D version")); return r; }
+
+        var installs = Installs();
+        var proj = ProjectPath(req.Project)!;
+        var files = r.Files.Select(f => Path.Combine(_folder, f)).ToList();
+        lock (Gate)
+        {
+            foreach (var year in years)
+                r.Builds.Add(BuildYear(r, installs.FirstOrDefault(i => i.Year == year) ?? new C3DInstall(year, null, C3DVersions.FallbackTfm(year), false, false, "ไม่ได้ติดตั้ง"),
+                                       proj, files, req.AllowSameName));
+        }
+        r.Ok = r.Builds.All(b => b.Status == "ok");
+        return r;
+    }
+
+    BuildYearResult BuildYear(BuildResult plan, C3DInstall c3d, string proj, List<string> files, bool allowSameName)
+    {
+        var sw = Stopwatch.StartNew();
+        var dllName = plan.DllName;
+        var outDir = BuildPaths.OutputDir(proj, dllName, c3d.Year);
+        var dll = BuildPaths.Dll(outDir, dllName);
+        var y = new BuildYearResult { Year = c3d.Year, OutDir = outDir, Tfm = c3d.Tfm };
+        if (!c3d.CanBuild) { y.Status = "skipped"; y.Message = c3d.Reason; return y; }
+
+        if (IsLocked(dll)) { y.Status = "locked"; y.Message = $"ปิด Civil 3D ก่อน: {dllName}.dll ถูกโปรแกรมอื่นใช้อยู่"; return y; }
+
+        y.SameName = History.SameNameElsewhere(dllName, c3d.Year, new[] { outDir });
+        if (y.SameName.Count > 0 && !allowSameName)
+        {
+            y.Status = "same-name";
+            y.Message = $"มี {dllName}.dll อยู่แล้วในโฟลเดอร์อื่น";
+            return y;
+        }
+
+        Directory.CreateDirectory(BuildPaths.ObjDir(outDir));
+        var csproj = BuildPaths.Csproj(outDir, dllName);
+        File.WriteAllText(csproj, CsprojWriter.Generate(dllName, c3d.Tfm, c3d.Path!, files, outDir));
+
+        var (code, output) = RunDotnet(csproj);
+        File.WriteAllText(BuildPaths.Log(outDir), output);
+        if (code != 0)
+        {
+            if (Regex.IsMatch(output, "being used by another process|locked by|MSB3027|MSB3021"))
+            {
+                y.Status = "locked";
+                y.Message = $"ปิด Civil 3D ก่อน: {dllName}.dll ถูกโปรแกรมอื่นใช้อยู่";
+            }
+            else
+            {
+                y.Status = "failed";
+                y.Errors = ErrorSummary(output);
+                y.Message = code == -1 ? "build ใช้เวลานานเกินไป (หยุดแล้ว)" : $"build ไม่ผ่าน: {y.Errors.Count} error";
+            }
+            y.Ms = sw.Elapsed.TotalMilliseconds;
+            return y;
+        }
+
+        var manifest = new BuildManifest
+        {
+            DllName = dllName, Year = c3d.Year, Tfm = c3d.Tfm, C3DInstall = c3d.Path!, BuiltAt = DateTime.Now,
+            Files = plan.Files.ToList(),
+            Classes = ReadParams(plan, files, y.Warnings),
+        };
+        var old = BuildManifest.Load(BuildPaths.Manifest(outDir));
+        if (old != null) manifest.CopiedTo = old.CopiedTo;
+        y.Changes = ManifestDiff.Diff(old, manifest);
+        manifest.Save(BuildPaths.Manifest(outDir));
+        History.Record(dll, c3d.Year);
+
+        y.Status = "ok";
+        y.Dll = dll;
+        y.Message = "build สำเร็จ";
+        y.Ms = sw.Elapsed.TotalMilliseconds;
+        return y;
+    }
+
+    // Parameters as GetInputParameters gives them, read by running each class in the simulator with default values.
+    // A file the simulator cannot compile (API it lacks) still builds; its classes get no parameter list + a warning.
+    List<ManifestClass> ReadParams(BuildResult plan, List<string> files, List<BuildIssue> warnings)
+    {
+        var list = new List<ManifestClass>();
+        foreach (var path in files)
+        {
+            var name = Path.GetFileName(path);
+            var compiled = _compiler.Compile(FileUtil.ReadShared(path), name);
+            foreach (var c in plan.Classes.Where(c => c.File == name))
+            {
+                var mc = new ManifestClass { FullName = c.FullName, File = name };
+                var type = compiled.Success ? compiled.Classes.FirstOrDefault(t => t.FullName == c.FullName) : null;
+                if (type == null)
+                    warnings.Add(new("warning", name, $"อ่าน parameter ของ {c.FullName} จากตัวจำลองไม่ได้ (ตัวจำลองคอมไพล์ไฟล์นี้ไม่ผ่าน)"));
+                else
+                    mc.Params = _runner.Run(type, null, new WorldInput()).Params
+                        .Select(p => new ManifestParam { Name = p.Name, Kind = p.Kind, Default = BuildManifest.FormatDefault(p.Default) }).ToList();
+                list.Add(mc);
+            }
+        }
+        return list;
+    }
+
+    // A loaded DLL (Civil 3D open) cannot be opened for writing
+    public static bool IsLocked(string file)
+    {
+        if (!File.Exists(file)) return false;
+        try { using var fs = new FileStream(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None); return false; }
+        catch (IOException) { return true; }
+        catch (UnauthorizedAccessException) { return true; }
+    }
+
+    // Same summary as tests-civil3d/build/build.js: error lines once each, without the trailing [project] part
+    public static List<string> ErrorSummary(string output)
+    {
+        return output.Split('\n')
+            .Select(l => l.TrimEnd('\r'))
+            .Where(l => Regex.IsMatch(l, @"\berror\b"))
+            .Select(l => Regex.Replace(l, @"\s*\[[^\]]*\.csproj\]\s*$", "").Trim())
+            .Select(l => Regex.Replace(l, @"^[A-Za-z]:\\[^(:]*\\([^\\(:]+\.cs)\(", "$1("))   // full path -> file name
+            .Distinct()
+            .ToList();
+    }
+
+    // -1 = timed out
+    static (int Code, string Output) RunDotnet(string csproj)
+    {
+        var psi = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        foreach (var a in new[] { "build", csproj, "-nologo", "-v", "q", "-consoleloggerparameters:NoSummary", "-nodeReuse:false",
+                                  "-p:ImportDirectoryBuildProps=false", "-p:ImportDirectoryBuildTargets=false" })
+            psi.ArgumentList.Add(a);
+        psi.Environment["DOTNET_CLI_UI_LANGUAGE"] = "en";     // English messages: the error parser looks for "error"
+        psi.Environment["MSBUILDDISABLENODEREUSE"] = "1";     // no MSBuild node left running (it would hold files)
+        psi.Environment["DOTNET_NOLOGO"] = "1";
+        psi.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
+        using var p = Process.Start(psi)!;
+        var sb = new StringBuilder();
+        p.OutputDataReceived += (_, e) => { if (e.Data != null) lock (sb) sb.AppendLine(e.Data); };
+        p.ErrorDataReceived += (_, e) => { if (e.Data != null) lock (sb) sb.AppendLine(e.Data); };
+        p.BeginOutputReadLine();
+        p.BeginErrorReadLine();
+        if (!p.WaitForExit((int)Timeout.TotalMilliseconds))
+        {
+            try { p.Kill(true); } catch (InvalidOperationException) { }
+            return (-1, sb + "\r\n(timed out)");
+        }
+        p.WaitForExit();
+        lock (sb) return (p.ExitCode, sb.ToString());
+    }
+
+    // A file name at the top of the project folder (no path that leads outside it)
+    string? SafeFile(string name)
+    {
+        name = name.Trim();
+        if (name != Path.GetFileName(name) || name.StartsWith('.') || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return null;
+        if (!name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)) return null;
+        return Path.Combine(_folder, name);
+    }
+}

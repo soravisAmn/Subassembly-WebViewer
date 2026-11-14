@@ -30,6 +30,8 @@ builder.Services.AddSingleton<SubassemblyCompiler>();
 builder.Services.AddSingleton<SubassemblyRunner>();
 builder.Services.AddSingleton(sp => new AssemblyService(
     sp.GetRequiredService<SubassemblyCompiler>(), sp.GetRequiredService<SubassemblyRunner>(), folder));
+builder.Services.AddSingleton(sp => new SA.Build.BuildEngine(
+    sp.GetRequiredService<SubassemblyCompiler>(), sp.GetRequiredService<SubassemblyRunner>(), folder));
 
 var app = builder.Build();
 SA.Mcp.McpSetup.UseSaMcpGuard(app);
@@ -284,6 +286,16 @@ app.MapPost("/api/drawing/save", (DrawingReq req) =>
         return Results.Ok(new { ok = false, message = $"บันทึก {name} ไม่ได้: {e.Message}" });
     }
 });
+
+// ---------------- Build (round 7): DLL for Civil 3D from the files of a project ----------------
+// versions = Civil 3D installs found + whether this machine can build them; plan = files / classes / checks (no build);
+// build = dotnet build per ticked version (docs/build.md)
+
+app.MapGet("/api/build/versions", (SA.Build.BuildEngine eng) => new { versions = eng.Installs() });
+
+app.MapPost("/api/build/plan", (SA.Build.BuildRequest req, SA.Build.BuildEngine eng) => eng.Plan(req));
+
+app.MapPost("/api/build", (SA.Build.BuildRequest req, SA.Build.BuildEngine eng) => eng.Build(req));
 
 app.Run();
 

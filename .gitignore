@@ -12,6 +12,9 @@ obj/
 # Full output of test-all.bat
 SA.Tests/test-all.log
 
+# Build dialog output (round 7): build\<DLL>\<year>\ next to the project
+/build/
+
 # Civil 3D build output
 tests-civil3d/build/out/
 tests-civil3d/build/out-build.log

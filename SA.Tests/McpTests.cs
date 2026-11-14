@@ -55,8 +55,18 @@ static class McpTests
         {
             var (_, b) = Post("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""").Result;
             var names = b.GetProperty("result").GetProperty("tools").EnumerateArray().Select(t => t.GetProperty("name").GetString()!).OrderBy(n => n, StringComparer.Ordinal).ToArray();
-            var want = new[] { "sa_apply", "sa_catalog", "sa_check", "sa_code_preview", "sa_describe", "sa_get_spec", "sa_new", "sa_proposal", "sa_render", "sa_scenarios", "sa_status" };
+            var want = new[] { "sa_apply", "sa_build_check", "sa_catalog", "sa_check", "sa_code_preview", "sa_describe", "sa_get_spec", "sa_new", "sa_proposal", "sa_render", "sa_scenarios", "sa_status" };
             Is(names.SequenceEqual(want), string.Join(",", names));
+        });
+        test("sa_build_check: runs on the server (no page needed), the service provider is not an argument", () =>
+        {
+            var (_, b) = Post("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""").Result;
+            var tool = b.GetProperty("result").GetProperty("tools").EnumerateArray().Single(t => t.GetProperty("name").GetString() == "sa_build_check");
+            var props = tool.GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).OrderBy(n => n).ToArray();
+            Is(string.Join(",", props) == "dllName,project,years", string.Join(",", props));
+            Is(tool.GetProperty("annotations").GetProperty("readOnlyHint").GetBoolean(), "read-only");
+            var r = Post(Call("sa_build_check")).Result.Body.GetProperty("result");
+            Is(r.GetProperty("isError").GetBoolean() && r.GetProperty("content")[0].GetProperty("text").GetString()!.Contains("Build is not available"), r.ToString());
         });
         test("guide: instructions, prompts and resources", () =>
         {

@@ -1,5 +1,6 @@
-// MCP endpoint (host side). The spec lives in the browser, so every tool forwards to the open page over a WebSocket.
-// No spec logic here: the page runs the Logic API. No tool writes files or runs commands.
+// MCP endpoint (host side). The spec lives in the browser, so the tools forward to the open page over a WebSocket.
+// No spec logic here: the page runs the Logic API. No tool writes files or runs commands. Exception: sa_build_check
+// (round 7) runs the read-only pre-build checks on the server (SA.Build.BuildEngine.Check), on the saved files.
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Net;
@@ -142,6 +143,36 @@ public sealed class SaTools(PageHub hub)
 
     [McpServerTool(Name = "sa_code_preview", ReadOnly = true), Description("The generated drawing method in C#. No file is written. detail: full gives the whole file (long).")]
     public Task<CallToolResult> CodePreview(string? item = null, string? detail = null, string? view = null, CancellationToken ct = default) => Forward("sa_code_preview", new { item, detail, view }, ct);
+
+    // Round 7: runs on the server (the files on disk, as the Build would compile them), not in the page. Never builds.
+    [McpServerTool(Name = "sa_build_check", ReadOnly = true), Description("Pre-build checks of a project (*.assembly.json) as the Build dialog runs them, on the saved .cs files: class names, simulator compile and runs (every scenario Right + Left), links / shapes without codes, codes differing only by case, locked or same-named DLL, parameter changes since the last build. Never builds: the user presses Build.")]
+    public CallToolResult BuildCheck(IServiceProvider services,
+        [Description("Project file name, e.g. SR03 or SR03.assembly.json. Default: the only project in the folder.")] string? project = null,
+        [Description("DLL name. Default: the project name.")] string? dllName = null,
+        [Description("Civil 3D years to check, e.g. [2027]. Default: every version that can be built.")] int[]? years = null)
+    {
+        if (services.GetService(typeof(SA.Build.BuildEngine)) is not SA.Build.BuildEngine eng) return Fail("Build is not available in this server.");
+        if (string.IsNullOrWhiteSpace(project))
+        {
+            var all = eng.ProjectNames();
+            if (all.Count != 1) return Fail(all.Count == 0 ? "No *.assembly.json in the folder. Save the project first." : $"Pass project. Projects: {string.Join(", ", all)}.");
+            project = all[0];
+        }
+        years ??= eng.Installs().Where(i => i.CanBuild).Select(i => i.Year).ToArray();
+        var r = eng.Check(new SA.Build.CheckRequest(project, dllName, years, null, null));
+        var lines = new List<string>
+        {
+            $"Project {r.Project ?? project}, DLL {r.DllName}.dll, years {(years.Length > 0 ? string.Join(", ", years) : "none buildable")}. {(r.Ok ? "No blocking error." : "BLOCKING ERRORS: Build is not possible.")} Scenario runs: {r.ScenarioRuns}.",
+            "Classes: " + string.Join(", ", r.Classes.Select(c => $"{c.FullName} ({c.File}{(r.WebFiles.Contains(c.File) ? ", web" : ", hand-written")})")),
+        };
+        foreach (var y in r.Years.Where(y => years.Contains(y.Year)))
+            lines.Add($"Civil 3D {y.Year} ({y.Tfm}): {(y.CanBuild ? $"output {y.OutDir}{(y.Locked ? ", DLL LOCKED" : "")}{(y.HasManifest ? $", {y.Changes.Count} parameter change(s) since last build" : ", never built")}" : "cannot build: " + y.Reason)}");
+        foreach (var i in r.Issues)
+            lines.Add($"{i.Severity.ToUpperInvariant()} [{i.Kind}] {(i.File != null ? i.File + ": " : "")}{i.Message}{(i.Scenarios is { Count: > 0 } ? $" (scenarios: {string.Join(", ", i.Scenarios.Take(6))}{(i.Scenarios.Count > 6 ? ", …" : "")})" : "")}");
+        if (r.Issues.Count == 0) lines.Add("No warnings.");
+        lines.Add("Messages are in Thai as the user sees them in the Build dialog.");
+        return new CallToolResult { Content = [new TextContentBlock { Text = string.Join("\n", lines) }] };
+    }
 }
 
 // The drawing guide, for clients that read MCP prompts or resources

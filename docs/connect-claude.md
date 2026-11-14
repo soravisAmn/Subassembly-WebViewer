@@ -58,6 +58,7 @@ For each: review the AI tab, press "รับทั้งหมด", then Save (
 | `sa_render` | PNG of the section. `scenario`: a name from `sa_check` or `{ ground, values, layout }`. `labels`: points, all, none. Default 900 x 500 |
 | `sa_check` | Compile, every scenario Right + Left, branch / Loop coverage, bottom boundary. `code: "Datum"` lists missing stretches. `detail: "full"` lists every stretch |
 | `sa_code_preview` | The generated drawing method. `detail: "full"` gives the whole file (about 40,000 characters) |
+| `sa_build_check` | Pre-build checks of a project on the saved files, as the Build dialog runs them (runs on the server, no page needed). Never builds. See [build.md](build.md) |
 | `sa_new` | Proposes a new subassembly in the current assembly; it exists only after you accept |
 | `sa_apply` | Runs Logic API ops on the proposal, all or nothing. Returns named results, warnings and a diff |
 | `sa_scenarios` | Lists scenarios, or adds one to the proposal (ground + parameter values) |

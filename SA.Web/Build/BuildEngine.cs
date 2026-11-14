@@ -40,13 +40,14 @@ public class BuildResult
     public List<BuildYearResult> Builds { get; set; } = new();
 }
 
-public class BuildEngine
+public partial class BuildEngine
 {
     readonly SubassemblyCompiler _compiler;
     readonly SubassemblyRunner _runner;
     readonly string _folder;
     readonly Func<List<C3DInstall>> _installs;
     public BuildHistory History { get; }
+    public string MachineDir { get; }
 
     static readonly object Gate = new();
     public static TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(5);
@@ -56,7 +57,8 @@ public class BuildEngine
         _compiler = compiler;
         _runner = runner;
         _folder = Path.GetFullPath(folder);
-        History = new BuildHistory(machineDir ?? BuildPaths.DefaultMachineDir());
+        MachineDir = machineDir ?? BuildPaths.DefaultMachineDir();
+        History = new BuildHistory(MachineDir);
         _installs = installs ?? (() => C3DVersions.DetectThisMachine());
     }
 
@@ -73,22 +75,34 @@ public class BuildEngine
         return n.Length == 0 ? "Subassemblies" : n;
     }
 
+    // *.assembly.json at the top of the folder
+    public List<string> ProjectNames() => Directory.Exists(_folder)
+        ? Directory.GetFiles(_folder, "*.assembly.json", SearchOption.TopDirectoryOnly).Select(Path.GetFileName).OrderBy(n => n, StringComparer.OrdinalIgnoreCase).ToList()!
+        : new List<string>();
+
     public string? ProjectPath(string? project)
     {
         var name = FileUtil.AssemblyFileName(project);
         return name == null ? null : Path.Combine(_folder, name);
     }
 
-    // .cs files of the project in item order (a file used by several items counts once)
+    // .cs files of the project in item order (a file used by several items counts once).
+    // Version 1 = items at the root; version 2 = assemblies[].items.
     public static List<string> ProjectFiles(string projectJson)
     {
         using var doc = JsonDocument.Parse(projectJson);
         var list = new List<string>();
-        if (doc.RootElement.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+        void Items(JsonElement owner)
+        {
+            if (!owner.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array) return;
             foreach (var it in items.EnumerateArray())
-                if (it.TryGetProperty("file", out var f) && f.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(f.GetString())
-                    && !list.Contains(f.GetString()!, StringComparer.OrdinalIgnoreCase))
+                if (it.ValueKind == JsonValueKind.Object && it.TryGetProperty("file", out var f) && f.ValueKind == JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(f.GetString()) && !list.Contains(f.GetString()!, StringComparer.OrdinalIgnoreCase))
                     list.Add(f.GetString()!);
+        }
+        Items(doc.RootElement);
+        if (doc.RootElement.TryGetProperty("assemblies", out var asms) && asms.ValueKind == JsonValueKind.Array)
+            foreach (var a in asms.EnumerateArray()) if (a.ValueKind == JsonValueKind.Object) Items(a);
         return list;
     }
 
@@ -154,7 +168,7 @@ public class BuildEngine
 
         if (IsLocked(dll)) { y.Status = "locked"; y.Message = $"ปิด Civil 3D ก่อน: {dllName}.dll ถูกโปรแกรมอื่นใช้อยู่"; return y; }
 
-        y.SameName = History.SameNameElsewhere(dllName, c3d.Year, new[] { outDir });
+        y.SameName = History.SameNameElsewhere(dllName, c3d.Year, TargetDirs(outDir));
         if (y.SameName.Count > 0 && !allowSameName)
         {
             y.Status = "same-name";
@@ -225,6 +239,15 @@ public class BuildEngine
                 list.Add(mc);
             }
         }
+        return list;
+    }
+
+    // Folders this build writes the DLL to: the output folder + the Copy-to folder when it is on (M4 copies there)
+    public List<string> TargetDirs(string outDir)
+    {
+        var list = new List<string> { outDir };
+        var s = MachineSettings.Load(MachineDir);
+        if (s.CopyToOn && MachineSettings.CopyToError(s.CopyTo) == null) list.Add(s.CopyTo!);
         return list;
     }
 

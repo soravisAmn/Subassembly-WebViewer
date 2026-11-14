@@ -129,3 +129,12 @@ Whether a single-file `<Category>` root (XAML style) works with Add Catalog is u
 - `.gitignore`: `/build/` (root only). `build/` would also hide new files in the tracked `tests-civil3d/build/`. Round 8 (projects in folders) must widen it.
 - A subassembly class = top-level, non-static, with `Draw()` without parameters. The generated `SaDrawing_*` static helper is not a class of the DLL.
 - Open for M4: Copy-to with several Civil 3D years ticked would overwrite one DLL with another. Proposal: Copy-to only for one year at a time, or `<Copy-to>\<year>\`.
+
+## 7. M2 notes
+
+- The pre-build checks run on the **server** (`BuildEngine.Check`) on the files on disk, not in the page. One implementation serves the dialog and MCP `sa_build_check`, and it covers hand-written files too. The page only adds its saved scenarios and the "not saved (.cs)" warning.
+- Namespace / class rename (answer 5): the whole file cannot be regenerated, because real files differ from `GenerateFile` outside SA-DRAWING (e.g. the header comment keeps the old parameter list). So `CodeGenerator.RenameClass` renames Roslyn tokens instead: identifiers equal to the class name (except namespace parts), the `SaDrawing_` helper, and namespace declarations equal to the old namespace. Then the block is regenerated and `MissingCalls` must be empty. Hand edits inside SA-DRAWING still ask for force, as on a normal Save.
+- Logic API: `setClassName(spec, { className?, namespace? })`.
+- Same-name box (answer 4): a browser confirm (OK / Cancel) with the paths and the advice.
+- Default ticked version: the newest that can be built.
+- Project version 2 (`assemblies[].items`) is read too.

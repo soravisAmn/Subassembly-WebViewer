@@ -1695,6 +1695,30 @@ public static class CodeGenerator
     }
     private static string Norm(string s) => string.Join("\n", s.Replace("\r\n", "\n").Split('\n').Select(l => l.TrimEnd()));
 
+    // Round 7 Build dialog: rename the namespace / class of a web file outside SA-DRAWING (the block is regenerated after).
+    // Roslyn tokens, not text: identifiers named like the class (declaration, constructors, uses), the SaDrawing_ helper
+    // name, and namespace declarations named like the old namespace. Comments and strings are not touched.
+    public static string RenameClass(string source, string oldNamespace, string oldClass, string newNamespace, string newClass)
+    {
+        var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source).GetRoot();
+        var edits = new List<(int Start, int Length, string Text)>();
+        string oldHelper = "SaDrawing_" + oldClass, newHelper = "SaDrawing_" + newClass;
+        if (oldClass != newClass)
+            foreach (var t in root.DescendantTokens().Where(t => t.RawKind == (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken))
+            {
+                // a namespace part with the same text as the class is not the class
+                if (t.Parent!.AncestorsAndSelf().Any(a => a.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.BaseNamespaceDeclarationSyntax nd && nd.Name == a)) continue;
+                if (t.ValueText == oldClass) edits.Add((t.SpanStart, t.Span.Length, newClass));
+                else if (t.ValueText == oldHelper) edits.Add((t.SpanStart, t.Span.Length, newHelper));
+            }
+        if (oldNamespace != newNamespace)
+            foreach (var n in root.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.BaseNamespaceDeclarationSyntax>())
+                if (n.Name.ToString() == oldNamespace) edits.Add((n.Name.SpanStart, n.Name.Span.Length, newNamespace));
+        var sb = new StringBuilder(source);
+        foreach (var e in edits.OrderByDescending(e => e.Start)) sb.Remove(e.Start, e.Length).Insert(e.Start, e.Text);
+        return sb.ToString();
+    }
+
     // บรรทัดเรียกที่ไฟล์ต้องมี (ขาดบรรทัดไหน = ยังไม่ได้แทรก -> Milestone 4)
     public static List<string> MissingCalls(string source, DrawingSpec s)
     {

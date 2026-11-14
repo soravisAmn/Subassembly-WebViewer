@@ -1,6 +1,46 @@
 # Build for Civil 3D (round 7)
 
-Builds the subassemblies of one project (`*.assembly.json`) into one DLL per Civil 3D version. Design and decisions: [prompts/prompt-7-design.md](prompts/prompt-7-design.md). Status: **M1, the engine and endpoints only**. The Build dialog (M2), `.atc` and icons (M3), and the report, source package and Copy-to (M4) come next.
+Builds the subassemblies of one project (`*.assembly.json`) into one DLL per Civil 3D version. Design and decisions: [prompts/prompt-7-design.md](prompts/prompt-7-design.md). Status: **M2**: engine, endpoints, Build dialog, pre-build checks and `sa_build_check`. The `.atc` and icons come in M3, and the report, source package and the actual Copy-to in M4.
+
+## Build dialog (`js/build.js`)
+
+Open it from **"ไฟล์ ▾" → "Build…"** or the **Build** button on the menu bar. The project must be saved first, because the build uses the saved project file and the `.cs` files on disk.
+
+| Part | Does |
+|---|---|
+| สิ่งที่อยู่ใน DLL | One row per class: tick box per file (default all), file (สร้างจากเว็บ / เขียนเอง), namespace, class, and check result (✓ / ⚠ n / ✖ n) |
+| namespace / class | Web files: editable, then "เปลี่ยน" → confirm "ต้อง Save ไฟล์ … ด้วย" → Logic API `setClassName` (one Undo step) → Save (.cs) with `rename` (Roslyn renames the class, its uses, the `SaDrawing_` helper and the namespace declaration outside SA-DRAWING; comments are not touched). The file must be open in the workspace. Hand-written files: read-only ("แก้ในโค้ด") |
+| Export | Build (DLL package). Source package (M4) and `.pkt` ("ทดลองภายหลัง") are shown disabled |
+| ชื่อ DLL | Default = project name |
+| Civil 3D | One tick per version found; versions that cannot be built are greyed with the reason. Default: the newest that can be built |
+| Output | `build\<DLL>\<year>\` per ticked version |
+| Copy to | Machine setting (tick + absolute folder that exists), saved at once to `settings.json`. The copy itself comes in M4 |
+| ตรวจก่อน build | Runs when the dialog opens, on every change, and on "ตรวจอีกครั้ง". Errors first, then warnings. The page adds "ส่วนที่วาดยังไม่ได้ Save (.cs)" for unsaved drawings of built files |
+| Build | Disabled while there is an error (or nothing to build). A same-named DLL in another folder → OK / Cancel box "มี DLL ชื่อนี้อยู่แล้ว" (decision 4), OK = build with `allowSameName`. Shows progress, then per version: DLL path (copy button), compiler errors, and parameter changes ("ลบเครื่องมือเก่าออกจาก palette แล้วลากใหม่") |
+
+No new shortcut.
+
+## Pre-build checks (`BuildChecks.cs`, `BuildEngine.Check`)
+
+Same for the dialog and MCP `sa_build_check`. They run on the files on disk, because that is what `dotnet build` compiles.
+
+| Kind | Severity | What |
+|---|---|---|
+| `class` | error / warning | From `ClassReader` (see below) |
+| `compile` | error | The simulator cannot compile the file (first 10 errors, with line) |
+| `run` | error | An exception in some scenario (the scenarios are listed) |
+| `message` | warning | Simulator messages, once each with the scenarios they occur in |
+| `no-code` | warning | Links / shapes without any code. Web files: ids from the sa-spec (`L3`, `S1`, auxiliary links not counted). Hand-written files: `link #n (บรรทัด …)` from the simulator run |
+| `code-case` | warning | Codes that differ only by case or spaces anywhere in the DLL (`Datum` vs `datum `) |
+| `locked` | error | Ticked version: the DLL in the output folder is in use ("ปิด Civil 3D ก่อน") |
+| `same-name` | warning | Ticked version: a same-named DLL in another folder (build history; the output and Copy-to folders do not count) |
+| `params` | warning | Ticked version: parameter changes since the last build (manifest) |
+
+Scenarios per class, as `sa_check`: grounds `high`, `low`, `mid`, `rising`, `falling`, `V` around the shape, `layout`, `no target`, each Right and Left (Left only when the class has the Side parameter), plus the saved scenarios the page sends for that file (ground relative to the item origin). That makes 16 runs per class, plus the saved scenarios.
+
+## MCP `sa_build_check`
+
+A read-only tool that runs `Check` on the server, so it works without the page. Arguments: `project` (default: the only project in the folder), `dllName`, `years` (default: every version that can be built). It never builds: the user presses Build. Messages stay in Thai, as in the dialog.
 
 ## Engine (`SA.Web/Build/`)
 
@@ -11,6 +51,8 @@ Builds the subassemblies of one project (`*.assembly.json`) into one DLL per Civ
 | `CsprojWriter.cs` | The `.csproj`: same settings as `tests-civil3d/build/Round6.csproj`. The `.cs` files are compiled where they are (never copied or edited), Autodesk DLLs referenced in place with `Private=false`, and `C3DInstall` can be overridden |
 | `ClassReader.cs` | Namespace + class per file (Roslyn, syntax only). A subassembly class = top-level, non-static, with `Draw()` (no parameters). Checks: valid identifiers, public, full name unique in the DLL (error), names that differ only by case (warning), missing `GetLogicalNames` / `GetInputParameters` / `GetOutputParameters` / `Draw` (warning) |
 | `BuildManifest.cs` | `build-manifest.json` (classes + parameters of the last successful build) and its diff: class added / removed, parameter added / removed (a rename shows as both), default or type changed. `build-history.json` in the machine folder: every DLL path built, used to find a same-named DLL in another folder |
+| `BuildChecks.cs` | `Check`: the pre-build checks above |
+| `MachineSettings.cs` | `%LOCALAPPDATA%\SA-Studio\settings.json`: `copyTo`, `copyToOn` |
 | `BuildEngine.cs` | `Plan` (files → classes → checks, no build) and `Build` (per year: locked DLL? → same name elsewhere? → csproj → `dotnet build` → parameters from the simulator → manifest + diff → history). One build at a time, 5 min timeout |
 
 ## Output folder
@@ -40,6 +82,9 @@ Builds the subassemblies of one project (`*.assembly.json`) into one DLL per Civ
 | Endpoint | Body / result |
 |---|---|
 | `GET /api/build/versions` | `{ versions: [{ year, path, tfm, installed, sdkOk, canBuild, reason }] }` |
+| `POST /api/build/check` | `{ project, dllName?, years?, files?, scenarios?: [{ file, name, surface, values, layout }] }` → `{ ok, dllName, files, classes, webFiles, issues: [{ severity, kind, file, message, scenarios }], years: [{ year, tfm, canBuild, reason, outDir, locked, sameName, changes, hasManifest }], scenarioRuns, ms }` |
+| `GET` / `POST /api/build/settings` | `{ copyTo, copyToOn }`. POST refuses a missing or relative folder while `copyToOn` |
+| `POST /api/drawing/save` + `rename: true` | Save (.cs) that also renames namespace / class outside SA-DRAWING (Build dialog) |
 | `POST /api/build/plan` | `{ project, dllName?, files? }` → `{ ok, dllName, files, classes, issues }` |
 | `POST /api/build` | `{ project, dllName?, years: [2027], files?, allowSameName? }` → plan fields + `builds: [{ year, status, message, outDir, dll, tfm, errors, changes, sameName, warnings, ms }]` |
 
@@ -49,4 +94,4 @@ Parameters in the manifest come from running each class in the simulator with de
 
 ## Tests
 
-`SA.Tests/BuildTests.cs` (in `test-all.bat`): csproj, version detection with a fake install folder, DLL names, class reading and checks, manifest diff, same-name detection, locked DLL, error summary, plan. A **real build** of the 3 round 6 fixtures (copies in a temp folder) runs only when a Civil 3D install that can be built is found, otherwise it prints "skipped". Temp folder: `%TEMP%\sa-build-tests\` (cleared at the start of each run).
+`SA.Tests/BuildTests.cs` (in `test-all.bat`): csproj, version detection with a fake install folder, DLL names, class reading and checks, manifest diff, same-name detection, locked DLL, error summary, plan, project version 2, class rename, pre-build checks (web and hand-written files, per version, Copy-to, saved scenarios). `logicops.test.js`: `setClassName`. `McpTests.cs`: `sa_build_check` is listed, read-only, and has no hidden argument. A **real build** of the 3 round 6 fixtures (copies in a temp folder) runs only when a Civil 3D install that can be built is found, otherwise it prints "skipped". Temp folder: `%TEMP%\sa-build-tests\` (cleared at the start of each run).

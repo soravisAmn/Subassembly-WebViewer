@@ -330,7 +330,7 @@ async function saveDrawing(it, opts = {}){
     if (!file) return;
   }
   if (!/\.cs$/i.test(file)) file += ".cs";
-  const body = { spec: it.spec, file, overwrite: !!opts.overwrite, force: !!opts.force };
+  const body = { spec: it.spec, file, overwrite: !!opts.overwrite, force: !!opts.force, rename: !!opts.rename };   // rename: Build dialog (round 7)
   const r = await fetch("/api/drawing/save", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) })
     .then(r => r.json()).catch(() => ({ ok: false, message: NO_SERVER }));
   if (!r.ok){
@@ -2041,7 +2041,8 @@ $("dd-file").addEventListener("click", e => {
   const b = e.target.closest("[data-cmd]"); if (!b || b.disabled) return;
   closeMenus();
   ({ "import": () => openImport(), "new-cs": () => newCs(), "open-proj": openProject, "save-proj": () => WS().name ? saveProject(WS().name) : saveProjectAs(),
-     "save-proj-as": saveProjectAs, "new-proj": newProject, "sc-export": exportScenarios, "sc-import": () => $("f-import").click() })[b.dataset.cmd]();
+     "save-proj-as": saveProjectAs, "new-proj": newProject, "sc-export": exportScenarios, "sc-import": () => $("f-import").click(),
+     "build": () => openBuild() })[b.dataset.cmd]();
 });
 function renderProjName(){
   $("proj-name").innerHTML = WS().name ? `project: <b>${esc(WS().name)}</b>` : "project: (ยังไม่ได้บันทึก)";
@@ -2053,6 +2054,7 @@ const DIALOG_TOOLS = new Set(["extend", "clip", "cutfill"]);
 const dlg = { tool: null, dirty: false };
 function openDialog(title, build){
   $("dlg-title").textContent = title;
+  $("modal").firstElementChild.className = "dlg";          // drop size classes of the last dialog (Build: wide)
   const b = $("dlg-body"); b.innerHTML = "";
   dlg.tool = DIALOG_TOOLS.has(draw.tool) ? draw.tool : null; dlg.dirty = false; $("dlg-note").hidden = true;
   build(b);

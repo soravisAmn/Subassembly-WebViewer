@@ -24,11 +24,13 @@
       <button data-cmd="new-proj">New project (ว่าง)</button>
       <hr>
       <button data-cmd="export" disabled title="มาใน Milestone 5">Save / Export .cs…</button>
+      <button data-cmd="build">Build… (DLL สำหรับ Civil 3D)</button>
       <hr>
       <button data-cmd="sc-export">Export scenarios (.json)</button>
       <button data-cmd="sc-import">Import scenarios…</button>
     </div>
   </div>
+  <button id="b-build" title="Build: DLL สำหรับ Civil 3D จากไฟล์ .cs ของ project ที่เปิดอยู่">Build</button>
   <button id="b-edit" title="แสดง/ซ่อนแถบแก้โค้ดของ subassembly ที่เลือก (Ctrl+E)">✎ แก้โค้ด</button>
   <span class="proj" id="proj-name"></span>
   <span class="spacer"></span>
@@ -210,6 +212,7 @@
 <script src="js/condtree.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/codelink.js"></script>
+<script src="js/build.js"></script>
 <!-- ตัวลากความกว้างแถบซ้าย / ขวา (position: fixed ไม่กินช่อง grid) -->
 <div class="pane-resize" id="lw-resize" title="ลากปรับความกว้างแถบซ้าย · ดับเบิลคลิก = ค่าเริ่มต้น"></div>
 <div class="pane-resize" id="rw-resize" title="ลากปรับความกว้างแถบขวา · ดับเบิลคลิก = ค่าเริ่มต้น"></div>

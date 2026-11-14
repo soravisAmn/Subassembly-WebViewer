@@ -118,6 +118,7 @@ Logic.applyBatch(spec, [
 | Function | Does | Possible errors |
 |---|---|---|
 | `applyBatch(ops)` | Run [{ fn, args, as? }] in order, all or nothing. "${name.path}" in a string reads an earlier op's result. Failure returns failedOp and the reason. | Any op's error, unknown fn or reference |
+| `setClassName({ className?, namespace? })` | Rename the C# class and / or namespace (default namespace TestSubassembly). Save (.cs) from the Build dialog renames them in the file too. | Invalid name, reserved SaDrawing_ prefix |
 | `newSubassembly(name, { namespace?, sideParam?, targets? })` | New spec. Takes no spec argument; the result is the spec. | Invalid class name |
 
 ### Reading

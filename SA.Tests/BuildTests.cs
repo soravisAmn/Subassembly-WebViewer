@@ -185,6 +185,121 @@ static class BuildTests
             True(File.ReadAllText(Path.Combine(dir, Fixtures[0])) == File.ReadAllText(Path.Combine(fixtures, Fixtures[0])), "ไฟล์ .cs ไม่ถูกแก้");
         });
 
+        // ---------- M2: pre-build checks ----------
+
+        test("project รูปแบบหลาย assembly (version 2): อ่านไฟล์จาก assemblies[].items", () =>
+        {
+            var j = "{\"version\":2,\"assemblies\":[{\"items\":[{\"file\":\"a.cs\"},{\"file\":\"b.cs\"}]},{\"items\":[{\"file\":\"A.cs\"},{\"source\":\"x\"},{\"file\":\"c.cs\"}]}]}";
+            Eq("a.cs,b.cs,c.cs", string.Join(",", BuildEngine.ProjectFiles(j)), "ไฟล์");
+        });
+
+        test("เปลี่ยน namespace / class ของไฟล์จากเว็บ: ชื่อนอกช่วง SA-DRAWING ตามไป, คอมไพล์ผ่าน, ไฟล์อื่นในโค้ดไม่เปลี่ยน", () =>
+        {
+            foreach (var f in Fixtures)
+            {
+                var src = File.ReadAllText(Path.Combine(fixtures, f));
+                var blk = SA.Drawing.CodeGenerator.FindBlock(src)!;
+                var oldClass = SA.Drawing.DrawingSpec.Parse(blk.SpecJson!).ClassName;
+                var raw = System.Text.Json.Nodes.JsonNode.Parse(blk.SpecJson!)!;
+                raw["className"] = "Renamed" + oldClass; raw["namespace"] = "Soravis.SA";
+                var newSpec = SA.Drawing.DrawingSpec.Parse(raw.ToJsonString());
+                var renamed = SA.Drawing.CodeGenerator.RenameClass(src, "TestSubassembly", oldClass, "Soravis.SA", "Renamed" + oldClass);
+                var b2 = SA.Drawing.CodeGenerator.FindBlock(renamed)!;
+                var text = SA.Drawing.CodeGenerator.ReplaceBlock(renamed, b2, SA.Drawing.CodeGenerator.GenerateBlock(newSpec, raw.ToJsonString(), b2.Indent));
+                Eq(0, SA.Drawing.CodeGenerator.MissingCalls(text, newSpec).Count, $"{f}: บรรทัดเรียกส่วนที่วาด");
+                var cls = ClassReader.Read(text, f).Single();
+                Eq("Soravis.SA.Renamed" + oldClass, cls.FullName, $"{f}: ชื่อเต็ม");
+                Eq(0, cls.MissingMethods.Length, $"{f}: เมธอด");
+                var c = compiler.Compile(text, f);
+                True(c.Success && c.Classes.Single().FullName == "Soravis.SA.Renamed" + oldClass, $"{f}: คอมไพล์ " + string.Join(" | ", c.Diagnostics.Take(3).Select(d => d.Message)));
+                True(text.Contains("SaDrawing_Renamed" + oldClass) && !text.Contains("SaDrawing_" + oldClass + "."), $"{f}: helper");
+            }
+            // a namespace part equal to the class name stays (only the class is renamed)
+            Eq("namespace A.Box { public class Lid { public void Draw(){} } public class Box2 { Lid b; } }",
+               SA.Drawing.CodeGenerator.RenameClass("namespace A.Box { public class Box { public void Draw(){} } public class Box2 { Box b; } }", "A.Box", "Box", "A.Box", "Lid"),
+               "namespace ที่ชื่อเหมือน class");
+        });
+
+        test("ตรวจก่อน build: fixture 3 ไฟล์ รันทุก scenario ขวา + ซ้าย ไม่มี error, link / shape ไม่มี code บอกเป็น id", () =>
+        {
+            var dir = Project(fixtures, "T", Fixtures);
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"), () => new List<C3DInstall>());
+            var r = eng.Check(new CheckRequest("T", null, null, null, null));
+            True(r.Ok, "ไม่มี error: " + string.Join(" | ", r.Issues.Where(i => i.Severity == "error").Select(i => i.Message)));
+            Eq(3, r.WebFiles.Count, "ไฟล์จากเว็บ");
+            True(r.ScenarioRuns >= 3 * 16, $"จำนวนรัน {r.ScenarioRuns}");
+            var nc = r.Issues.FirstOrDefault(i => i.Kind == "no-code" && i.File == "pavement-assembly.cs" && i.Message.Contains("link"));
+            True(nc != null && nc.Message.Contains("L1,") && !nc.Message.Contains("L52"), "link ไม่มี code ของ pavement: " + nc?.Message);
+            True(nc!.Severity == "warning", "เป็น warning");
+        });
+
+        test("ตรวจก่อน build: ไฟล์เขียนเอง — compile error, exception ตอน Draw, link ไม่มี code (บรรทัด), code ต่างแค่ตัวพิมพ์ / ช่องว่าง", () =>
+        {
+            var dir = Project(fixtures, "H", new[] { "hand.cs", "throws.cs", "broken.cs" });
+            var hand = SubassemblyTemplate.Create("Hand").Replace("Link top = cs.Links.Add(new[] { p1, p2 }, \"Top\");", "Link top = cs.Links.Add(new[] { p1, p2 }, \"Top\"); cs.Links.Add(new[] { p2, p1 }, \"\");").Replace("\"CrestIn\"", "\"daylight \"");
+            True(hand.Contains("cs.Links.Add(new[] { p2, p1 }, \"\")") && hand.Contains("\"daylight \""), "template เปลี่ยนแล้ว");
+            File.WriteAllText(Path.Combine(dir, "hand.cs"), hand);
+            var throws = System.Text.RegularExpressions.Regex.Replace(SubassemblyTemplate.Create("Throws"), @"public void Draw\(\)\s*\{", "public void Draw() { throw new System.InvalidOperationException(\"boom\");");
+            File.WriteAllText(Path.Combine(dir, "throws.cs"), throws);
+            File.WriteAllText(Path.Combine(dir, "broken.cs"), "namespace X { public class Broken { public void GetLogicalNames(){} public void GetInputParameters(){} public void GetOutputParameters(){} public void Draw() { int x = ; } } }");
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"), () => new List<C3DInstall>());
+            var r = eng.Check(new CheckRequest("H", null, null, null, null));
+            True(!r.Ok, "ต้องมี error");
+            True(r.Issues.Any(i => i.Kind == "compile" && i.File == "broken.cs" && i.Severity == "error"), "compile error");
+            var run = r.Issues.FirstOrDefault(i => i.Kind == "run" && i.File == "throws.cs");
+            True(run != null && run.Severity == "error" && run.Message.Contains("boom") && run.Scenarios!.Count >= 8, "exception: " + run?.Message);
+            var nc = r.Issues.FirstOrDefault(i => i.Kind == "no-code" && i.File == "hand.cs");
+            True(nc != null && nc.Message.Contains("link #1") && nc.Message.Contains("บรรทัด"), "link ไม่มี code: " + string.Join(" | ", r.Issues.Select(i => i.File + " " + i.Kind + ": " + i.Message)) + " classes " + string.Join(",", r.Classes.Select(c => c.File + ":" + c.FullName)) + " files " + string.Join(",", r.Files));
+            True(r.Issues.Any(i => i.Kind == "code-case" && i.Message.Contains("\"daylight \"") && i.Message.Contains("\"Daylight\"")), "code ต่างแค่ตัวพิมพ์: " + string.Join(" | ", r.Issues.Select(i => i.Message)));
+            Eq(0, r.WebFiles.Count, "ไม่มีไฟล์จากเว็บ");
+        });
+
+        test("ตรวจก่อน build ต่อปี: DLL ถูกล็อก = error, ชื่อซ้ำที่อื่น = warning, parameter เปลี่ยนจาก build ก่อน = warning, ปีที่ไม่ได้ติ๊กไม่เตือน", () =>
+        {
+            var dir = Project(fixtures, "T", Fixtures.Take(1));
+            var fake = Temp();
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"),
+                () => new List<C3DInstall> { new(2026, fake, "net8.0-windows", true, true, null), new(2027, fake, "net10.0-windows", true, true, null) });
+            var outDir = Path.Combine(dir, "build", "T", "2027");
+            Directory.CreateDirectory(outDir);
+            new BuildManifest { DllName = "T", Year = 2027, Classes = { new ManifestClass { FullName = "TestSubassembly.PavementAssembly", Params = { new ManifestParam { Name = "Side", Kind = "long", Default = "1" } } } } }
+                .Save(Path.Combine(outDir, "build-manifest.json"));
+            var other = Path.Combine(Temp(), "T.dll"); File.WriteAllText(other, "");
+            eng.History.Record(other, 2027);
+            File.WriteAllText(Path.Combine(outDir, "T.dll"), "");
+            using (new FileStream(Path.Combine(outDir, "T.dll"), FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                var r = eng.Check(new CheckRequest("T", null, new[] { 2027 }, null, null));
+                True(!r.Ok && r.Issues.Any(i => i.Kind == "locked" && i.Severity == "error"), "ล็อก");
+                True(r.Issues.Any(i => i.Kind == "same-name" && i.Message.Contains(other)), "ชื่อซ้ำ");
+                var pc = r.Issues.FirstOrDefault(i => i.Kind == "params");
+                True(pc != null && pc.Message.Contains("Side ค่าเริ่มต้น 1 → 0") && pc.Message.Contains("MinDrop"), "parameter: " + pc?.Message);
+                var y27 = r.Years.Single(y => y.Year == 2027);
+                True(y27.Locked && y27.HasManifest && y27.SameName.Count == 1 && y27.OutDir == outDir, "ข้อมูลปี 2027");
+                True(!r.Issues.Any(i => i.Message.StartsWith("Civil 3D 2026")), "2026 ไม่ได้ติ๊ก");
+            }
+            Eq(true, eng.Check(new CheckRequest("T", null, new[] { 2026 }, null, null)).Ok, "ปีอื่นไม่ล็อก");
+            // Copy-to folder = a folder this build writes to: a DLL there is not "another folder"
+            var s = new MachineSettings { CopyTo = Path.GetDirectoryName(other), CopyToOn = true };
+            s.Save(eng.MachineDir);
+            Eq(0, eng.Check(new CheckRequest("T", null, new[] { 2027 }, null, null)).Years.Single(y => y.Year == 2027).SameName.Count, "Copy-to ไม่นับเป็นที่อื่น");
+            True(MachineSettings.CopyToError("relative\\x") != null && MachineSettings.CopyToError(Path.Combine(fake, "nope")) != null && MachineSettings.CopyToError(fake) == null, "ตรวจโฟลเดอร์ Copy-to");
+            Eq(true, MachineSettings.Load(eng.MachineDir).CopyToOn, "โหลด setting");
+        });
+
+        test("ตรวจก่อน build: scenario ที่บันทึกไว้ในหน้าเว็บ (ไฟล์ตรงกัน) ถูกรันด้วย", () =>
+        {
+            var dir = Project(fixtures, "T", Fixtures.Take(1));
+            var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"), () => new List<C3DInstall>());
+            var n0 = eng.Check(new CheckRequest("T", null, null, null, null)).ScenarioRuns;
+            var sc = new List<CheckScenario>
+            {
+                new("pavement-assembly.cs", "กรณี 1", new List<SurfacePt> { new(-50, -1), new(50, -1) }, null, false),
+                new("other.cs", "ไม่เกี่ยว", null, null, true)
+            };
+            Eq(n0 + 1, eng.Check(new CheckRequest("T", null, null, null, sc)).ScenarioRuns, "รันเพิ่ม 1");
+        });
+
         var c3d = C3DVersions.DetectThisMachine().Where(i => i.CanBuild).OrderByDescending(i => i.Year).FirstOrDefault();
         test(c3d == null ? "build จริง: skipped (ไม่พบ Civil 3D ที่ build ได้)" : $"build จริงกับ Civil 3D {c3d.Year}: DLL + manifest + build ซ้ำไม่มีการเปลี่ยน + ชื่อซ้ำที่อื่นต้องยืนยัน", () =>
         {

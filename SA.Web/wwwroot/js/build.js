@@ -1,0 +1,245 @@
+// Build dialog (round 7 M2): one DLL for Civil 3D from the .cs files of the open project.
+//   "ไฟล์ ▾ → Build…" or the Build button on the menu bar. The server does the work (SA.Web/Build, docs/build.md):
+//   /api/build/versions · /api/build/check (pre-build checks on the saved files) · /api/build · /api/build/settings (Copy-to)
+//   Namespace / class of a web file: Logic API setClassName + Save (.cs) with rename (asks first). Hand-written: read-only.
+"use strict";
+const Build = (() => {
+  const st = { project: null, versions: [], years: new Set(), files: null, allFiles: [], dllName: "", check: null, settings: { copyTo: "", copyToOn: false },
+               busy: false, result: null, checking: false, seq: 0 };
+  const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then(r => r.json()).catch(() => ({ ok: false, message: NO_SERVER }));
+  const get = url => fetch(url).then(r => r.json()).catch(() => null);
+
+  // Saved scenarios (browser) of the items whose file is built: ground relative to the item origin, as sa_check
+  function savedScenarios(){
+    const out = [];
+    for (const s of scenarios){
+      const w = s.ws || s.asm; if (!w) continue;
+      const items = w.assemblies ? w.assemblies.flatMap(a => a.items || []) : (w.items || []);
+      for (const si of items){
+        if (!si.file) continue;
+        const cur = itemById(si.id), o = cur ? itemOrigin(cur) : (si.attach && si.attach.x != null ? { x: si.attach.x, y: si.attach.y } : { x: 0, y: 0 });
+        const sf = w.surface || [];
+        out.push({ file: si.file, name: s.name, values: si.params || {}, layout: !!w.layout,
+                   surface: w.surfaceOn !== false && sf.length >= 2 ? sf.map(p => ({ x: p.x - o.x, y: p.y - o.y })) : null });
+      }
+    }
+    return out;
+  }
+
+  // Unsaved drawings of files in this build: the build uses the file on disk
+  const unsaved = () => allItems().filter(it => it.file && drawingDirty(it) && (!st.check || st.check.files.includes(it.file)));
+
+  async function open(){
+    if (!WS().name){ alert("Save project ก่อน (ไฟล์ ▾ → Save project) — Build ใช้ไฟล์ project และไฟล์ .cs ที่บันทึกแล้ว"); return; }
+    if (st.project !== WS().name){ st.project = WS().name; st.files = null; st.allFiles = []; st.dllName = ""; st.result = null; st.years.clear(); }
+    openDialog("Build — " + st.project, b => { b.innerHTML = '<div class="hint">กำลังอ่าน…</div>'; });
+    $("modal").firstElementChild.classList.add("wide");
+    const [v, s] = await Promise.all([get("/api/build/versions"), get("/api/build/settings")]);
+    st.versions = v && v.versions || [];
+    if (s) st.settings = { copyTo: s.copyTo || "", copyToOn: !!s.copyToOn };
+    if (!st.years.size){ const top = st.versions.filter(x => x.canBuild).map(x => x.year).sort().pop(); if (top) st.years.add(top); }
+    await recheck();
+  }
+
+  async function recheck(){
+    const seq = ++st.seq;
+    st.checking = true; render();
+    const r = await post("/api/build/check", { project: st.project, dllName: st.dllName || null, years: [...st.years], files: st.files, scenarios: savedScenarios() });
+    if (seq !== st.seq) return;
+    st.checking = false;
+    if (r.message && !r.files){ st.check = null; render(r.message); return; }
+    st.check = r;
+    if (!st.dllName) st.dllName = r.dllName;
+    if (!st.files){ st.files = r.files.slice(); st.allFiles = r.files.slice(); }
+    render();
+  }
+
+  // ---------- render ----------
+  function render(fatal){
+    if ($("modal").hidden || !$("dlg-title").textContent.startsWith("Build")) return;
+    const b = $("dlg-body"); b.innerHTML = "";
+    if (fatal){ div("bd-err", esc(fatal), b); return; }
+    const c = st.check;
+    if (!c){ div("hint", "กำลังตรวจ…", b); return; }
+    const issuesOf = f => c.issues.filter(i => i.file === f);
+
+    // contents + class table
+    div("pg-h", "สิ่งที่อยู่ใน DLL <small>(ไฟล์ .cs ของ project)</small>", b);
+    const tb = document.createElement("table"); tb.className = "bd-table";
+    tb.innerHTML = "<thead><tr><th></th><th>ไฟล์</th><th>namespace</th><th>class</th><th>ตรวจ</th></tr></thead>";
+    const body = document.createElement("tbody"); tb.appendChild(body);
+    const allFiles = st.allFiles.length ? st.allFiles : c.files;
+    for (const f of allFiles){
+      const on = !st.files || st.files.includes(f), cls = c.classes.filter(x => x.file === f), web = c.webFiles.includes(f);
+      const iss = issuesOf(f), nErr = iss.filter(i => i.severity === "error").length, nWarn = iss.length - nErr;
+      const rows = cls.length ? cls : [null];
+      rows.forEach((k, idx) => {
+        const tr = document.createElement("tr"); if (!on) tr.className = "off";
+        const ck = document.createElement("td");
+        if (idx === 0){
+          const box = document.createElement("input"); box.type = "checkbox"; box.checked = on; box.title = "รวมไฟล์นี้ใน DLL";
+          box.onchange = () => { st.files = box.checked ? allFiles.filter(x => x === f || (st.files || []).includes(x)) : (st.files || allFiles).filter(x => x !== f); recheck(); };
+          ck.appendChild(box);
+        }
+        tr.appendChild(ck);
+        const tdF = document.createElement("td"); tdF.className = "mono"; tdF.innerHTML = idx === 0 ? `${esc(f)}<small>${web ? "สร้างจากเว็บ" : "เขียนเอง"}</small>` : ""; tr.appendChild(tdF);
+        const tdN = document.createElement("td"), tdC = document.createElement("td");
+        if (k && web && on){
+          const ns = input(k.namespace, "namespace"), cn = input(k.name, "class");
+          const go = btn("เปลี่ยน", () => rename(f, k, ns.value.trim(), cn.value.trim()), true, "เปลี่ยนชื่อในส่วนที่วาด (Logic API) แล้ว Save (.cs)");
+          const dirty = () => { go.disabled = ns.value.trim() === k.namespace && cn.value.trim() === k.name; };
+          ns.oninput = cn.oninput = dirty;
+          tdN.appendChild(ns); tdC.append(cn, go);
+        } else {
+          tdN.innerHTML = k ? `<span class="mono">${esc(k.namespace || "—")}</span>` : "—";
+          tdC.innerHTML = k ? `<span class="mono">${esc(k.name)}</span>${web ? "" : '<small title="ไฟล์ที่เขียนเอง: แก้ชื่อในโค้ด">แก้ในโค้ด</small>'}` : "—";
+        }
+        tr.append(tdN, tdC);
+        const tdS = document.createElement("td");
+        tdS.innerHTML = !on ? "" : st.checking ? "…" : nErr ? `<span class="bd-e">✖ ${nErr}</span>` : nWarn ? `<span class="bd-w">⚠ ${nWarn}</span>` : '<span class="bd-ok">✓</span>';
+        tr.appendChild(tdS);
+        body.appendChild(tr);
+      });
+    }
+    b.appendChild(tb);
+
+    // export mode + DLL name
+    const g = div("bd-grid", null, b);
+    div("bd-l", "Export", g);
+    div("bd-v", `<label><input type="radio" name="bd-mode" checked> Build (DLL package)</label>
+      <label class="dis" title="มาใน M4"><input type="radio" name="bd-mode" disabled> Source package</label>
+      <label class="dis" title="ทดลองภายหลัง"><input type="radio" name="bd-mode" disabled> .pkt (ทดลองภายหลัง)</label>`, g);
+    div("bd-l", "ชื่อ DLL", g);
+    const dv = div("bd-v", null, g);
+    const dn = input(st.dllName, "ชื่อ DLL"); dn.classList.add("bd-dll");
+    dn.onchange = () => { st.dllName = dn.value.trim(); st.result = null; recheck(); };
+    dv.appendChild(dn); dv.insertAdjacentHTML("beforeend", '<small>.dll · ใช้ได้ A-Z a-z 0-9 _ - .</small>');
+
+    // Civil 3D versions
+    div("bd-l", "Civil 3D", g);
+    const vv = div("bd-v", null, g);
+    for (const v of st.versions){
+      const l = document.createElement("label"); if (!v.canBuild) l.className = "dis";
+      const x = document.createElement("input"); x.type = "checkbox"; x.disabled = !v.canBuild; x.checked = v.canBuild && st.years.has(v.year);
+      x.onchange = () => { x.checked ? st.years.add(v.year) : st.years.delete(v.year); st.result = null; recheck(); };
+      l.append(x, ` ${v.year}`);
+      l.insertAdjacentHTML("beforeend", `<small>${v.canBuild ? esc(v.tfm) : esc(v.reason || "")}</small>`);
+      l.title = v.path || v.reason || "";
+      vv.appendChild(l);
+    }
+    if (!st.versions.length) vv.textContent = "ไม่พบ Civil 3D";
+
+    // output folders
+    div("bd-l", "Output", g);
+    const ov = div("bd-v", null, g);
+    const ys = c.years.filter(y => st.years.has(y.year));
+    ov.innerHTML = ys.length ? ys.map(y => `<div class="mono bd-path">${esc(y.outDir)}</div>`).join("") : '<span class="hint">เลือก Civil 3D ก่อน</span>';
+
+    // Copy to (machine setting)
+    div("bd-l", "Copy to", g);
+    const cv = div("bd-v", null, g);
+    const cOn = document.createElement("input"); cOn.type = "checkbox"; cOn.checked = st.settings.copyToOn;
+    const cPath = input(st.settings.copyTo, "เช่น D:\\test_cad\\C3D_Custom\\SA"); cPath.classList.add("bd-copy"); cPath.disabled = !cOn.checked;
+    const save = async () => {
+      const r = await post("/api/build/settings", { copyTo: cPath.value.trim(), copyToOn: cOn.checked });
+      if (!r.ok){ alert(r.message); cOn.checked = false; cPath.disabled = true; return; }
+      st.settings = { copyTo: cPath.value.trim(), copyToOn: cOn.checked };
+      recheck();
+    };
+    cOn.onchange = () => { cPath.disabled = !cOn.checked; if (!cOn.checked || cPath.value.trim()) save(); else cPath.focus(); };
+    cPath.onchange = save;
+    const lab = document.createElement("label"); lab.append(cOn, " คัดลอก DLL + .atc + icons ไปที่ ");
+    cv.append(lab, cPath);
+    cv.insertAdjacentHTML("beforeend", "<small>ค่าของเครื่องนี้ (ไม่อยู่ในไฟล์ project) · การคัดลอกจริงมาใน M4</small>");
+
+    // checks
+    const head = div("pg-h", `ตรวจก่อน build <small>${st.checking ? "กำลังตรวจ…" : `${c.scenarioRuns} scenario run · ${(c.ms / 1000).toFixed(1)} s`}</small>`, b);
+    head.appendChild(btn("ตรวจอีกครั้ง", () => recheck(), st.checking || st.busy, "รันการตรวจทั้งหมดใหม่ (ไฟล์บนดิสก์)"));
+    const list = div("bd-issues", null, b);
+    const extra = unsaved().map(it => ({ severity: "warning", kind: "unsaved", file: it.file, message: `ส่วนที่วาดยังไม่ได้ Save (.cs) — build ใช้ไฟล์บนดิสก์ (กด Save (.cs) ก่อน)` }));
+    const all = c.issues.concat(extra).sort((x, y) => (x.severity === "error" ? 0 : 1) - (y.severity === "error" ? 0 : 1));
+    if (!all.length) div("bd-ok", "✓ ไม่พบปัญหา", list);
+    for (const i of all){
+      const d = div("bd-i " + (i.severity === "error" ? "e" : "w"), null, list);
+      d.innerHTML = `<b>${i.severity === "error" ? "✖" : "⚠"}</b> ${i.file ? `<span class="mono">${esc(i.file)}</span> ` : ""}${esc(i.message)}`
+        + (i.scenarios && i.scenarios.length ? `<small>${esc(i.scenarios.slice(0, 6).join(", "))}${i.scenarios.length > 6 ? ` … (${i.scenarios.length} กรณี)` : ""}</small>` : "");
+    }
+
+    // result of the last build
+    if (st.result) renderResult(div("bd-result", null, b), st.result);
+    if (st.busy) div("bd-busy", `<span class="spin"></span> กำลัง build… <span id="bd-sec">0</span> s (ครั้งแรกใช้เวลานานกว่า)`, b);
+
+    // buttons
+    const errs = c.issues.some(i => i.severity === "error");
+    const reason = st.busy ? "กำลัง build" : st.checking ? "กำลังตรวจ" : !st.years.size ? "เลือก Civil 3D ก่อน" : !(st.files || []).length ? "ไม่ได้เลือกไฟล์" : errs ? "แก้ error ก่อน" : "";
+    const bb = div("btns bd-btns", null, b);
+    const go = btn("Build", doBuild, !!reason, reason || "build DLL ตาม Civil 3D ที่เลือก");
+    go.classList.add("primary");
+    bb.append(go, btn("ปิด", () => closeDialog()));
+    if (reason && !st.busy && !st.checking) bb.insertAdjacentHTML("beforeend", `<span class="hint">${esc(reason)}</span>`);
+  }
+
+  function input(v, ph){ const i = document.createElement("input"); i.type = "text"; i.value = v || ""; i.placeholder = ph || ""; i.spellcheck = false; return i; }
+
+  function renderResult(box, r){
+    for (const y of r.builds || []){
+      const okY = y.status === "ok";
+      const d = div("bd-i " + (okY ? "ok" : y.status === "skipped" ? "w" : "e"), null, box);
+      d.innerHTML = `<b>${okY ? "✓" : "✖"}</b> Civil 3D ${y.year}: ${esc(y.message || y.status)}${okY ? ` <span class="mono">${esc(y.dll)}</span> · ${(y.ms / 1000).toFixed(1)} s` : ""}`;
+      if (okY) d.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(y.dll)));
+      for (const e of (y.errors || []).slice(0, 30)) div("bd-sub mono", esc(e), box);
+      if ((y.errors || []).length > 30) div("bd-sub", `… อีก ${y.errors.length - 30} (ดู build.log ใน ${esc(y.outDir)})`, box);
+      if ((y.changes || []).length){
+        div("bd-sub", "parameter เปลี่ยนจาก build ครั้งก่อน — ใน Civil 3D ต้องลบเครื่องมือเก่าออกจาก palette แล้วลากใหม่จาก catalog:", box);
+        for (const ch of y.changes) div("bd-sub mono", esc(ch.text), box);
+      }
+      for (const w of y.warnings || []) div("bd-sub", "⚠ " + esc(w.message), box);
+    }
+    for (const i of (r.issues || []).filter(i => i.severity === "error")) div("bd-i e", "✖ " + esc(i.message), box);
+  }
+
+  // ---------- Build ----------
+  async function doBuild(){
+    const c = st.check; if (!c || st.busy) return;
+    const same = c.years.filter(y => st.years.has(y.year) && y.sameName.length);
+    let allow = false;
+    if (same.length){
+      const where = same.map(y => `Civil 3D ${y.year}:\n` + y.sameName.map(p => "  " + p).join("\n")).join("\n");
+      allow = confirm(`มี DLL ชื่อนี้อยู่แล้ว\n\n${st.dllName}.dll มีอยู่แล้วที่:\n${where}\n\n`
+        + "ถ้า Civil 3D เคยโหลดตัวนั้นไปแล้วใน session นี้ จะโหลดตัวใหม่จากโฟลเดอร์อื่นไม่ได้ (subassembly .Net classes could not be found)\n"
+        + "แนะนำ: ปิด Civil 3D ก่อน หรือใช้โฟลเดอร์ Copy-to เดียวกันเสมอ\n\nต้องการ build ทับต่อไหม?\nOK = build ต่อ · Cancel = ไม่ build");
+      if (!allow) return;
+    }
+    st.busy = true; st.result = null; render();
+    const t0 = Date.now(), timer = setInterval(() => { const s = $("bd-sec"); if (s) s.textContent = Math.round((Date.now() - t0) / 1000); }, 500);
+    const r = await post("/api/build", { project: st.project, dllName: st.dllName, years: [...st.years], files: st.files, allowSameName: allow });
+    clearInterval(timer);
+    st.busy = false; st.result = r;
+    const okAll = r.ok && (r.builds || []).length;
+    setStatus(okAll ? "ok" : "err", okAll ? `Build ${st.dllName}.dll สำเร็จ` : `Build ${st.dllName}.dll ไม่สำเร็จ`);
+    await recheck();     // manifest / locked / same-name changed
+  }
+
+  // ---------- namespace / class of a web file ----------
+  async function rename(file, k, ns, cn){
+    const items = allItems().filter(it => it.file === file && it.spec);
+    if (!items.length){ alert(`${file}: ยังไม่ได้เปิดส่วนที่วาดของไฟล์นี้ใน workspace — Import ไฟล์นี้ก่อน`); return; }
+    const it = items[0];
+    const dirtyNote = drawingDirty(it) ? "\n(ส่วนที่วาดที่ยังไม่ได้ Save จะถูก Save ไปด้วย)" : "";
+    if (!confirm(`เปลี่ยนชื่อเป็น ${ns}.${cn}\n\nต้อง Save ไฟล์ ${file} ด้วย (ชื่อในไฟล์เปลี่ยนตาม)${dirtyNote}\n\nOK = เปลี่ยนแล้ว Save · Cancel = ไม่เปลี่ยน`)) return;
+    History.act(`เปลี่ยนชื่อ ${k.namespace}.${k.name} → ${ns}.${cn}`);
+    for (const x of items){
+      const r = Logic.setClassName(x.spec, { className: cn, namespace: ns });
+      if (!r.ok){ alert(r.error); return; }
+    }
+    persist();
+    await saveDrawing(it, { rename: true });
+    await recheck();
+  }
+
+  return { open, recheck };
+})();
+
+function openBuild(){ Build.open(); }
+$("b-build").onclick = openBuild;

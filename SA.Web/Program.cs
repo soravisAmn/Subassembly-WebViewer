@@ -1,4 +1,4 @@
-// เว็บ viewer สำหรับ subassembly (ไฟล์ .cs ตัวจริงที่เขียนด้วย Civil 3D API)
+﻿// เว็บ viewer สำหรับ subassembly (ไฟล์ .cs ตัวจริงที่เขียนด้วย Civil 3D API)
 // รัน: dotnet run --project SA.Web   แล้วเปิด http://localhost:5050
 //
 // ลำดับงาน:
@@ -258,7 +258,21 @@ app.MapPost("/api/drawing/save", (DrawingReq req) =>
         {
             var src = ReadShared(path);
             var block = CodeGenerator.FindBlock(src);
-            if (block == null)
+            if (req.Rename && block?.SpecJson != null)
+            {
+                // Build dialog: namespace / class renamed (Logic API setClassName) -> rename them outside SA-DRAWING too
+                if (!req.Force && !CodeGenerator.BlockMatchesSpec(block))
+                    return Results.Ok(new { ok = false, edited = true, message = $"ช่วง SA-DRAWING ใน {name} ถูกแก้ด้วยมือ (ไม่ตรงกับ sa-spec)" });
+                var old = DrawingSpec.Parse(block.SpecJson);
+                string Ns(DrawingSpec d) => string.IsNullOrWhiteSpace(d.Namespace) ? "TestSubassembly" : d.Namespace!;
+                var renamed = CodeGenerator.RenameClass(src, Ns(old), old.ClassName, Ns(spec), spec.ClassName);
+                var b2 = CodeGenerator.FindBlock(renamed)!;
+                text = CodeGenerator.ReplaceBlock(renamed, b2, CodeGenerator.GenerateBlock(spec, raw, b2.Indent));
+                var missing = CodeGenerator.MissingCalls(text, spec);
+                if (missing.Count > 0)
+                    return Results.Ok(new { ok = false, message = $"เปลี่ยนชื่อใน {name} ไม่ครบ (ไม่พบ {string.Join(", ", missing)}) — แก้ชื่อในโค้ดเอง" });
+            }
+            else if (block == null)
             {
                 if (!req.Overwrite)
                     return Results.Ok(new { ok = false, exists = true, message = $"มีไฟล์ชื่อ {name} อยู่แล้ว และไม่ใช่ไฟล์ที่สร้างจากเว็บ" });
@@ -296,6 +310,20 @@ app.MapGet("/api/build/versions", (SA.Build.BuildEngine eng) => new { versions =
 app.MapPost("/api/build/plan", (SA.Build.BuildRequest req, SA.Build.BuildEngine eng) => eng.Plan(req));
 
 app.MapPost("/api/build", (SA.Build.BuildRequest req, SA.Build.BuildEngine eng) => eng.Build(req));
+
+// pre-build checks for the dialog (simulator runs, codes, locked / same-name DLL, parameter changes); no build
+app.MapPost("/api/build/check", (SA.Build.CheckRequest req, SA.Build.BuildEngine eng) => eng.Check(req));
+
+// machine settings (Copy-to folder): %LOCALAPPDATA%\SA-Studio\settings.json, never in a project
+app.MapGet("/api/build/settings", (SA.Build.BuildEngine eng) => SA.Build.MachineSettings.Load(eng.MachineDir));
+app.MapPost("/api/build/settings", (SA.Build.MachineSettings s, SA.Build.BuildEngine eng) =>
+{
+    s.CopyTo = string.IsNullOrWhiteSpace(s.CopyTo) ? null : s.CopyTo.Trim();
+    var err = s.CopyToOn ? SA.Build.MachineSettings.CopyToError(s.CopyTo) : null;
+    if (err != null) return Results.Ok(new { ok = false, message = "Copy to: " + err });
+    s.Save(eng.MachineDir);
+    return Results.Ok(new { ok = true });
+});
 
 app.Run();
 
@@ -353,7 +381,7 @@ static string ReadShared(string path)
 record SaveRequest(string? File, string? Source, string? BaseMtime, bool Force);
 record NewRequest(string? Name);
 record AssemblySaveRequest(string? Name, JsonElement Content);
-record DrawingReq(JsonElement Spec, string? File, string? FileName, bool Overwrite, bool Force);
+record DrawingReq(JsonElement Spec, string? File, string? FileName, bool Overwrite, bool Force, bool Rename = false);
 
 record RunRequest(string? File, string? Source, string? SourceName, string? ClassName,
                   Dictionary<string, JsonElement>? Params, WorldInput? World);

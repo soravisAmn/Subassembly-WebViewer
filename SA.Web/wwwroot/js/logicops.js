@@ -688,6 +688,28 @@ const Logic = (() => {
     if (o.targets) s.targets = asList(o.targets).map(t => typeof t === "string" ? { name: t, type: "Surface", displayName: t } : { type: "Surface", displayName: t.name, ...t });
     return { ok: true, result: s };
   }
+  // Round 7 (Build dialog): rename the C# class / namespace of a drawn subassembly. Save (.cs) with rename renames them in the file.
+  const CS_KEYWORDS = new Set(("abstract as base bool break byte case catch char checked class const continue decimal default delegate do double else enum " +
+    "event explicit extern false finally fixed float for foreach goto if implicit in int interface internal is lock long namespace new null object operator " +
+    "out override params private protected public readonly ref return sbyte sealed short sizeof stackalloc static string struct switch this throw true try " +
+    "typeof uint ulong unchecked unsafe ushort using virtual void volatile while").split(" "));
+  const csIdent = s => typeof s === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(s) && !CS_KEYWORDS.has(s);
+  function setClassName(spec, o){
+    return tx(spec, s => {
+      o = o || {};
+      if (o.className == null && o.namespace == null) fail("Give className and / or namespace.");
+      if (o.className != null){
+        if (!csIdent(o.className)) fail(`Class name "${o.className}" is not valid in C#. Use English letters, digits, _ (not starting with a digit).`);
+        if (/^SaDrawing_/.test(o.className)) fail(`Class name "${o.className}" is reserved for the generated helper.`);
+        s.className = o.className;
+      }
+      if (o.namespace != null){
+        if (!String(o.namespace).split(".").every(csIdent)) fail(`Namespace "${o.namespace}" is not valid in C#. Use names joined by dots, e.g. Company.Roads.`);
+        s.namespace = o.namespace;
+      }
+      return { result: { className: s.className, namespace: s.namespace || "TestSubassembly" } };
+    });
+  }
   function addParam(spec, p, opts){
     return tx(spec, s => {
       p = p || {};
@@ -1023,6 +1045,7 @@ const Logic = (() => {
     M("Arrays", "removeArray", "id", 1, "Dissolve an Array (objects stay).", "Missing Array"),
     M("Arrays", "addLastOf", "arrayId, pointId, opts?", 3, "Create a \"last set\" point. Returns the id in result.", "Point not in the original set, missing Array"),
     M("Batch", "applyBatch", "ops", 1, "Run [{ fn, args, as? }] in order, all or nothing. \"${name.path}\" in a string reads an earlier op's result. Failure returns failedOp and the reason.", "Any op's error, unknown fn or reference", false),
+    M("Batch", "setClassName", "{ className?, namespace? }", 1, "Rename the C# class and / or namespace (default namespace TestSubassembly). Save (.cs) from the Build dialog renames them in the file too.", "Invalid name, reserved SaDrawing_ prefix"),
     M("Batch", "newSubassembly", "name, { namespace?, sideParam?, targets? }", 2, "New spec. Takes no spec argument; the result is the spec.", "Invalid class name", false),
     M("Reading", "catalog", "", 0, "Functions, point types, link types and key rules.", "", false),
     M("Reading", "describe", "evalResult?", 1, "Short JSON: parameters, conditions (+ current values), decision → branch → object (+ occurs?), always-occurring objects, arrays, risks.", "", false),
@@ -1041,12 +1064,12 @@ const Logic = (() => {
     rules: ["Coordinates are in the Side = Right frame; Left is mirrored automatically.", "x outward +, y up +, relative to the origin point P1.", "slope fields are rise / run expressions, down = negative, e.g. -1/SideSlope.", "A real link cannot end on an auxiliary point, except a real end (firstOf / lastOf).", "Define points from parameters and other points, not fixed coordinates."]
   });
 
-  const API = { addCondition, editCondition, renameCondition, removeCondition, addDecision, editDecision, removeDecision, moveDecision,
+  const API = { setClassName, addCondition, editCondition, renameCondition, removeCondition, addDecision, editDecision, removeDecision, moveDecision,
                 addCase, editCase, removeCase, moveCase, renameBranch, setBranch, addVariable, editVariable, renameVariable, removeVariable, moveVariable,
                 addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setArrayLoop, removeArray, addLastOf, setParamBounds, setParamUnit,
                 addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects };
 
-  return { META, catalog, applyBatch, newSubassembly, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects,
+  return { META, catalog, applyBatch, newSubassembly, setClassName, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects,
            RESERVED, nameError, freeCondName, toText, diffText,
            addCondition, editCondition, renameCondition, removeCondition,
            addDecision, editDecision, removeDecision, moveDecision,

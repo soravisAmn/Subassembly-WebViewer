@@ -228,5 +228,26 @@ test("describe: โครง + ค่าตอนนี้ (round4-demo) — เ
   ok(JSON.stringify(d1).length < 4000, "สั้นพอให้ AI อ่าน");
 });
 
+test("setClassName (รอบ 7, หน้าต่าง Build): เปลี่ยนชื่อ class / namespace + ชื่อที่ใช้ไม่ได้ = error ไม่แก้ spec", () => {
+  const s = Spec.newSpec("Body");
+  const r = good(Logic.setClassName(s, { className: "RockBody", namespace: "Soravis.SA" }), "เปลี่ยนทั้งคู่");
+  eq({ className: "RockBody", namespace: "Soravis.SA" }, r.result, "ผล");
+  eq("RockBody", s.className, "className");
+  eq("Soravis.SA", s.namespace, "namespace");
+  good(Logic.setClassName(s, { className: "Rock_2" }), "เฉพาะ class");
+  eq("Soravis.SA", s.namespace, "namespace คงเดิม");
+  eq("TestSubassembly", good(Logic.setClassName(Spec.newSpec("X"), { className: "Y" }), "ไม่มี namespace").result.namespace, "namespace เริ่มต้น");
+  bad(s, () => Logic.setClassName(s, { className: "2abc" }), /not valid/, "ขึ้นต้นด้วยเลข");
+  bad(s, () => Logic.setClassName(s, { className: "my-class" }), /not valid/, "มี -");
+  bad(s, () => Logic.setClassName(s, { className: "class" }), /not valid/, "keyword");
+  bad(s, () => Logic.setClassName(s, { className: "ถนน" }), /not valid/, "ภาษาไทย");
+  bad(s, () => Logic.setClassName(s, { className: "SaDrawing_X" }), /reserved/, "ชื่อ helper");
+  bad(s, () => Logic.setClassName(s, { namespace: "A..B" }), /Namespace/, "namespace ว่างตรงกลาง");
+  bad(s, () => Logic.setClassName(s, { namespace: "A.namespace" }), /Namespace/, "namespace keyword");
+  bad(s, () => Logic.setClassName(s, {}), /className/, "ไม่ได้ให้อะไร");
+  good(Logic.applyBatch(s, [{ fn: "setClassName", args: [{ className: "Rock_3" }] }]), "ผ่าน applyBatch");
+  eq("Rock_3", s.className, "applyBatch");
+});
+
 console.log(`\n${passed} ผ่าน, ${failed} ไม่ผ่าน`);
 process.exitCode = failed ? 1 : 0;

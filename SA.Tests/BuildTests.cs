@@ -439,7 +439,7 @@ static class BuildTests
             True(r.Ok && File.Exists(r.Zip!) && r.Zip == Path.Combine(dir, "build", "T7", "T7-source.zip"), "zip " + r.Zip);
             using var z = System.IO.Compression.ZipFile.OpenRead(r.Zip!);
             var names = z.Entries.Select(e => e.FullName.Replace('\\', '/')).OrderBy(n => n, StringComparer.Ordinal).ToList();
-            foreach (var want in Fixtures.Concat(new[] { "T7.csproj", "build.bat", "T7.atc", "T7_tools.atc", "report.md", "README.txt", "icons/T7/PavementAssembly.png" }))
+            foreach (var want in Fixtures.Concat(new[] { "T7.csproj", "build.bat", "T7.atc", "T7_tools.atc.template", "report.md", "README.txt", "icons/T7/PavementAssembly.png" }))
                 True(names.Contains(want), "ไม่มี " + want + ": " + string.Join(", ", names));
             True(!names.Any(n => n.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)), "ไม่มี DLL");
             string Read(string n) { using var s = new StreamReader(z.GetEntry(n)!.Open()); return s.ReadToEnd(); }
@@ -450,7 +450,8 @@ static class BuildTests
             var bat = Read("build.bat");
             True(bat.StartsWith("@echo off\r\n") && bat.Contains("chcp 65001") && bat.Contains("AeccDbMgd.dll") && bat.Contains("T7.csproj"), "build.bat");
             True(Read("README.txt").Contains("TestSubassembly.RockPitchingBodyWeb"), "README");
-            True(XDocument.Parse(Read("T7_tools.atc")).Descendants("DotNetClass").All(d => (string?)d.Attribute("Assembly") == "T7.dll"), ".atc อ้างชื่อไฟล์");
+            True(!names.Contains("T7_tools.atc") && XDocument.Parse(Read("T7_tools.atc.template")).Descendants("DotNetClass").All(d => (string?)d.Attribute("Assembly") == BuildEngine.DllPathToken), "template ของ .atc (build.bat เขียน path เต็ม)");
+            True(bat.Contains("T7_tools.atc.template") && bat.Contains(BuildEngine.DllPathToken), "build.bat เขียน .atc");
         });
 
         var c3d = C3DVersions.DetectThisMachine().Where(i => i.CanBuild).OrderByDescending(i => i.Year).FirstOrDefault();
@@ -474,6 +475,7 @@ static class BuildTests
             // Copy-to
             Eq(copy, y.CopiedTo, "คัดลอกไป");
             True(new[] { "T7.dll", "T7.atc", "T7_tools.atc" }.All(f => File.Exists(Path.Combine(copy, f))) && Directory.GetFiles(Path.Combine(copy, "icons", "T7"), "*.png").Length == 3, "ไฟล์ใน Copy-to");
+            True(XDocument.Parse(File.ReadAllText(Path.Combine(copy, "T7_tools.atc"))).Descendants("DotNetClass").All(d => (string?)d.Attribute("Assembly") == Path.Combine(copy, "T7.dll")), ".atc อ้าง DLL ใน Copy-to ด้วย path เต็ม");
             var m = BuildManifest.Load(Path.Combine(outDir, "build-manifest.json"))!;
             Eq(3, m.Classes.Count, "class ใน manifest");
             True(m.Classes.All(c => c.Params.Any(p => p.Name == "Side")), "parameter จากตัวจำลอง");
@@ -507,6 +509,8 @@ static class BuildTests
             var outText = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
             p.WaitForExit(300000);
             True(p.ExitCode == 0 && outText.Contains("OK:") && File.Exists(Path.Combine(unpack, "T7.dll")), $"build.bat: exit {p.ExitCode} {outText}");
+            var builtAtc = XDocument.Parse(File.ReadAllText(Path.Combine(unpack, "T7_tools.atc")));
+            True(builtAtc.Descendants("DotNetClass").All(d => (string?)d.Attribute("Assembly") == Path.Combine(unpack, "T7.dll")), "build.bat เขียน path เต็มลง .atc");
         });
     }
 

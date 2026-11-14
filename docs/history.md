@@ -4,7 +4,7 @@ Condensed from the old `CLAUDE.md`. Prompts and design docs of each round are in
 
 ## Not yet tested in real Civil 3D
 
-`tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `round5-demo.cs`, `round5b-demo.cs`, and the root files `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs`, `pavement-assembly.cs` (`tests-civil3d/round6-checklist.md`). (`round4b-demo` was deleted together with Max / Min.)
+`tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `round5-demo.cs`, `round5b-demo.cs`, and the root files `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs`, `pavement-assembly.cs` (`tests-civil3d/round6-checklist.md`). Round 7: the Build dialog output (`.atc`, icons, Copy-to, source package) in `tests-civil3d/round7-checklist.md`. (`round4b-demo` was deleted together with Max / Min.)
 
 ## Round 4: Logic style ก (`prompt-4.md`, `prompt-4-design.md`)
 
@@ -78,6 +78,17 @@ Decisions: Claude Code first, Desktop via a stdio bridge (Desktop's custom conne
 - M5: `build-c3d.bat`, `tests-civil3d/round6-checklist.md`. The 3 files compile against the real Civil 3D 2027 API.
 - Known at the end of M5: by `sa_check`, `body` lacks `Datum` on L13 and L10, and `pavement` on L57 (and more when the ground is above the whole section). Left for the user to judge in Civil 3D.
 - Postponed: drawing from a CAD screenshot.
+
+## Round 7: Build dialog, report, .atc, source package (`prompt-7.md`, `prompt-7-design.md`)
+
+Decisions: all as proposed; same-named DLL in another folder = an OK / Cancel box like a file-replace prompt; two `.atc` files like the stock catalogs (Catalog → Category); icons fitted into 256 px, declared 64 × 64; Copy-to only for the newest ticked year.
+
+- M0: stock `.atc` read (BasicLane in the Road Catalog, literal-text tools in the SAC / XAML catalogs), design doc.
+- M1: build engine `SA.Web/Build/` (Civil 3D / TFM / SDK detection, generated `.csproj`, `dotnet build`, error summary, locked DLL, `build-manifest.json`, machine build history), `/api/build*`.
+- M2: Build dialog `js/build.js`, server-side pre-build checks (`BuildEngine.Check`, also MCP `sa_build_check`), namespace / class rename (Logic API `setClassName` + Roslyn rename outside SA-DRAWING), Copy-to machine setting.
+- M3: parameter description / options (Logic API `setParamInfo`, Parameter card), `.atc` with stable GUIDs (`AtcWriter`), icons drawn on the server (`IconRenderer`), locked expected `.atc`.
+- M4: `report.md` (also shown in the dialog), Copy-to after build, source package zip with `build.bat` (tested by building the unpacked zip).
+- M5: `tests-civil3d/round7-checklist.md`. User's Civil 3D run: the bare DLL name did not load, so the `.atc` now always uses the full path (source package: `build.bat` writes it); Side shows as a Right / Left list; re-adding the catalog duplicates the tools (open). Thai text and Bool parameters not checked yet.
 
 ## Long-term plan notes
 

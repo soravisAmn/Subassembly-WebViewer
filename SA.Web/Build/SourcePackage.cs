@@ -1,6 +1,8 @@
 // Round 7 M4: Source package = a zip for someone with Civil 3D (the user may have none): the .cs files, a .csproj (same
 // settings as Build), build.bat (finds the Civil 3D install, picks the TFM from its year, runs dotnet build, prints a short
 // summary), the .atc + icons, report.md and README.txt (Thai). Never any Autodesk DLL.
+// Civil 3D needs the full DLL path in the .atc, and only build.bat knows where the zip was unpacked: the tools catalog is
+// shipped as <DLL>_tools.atc.template with DllPathToken, and build.bat writes <DLL>_tools.atc after a successful build.
 //   <project folder>\build\<DLL>\<DLL>-source.zip   (staging folder build\<DLL>\source\ is rebuilt every time)
 
 using System.IO.Compression;
@@ -13,6 +15,8 @@ public record SourceResult(bool Ok, string? Zip, List<BuildIssue> Issues, List<B
 
 public partial class BuildEngine
 {
+    public const string DllPathToken = "__SA_DLL_PATH__";
+
     public SourceResult SourcePackage(BuildRequest req)
     {
         var plan = Plan(req);
@@ -25,7 +29,7 @@ public partial class BuildEngine
         lock (Gate)
         {
             var check = Check(new CheckRequest(req.Project, plan.DllName, req.Years, req.Files, req.Scenarios));
-            var cat = MakeCatalog(plan.DllName, plan.Classes, files, plan.DllName + ".dll");
+            var cat = MakeCatalog(plan.DllName, plan.Classes, files, DllPathToken);
             var root = Path.Combine(Path.GetDirectoryName(BuildPaths.OutputDir(proj, plan.DllName, 0))!);
             var stage = Path.Combine(root, "source");
             if (Directory.Exists(stage)) Directory.Delete(stage, true);
@@ -35,6 +39,8 @@ public partial class BuildEngine
             File.WriteAllText(Path.Combine(stage, plan.DllName + ".csproj"), CsprojWriter.GeneratePortable(plan.DllName, tfm, plan.Files));
             File.WriteAllText(Path.Combine(stage, "build.bat"), BuildBat(plan.DllName), new UTF8Encoding(false));
             WriteCatalog(stage, plan.DllName, cat);
+            var tools = Path.Combine(stage, AtcWriter.CategoryFile(plan.DllName));
+            File.Move(tools, tools + ".template");
             var report = ReportWriter.Build(new ReportData(plan.DllName, plan.Project, null, null, cat, check, plan.Classes, DateTime.Now,
                 $"Source package: {plan.DllName}.dll (ยังไม่ได้ build)"));
             File.WriteAllText(Path.Combine(stage, "report.md"), report);
@@ -76,6 +82,12 @@ echo Civil 3D: %C3DInstall%  (%TFM%)
 rem C3DInstall reaches the .csproj as an environment variable (a path ending in \ breaks a -p: argument)
 dotnet build "{{dll}}.csproj" -nologo -v q -consoleloggerparameters:NoSummary -nodeReuse:false -p:TargetFramework=%TFM% > build.log 2>&1
 if not errorlevel 1 (
+  rem Civil 3D needs the full DLL path in the .atc: write it into the tools catalog from the template
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "$t = [IO.File]::ReadAllText('%~dp0{{dll}}_tools.atc.template'); [IO.File]::WriteAllText('%~dp0{{dll}}_tools.atc', $t.Replace('{{DllPathToken}}', [Security.SecurityElement]::Escape('%~dp0{{dll}}.dll')), (New-Object Text.UTF8Encoding $false))"
+  if errorlevel 1 (
+    echo เขียน {{dll}}_tools.atc ไม่ได้
+    exit /b 1
+  )
   echo OK: %~dp0{{dll}}.dll
   echo ต่อไป: CONTENTBROWSER - Add Catalog - %~dp0{{dll}}.atc
   exit /b 0
@@ -102,7 +114,7 @@ exit /b 1
         "1. ติดตั้ง .NET SDK: Civil 3D 2025 / 2026 ใช้ .NET 8, Civil 3D 2027 ใช้ .NET 10 (https://dotnet.microsoft.com)",
         "2. แตก zip ไว้ในโฟลเดอร์ที่จะใช้จริง แล้วเพิ่มโฟลเดอร์นั้นเป็น Trusted Location ของ Civil 3D (Options → Files)",
         "3. ปิด Civil 3D แล้วดับเบิลคลิก build.bat (ถ้ามี Civil 3D หลายรุ่น: set C3DInstall=C:\\Program Files\\Autodesk\\AutoCAD 2026\\ ก่อนรัน)",
-        $"4. ได้ {dll}.dll ข้าง {dll}.atc — เปิด Civil 3D พิมพ์ CONTENTBROWSER → Add Catalog → เลือก {dll}.atc",
+        $"4. ได้ {dll}.dll ข้าง {dll}.atc (build.bat เขียน path เต็มของ DLL ลง {dll}_tools.atc ให้ — ถ้าย้ายโฟลเดอร์ ให้รัน build.bat ใหม่) — เปิด Civil 3D พิมพ์ CONTENTBROWSER → Add Catalog → เลือก {dll}.atc",
         "5. ลากเครื่องมือไปใส่ Tool Palette แล้วใส่ลง assembly",
         "",
         "class ใน DLL:",

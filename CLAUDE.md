@@ -56,9 +56,9 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 
 ## Status
 
-- Last finished: round 6 (MCP), M0-M5. History: `docs/history.md`. Setup: `docs/connect-claude.md`.
+- Last finished: round 7 (Build dialog, report, `.atc`, icons, source package), M0-M5. Docs: `docs/build.md`. History: `docs/history.md`.
+- Round 7 Civil 3D run: `.atc` needs the full DLL path (now the only form), Side list OK, re-adding the catalog duplicates the tools (open: try refresh / remove first). Thai text not checked. Next: round 8 (project folders).
 - Round 6 M5 Civil 3D run: shapes filled crossed (link order in `Shapes.Add`). Fixed in shim + generator (`docs/civil3d-testing.md`).
-- Next: round 7 (`prompt-7.md`): Build dialog, report, auto `.atc`, source package.
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
 
 ## Plan

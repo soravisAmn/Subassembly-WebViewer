@@ -154,3 +154,9 @@ Whether a single-file `<Category>` root (XAML style) works with Add Catalog is u
 - Build runs the pre-build checks again (with the page's saved scenarios) for the report. `report.md` is written for failed builds too. The `.atc` is written only on success.
 - Source package: one zip for Civil 3D 2025–2027. `build.bat` picks the TFM from the install folder's year. `C3DInstall` goes to MSBuild as an environment variable, because `-p:C3DInstall="...\"` breaks on the trailing backslash (found when the test ran build.bat). The `find` command is avoided, because a Unix `find` on PATH (Git) shadows the Windows one.
 - The report is Markdown. The dialog renders the small subset that ReportWriter writes (headings, tables, lists, code).
+
+## 10. M5 results (user, Civil 3D 2027)
+
+1. Relative DLL path in the `.atc` (`Assembly="SR03.dll"`) did not load; the full path did. The "path แบบเต็ม" option was removed: the `.atc` always names the DLL by full path (Copy-to folder, else output folder). The source package ships `<DLL>_tools.atc.template`, and `build.bat` writes the real path after building.
+2. Side shows as a Right / Left list.
+3. Adding the catalog again after a rebuild duplicated the tools, despite stable GUIDs. Not solved; next time try refreshing the existing catalog, or removing it first.

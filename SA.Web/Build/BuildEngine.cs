@@ -15,9 +15,8 @@ using System.Text.RegularExpressions;
 
 namespace SA.Build;
 
-// AtcFullPath: the .atc names the DLL by full path (fallback if Civil 3D does not accept the bare file name, see M5)
 // Scenarios: the page's saved scenarios, as for the checks (they go into the report)
-public record BuildRequest(string? Project, string? DllName, int[]? Years, string[]? Files, bool AllowSameName = false, bool AtcFullPath = false,
+public record BuildRequest(string? Project, string? DllName, int[]? Years, string[]? Files, bool AllowSameName = false,
                            List<CheckScenario>? Scenarios = null);
 
 public class BuildYearResult
@@ -194,7 +193,9 @@ public partial class BuildEngine
         }
 
         // parameters / icons / .atc text first: the report needs them even when the build fails
-        var cat = MakeCatalog(dllName, plan.Classes, files, req.AtcFullPath ? Path.Combine(copyDir ?? outDir, dllName + ".dll") : dllName + ".dll");
+        // Civil 3D 2027 needs the full DLL path in the .atc (round 7 M5: the bare file name did not load). The DLL is loaded
+        // from the Copy-to folder when there is one.
+        var cat = MakeCatalog(dllName, plan.Classes, files, Path.Combine(copyDir ?? outDir, dllName + ".dll"));
         y.Warnings.AddRange(cat.Warnings);
 
         Directory.CreateDirectory(BuildPaths.ObjDir(outDir));
@@ -221,7 +222,7 @@ public partial class BuildEngine
             return y;
         }
 
-        // .atc + icons: the DLL is referenced by file name (next to the .atc) or by the full path where it is loaded from
+        // .atc + icons (the DLL by full path, see above)
         WriteCatalog(outDir, dllName, cat);
         y.Atc = Path.Combine(outDir, dllName + ".atc");
         y.Icons = cat.Icons.Count;

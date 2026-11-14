@@ -17,6 +17,17 @@ Test sets live in `tests-civil3d/`. Thai labels in quotes are the text shown in 
 - Needs a target surface where the corridor passes through both cut and fill; then follow `tests-civil3d/round4-checklist.md` (10 items + coordinates on flat ground).
 - The same spec is in `drawing-cases.json` (JS vs C# in 5 cases: cut, normal fill, high fill + no curb, Left, Layout).
 
+## Round 7: Build dialog, .atc, icons, report
+
+Build `SR03` from the web's Build dialog (not `build-c3d.bat`) with Copy-to `D:\test_cad\C3D_Custom\SA`, then add `SR03.atc` in Content Browser: no hand-made tools, and no BasicLane copy keeping the wrong parameters. Follow `tests-civil3d/round7-checklist.md`. How the build works: [build.md](build.md).
+
+**First run (user, Civil 3D 2027):**
+
+- The bare DLL file name in the `.atc` did **not** load; the full path did. The full path is now the only form (Build: the Copy-to or output folder; source package: `build.bat` writes it).
+- Side shows as a Right / Left list.
+- Adding the catalog again after a rebuild gave a **second set of tools** (stable GUIDs did not prevent it). Open: try refreshing the existing catalog, or removing it before adding it again.
+- Thai descriptions: not reported yet.
+
 ## Round 6: the 3 files edited through the web
 
 `build-c3d.bat` at the root builds `pavement-assembly.cs`, `base_rock-pitching-web.cs` and `body_rock-pitching-web.cs` into `tests-civil3d\build\out\SaRound6.dll` against the installed Civil 3D 2027 (.NET 10, project `tests-civil3d/build/Round6.csproj`; set the MSBuild property `C3DInstall` for another install path). It prints only a short summary; "ปิด Civil 3D ก่อน" means the DLL is locked. Autodesk DLLs are referenced in place and never copied or committed.

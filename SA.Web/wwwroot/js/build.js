@@ -5,7 +5,7 @@
 "use strict";
 const Build = (() => {
   const st = { project: null, versions: [], years: new Set(), files: null, allFiles: [], dllName: "", check: null, settings: { copyTo: "", copyToOn: false },
-               busy: false, result: null, checking: false, seq: 0, atcFullPath: false, mode: "build", source: null, showReport: {} };
+               busy: false, result: null, checking: false, seq: 0, mode: "build", source: null, showReport: {} };
   const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     .then(r => r.json()).catch(() => ({ ok: false, message: NO_SERVER }));
   const get = url => fetch(url).then(r => r.json()).catch(() => null);
@@ -112,12 +112,7 @@ const Build = (() => {
       <label class="dis" title="ทดลองภายหลัง"><input type="radio" name="bd-mode" disabled> .pkt (ทดลองภายหลัง)</label>`, g);
     for (const r of mv.querySelectorAll("input[value]")){ r.checked = r.value === st.mode; r.onchange = () => { st.mode = r.value; render(); }; }
     div("bd-l", ".atc", g);
-    const av = div("bd-v", null, g), al = document.createElement("label"), ac = document.createElement("input");
-    ac.type = "checkbox"; ac.checked = st.atcFullPath; ac.onchange = () => { st.atcFullPath = ac.checked; };
-    al.append(ac, " path แบบเต็ม");
-    al.title = "ปกติ .atc อ้าง DLL ด้วยชื่อไฟล์ (อยู่โฟลเดอร์เดียวกัน) · ติ๊ก = อ้างด้วย path เต็มของโฟลเดอร์ที่ Civil 3D โหลด (Copy-to ถ้าเปิดไว้) — ใช้เมื่อ Civil 3D หา DLL ไม่เจอ";
-    av.appendChild(al);
-    av.insertAdjacentHTML("beforeend", "<small>ไม่ติ๊ก = ชื่อไฟล์ DLL อย่างเดียว (อยู่ข้าง .atc)</small>");
+    div("bd-v", "<small>อ้าง DLL ด้วย path เต็ม (Civil 3D ต้องการ) — โฟลเดอร์ Copy to ถ้าเปิดไว้ ไม่งั้นโฟลเดอร์ Output · ย้ายไฟล์แล้วต้อง Build ใหม่</small>", g);
     div("bd-l", "ชื่อ DLL", g);
     const dv = div("bd-v", null, g);
     const dn = input(st.dllName, "ชื่อ DLL"); dn.classList.add("bd-dll");
@@ -289,7 +284,7 @@ const Build = (() => {
     }
     st.busy = true; st.result = null; render();
     const t0 = Date.now(), timer = setInterval(() => { const s = $("bd-sec"); if (s) s.textContent = Math.round((Date.now() - t0) / 1000); }, 500);
-    const r = await post("/api/build", { project: st.project, dllName: st.dllName, years: [...st.years], files: st.files, allowSameName: allow, atcFullPath: st.atcFullPath, scenarios: savedScenarios() });
+    const r = await post("/api/build", { project: st.project, dllName: st.dllName, years: [...st.years], files: st.files, allowSameName: allow, scenarios: savedScenarios() });
     clearInterval(timer);
     st.busy = false; st.result = r;
     const okAll = r.ok && (r.builds || []).length;

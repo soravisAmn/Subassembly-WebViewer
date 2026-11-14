@@ -65,6 +65,20 @@ static class ShapeChainTests
             if (!Get<bool>(s1, "chained")) throw new Exception("S1 ต่อกันถูกอยู่แล้ว ต้อง chained");
         });
 
+        test("ตัวจำลองไม่หลวมกว่า Civil 3D: Point จาก Link.Points เป็นตัวห่อใหม่ (เทียบ reference = ไม่ตรง เหมือนของจริง)", () =>
+        {
+            var blk = CodeGenerator.FindBlock(File.ReadAllText(Path.Combine(root, "SA.Tests", "fixtures", "round6", "body_rock-pitching-web.cs")))!;
+            var spec = DrawingSpec.Parse(blk.SpecJson!);
+            var src = CodeGenerator.GenerateFile(spec, blk.SpecJson!, "x.cs");
+            if (!src.Contains("SamePt(a, end)")) throw new Exception("ChainLinks ต้องเทียบจุดด้วย SamePt");
+            // ChainLinks as first built (ReferenceEquals) warned in Civil 3D 2027: it must fail in the simulator too
+            var byRef = src.Replace("SamePt(", "ReferenceEquals(").Replace("static bool ReferenceEquals(", "static bool SamePt(");
+            var c = compiler.Compile(byRef, "x.cs");
+            if (!c.Success) throw new Exception("คอมไพล์ไม่ผ่าน");
+            var o = runner.Run(c.Classes[0], Values(0), World(grounds[2], 0));
+            if (!o.Issues.Any(i => i.Message.Contains("ต่อกันไม่เป็นรูปปิด"))) throw new Exception("เทียบ reference ต้องต่อไม่ได้ + เตือน (แบบที่เห็นใน Civil 3D)");
+        });
+
         foreach (var rel in Files)
         {
             test($"{Path.GetFileName(rel)}: สร้างใหม่จาก sa-spec · ทุก shape เป็นรูปปิดไม่ไขว้ ({grounds.Count} ผิวดิน × Right / Left)", () =>

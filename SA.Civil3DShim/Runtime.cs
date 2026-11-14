@@ -165,11 +165,22 @@ namespace Autodesk.Civil.Runtime
 
     public class Point
     {
-        internal Point(int index, double offset, double elevation) { Index = index; Offset = offset; Elevation = elevation; }
-        public int Index { get; }
-        public double Offset { get; set; }      // เทียบ origin ของ subassembly
-        public double Elevation { get; set; }   // เทียบ origin ของ subassembly
-        public CodeCollection Codes { get; } = new CodeCollection();
+        // The real API hands out managed wrappers: the Point read back from Link.Points is not the same object as the one
+        // Points.Add returned (found in Civil 3D 2027: ReferenceEquals on them never matched). The simulator does the same,
+        // so code that compares points by reference fails here too. Same point = same Index / coordinates.
+        internal sealed class Data
+        {
+            public int Index;
+            public double Offset, Elevation;
+            public readonly CodeCollection Codes = new CodeCollection();
+        }
+        internal readonly Data D;
+        internal Point(int index, double offset, double elevation) { D = new Data { Index = index, Offset = offset, Elevation = elevation }; }
+        internal Point(Data d) { D = d; }
+        public int Index => D.Index;
+        public double Offset { get => D.Offset; set => D.Offset = value; }        // เทียบ origin ของ subassembly
+        public double Elevation { get => D.Elevation; set => D.Elevation = value; }   // เทียบ origin ของ subassembly
+        public CodeCollection Codes => D.Codes;
     }
 
     public class Link
@@ -194,7 +205,8 @@ namespace Autodesk.Civil.Runtime
         private readonly List<Point> _items = new List<Point>();
         private readonly bool _readOnly;
         public int Count => _items.Count;
-        public Point this[int index] => _items[index];
+        // The points of a link come back as new wrappers on every read (see Point)
+        public Point this[int index] => _readOnly ? new Point(_items[index].D) : _items[index];
 
         internal PointCollection() { }
         // The points of one link (read-only in the simulator)
@@ -213,8 +225,8 @@ namespace Autodesk.Civil.Runtime
             return p;
         }
 
-        public IEnumerator<Point> GetEnumerator() => _items.GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
+        public IEnumerator<Point> GetEnumerator() => (_readOnly ? _items.Select(p => new Point(p.D)) : _items).GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     public class LinkCollection : IEnumerable<Link>

@@ -836,29 +836,46 @@ namespace TestSubassembly
 
         // Civil 3D walks the links of Shapes.Add in array order: each link must touch the end of the previous one
         // (a reversed link is turned around), otherwise the fill is drawn crossed. So sort them into one closed chain.
-        // Not possible (open outline, more than two links at a point) = warn and keep the order given.
+        // Starts from the first link and searches (with backtracking: points at the same position, e.g. zero-length links,
+        // can offer several ways) for an order that uses every link and returns to the start.
+        // Not possible (open outline) = warn and keep the order given.
         private static Link[] ChainLinks(CorridorState cs, string id, Link[] links)
         {
-            var rest = new List<Link>(links);
-            var chain = new List<Link> { rest[0] };
-            rest.RemoveAt(0);
-            Point start = links[0].Points[0];
-            Point end = links[0].Points[links[0].Points.Count - 1];
-            while (rest.Count > 0)
-            {
-                int k = rest.FindIndex(l => ReferenceEquals(l.Points[0], end) || ReferenceEquals(l.Points[l.Points.Count - 1], end));
-                if (k < 0) break;
-                Link next = rest[k];
-                rest.RemoveAt(k);
-                end = ReferenceEquals(next.Points[0], end) ? next.Points[next.Points.Count - 1] : next.Points[0];
-                chain.Add(next);
-            }
-            if (rest.Count > 0 || !ReferenceEquals(end, start))
+            var used = new bool[links.Length];
+            var order = new List<Link> { links[0] };
+            used[0] = true;
+            int budget = 100000;
+            if (!ChainFrom(links, used, order, links[0].Points[links[0].Points.Count - 1], links[0].Points[0], ref budget))
             {
                 Warn(cs, CorridorError.Failure, id + ": link ต่อกันไม่เป็นรูปปิด — Civil 3D จะระบายสีผิด");
                 return links;
             }
-            return chain.ToArray();
+            return order.ToArray();
+        }
+
+        private static bool ChainFrom(Link[] links, bool[] used, List<Link> order, Point end, Point start, ref int budget)
+        {
+            if (order.Count == links.Length) return SamePt(end, start);
+            if (--budget < 0) return false;
+            for (int i = 0; i < links.Length; i++)
+            {
+                if (used[i]) continue;
+                Point a = links[i].Points[0], b = links[i].Points[links[i].Points.Count - 1];
+                Point next = SamePt(a, end) ? b : SamePt(b, end) ? a : null;
+                if (next == null) continue;
+                used[i] = true;
+                order.Add(links[i]);
+                if (ChainFrom(links, used, order, next, start, ref budget)) return true;
+                used[i] = false;
+                order.RemoveAt(order.Count - 1);
+            }
+            return false;
+        }
+
+        // Points read back from Link.Points are new wrapper objects in Civil 3D: compare by position, never by reference
+        private static bool SamePt(Point a, Point b)
+        {
+            return Math.Abs(a.Offset - b.Offset) < 1e-7 && Math.Abs(a.Elevation - b.Elevation) < 1e-7;   // same tolerance as samePt in spec.js
         }
 
         private static PointInMem Abs(CorridorState cs, Pt p)

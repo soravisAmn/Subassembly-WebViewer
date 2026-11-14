@@ -693,20 +693,27 @@ const Spec = (() => {
   const samePt = (p, q) => Math.abs(p.x - q.x) < 1e-7 && Math.abs(p.y - q.y) < 1e-7;
 
   // Same as ChainLinks in the generated C#: order of the link paths that makes one closed chain,
-  // starting from the first link (greedy, first link that touches the current end) · null = not possible
+  // starting from the first link, depth-first with backtracking, links tried in their order · null = not possible
   function chainOrder(paths){
     if (!paths.length) return null;
-    const rest = paths.map((p, i) => i).slice(1), order = [0];
-    const start = paths[0][0];
-    let end = paths[0][paths[0].length - 1];
-    while (rest.length){
-      const k = rest.findIndex(i => samePt(paths[i][0], end) || samePt(paths[i][paths[i].length - 1], end));
-      if (k < 0) return null;
-      const i = rest.splice(k, 1)[0], p = paths[i];
-      end = samePt(p[0], end) ? p[p.length - 1] : p[0];
-      order.push(i);
-    }
-    return samePt(end, start) ? order : null;
+    const used = paths.map(() => false), order = [0], start = paths[0][0];
+    used[0] = true;
+    let budget = 100000;
+    const from = end => {
+      if (order.length === paths.length) return samePt(end, start);
+      if (--budget < 0) return false;
+      for (let i = 0; i < paths.length; i++){
+        if (used[i]) continue;
+        const a = paths[i][0], b = paths[i][paths[i].length - 1];
+        const next = samePt(a, end) ? b : samePt(b, end) ? a : null;
+        if (!next) continue;
+        used[i] = true; order.push(i);
+        if (from(next)) return true;
+        used[i] = false; order.pop();
+      }
+      return false;
+    };
+    return from(paths[0][paths[0].length - 1]) ? order : null;
   }
 
   // Same as Civil 3D (ShapeWalk in the shim): walk the links in the order given · first link keeps its direction,

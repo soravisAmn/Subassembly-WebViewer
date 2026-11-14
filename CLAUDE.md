@@ -58,7 +58,8 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 
 - Last finished: round 6 (MCP), M0-M5. History: `docs/history.md`. Setup: `docs/connect-claude.md`.
 - Round 6 M5 Civil 3D run: shapes filled crossed (link order in `Shapes.Add`). Fixed in shim + generator (`docs/civil3d-testing.md`). The user re-Saves the 3 root files from the web, then `build-c3d.bat` and re-test.
-- Next: the user runs `tests-civil3d/round6-checklist.md` in Civil 3D. Then a new prompt: drawing from a CAD screenshot (postponed from round 6).
+- Second Civil 3D run: every shape warned "not chained" (`Link.Points` gives new Point wrappers; reference compare failed). Fixed: compare by position, shim returns new wrappers too, test added. 3 root files re-Saved. All tests pass (485).
+- Next: the user rebuilds (`build-c3d.bat`, close Civil 3D first) and runs `tests-civil3d/round6-checklist.md` in Civil 3D. Then round 7: `prompt-7.md` (Build dialog, build report, .atc, source package) is written. Idea list: `docs/ideas/IDEA#1.md`.
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
 
 ## Plan

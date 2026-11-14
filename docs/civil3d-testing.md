@@ -25,6 +25,8 @@ Load it as in the guide `Subassembly C# สู่ Civil 3D 2027.html`: Trusted L
 
 **Result of the first run (corridor on `test_corridor.dwg`):** links in the right place, but body S2 and pavement S2 / S3 filled as crossed triangles; base S1 filled correctly. Cause: Civil 3D walks the links of `Shapes.Add` in array order (see [code-generation.md](code-generation.md), "Shape link order"); the API reference says nothing about it. The rule was inferred from these four shapes: a "any order" rule would have filled body S2 correctly, and a "strict head-to-tail direction" rule would have broken base S1 (its L6 is reversed). Fixed in the generator (`ChainLinks`) and in the simulator (`ShapeWalk`). The 3 root files must be Saved again from the web, then rebuilt with `build-c3d.bat`. Still to confirm in Civil 3D: body S1 and pavement S1 (predicted correct before the fix).
 
+**Second run (SaRound6b, built under another assembly name because the running Civil 3D still held SaRound6):** every shape warned `link ต่อกันไม่เป็นรูปปิด`: `ChainLinks` compared points by reference, but Points read from `Link.Points` are new wrappers in the real API. Fixed (compare by position); the simulator now returns new wrappers too, with a test. A running Civil 3D will not load a second DLL with the same assembly name from another folder ("class not found"): close Civil 3D, or build under a new AssemblyName.
+
 Also found with the stricter simulator:
 
 - The hand-written `body_rock-pitching.cs` passes its soil links as `RockBase (PR→B0), PR→PE, …`, which does not chain: by the same rule Civil 3D fills `CompactedSoil` crossed there too. `RockPitchingTests` compares its shapes by points only.

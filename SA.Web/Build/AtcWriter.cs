@@ -1,7 +1,9 @@
 // Round 7 M3: Tool Catalog files for Civil 3D Content Browser ("Add Catalog"), written from scratch after reading the stock
 // catalogs (outline in docs/prompts/prompt-7-design.md, section 3; nothing of Autodesk is copied):
 //   <DLL>.atc        root <Catalog>: one category that points to the file below (as the stock Corridor catalogs do)
-//   <DLL>_tools.atc  root <Category>: one <Tool> per class (plain-text names like the SAC / XAML catalogs)
+//   <DLL>_tools.atc  root <Category>: one <Tool> per class (plain-text names like the SAC / XAML catalogs) + one palette
+//   <DLL>_palette.atc root <Palette> (round 8): the same tools as one palette, as the stock catalogs ship palettes, so the
+//                    user drags the whole palette once and later right-clicks it -> Refresh Palette after a new build
 // GUIDs are derived from the DLL / class names, so a rebuild keeps them and re-adding the catalog updates the tools.
 
 using System.Globalization;
@@ -28,6 +30,7 @@ public static class AtcWriter
     const string StockToolRef = "{7F55AAC0-0256-48D7-BFA5-914702663FDE}";
 
     public static string CategoryFile(string dllName) => dllName + "_tools.atc";
+    public static string PaletteFile(string dllName) => dllName + "_palette.atc";
 
     // Name-based GUID (SHA-1, version 5 layout): same text = same GUID on every build and machine
     public static string StableGuid(string text)
@@ -52,8 +55,9 @@ public static class AtcWriter
     static string DataType(string kind) => kind switch { "long" => "Long", "string" => "String", "bool" => "Bool", _ => "Double" };
 
     // <DLL>.atc and <DLL>_tools.atc. assemblyRef = "SR03.dll" (next to the .atc) or a full path.
-    public static (string Catalog, string Category) Write(string dllName, string assemblyRef, IReadOnlyList<AtcTool> tools)
+    public static (string Catalog, string Category, string Palette) Write(string dllName, string assemblyRef, IReadOnlyList<AtcTool> tools)
     {
+        var palId = StableGuid("palette|" + dllName);
         var catId = StableGuid("category|" + dllName);
         string catDesc = $"Subassemblies in {dllName}.dll (SA Drawing Studio)";
         var catIcon = tools.Count > 0 ? tools[0].Icon : null;
@@ -87,15 +91,35 @@ public static class AtcWriter
                 Images(catIcon, 93, 123),
                 new XElement("Description", catDesc),
                 new XElement("AccessRight", "1")),
-            new XElement("CustomData"), new XElement("Source"), new XElement("Palettes"), new XElement("Packages"),
-            new XElement("Tools", tools.Select(t => Tool(dllName, assemblyRef, t))));
+            new XElement("CustomData"), new XElement("Source"),
+            new XElement("Palettes",
+                new XElement("Palette", new XAttribute("Revision", "18.0.0"), new XAttribute("option", "0"),
+                    new XElement("ItemID", new XAttribute("idValue", palId)),
+                    new XElement("Url", new XAttribute("href", ".\\" + PaletteFile(dllName))),
+                    new XElement("Properties",
+                        new XElement("ItemName", dllName),
+                        Images(catIcon, 93, 123),
+                        new XElement("Description", catDesc)),
+                    new XElement("Source"))),
+            new XElement("Packages"),
+            new XElement("Tools", tools.Select(t => Tool(dllName, assemblyRef, t, "tool|"))));
 
-        return (Text(catalog), Text(category));
+        // palette tools: their own stable ids (an id names one item), same content as the catalog tools
+        var palette = new XElement("Palette", new XAttribute("FileRevision", "18.0.0"), new XAttribute("Revision", "18.0.0"), new XAttribute("option", "0"),
+            new XElement("ItemID", new XAttribute("idValue", palId)),
+            new XElement("Properties",
+                new XElement("ItemName", dllName),
+                Images(catIcon, 93, 123),
+                new XElement("Description", catDesc)),
+            new XElement("Source"),
+            new XElement("Tools", tools.Select(t => Tool(dllName, assemblyRef, t, "palette-tool|"))));
+
+        return (Text(catalog), Text(category), Text(palette));
     }
 
-    static XElement Tool(string dllName, string assemblyRef, AtcTool t) =>
+    static XElement Tool(string dllName, string assemblyRef, AtcTool t, string idKind) =>
         new("Tool",
-            new XElement("ItemID", new XAttribute("idValue", StableGuid("tool|" + dllName + "|" + t.FullName))),
+            new XElement("ItemID", new XAttribute("idValue", StableGuid(idKind + dllName + "|" + t.FullName))),
             new XElement("Properties",
                 new XElement("ItemName", t.ClassName),
                 new XElement("Images", new XElement("Image", new XAttribute("cx", 64), new XAttribute("cy", 64), new XAttribute("src", ".\\" + t.Icon))),
@@ -144,8 +168,9 @@ public static class AtcWriter
         return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n" + sb + "\r\n";
     }
 
-    // Well-formed, the catalog points to the category file, every class of the DLL appears exactly once
-    public static List<string> Validate(string catalog, string category, string dllName, IEnumerable<string> fullNames)
+    // Well-formed, the catalog points to the category file, the category to the palette, every class of the DLL appears
+    // exactly once in the category and once in the palette
+    public static List<string> Validate(string catalog, string category, string dllName, IEnumerable<string> fullNames, string? palette = null)
     {
         var errors = new List<string>();
         try
@@ -160,6 +185,17 @@ public static class AtcWriter
                 if (k != 1) errors.Add($"{n} อยู่ใน .atc {k} ครั้ง");
             }
             foreach (var extra in tools.Except(fullNames)) errors.Add($".atc มี {extra} ที่ไม่อยู่ใน DLL");
+            if (palette != null)
+            {
+                var pref = XDocument.Parse(category).Descendants("Palette").Descendants("Url").Select(u => (string?)u.Attribute("href")).FirstOrDefault();
+                if (pref == null || !pref.EndsWith(PaletteFile(dllName))) errors.Add("tools catalog ไม่ชี้ไปที่ " + PaletteFile(dllName));
+                var ptools = XDocument.Parse(palette).Descendants("DotNetClass").Select(d => d.Value).ToList();
+                foreach (var n in fullNames)
+                {
+                    int k = ptools.Count(t => t == n);
+                    if (k != 1) errors.Add($"{n} อยู่ใน palette {k} ครั้ง");
+                }
+            }
         }
         catch (System.Xml.XmlException e) { errors.Add(".atc ไม่ใช่ XML ที่ถูกต้อง: " + e.Message); }
         return errors;

@@ -22,8 +22,8 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 
 - Text files use **CRLF**.
 - The server listens on localhost only. Do not break existing modes or features.
-- Never edit the user's `.cs` files at the root during tests; copy them elsewhere.
-- Tests must never read the user's working files at the root (`*.cs`, `*.assembly.json`). Use locked copies in `SA.Tests/fixtures/` instead.
+- The user's projects live outside the repo, one folder each (`D:\test_cad\SA-Projects\SR03\`, round 8). Never edit them during tests; tests never read them (nor any `*.cs` / `*.assembly.json` left at the repo root). Use locked copies in `SA.Tests/fixtures/` instead.
+- A manual test server (preview) sets `SA_STUDIO_MACHINE_DIR` to a scratch folder (not the real `%LOCALAPPDATA%\SA-Studio` settings / recent projects) and opens copies of projects only.
 - No commit, push or new branch without the user's permission.
 - Every milestone: run all tests, update the relevant `docs/` file, tell the user whether to reopen `run-viewer.bat` or just press Ctrl+F5.
 - New shortcuts go in the `?` table and must not clash. Options inside a command beat general shortcuts.
@@ -52,12 +52,14 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 
 ## Tests
 
-`build-c3d.bat` builds the round 6 subassemblies against real Civil 3D. `test-all.bat` at the root runs the C# suite and every JS suite: one line per suite plus only the failures; full log in `SA.Tests/test-all.log`. Close the viewer first (it locks the build output). Details: `docs/testing.md`. Real Civil 3D test sets: `tests-civil3d/`, see `docs/civil3d-testing.md`.
+`build-c3d.bat` builds the round 6 subassemblies (snapshot in `tests-civil3d/round6/`) against real Civil 3D; projects are built from the web's Build dialog. `test-all.bat` at the root runs the C# suite and every JS suite: one line per suite plus only the failures; full log in `SA.Tests/test-all.log`. Close the viewer first (it locks the build output). Details: `docs/testing.md`. Real Civil 3D test sets: `tests-civil3d/`, see `docs/civil3d-testing.md`.
 
 ## Status
 
-- Last finished: round 7 (Build dialog, report, `.atc`, icons, source package), M0-M5. Docs: `docs/build.md`. History: `docs/history.md`.
-- Round 7 Civil 3D run: `.atc` needs the full DLL path (now the only form), Side list OK, re-adding the catalog duplicates the tools (open: try refresh / remove first). Thai text not checked. Next: round 8 (project folders).
+- Last finished: round 8 (project folders: per-tab projects, v3 project file with drafts, web file dialog, settings, scenarios in the project, Pack, `.atc` palette), M0-M5. Docs: `docs/projects.md`. History: `docs/history.md`.
+- The user's projects are in `D:\test_cad\SA-Projects\` (SR03, rock-pitching-compare); none left at the repo root.
+- Open for the user in Civil 3D: `tests-civil3d/round8-checklist.md` (whole-palette drag + Refresh Palette without duplicates, Thai text from round 7). Next: round 9 (new UI shell, after the Figma pass).
+- Round 7 Civil 3D run: `.atc` needs the full DLL path (now the only form), Side list OK, re-adding the catalog duplicated the tools (round 8 adds a palette + Refresh Palette to test).
 - Round 6 M5 Civil 3D run: shapes filled crossed (link order in `Shapes.Add`). Fixed in shim + generator (`docs/civil3d-testing.md`).
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
 

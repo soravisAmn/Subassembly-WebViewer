@@ -4,7 +4,7 @@ Condensed from the old `CLAUDE.md`. Prompts and design docs of each round are in
 
 ## Not yet tested in real Civil 3D
 
-`tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `round5-demo.cs`, `round5b-demo.cs`, and the root files `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs`, `pavement-assembly.cs` (`tests-civil3d/round6-checklist.md`). Round 7: the Build dialog output (`.atc`, icons, Copy-to, source package) in `tests-civil3d/round7-checklist.md`. (`round4b-demo` was deleted together with Max / Min.)
+`tests-civil3d/round3-demo.cs`, `round4-demo.cs`, `round4c-base.cs`, `round4c-body.cs`, `round5-demo.cs`, `round5b-demo.cs`, and the round 6 files `base_rock-pitching-web.cs`, `body_rock-pitching-web.cs`, `pavement-assembly.cs` (now the SR03 project in `D:\test_cad\SA-Projects\SR03\`; `tests-civil3d/round6-checklist.md`). Round 7: the Build dialog output (`.atc`, icons, Copy-to, source package) in `tests-civil3d/round7-checklist.md`. (`round4b-demo` was deleted together with Max / Min.)
 
 ## Round 4: Logic style ก (`prompt-4.md`, `prompt-4-design.md`)
 
@@ -89,6 +89,17 @@ Decisions: all as proposed; same-named DLL in another folder = an OK / Cancel bo
 - M3: parameter description / options (Logic API `setParamInfo`, Parameter card), `.atc` with stable GUIDs (`AtcWriter`), icons drawn on the server (`IconRenderer`), locked expected `.atc`.
 - M4: `report.md` (also shown in the dialog), Copy-to after build, source package zip with `build.bat` (tested by building the unpacked zip).
 - M5: `tests-civil3d/round7-checklist.md`. User's Civil 3D run: the bare DLL name did not load, so the `.atc` now always uses the full path (source package: `build.bat` writes it); Side shows as a Right / Left list; re-adding the catalog duplicates the tools (open). Thai text and Bool parameters not checked yet.
+
+## Round 8: project folders (`prompt-8.md`, `prompt-8-design.md`)
+
+Answers: 1-7 as proposed; 8 changed to one project per browser tab (handle in every request, MCP lists tabs, second tab read-only); 9: edits while a scenario is active are temporary (`*`, "อัปเดต", ask on switch). Root files: SR03 and rock-pitching-compare moved to `D:\test_cad\SA-Projects\`, `test2.cs` deleted, `build-c3d.bat` builds the snapshot `tests-civil3d/round6/`.
+
+- M0: confirmed the scenario bug (a scenario was a whole-workspace snapshot, applying it reverted the drawing); several codes per object was not a bug.
+- M1: server `SA.Web/Projects/` (paths, v1 / v2 → v3 with drafts, per-tab registry, fs list, open / new / save / relink, settings); every file endpoint, Build and MCP follow the tab's project.
+- M2: page `js/project.js` + `fetch` wrapper in `core.js`: web file dialog, Open / Save / Save as / New / Recent, "ตั้งค่า…" (Copy-to moved there), title `*`, read-only tab, migration questions, "ไฟล์หาย" + relink; workspace per tab (sessionStorage).
+- M3: scenarios in the project file (`js/scenarios.js`): ground / differing values / mode only, Default, pending edits, export / import, old-scenario import dialog; the old snapshot code removed.
+- M4: Pack project (zip, outside files into `ext\`), `.atc` palette (`<DLL>_palette.atc`), user files moved, CLAUDE.md rules.
+- M5: `docs/projects.md`, `tests-civil3d/round8-checklist.md`.
 
 ## Long-term plan notes
 

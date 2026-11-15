@@ -1,0 +1,219 @@
+{
+  "version": 3,
+  "originElevation": 100,
+  "surface": [
+    {
+      "x": -10,
+      "y": -1
+    },
+    {
+      "x": 10,
+      "y": -2
+    }
+  ],
+  "surfaceOn": true,
+  "assemblies": [
+    {
+      "id": "a1",
+      "name": "A",
+      "baseline": {
+        "x": 0,
+        "y": 0
+      },
+      "items": [
+        {
+          "id": "k1",
+          "file": "box.cs",
+          "params": {
+            "W": 4
+          },
+          "attach": {
+            "type": "baseline",
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "id": "k2",
+          "file": "box.cs",
+          "params": {},
+          "attach": {
+            "type": "baseline",
+            "x": 0,
+            "y": 0
+          },
+          "draft": {
+            "spec": {
+              "version": 1,
+              "className": "Box8",
+              "namespace": "TestSubassembly",
+              "params": [
+                {
+                  "name": "Side",
+                  "kind": "long",
+                  "default": 0,
+                  "displayName": "Side",
+                  "min": null,
+                  "max": null
+                },
+                {
+                  "name": "W",
+                  "kind": "double",
+                  "default": 2,
+                  "displayName": "W",
+                  "min": null,
+                  "max": null
+                }
+              ],
+              "targets": [],
+              "points": [
+                {
+                  "id": "P1",
+                  "codes": [],
+                  "def": {
+                    "type": "origin"
+                  }
+                },
+                {
+                  "id": "P2",
+                  "codes": [
+                    "Top",
+                    "Edge"
+                  ],
+                  "def": {
+                    "type": "delta",
+                    "from": "P1",
+                    "dx": "W",
+                    "dy": "-1"
+                  }
+                }
+              ],
+              "links": [
+                {
+                  "id": "L1",
+                  "points": [
+                    "P1",
+                    "P2"
+                  ],
+                  "codes": [
+                    "Top"
+                  ]
+                }
+              ],
+              "shapes": [],
+              "side": {
+                "param": "Side",
+                "mirror": true
+              }
+            }
+          }
+        },
+        {
+          "id": "k3",
+          "name": "ร่าง",
+          "params": {},
+          "attach": {
+            "type": "baseline",
+            "x": 0,
+            "y": 0
+          },
+          "draft": {
+            "fileName": "draft.cs",
+            "spec": {
+              "version": 1,
+              "className": "Box8",
+              "namespace": "TestSubassembly",
+              "params": [
+                {
+                  "name": "Side",
+                  "kind": "long",
+                  "default": 0,
+                  "displayName": "Side",
+                  "min": null,
+                  "max": null
+                },
+                {
+                  "name": "W",
+                  "kind": "double",
+                  "default": 2,
+                  "displayName": "W",
+                  "min": null,
+                  "max": null
+                }
+              ],
+              "targets": [],
+              "points": [
+                {
+                  "id": "P1",
+                  "codes": [],
+                  "def": {
+                    "type": "origin"
+                  }
+                },
+                {
+                  "id": "P2",
+                  "codes": [
+                    "Top",
+                    "Edge"
+                  ],
+                  "def": {
+                    "type": "delta",
+                    "from": "P1",
+                    "dx": "W",
+                    "dy": "-1"
+                  }
+                }
+              ],
+              "links": [
+                {
+                  "id": "L1",
+                  "points": [
+                    "P1",
+                    "P2"
+                  ],
+                  "codes": [
+                    "Top"
+                  ]
+                }
+              ],
+              "shapes": [],
+              "side": {
+                "param": "Side",
+                "mirror": true
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "ตลิ่งสูง",
+      "ground": [
+        [
+          -20,
+          1.5
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          15,
+          -1.8
+        ]
+      ],
+      "params": {
+        "k1": {
+          "W": 5
+        }
+      },
+      "mode": "normal"
+    },
+    {
+      "name": "Layout",
+      "mode": "layout"
+    }
+  ]
+}

@@ -125,14 +125,15 @@ static class McpTests
         app.StopAsync().Wait();
     }
 
-    sealed class Page : IDisposable
+    internal sealed class Page : IDisposable
     {
         public ClientWebSocket Ws = new();
         public CancellationTokenSource Cts = new();
         public void Active() => Ws.SendAsync(Encoding.UTF8.GetBytes("""{"active":1}"""), WebSocketMessageType.Text, true, default).Wait();
+        public void Send(string json) => Ws.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, default).Wait();
         public void Dispose() { Cts.Cancel(); Ws.Dispose(); }
     }
-    static Page FakePage(string url, Func<JsonElement, string> reply)
+    internal static Page FakePage(string url, Func<JsonElement, string> reply)
     {
         var p = new Page();
         p.Ws.ConnectAsync(new Uri(url.Replace("http", "ws") + "/mcp-page"), default).Wait();

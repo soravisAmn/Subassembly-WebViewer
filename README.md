@@ -19,6 +19,7 @@ Double-click `run-viewer.bat`, then open http://localhost:5050. Run all tests wi
 | [docs/parameters.md](docs/parameters.md) | Parameter table, value types, slope fields |
 | [docs/code-generation.md](docs/code-generation.md) | Save (.cs), generated code layout, object → code line, rock-pitching files from the web |
 | [docs/viewer.md](docs/viewer.md) | Import, editing code, hung code, assemblies, surface line, API simulator |
+| [docs/projects.md](docs/projects.md) | Project folders, Open / Save / New / Pack, app settings, tabs, old files, missing files, scenarios (round 8) |
 | [docs/connect-claude.md](docs/connect-claude.md) | Connect Claude (MCP): setup, tools, what the AI cannot do |
 | [docs/build.md](docs/build.md) | Build for Civil 3D: build engine, output folder, endpoints (round 7) |
 | [docs/testing.md](docs/testing.md) | Test commands and what each suite covers |

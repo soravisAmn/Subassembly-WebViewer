@@ -69,7 +69,7 @@ public partial class BuildEngine
         var codes = new List<(string Code, string Where)>();
         foreach (var name in plan.Files)
         {
-            var src = FileUtil.ReadShared(Path.Combine(_folder, name));
+            var src = FileUtil.ReadShared(Full(name));
             var block = CodeGenerator.FindBlock(src);
             DrawingSpec? spec = null;
             if (block?.SpecJson != null)

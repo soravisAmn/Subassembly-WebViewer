@@ -18,7 +18,9 @@ public static class BuildPaths
     public static string Log(string outDir) => Path.Combine(outDir, "build.log");
     public static string Report(string outDir) => Path.Combine(outDir, "report.md");
 
-    // Machine settings (not in any project, never committed): build history now, the Copy-to folder from M2
+    // Machine settings (not in any project, never committed): build history, settings.json, scratch\.
+    // SA_STUDIO_MACHINE_DIR (environment) = another folder, for a test server that must not touch the real settings.
     public static string DefaultMachineDir() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SA-Studio");
+        Environment.GetEnvironmentVariable("SA_STUDIO_MACHINE_DIR") is { Length: > 0 } d ? Path.GetFullPath(d)
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SA-Studio");
 }

@@ -58,13 +58,9 @@ const Mcp = (() => {
     }
     const prop = Proposals.pendingFor(it.id);
     if (prop) for (const c of prop.scenarios) out.push({ name: `proposed: ${c.name}`, ctx: { ...base, values: { ...base.values, ...(c.values || {}) }, layout: !!c.layout, extendEnds: true, surface: c.ground || null } });
-    for (const s of scenarios){
-      const ws_ = s.ws || s.asm; if (!ws_) continue;
-      const si = (ws_.assemblies ? ws_.assemblies.flatMap(a => a.items || []) : (ws_.items || [])).find(x => x.id === it.id);
-      if (!si) continue;
-      const o = !hasCode(it) && si.attach && si.attach.x != null ? { x: si.attach.x, y: si.attach.y } : itemOrigin(it), sf = ws_.surface || [];
-      out.push({ name: `saved: ${s.name}`, ctx: { ...base, values: si.params || {}, layout: !!ws_.layout, extendEnds: ws_.extendEnds !== false,
-                 surface: ws_.surfaceOn !== false && sf.length >= 2 ? sf.map(p => ({ x: p.x - o.x, y: p.y - o.y })) : null } });
+    for (const s of projScenarios()){
+      const c = scenarioCtxOf(s, it, itemOrigin(it));
+      out.push({ name: `saved: ${s.name}`, ctx: { ...base, ...c } });
     }
     return out;
   }
@@ -281,10 +277,12 @@ const Mcp = (() => {
   function connect(){
     ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/mcp-page");
     ws.onmessage = onMessage;
-    ws.onopen = () => { if (document.hasFocus()) ws.send('{"active":1}'); };
+    // round 8: which project this tab holds (MCP calls can name a project), then focus
+    ws.onopen = () => { ws.send(JSON.stringify({ project: Proj.handle })); if (document.hasFocus()) ws.send('{"active":1}'); };
     ws.onclose = () => setTimeout(connect, 2000);          // dotnet watch restarts the server
   }
   window.addEventListener("focus", () => { if (ws && ws.readyState === 1) ws.send('{"active":1}'); });
+  Proj.notify = () => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ project: Proj.handle })); };
   connect();
   return { TOOLS, drawSvg };
 })();

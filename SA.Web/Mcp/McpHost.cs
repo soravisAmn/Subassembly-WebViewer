@@ -12,11 +12,17 @@ using ModelContextProtocol.Server;
 
 namespace SA.Mcp;
 
-// The open web pages. The most recently active one answers tool calls.
+// The open web pages. The most recently active one answers tool calls, unless the call names a project (round 8:
+// each tab holds its own project; the page sends {"project": handle} after opening one, {"active": 1} on focus).
 public sealed class PageHub
 {
     public const string NoPage = "Open http://localhost:5050 first (run-viewer.bat).";
-    sealed class Conn { public WebSocket Ws = null!; public long Active; public readonly SemaphoreSlim Send = new(1, 1); }
+    sealed class Conn { public WebSocket Ws = null!; public long Active; public string? Project; public readonly SemaphoreSlim Send = new(1, 1); }
+
+    // Project handles held by open page sockets (ProjectRegistry: a tab is live while its socket is open)
+    public IReadOnlyCollection<string> Handles => _conns.Values.Select(c => c.Project).OfType<string>().ToList();
+    // Called with the handle of the page that became active (ProjectRegistry.Focused)
+    public Action<string?>? Focused { get; set; }
 
     readonly ConcurrentDictionary<Guid, Conn> _conns = new();
     readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _waiting = new();
@@ -55,14 +61,21 @@ public sealed class PageHub
     {
         JsonElement msg;
         try { msg = JsonDocument.Parse(data).RootElement.Clone(); } catch (JsonException) { return; }
-        if (msg.TryGetProperty("active", out _)) { conn.Active = Interlocked.Increment(ref _clock); return; }
+        if (msg.TryGetProperty("project", out var pj) && !msg.TryGetProperty("id", out _))
+        {
+            conn.Project = pj.ValueKind == JsonValueKind.String ? pj.GetString() : null;
+            conn.Active = Interlocked.Increment(ref _clock);
+            Focused?.Invoke(conn.Project);
+            return;
+        }
+        if (msg.TryGetProperty("active", out _)) { conn.Active = Interlocked.Increment(ref _clock); Focused?.Invoke(conn.Project); return; }
         if (msg.TryGetProperty("id", out var idEl) && idEl.GetString() is { } rid && _waiting.TryRemove(rid, out var tcs)) tcs.TrySetResult(msg);
     }
 
-    // Sends a tool call to the most recently active page. Null = no page open.
-    public async Task<JsonElement?> CallAsync(string tool, object args, CancellationToken ct)
+    // Sends a tool call to the most recently active page, or to the page holding project handle. Null = no such page.
+    public async Task<JsonElement?> CallAsync(string tool, object args, CancellationToken ct, string? handle = null)
     {
-        var target = _conns.Values.OrderByDescending(c => c.Active).FirstOrDefault();
+        var target = _conns.Values.Where(c => handle == null || c.Project == handle).OrderByDescending(c => c.Active).FirstOrDefault();
         if (target == null) return null;
         var id = Guid.NewGuid().ToString("N");
         var tcs = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -80,14 +93,34 @@ public sealed class PageHub
 }
 
 [McpServerToolType]
-public sealed class SaTools(PageHub hub)
+public sealed class SaTools(PageHub hub, IServiceProvider services)
 {
     static CallToolResult Fail(string text) => new() { IsError = true, Content = [new TextContentBlock { Text = text }] };
+    const string ProjectDesc = "Project name, file name or path of an open tab. Default: the most recently focused tab.";
 
-    async Task<CallToolResult> Forward(string tool, object args, CancellationToken ct)
+    SA.Projects.ProjectRegistry? Registry => services.GetService(typeof(SA.Projects.ProjectRegistry)) as SA.Projects.ProjectRegistry;
+
+    // Open tabs, for sa_status and for errors about an unknown project
+    string Tabs()
     {
+        var reg = Registry;
+        var tabs = reg?.All.Where(reg.IsLive).OrderByDescending(c => c.Focus).ToList();
+        if (tabs == null || tabs.Count == 0) return "Open tabs: none with a project.";
+        return "Open tabs (most recently focused first):\n" + string.Join("\n", tabs.Select((c, i) =>
+            $"  {(c.ProjectFile == null ? "(no project)" : c.Name)} - {(c.ProjectFile ?? c.ProjectDir)}{(c.ReadOnly ? " [read-only: open in another tab]" : "")}{(i == 0 ? " [default]" : "")}"));
+    }
+
+    async Task<CallToolResult> Forward(string tool, object args, CancellationToken ct, string? project = null)
+    {
+        string? handle = null;
+        if (!string.IsNullOrWhiteSpace(project))
+        {
+            var ctx = Registry?.Find(project);
+            if (ctx == null) return Fail($"No open tab has project {project}. {Tabs()}");
+            handle = ctx.Handle;
+        }
         JsonElement? reply;
-        try { reply = await hub.CallAsync(tool, args, ct); }
+        try { reply = await hub.CallAsync(tool, args, ct, handle); }
         catch (TimeoutException) { return Fail("The web page did not answer in time. Check that the page is not stuck, then try again."); }
         catch (WebSocketException) { return Fail("Lost the connection to the web page. Try again."); }
         if (reply == null) return Fail(PageHub.NoPage);
@@ -99,28 +132,33 @@ public sealed class SaTools(PageHub hub)
         return new CallToolResult { Content = content };
     }
 
-    [McpServerTool(Name = "sa_status", ReadOnly = true), Description("Whether the web page is open, its assemblies and subassemblies, which one is selected or being edited, pending proposals. Call this first.")]
-    public Task<CallToolResult> Status(CancellationToken ct = default) => Forward("sa_status", new { }, ct);
+    [McpServerTool(Name = "sa_status", ReadOnly = true), Description("Open tabs and their projects; for the default (or named) tab: its assemblies and subassemblies, which one is selected or being edited, pending proposals. Call this first.")]
+    public async Task<CallToolResult> Status([Description(ProjectDesc)] string? project = null, CancellationToken ct = default)
+    {
+        var r = await Forward("sa_status", new { }, ct, project);
+        if (Registry != null) r.Content.Insert(0, new TextContentBlock { Text = Tabs() });
+        return r;
+    }
 
     [McpServerTool(Name = "sa_describe", ReadOnly = true), Description("Parameters, conditions, branches, objects and a text view (with current values) of a subassembly's drawn part.")]
-    public Task<CallToolResult> Describe([Description("Subassembly id, name, file or class. Default: the one being edited or selected.")] string? item = null, [Description("real = ignore a pending proposal.")] string? view = null, CancellationToken ct = default) => Forward("sa_describe", new { item, view }, ct);
+    public Task<CallToolResult> Describe([Description("Subassembly id, name, file or class. Default: the one being edited or selected.")] string? item = null, [Description("real = ignore a pending proposal.")] string? view = null, [Description(ProjectDesc)] string? project = null, CancellationToken ct = default) => Forward("sa_describe", new { item, view }, ct, project);
 
     [McpServerTool(Name = "sa_get_spec", ReadOnly = true), Description("Full spec JSON. Use only when sa_describe is not enough.")]
-    public Task<CallToolResult> GetSpec(string? item = null, string? view = null, CancellationToken ct = default) => Forward("sa_get_spec", new { item, view }, ct);
+    public Task<CallToolResult> GetSpec(string? item = null, string? view = null, [Description(ProjectDesc)] string? project = null, CancellationToken ct = default) => Forward("sa_get_spec", new { item, view }, ct, project);
 
     [McpServerTool(Name = "sa_new"), Description("Propose a new subassembly in the current assembly. It exists only after the user accepts. Ask the user first about anything not stated.")]
-    public Task<CallToolResult> New([Description("C# class name.")] string name, string? summary = null, [Description("Target surface names. Default: TargetSurface.")] string[]? targets = null, CancellationToken ct = default) => Forward("sa_new", new { name, summary, targets }, ct);
+    public Task<CallToolResult> New([Description("C# class name.")] string name, string? summary = null, [Description("Target surface names. Default: TargetSurface.")] string[]? targets = null, [Description(ProjectDesc)] string? project = null, CancellationToken ct = default) => Forward("sa_new", new { name, summary, targets }, ct, project);
 
     [McpServerTool(Name = "sa_apply"), Description("Apply Logic API ops to a proposal, all or nothing. Never changes the real subassembly: the user accepts in the web. See sa_catalog for functions.")]
     public Task<CallToolResult> Apply([Description("[{ fn, args, as? }]; \"${name.result}\" in a string reads an earlier op's result.")] JsonElement ops,
-        [Description("One or two sentences for the user, in Thai.")] string summary, string? item = null, CancellationToken ct = default) => Forward("sa_apply", new { item, ops, summary }, ct);
+        [Description("One or two sentences for the user, in Thai.")] string summary, string? item = null, [Description(ProjectDesc)] string? project = null, CancellationToken ct = default) => Forward("sa_apply", new { item, ops, summary }, ct, project);
 
     [McpServerTool(Name = "sa_scenarios"), Description("List scenarios, or add one to the proposal (ground polyline relative to the subassembly origin + parameter values) to cover every branch.")]
     public Task<CallToolResult> Scenarios([Description("list (default) or add.")] string? action = null, string? name = null,
-        [Description("[{x,y}], at least 2 points, or omit for no ground.")] JsonElement? ground = null, JsonElement? values = null, bool? layout = null, string? item = null, CancellationToken ct = default) => Forward("sa_scenarios", new { item, action, name, ground, values, layout }, ct);
+        [Description("[{x,y}], at least 2 points, or omit for no ground.")] JsonElement? ground = null, JsonElement? values = null, bool? layout = null, string? item = null, [Description(ProjectDesc)] string? project = null, CancellationToken ct = default) => Forward("sa_scenarios", new { item, action, name, ground, values, layout }, ct, project);
 
     [McpServerTool(Name = "sa_proposal"), Description("Status of a proposal, or cancel your own. Only the user can accept.")]
-    public Task<CallToolResult> Proposal([Description("status (default) or cancel.")] string? action = null, string? id = null, string? item = null, CancellationToken ct = default) => Forward("sa_proposal", new { action, id, item }, ct);
+    public Task<CallToolResult> Proposal([Description("status (default) or cancel.")] string? action = null, string? id = null, string? item = null, [Description(ProjectDesc)] string? project = null, CancellationToken ct = default) => Forward("sa_proposal", new { action, id, item }, ct, project);
 
     [McpServerTool(Name = "sa_catalog", ReadOnly = true), Description("Logic API functions, point and link types, op format and the drawing guide. Read this before the first edit.")]
     public async Task<CallToolResult> Catalog(CancellationToken ct = default)
@@ -134,25 +172,36 @@ public sealed class SaTools(PageHub hub)
     public Task<CallToolResult> Render(string? item = null,
         [Description("Scenario name from sa_check, or { ground: [{x,y}], values: {}, layout: false }. Default: the current workspace.")] JsonElement? scenario = null,
         [Description("Labels: points (default), all (points and links), none.")] string? labels = null,
-        int? width = null, int? height = null, string? view = null, CancellationToken ct = default) => Forward("sa_render", new { item, scenario, labels, width, height, view }, ct);
+        int? width = null, int? height = null, string? view = null, [Description(ProjectDesc)] string? project = null, CancellationToken ct = default) => Forward("sa_render", new { item, scenario, labels, width, height, view }, ct, project);
 
     [McpServerTool(Name = "sa_check", ReadOnly = true), Description("Compiles the generated code (no file written) and evaluates every scenario, Right and Left: messages, branch and Loop coverage, and the bottom boundary (lower envelope of real links). Give code (e.g. Datum) to list offset stretches lacking it.")]
     public Task<CallToolResult> Check(string? item = null,
         [Description("Code the bottom boundary must carry, e.g. Datum.")] string? code = null,
-        [Description("summary (default) or full.")] string? detail = null, string? view = null, CancellationToken ct = default) => Forward("sa_check", new { item, code, detail, view }, ct);
+        [Description("summary (default) or full.")] string? detail = null, string? view = null, [Description(ProjectDesc)] string? project = null, CancellationToken ct = default) => Forward("sa_check", new { item, code, detail, view }, ct, project);
 
     [McpServerTool(Name = "sa_code_preview", ReadOnly = true), Description("The generated drawing method in C#. No file is written. detail: full gives the whole file (long).")]
-    public Task<CallToolResult> CodePreview(string? item = null, string? detail = null, string? view = null, CancellationToken ct = default) => Forward("sa_code_preview", new { item, detail, view }, ct);
+    public Task<CallToolResult> CodePreview(string? item = null, string? detail = null, string? view = null, [Description(ProjectDesc)] string? project = null, CancellationToken ct = default) => Forward("sa_code_preview", new { item, detail, view }, ct, project);
 
     // Round 7: runs on the server (the files on disk, as the Build would compile them), not in the page. Never builds.
     [McpServerTool(Name = "sa_build_check", ReadOnly = true), Description("Pre-build checks of a project (*.assembly.json) as the Build dialog runs them, on the saved .cs files: class names, simulator compile and runs (every scenario Right + Left), links / shapes without codes, codes differing only by case, locked or same-named DLL, parameter changes since the last build. Never builds: the user presses Build.")]
     public CallToolResult BuildCheck(IServiceProvider services,
-        [Description("Project file name, e.g. SR03 or SR03.assembly.json. Default: the only project in the folder.")] string? project = null,
+        [Description("Project name, file name or path of an open tab. Default: the most recently focused tab.")] string? project = null,
         [Description("DLL name. Default: the project name.")] string? dllName = null,
         [Description("Civil 3D years to check, e.g. [2027]. Default: every version that can be built.")] int[]? years = null)
     {
         if (services.GetService(typeof(SA.Build.BuildEngine)) is not SA.Build.BuildEngine eng) return Fail("Build is not available in this server.");
-        if (string.IsNullOrWhiteSpace(project))
+        // round 8: the project of an open tab (named, else the most recently focused); without tabs, the old folder
+        var reg = Registry;
+        var tab = reg?.Find(project);
+        if (tab != null)
+        {
+            if (tab.ProjectFile == null) return Fail("The tab has no saved project. Save the project first.");
+            eng = eng.For(tab.ProjectDir, tab.Referenced.Contains);
+            project = Path.GetFileName(tab.ProjectFile);
+        }
+        else if (reg != null && reg.All.Any(reg.IsLive))
+            return Fail($"No open tab has project {project}. {Tabs()}");
+        else if (string.IsNullOrWhiteSpace(project))
         {
             var all = eng.ProjectNames();
             if (all.Count != 1) return Fail(all.Count == 0 ? "No *.assembly.json in the folder. Save the project first." : $"Pass project. Projects: {string.Join(", ", all)}.");

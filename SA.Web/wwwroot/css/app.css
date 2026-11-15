@@ -572,3 +572,32 @@ body.editing #ed{display:flex}
 .bd-report th,.bd-report td{border:1px solid var(--line);padding:2px 6px;text-align:left;vertical-align:top}
 .bd-report code{font:11px "IBM Plex Mono",monospace;background:var(--accent-soft);padding:0 3px;border-radius:2px}
 .bd-report ul,.bd-report ol{margin:4px 0;padding-left:20px}
+/* round 8: project folders — file dialog, recent projects, migration / missing rows, read-only badge */
+.dropdown .dd-h,.fd-side .dd-h{font-size:11px;color:var(--muted);padding:6px 10px 2px}
+#dd-recent{display:flex;flex-direction:column}
+#dd-recent button small{max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.fd-top{display:flex;gap:6px;margin-bottom:6px}
+.fd-pathin{flex:1;min-width:0}
+.fd{display:flex;gap:8px;min-height:300px}
+.fd-side{width:200px;flex:none;display:flex;flex-direction:column;gap:1px;border-right:1px solid var(--line);padding-right:6px;overflow:auto;max-height:46vh}
+.fd-side button{text-align:left;border:0;background:transparent;font-weight:400;display:flex;gap:6px;padding:4px 8px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fd-side button:hover:not(:disabled),.fd-list button.on{background:var(--accent-soft)}
+.fd-side button small{color:var(--muted);font-size:11px;margin-left:auto}
+.fd-list{flex:1;min-width:0;margin:0}
+.fd-list button small{margin-left:auto;color:var(--muted);font-size:11px}
+.fd-note{color:var(--err);min-height:1.2em}
+input.wide{flex:1;min-width:0}
+.mig-row{display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.mig-row > div:first-child{flex:1;min-width:0}
+.mig-row small{color:var(--muted)}
+header .proj .ro{background:var(--warn-soft);color:var(--warn);border-radius:4px;padding:1px 6px;font-size:11px;margin-left:4px}
+@media (max-width:640px){.fd{flex-direction:column}.fd-side{width:auto;border-right:0;border-bottom:1px solid var(--line);max-height:120px}}
+.pk-list > div{display:flex;flex-direction:column;padding:2px 6px;border-radius:4px}
+.pk-list small{color:var(--muted);font-size:11px}
+.pk-out{background:var(--warn-soft)}
+.pk-out small{color:var(--warn)!important}
+.pk-miss{background:var(--err-soft)}
+.pk-miss small{color:var(--err)!important}
+.pk-warn{color:var(--warn)}
+.pk-warn button{margin-left:8px}
+.row.wide-row{grid-template-columns:minmax(0,200px) minmax(0,1fr)}

@@ -47,8 +47,24 @@ function baseState(){
     editorOpen: false
   };
 }
+// Round 8: each browser tab holds its own project. The tab's workspace lives in sessionStorage (survives a reload of
+// that tab only); localStorage "sa3.state" keeps a copy of the last tab that changed something (restores unsaved work
+// after the browser was closed, see Proj.start in project.js).
+const TAB = (() => {
+  let t = null;
+  try{ t = sessionStorage.getItem("sa.tab"); }catch{}
+  if (!t){ t = newId("t") + newId(""); try{ sessionStorage.setItem("sa.tab", t); }catch{} }
+  return t;
+})();
+const tabStore = {
+  get(k){ try{ const v = sessionStorage.getItem(k); return v ? JSON.parse(v) : null; }catch{ return null; } },
+  set(k, v){ try{ sessionStorage.setItem(k, JSON.stringify(v)); }catch{} }
+};
+let tabReloaded = false;   // this tab had a workspace already (reload): keep it, only re-attach its project
 function loadState(){
-  const s = store.get("sa3.state", null);
+  const mine = tabStore.get("sa3.state");
+  tabReloaded = !!mine;
+  const s = mine || store.get("sa3.state", null);
   if (s){
     const st = Object.assign(baseState(), s);
     st.bar = Object.assign(defaultBar(), s.bar);
@@ -77,7 +93,55 @@ function loadState(){
 }
 const state = loadState();
 // บันทึกลงเบราว์เซอร์ + นับก้อน Undo (history.js) — ระหว่างลาก / พิมพ์ในช่อง Properties ยังไม่นับ
-const persist = () => { store.set("sa3.state", state); if (!drag && !typingInProps()) History.track(); };
+const persist = () => { tabStore.set("sa3.state", state); store.set("sa3.state", state); if (!drag && !typingInProps()) History.track(); };
+
+// ---------------- project of this tab (round 8) ----------------
+// The server knows the tab's project by a handle sent in the X-SA-Project header on every /api/ request.
+// Proj.opening = a project is being opened / re-attached: other requests wait for it.
+// A 409 { projectLost } (server restarted) re-attaches the same project by path and retries once.
+const rawFetch = window.fetch.bind(window);
+const Proj = {
+  handle: null, readOnly: false, opening: null, settings: null,
+  notify(){},                                   // mcp.js: tells the page socket which project this tab holds
+  async post(url, body){
+    const r = await rawFetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...(this.handle ? { "X-SA-Project": this.handle } : {}) },
+                                    body: JSON.stringify(body || {}) }).catch(() => null);
+    return r ? r.json().catch(() => ({ ok: false, message: "server ตอบผิดรูปแบบ" })) : { ok: false, message: NO_SERVER };
+  },
+  use(r){ this.handle = r.handle; this.readOnly = !!r.readOnly; WS().readOnly = this.readOnly; this.notify(); },
+  // same project again (server restart / tab reload): the workspace stays as it is
+  attach(){
+    if (!this.opening) this.opening = (async () => {
+      const r = WS().path ? await this.post("/api/project/open", { path: WS().path, tab: TAB }) : null;
+      if (r && r.ok){ this.use(r); return r; }
+      const s = await this.post("/api/project/scratch", { tab: TAB });
+      if (s.ok) this.use(s);
+      return r;
+    })().finally(() => { this.opening = null; });
+    return this.opening;
+  }
+};
+const PROJECT_ROUTES = /^\/api\/(project\/(open|new|scratch)|settings|fs\/)/;
+window.fetch = async (url, opt) => {
+  if (typeof url !== "string" || !url.startsWith("/api/") || PROJECT_ROUTES.test(url)) return rawFetch(url, opt);
+  // wait only while the tab has no handle yet (the opening itself reads specs once it has one)
+  if (Proj.opening && !Proj.handle) await Proj.opening.catch(() => {});
+  const go = () => {
+    const o = Object.assign({}, opt), h = new Headers((opt && opt.headers) || {});
+    if (Proj.handle) h.set("X-SA-Project", Proj.handle);
+    o.headers = h;
+    return rawFetch(url, o);
+  };
+  let r = await go();
+  if (r.status === 409){
+    const j = await r.clone().json().catch(() => ({}));
+    if (j.projectLost){ await Proj.attach(); r = await go(); }
+  }
+  return r;
+};
+window.addEventListener("pagehide", () => {
+  if (Proj.handle) rawFetch("/api/project/close", { method: "POST", headers: { "X-SA-Project": Proj.handle }, keepalive: true }).catch(() => {});
+});
 function typingInProps(){
   const a = document.activeElement;
   return !!a && a.tagName === "INPUT" && a.type !== "checkbox" && !!a.closest("#props");

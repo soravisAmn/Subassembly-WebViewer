@@ -11,7 +11,20 @@
   </Properties>
   <CustomData />
   <Source />
-  <Palettes />
+  <Palettes>
+    <Palette Revision="18.0.0" option="0">
+      <ItemID idValue="{10C519FC-614C-55FD-8795-04632CC2819D}" />
+      <Url href=".\T7_palette.atc" />
+      <Properties>
+        <ItemName>T7</ItemName>
+        <Images option="0">
+          <Image cx="93" cy="123" src=".\icons\T7\PavementAssembly.png" />
+        </Images>
+        <Description>Subassemblies in T7.dll (SA Drawing Studio)</Description>
+      </Properties>
+      <Source />
+    </Palette>
+  </Palettes>
   <Packages />
   <Tools>
     <Tool>

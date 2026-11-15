@@ -111,9 +111,13 @@ if (state.edWidth) document.body.style.setProperty("--edw", state.edWidth + "px"
 applyPaneWidths();          // ความกว้างแถบซ้าย / ขวาที่จำไว้ (panes.js)
 applySplits();              // ความสูง / พับของ Drawer และ Scenarios ที่จำไว้ (panes.js)
 allItems().forEach(normItem);   // spec รุ่นก่อน (construction) -> auxiliary
-renderBar(); renderScenarios(); renderEditorBar(); renderAll();
-History.reset();          // Undo เริ่มจากสภาพตอนเปิดหน้า (ไม่ข้ามการรีเฟรช)
-if (!allItems().length) setStatus("ok", "workspace ว่าง");
+renderBar(); renderScenarios(); renderEditorBar();
+// round 8: requests wait until this tab has its project (Proj.opening); renderAll may already ask the server
+Proj.start().then(() => {
+  History.reset();          // Undo เริ่มจากสภาพตอนเปิดหน้า / โปรเจกต์ที่เปิดตอนเริ่ม (ไม่ข้ามการรีเฟรช)
+  if (!allItems().length) setStatus("ok", "workspace ว่าง");
+});
+renderAll();
 new ResizeObserver(() => render()).observe(main);
 poll(); setInterval(poll, 1000);
 if (state.editorOpen) openEditor();

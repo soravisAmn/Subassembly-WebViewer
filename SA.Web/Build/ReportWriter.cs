@@ -42,7 +42,7 @@ public static class ReportWriter
         {
             L("## Output files");
             L();
-            foreach (var f in new[] { d.DllName + ".dll", d.DllName + ".atc", AtcWriter.CategoryFile(d.DllName), "report.md", "build.log", "build-manifest.json" })
+            foreach (var f in new[] { d.DllName + ".dll", d.DllName + ".atc", AtcWriter.CategoryFile(d.DllName), AtcWriter.PaletteFile(d.DllName), "report.md", "build.log", "build-manifest.json" })
                 L($"- `{f}`");
             foreach (var icon in d.Cat.Icons.Keys.OrderBy(k => k)) L($"- `{icon}`");
             L();
@@ -106,7 +106,7 @@ public static class ReportWriter
         {
             L("## Parameter changes since the last build");
             L();
-            L("parameter เปลี่ยน: ใน Civil 3D ต้องลบเครื่องมือเก่าออกจาก Tool Palette แล้วลากใหม่จาก catalog (เครื่องมือเก่าจำ parameter ชุดเดิม)");
+            L("parameter เปลี่ยน: ใน Civil 3D คลิกขวาที่ palette → Refresh Palette (ถ้าลากทั้ง palette มา) หรือลบเครื่องมือเก่าแล้วลากใหม่จาก catalog (เครื่องมือเก่าจำ parameter ชุดเดิม)");
             L();
             foreach (var c in y.Changes) L($"- {c.Text}");
             L();
@@ -118,8 +118,8 @@ public static class ReportWriter
         L("1. ถ้าเคยโหลด DLL ชื่อนี้จากโฟลเดอร์อื่นใน session นี้ ให้ปิด Civil 3D แล้วเปิดใหม่ก่อน (Civil 3D โหลด DLL ชื่อเดียวกันจาก 2 ที่ไม่ได้)");
         L($"2. โฟลเดอร์ที่มี DLL ต้องเป็น Trusted Location (Options → Files → Trusted Locations){(atcDir != null ? $": `{atcDir}`" : "")}");
         L($"3. พิมพ์ `CONTENTBROWSER` → Add Catalog → เลือก `{(atcDir != null ? Path.Combine(atcDir, d.DllName + ".atc") : d.DllName + ".atc")}`");
-        L($"4. ลากเครื่องมือ (หรือทั้ง category `{d.DllName}`) ไปใส่ Tool Palette แล้วใส่ลง assembly");
-        L("5. ถ้า parameter เปลี่ยน ให้ลบเครื่องมือเก่าออกจาก palette แล้วลากใหม่");
+        L($"4. ครั้งแรก: ลาก**ทั้ง palette** `{d.DllName}` ไปวางในหน้าต่าง Tool Palettes (ได้ palette ชื่อ {d.DllName} ที่มีเครื่องมือครบทุก class) แล้วลากเครื่องมือใส่ assembly");
+        L($"5. build ใหม่แล้ว: คลิกขวาที่ palette `{d.DllName}` → **Refresh Palette** (เครื่องมืออัปเดตตามไฟล์ใหม่) · ถ้าใช้ไม่ได้ ให้ลบเครื่องมือเก่าแล้วลากใหม่");
         return sb.ToString();
     }
 }

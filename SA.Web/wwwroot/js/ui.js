@@ -20,7 +20,7 @@ function setSel(sel){
 function renderAll(){
   aiCheckEdits();
   mapSelected();
-  render(); renderTree(); renderProps(); renderDock(); renderAi(); renderProblem(); applyMarkers(); renderEditBar(); renderDrawer(); renderProjName();
+  render(); renderTree(); renderProps(); renderDock(); renderAi(); renderProblem(); applyMarkers(); renderEditBar(); renderDrawer(); renderProjName(); renderScenarios();
   refreshGenerated();
 }
 const isSel = selHas;
@@ -1737,19 +1737,11 @@ function updateLogicLive(){
   for (const e of box.querySelectorAll("[data-dec]")) lgChip(e, r.logic.decisions[e.dataset.dec]);
   for (const e of box.querySelectorAll("[data-br]")){ const on = !!r.logic.branches[e.dataset.br]; lgChip(e, on, "br"); const row = e.closest(".lg-br"); if (row) row.classList.toggle("off", !on); }
 }
-// กิ่งที่เกิดใน scenario s (ใช้ spec ปัจจุบันของ it กับผิวดิน / parameter / Layout ของ scenario) — null = scenario ไม่มีตัวนี้
+// branches in scenario s (the current spec of it with the scenario's ground / values / mode); round 8 format
 function scenarioEval(s, it){
-  const ws = s.ws || s.asm;
-  if (!ws) return null;
-  const items = ws.assemblies ? ws.assemblies.flatMap(a => a.items || []) : (ws.items || []);
-  const si = items.find(x => x.id === it.id);
-  if (!si) return null;
-  // origin: ตัวที่ไม่มีโค้ดเก็บตำแหน่งไว้ใน attach · ตัวที่มีโค้ดใช้ตำแหน่งตอนนี้ (ใกล้เคียง)
-  const o = !hasCode(it) && si.attach && si.attach.x != null ? { x: si.attach.x, y: si.attach.y } : itemOrigin(it);
-  const c = specCtx(it, o), sf = ws.surface || [];
-  c.values = si.params || {};
-  c.surface = ws.surfaceOn !== false && sf.length >= 2 ? sf.map(p => ({ x: p.x - o.x, y: p.y - o.y })) : null;
-  c.layout = !!ws.layout; c.extendEnds = ws.extendEnds !== false;
+  if (!it || !it.spec) return null;
+  const o = itemOrigin(it), c = specCtx(it, o);
+  Object.assign(c, scenarioCtxOf(s, it, o));
   try{ return Spec.evaluate(it.spec, c); }
   catch{ return null; }
 }
@@ -1767,7 +1759,7 @@ function logicCoverage(it){
   for (const b of brs) by[b.id] = [];
   for (const g of it.spec.arrays || []) if (g.loop) loops[g.id] = { nMax: g.loop.nMax, ns: [] };
   const anyLoop = Object.keys(loops).length;
-  for (const s of scenarios){
+  for (const s of projScenarios()){
     const r = brs.length || anyLoop ? scenarioEval(s, it) : null; if (!r) continue;
     for (const id of Object.keys(r.logic.branches)) if (r.logic.branches[id] && by[id]) by[id].push(s.name);
     for (const id in loops) if (r.logic.loops && r.logic.loops[id] != null) loops[id].ns.push({ name: s.name, n: r.logic.loops[id] });
@@ -1833,10 +1825,10 @@ function renderLogic(){
   // ---- ต้นไม้ decision → กิ่ง ----
   const s2 = div("lg-sec", "<h4>กิ่ง <small>คลิก = เลือก object ในกิ่ง · ตัวเลข = จำนวน object</small></h4>", box);
   if (!decs.length) div("empty", "ยังไม่มีกิ่ง", s2);
-  if (cov.untested.length && scenarios.length)
+  if (cov.untested.length && projScenarios().length)
     div("lg-row lg-miss", `⚠ ยังไม่มี scenario ไหนเข้ากิ่ง: ${cov.untested.map(id => esc(branchPath(sp, id))).join(", ")}`, s2);
-  if (scenarios.length) for (const id of cov.loopMiss) div("lg-row lg-miss", `⚠ ยังไม่มี scenario ที่ Loop ${esc(id)} ${loopMissText(cov, id)} (ขอบของ Loop ที่ควรทดสอบ)`, s2);
-  if (!(cov.untested.length && scenarios.length) && decs.length && !scenarios.length) div("hint", "ยังไม่มี scenario — ตั้งผิวดิน / parameter ให้เข้าแต่ละกิ่ง แล้วกด + บันทึกกรณีนี้ (แผงซ้าย) เพื่อทดสอบให้ครบทุกกิ่ง", s2);
+  if (projScenarios().length) for (const id of cov.loopMiss) div("lg-row lg-miss", `⚠ ยังไม่มี scenario ที่ Loop ${esc(id)} ${loopMissText(cov, id)} (ขอบของ Loop ที่ควรทดสอบ)`, s2);
+  if (!(cov.untested.length && projScenarios().length) && decs.length && !projScenarios().length) div("hint", "ยังไม่มี scenario — ตั้งผิวดิน / parameter ให้เข้าแต่ละกิ่ง แล้วกด + บันทึกกรณีนี้ (แผงซ้าย) เพื่อทดสอบให้ครบทุกกิ่ง", s2);
   const walk = (parent, depth) => {
     for (const d of decs.filter(x => (x.parent || null) === parent)){
       const dr = div("lg-row", `<span style="padding-left:${depth * 16}px">◇ <b>${esc(d.label || d.id)}</b> <small>${esc(d.kind === "switch" ? "switch " : "")}${esc(d.test || "")}</small></span>`, s2);
@@ -1850,8 +1842,8 @@ function renderLogic(){
           + `<span class="lbl">${esc(b.label || b.id)} <small>${esc(b.id)} · case ${esc(String(b.case))} · ${objs.length} object</small></span>`, s2);
         const bc = document.createElement("span"); bc.dataset.br = b.id; lgChip(bc, on, "br"); br.appendChild(bc);
         const t = document.createElement("small");
-        t.textContent = scenarios.length ? (tested.length ? "ทดสอบ: " + tested.join(", ") : "ยังไม่มี scenario") : "";
-        if (scenarios.length && !tested.length) t.className = "lg-miss";
+        t.textContent = projScenarios().length ? (tested.length ? "ทดสอบ: " + tested.join(", ") : "ยังไม่มี scenario") : "";
+        if (projScenarios().length && !tested.length) t.className = "lg-miss";
         br.appendChild(t);
         const bcb = logicCodeBtn(it, b.id); if (bcb) br.appendChild(bcb);
         if (ed_) br.appendChild(btn("ชื่อ", ev => { ev.stopPropagation(); renameBranch(it, b); }, false, "เปลี่ยนชื่อกิ่ง (ป้ายในรูป / ต้นไม้ / คอมเมนต์ในโค้ด)"));
@@ -2054,27 +2046,27 @@ $("ve").onchange = () => { state.view.ve = +$("ve").value; persist(); render(); 
 $("b-fit").onclick = fit;
 
 // ---------------- 3 · เมนูไฟล์ ----------------
-$("m-file").onclick = () => { const d = $("dd-file"); const h = d.hidden; closeMenus(); d.hidden = !h; };
+$("m-file").onclick = () => { const d = $("dd-file"); const h = d.hidden; closeMenus(); d.hidden = !h; if (h){ renderRecent(); refreshSettings(); renderFileMenu(); } };
+// Save project is off in a read-only tab (the project is open in another tab)
+function renderFileMenu(){ const b = $("dd-file").querySelector('[data-cmd="save-proj"]'); if (b) b.disabled = Proj.readOnly; }
 $("dd-file").addEventListener("click", e => {
   const b = e.target.closest("[data-cmd]"); if (!b || b.disabled) return;
   closeMenus();
-  ({ "import": () => openImport(), "new-cs": () => newCs(), "open-proj": openProject, "save-proj": () => WS().name ? saveProject(WS().name) : saveProjectAs(),
+  ({ "import": () => openImport(), "new-cs": () => newCs(), "open-proj": openProject, "save-proj": () => saveProject(),
      "save-proj-as": saveProjectAs, "new-proj": newProject, "sc-export": exportScenarios, "sc-import": () => $("f-import").click(),
-     "build": () => openBuild() })[b.dataset.cmd]();
+     "build": () => openBuild(), "settings": openSettings, "pack": () => openPack() })[b.dataset.cmd]();
 });
-function renderProjName(){
-  $("proj-name").innerHTML = WS().name ? `project: <b>${esc(WS().name)}</b>` : "project: (ยังไม่ได้บันทึก)";
-}
+// renderProjName: project.js
 
 // ---------------- หน้าต่าง ----------------
 // dlg.tool = เครื่องมือที่เปิดหน้าต่างนี้ (คลิกเส้น / จุดด้วย Extend, Clipped, Daylight Cut/Fill) · dlg.dirty = มีช่องที่พิมพ์ / แก้ค้าง
 const DIALOG_TOOLS = new Set(["extend", "clip", "cutfill"]);
-const dlg = { tool: null, dirty: false };
+const dlg = { tool: null, dirty: false, onCancel: null };   // onCancel: a dialog that waits for an answer (project.js)
 function openDialog(title, build){
   $("dlg-title").textContent = title;
   $("modal").firstElementChild.className = "dlg";          // drop size classes of the last dialog (Build: wide)
   const b = $("dlg-body"); b.innerHTML = "";
-  dlg.tool = DIALOG_TOOLS.has(draw.tool) ? draw.tool : null; dlg.dirty = false; $("dlg-note").hidden = true;
+  dlg.tool = DIALOG_TOOLS.has(draw.tool) ? draw.tool : null; dlg.dirty = false; $("dlg-note").hidden = true; dlg.onCancel = null;
   build(b);
   $("modal").hidden = false;
 }
@@ -2083,8 +2075,9 @@ function closeDialog(){ $("modal").hidden = true; $("dlg-note").hidden = true; }
 // ยกเลิก = ผลเดียวกันทุกช่องทาง: × · ปุ่ม ยกเลิก · Esc · คลิกพื้นหลัง → ปิด + จบเครื่องมือที่เปิดหน้าต่างนี้ (ไม่แก้ spec)
 function cancelDialog(){
   if ($("modal").hidden) return;
-  const t = dlg.tool;
-  closeDialog(); dlg.tool = null;
+  const t = dlg.tool, f = dlg.onCancel;
+  closeDialog(); dlg.tool = null; dlg.onCancel = null;
+  if (f) f();
   if (t && draw.tool === t) setTool(null);
 }
 $("dlg-x").onclick = cancelDialog;
@@ -2121,7 +2114,7 @@ function openImport(asmId){
     sel.innerHTML = asms().map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join("");
     sel.value = importTarget; sel.onchange = () => importTarget = sel.value;
     row.appendChild(sel);
-    div("pg-h", `ไฟล์ในโฟลเดอร์ <span class="mono">${esc($("folder").textContent)}</span>`, b);
+    div("pg-h", `ไฟล์ในโฟลเดอร์${WS().path ? "โปรเจกต์" : "ชั่วคราว (ยังไม่มีโปรเจกต์)"} <span class="mono">${esc($("folder").textContent)}</span>`, b);
     const list = div("flist", null, b);
     if (!files.length) div("empty", "ไม่มีไฟล์ .cs ในโฟลเดอร์", list);
     const used = new Set(allItems().map(i => i.file));
@@ -2154,7 +2147,7 @@ async function openFromDisk(){
   }
 }
 async function newCs(){
-  const name = prompt("ชื่อไฟล์ .cs ใหม่ (สร้างในโฟลเดอร์ของ viewer)", "new-subassembly");
+  const name = prompt("ชื่อไฟล์ .cs ใหม่ (สร้างในโฟลเดอร์โปรเจกต์)", "new-subassembly");
   if (!name) return;
   const r = await fetch("/api/new", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) })
     .then(r => r.json()).catch(() => ({ ok: false, message: NO_SERVER }));
@@ -2164,17 +2157,6 @@ async function newCs(){
   if (!ed.open) openEditor();
 }
 
-// ---------------- project (.assembly.json) ----------------
-// assembly เดียว -> เขียนรูปแบบเดิม (version 1) ให้ viewer รุ่นก่อนเปิดได้; หลาย assembly -> version 2
-function projContent(){
-  const items = a => a.items.map(it => ({ id: it.id, file: it.file, sourceName: it.sourceName, source: it.file ? undefined : it.source,
-                                          name: it.name, className: it.className, params: it.params, attach: it.attach,
-                                          fileName: it.fileName, spec: it.spec, savedSpec: it.savedSpec, generatedFile: it.generatedFile }));
-  const common = { originElevation: state.originElevation, surface: state.surface, surfaceOn: state.surfaceOn, layout: state.layout,
-                   extendEnds: state.extendEnds, bar: state.bar };
-  if (asms().length === 1){ const a = asms()[0]; return { version: 1, baseline: a.baseline, name: a.name, ...common, items: items(a) }; }
-  return { version: 2, ...common, assemblies: asms().map(a => ({ id: a.id, name: a.name, baseline: a.baseline, items: items(a) })) };
-}
 function loadProjContent(c, name){
   History.act(name ? `โหลด ${name}` : "โหลด workspace");
   if (c.originElevation != null) state.originElevation = c.originElevation;
@@ -2192,89 +2174,6 @@ function loadProjContent(c, name){
   renderBar(); setSel({ type:"ws" }); run();
   setTimeout(fit, 500);
 }
-function openProject(){
-  openDialog("Open project", b => {
-    div("pg-h", "ไฟล์ .assembly.json ในโฟลเดอร์", b);
-    const list = div("flist", null, b);
-    if (!projFiles.length) div("empty", "ยังไม่มีไฟล์ project ในโฟลเดอร์", list);
-    for (const f of projFiles){
-      const x = btn("", async () => {
-        if (allItems().length && !confirm(`เปิด ${f.name}? workspace ตอนนี้จะถูกแทนที่ (ส่วนที่ยังไม่ได้บันทึกจะหายไป)`)) return;
-        closeDialog();
-        const r = await fetch("/api/assembly-file?name=" + encodeURIComponent(f.name)).catch(() => null);
-        if (!r || !r.ok){ alert("เปิดไฟล์ไม่สำเร็จ"); return; }
-        loadProjContent(await r.json(), f.name);
-      });
-      x.innerHTML = `${esc(f.name)}<small>${f.name === WS().name ? "เปิดอยู่" : ""}</small>`;
-      list.appendChild(x);
-    }
-    div("hint", "ไฟล์จากโหมด Assembly เดิมเปิดได้ (1 ไฟล์ = 1 assembly) · project ที่มีหลาย assembly บันทึกเป็นรูปแบบใหม่ในไฟล์เดียวกัน", b);
-  });
-}
-async function saveProject(name){
-  const r = await fetch("/api/assembly-file", { method:"POST", headers:{ "Content-Type":"application/json" },
-                         body: JSON.stringify({ name, content: projContent() }) }).catch(() => null);
-  const j = r ? await r.json().catch(() => ({})) : { message: NO_SERVER };
-  if (!r || !r.ok){ alert(j.message || "บันทึกไม่สำเร็จ"); return; }
-  WS().name = j.name; persist(); await poll(); renderAll();
-  setStatus("ok", "บันทึก " + j.name + " แล้ว");
-}
-function saveProjectAs(){
-  const n = prompt("ชื่อไฟล์ project (บันทึกเป็น ชื่อ.assembly.json ในโฟลเดอร์)", (WS().name || "project").replace(/\.assembly\.json$/i, ""));
-  if (!n) return;
-  if (projFiles.some(f => f.name.toLowerCase() === (n.replace(/\.assembly\.json$/i, "") + ".assembly.json").toLowerCase()) && n + ".assembly.json" !== WS().name
-      && !confirm(`มีไฟล์ ${n}.assembly.json อยู่แล้ว เขียนทับ?`)) return;
-  saveProject(n);
-}
-function newProject(){
-  if (allItems().length && !confirm("เริ่ม project ใหม่? (ส่วนที่ยังไม่ได้บันทึกจะหายไป)")) return;
-  loadProjContent({ baseline: asms()[0] ? asms()[0].baseline : { x:0, y:0 } }, null);
-}
+// Open / Save / Save as / New project: project.js (round 8)
 
-// ---------------- scenarios ----------------
-// กรณีที่บันทึกจากเว็บรุ่นก่อน (ไฟล์เดียว / assembly) โหลดได้ โดยแปลงเป็น workspace
-let scenarios = store.get("sav2.scenarios", []);
-const saveScenarios = () => store.set("sav2.scenarios", scenarios);
-// copy ทั้งก้อน: projContent อ้าง params / attach ของ item ตัวจริง — ไม่ copy = แก้ค่าทีหลังแล้ว scenario ที่บันทึกไว้เปลี่ยนตาม (จนกว่าจะโหลดหน้าใหม่)
-const snapshot = name => ({ name, ws: JSON.parse(JSON.stringify(projContent())), file: `${allItems().length} subassembly` });
-function loadScenario(s){
-  if (s.ws) return loadProjContent(JSON.parse(JSON.stringify(s.ws)), WS().name);
-  if (s.asm) return loadProjContent(JSON.parse(JSON.stringify(s.asm)), WS().name);
-  // ไฟล์เดียวแบบเดิม: origin อยู่ที่ (0, 0) = แกน assembly
-  loadProjContent({ baseline: { x:0, y:0 }, surface: s.surface, surfaceOn: s.surfaceOn, layout: s.layout, originElevation: s.originElevation,
-                    items: s.file ? [{ id: newId(), file: s.file, params: { ...(s.values || {}) }, attach: { type:"baseline", x:0, y:0 } }] : [] }, WS().name);
-}
-function renderScenarios(){
-  const box = $("sc-list"); box.innerHTML = "";
-  if (!scenarios.length){ box.innerHTML = '<div class="empty">ยังไม่มีกรณีที่บันทึกไว้</div>'; return; }
-  scenarios.forEach((s, i) => {
-    const row = document.createElement("div");
-    const name = document.createElement("span");
-    const li = logicItem(), on = li && ((li.spec.logic || {}).branches || []).length ? scenarioBranches(s, li) : null;
-    const lp = li ? scenarioLoops(s, li) : null;
-    const brTxt = (on ? " · กิ่ง: " + ([...on].map(id => Spec.branchLabel(li.spec, id)).join(", ") || "—") : "") + (lp ? " · " + Object.entries(lp).map(([id, n]) => `${id} ×${n}`).join(", ") : "");
-    name.innerHTML = `${esc(s.name)}<small>${esc((s.file || "") + brTxt)}</small>`; name.title = "โหลดกรณีนี้ (แทนที่ workspace)" + (on ? `\nกิ่งของ ${itemLabel(li)} ที่เกิดในกรณีนี้ (spec ตอนนี้)` : "");
-    name.onclick = () => loadScenario(s);
-    const del = document.createElement("button"); del.textContent = "×"; del.title = "ลบ";
-    del.onclick = () => { scenarios.splice(i, 1); saveScenarios(); renderScenarios(); renderLogic(); };
-    row.append(name, del); box.appendChild(row);
-  });
-}
-$("b-save").onclick = () => {
-  const name = prompt("ตั้งชื่อกรณีนี้", "กรณี " + (scenarios.length + 1));
-  if (!name) return;
-  scenarios.push(snapshot(name)); saveScenarios(); renderScenarios(); renderLogic();
-};
-function exportScenarios(){
-  const blob = new Blob([JSON.stringify(scenarios, null, 2)], { type:"application/json" });
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "scenarios.json"; a.click();
-  URL.revokeObjectURL(a.href);
-}
-$("f-import").onchange = e => {
-  const f = e.target.files[0]; if (!f) return;
-  f.text().then(t => {
-    try{ const arr = JSON.parse(t); if (Array.isArray(arr)){ scenarios = scenarios.concat(arr); saveScenarios(); renderScenarios(); } }
-    catch{ alert("ไฟล์ไม่ใช่ JSON ของ scenarios"); }
-  });
-  e.target.value = "";
-};
+// Scenarios: scenarios.js (round 8, in the project file)

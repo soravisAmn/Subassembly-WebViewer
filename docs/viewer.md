@@ -5,7 +5,7 @@ Thai labels in quotes are the text shown in the web.
 ## Opening a .cs file (Import)
 
 **"ไฟล์ ▾" → Import .cs** (or right-click an assembly), then choose:
-- **"ไฟล์ในโฟลเดอร์นี้"**: put the file in this folder; the web reads only top-level `.cs` files (no subfolders). To use another folder, edit `"SubassemblyFolder"` in `SA.Web\appsettings.json`.
+- **"ไฟล์ในโฟลเดอร์นี้"**: `.cs` files at the top of the open project's folder (no project = a scratch folder of this machine, `%LOCALAPPDATA%\SA-Studio\scratch`). See [projects.md](projects.md).
 - **"เปิดจากเครื่อง…"**: a file from anywhere; in Chrome or Edge the web also follows saves of that file. (After a page refresh, that item uses the remembered code; Import again to keep following the file.)
 - **"+ สร้างไฟล์ใหม่จาก template"**: creates a new `.cs` in the folder (crest of width Width + fill/cut slopes reaching Target Surface) and opens the code panel.
 
@@ -53,12 +53,16 @@ A workspace can hold several assemblies (right-click the Workspace → **"+ Asse
 - Each item has its own parameters (one file can be used by several items, e.g. left / right) · **Rename** changes only the displayed name, not the file name.
 - **Mirror** creates a copy on the opposite side (flips parameter `Side`) with everything attached to it.
 - **Remove from assembly** (the `.cs` file is not deleted): items attached to it float where they are.
-- **"ไฟล์ ▾" → Save project / Save project as…** stores `name.assembly.json` in this folder (parameters, attachments, axis, surface line, bottom-bar values). **Open project…** opens it (replaces the workspace) · files from the old Assembly mode open. A workspace with one assembly saves in the old format (older web versions can open it) · several assemblies use the new format (`version: 2`).
+- **"ไฟล์ ▾" → Save project / Save project as… / Open project… / New project…**: see [projects.md](projects.md).
 - Points in the result bar and Properties are **relative to the origin of the selected item** (the values the code gives `Points.Add`). Tooltips on the drawing and the bottom bar show offset from the assembly axis and real elevation.
 
 In the simulator each item gets `CurrentOffset/CurrentElevation` = the real position of its attachment point, and `CurrentSubassemblyOffset/Elevation` = the attachment point relative to the assembly axis (per the API Reference).
 
 Not supported yet: marked points (`ParamsPoint`), passing an output parameter of one item as input to another, offset/elevation targets.
+
+## Projects and scenarios
+
+Project folders, Open / Save / New / Pack, app settings, missing files, scenarios: [projects.md](projects.md) (round 8).
 
 ## Surface line
 

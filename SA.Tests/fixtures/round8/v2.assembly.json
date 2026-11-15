@@ -1,0 +1,280 @@
+{
+  "version": 2,
+  "originElevation": 100,
+  "surface": [
+    {
+      "x": -10,
+      "y": -1
+    },
+    {
+      "x": 10,
+      "y": -2
+    }
+  ],
+  "surfaceOn": true,
+  "assemblies": [
+    {
+      "id": "a1",
+      "name": "A",
+      "baseline": {
+        "x": 0,
+        "y": 0
+      },
+      "items": [
+        {
+          "id": "j1",
+          "file": "box.cs",
+          "params": {},
+          "attach": {
+            "type": "baseline",
+            "x": 0,
+            "y": 0
+          },
+          "spec": {
+            "version": 1,
+            "className": "Box8",
+            "namespace": "TestSubassembly",
+            "params": [
+              {
+                "name": "Side",
+                "kind": "long",
+                "default": 0,
+                "displayName": "Side",
+                "min": null,
+                "max": null
+              },
+              {
+                "name": "W",
+                "kind": "double",
+                "default": 2,
+                "displayName": "W",
+                "min": null,
+                "max": null
+              }
+            ],
+            "targets": [],
+            "points": [
+              {
+                "id": "P1",
+                "codes": [],
+                "def": {
+                  "type": "origin"
+                }
+              },
+              {
+                "id": "P2",
+                "codes": [
+                  "Top",
+                  "Edge"
+                ],
+                "def": {
+                  "type": "delta",
+                  "from": "P1",
+                  "dx": "W",
+                  "dy": "-1"
+                }
+              }
+            ],
+            "links": [
+              {
+                "id": "L1",
+                "points": [
+                  "P1",
+                  "P2"
+                ],
+                "codes": [
+                  "Top"
+                ]
+              }
+            ],
+            "shapes": [],
+            "side": {
+              "param": "Side",
+              "mirror": true
+            }
+          },
+          "savedSpec": "{\"version\":1,\"className\":\"Box8\",\"namespace\":\"TestSubassembly\",\"params\":[{\"name\":\"Side\",\"kind\":\"long\",\"default\":0,\"displayName\":\"Side\",\"min\":null,\"max\":null},{\"name\":\"W\",\"kind\":\"double\",\"default\":2,\"displayName\":\"W\",\"min\":null,\"max\":null}],\"targets\":[],\"points\":[{\"id\":\"P1\",\"codes\":[],\"def\":{\"type\":\"origin\"}},{\"id\":\"P2\",\"codes\":[\"Top\",\"Edge\"],\"def\":{\"type\":\"delta\",\"from\":\"P1\",\"dx\":\"W\",\"dy\":\"0\"}}],\"links\":[{\"id\":\"L1\",\"points\":[\"P1\",\"P2\"],\"codes\":[\"Top\"]}],\"shapes\":[],\"side\":{\"param\":\"Side\",\"mirror\":true}}"
+        },
+        {
+          "id": "j2",
+          "file": "box2.cs",
+          "params": {},
+          "attach": {
+            "type": "baseline",
+            "x": 0,
+            "y": 0
+          },
+          "spec": {
+            "version": 1,
+            "className": "Box8",
+            "namespace": "TestSubassembly",
+            "params": [
+              {
+                "name": "Side",
+                "kind": "long",
+                "default": 0,
+                "displayName": "Side",
+                "min": null,
+                "max": null
+              },
+              {
+                "name": "W",
+                "kind": "double",
+                "default": 2,
+                "displayName": "W",
+                "min": null,
+                "max": null
+              }
+            ],
+            "targets": [],
+            "points": [
+              {
+                "id": "P1",
+                "codes": [],
+                "def": {
+                  "type": "origin"
+                }
+              },
+              {
+                "id": "P2",
+                "codes": [
+                  "Top",
+                  "Edge"
+                ],
+                "def": {
+                  "type": "delta",
+                  "from": "P1",
+                  "dx": "W",
+                  "dy": "-1"
+                }
+              }
+            ],
+            "links": [
+              {
+                "id": "L1",
+                "points": [
+                  "P1",
+                  "P2"
+                ],
+                "codes": [
+                  "Top"
+                ]
+              }
+            ],
+            "shapes": [],
+            "side": {
+              "param": "Side",
+              "mirror": true
+            }
+          },
+          "savedSpec": "{\"version\":1,\"className\":\"Box8\",\"namespace\":\"TestSubassembly\",\"params\":[{\"name\":\"Side\",\"kind\":\"long\",\"default\":0,\"displayName\":\"Side\",\"min\":null,\"max\":null},{\"name\":\"W\",\"kind\":\"double\",\"default\":2,\"displayName\":\"W\",\"min\":null,\"max\":null}],\"targets\":[],\"points\":[{\"id\":\"P1\",\"codes\":[],\"def\":{\"type\":\"origin\"}},{\"id\":\"P2\",\"codes\":[\"Top\",\"Edge\"],\"def\":{\"type\":\"delta\",\"from\":\"P1\",\"dx\":\"W\",\"dy\":\"-1\"}}],\"links\":[{\"id\":\"L1\",\"points\":[\"P1\",\"P2\"],\"codes\":[\"Top\"]}],\"shapes\":[],\"side\":{\"param\":\"Side\",\"mirror\":true}}"
+        },
+        {
+          "id": "j3",
+          "file": "gone.cs",
+          "name": "หาย",
+          "params": {},
+          "attach": {
+            "type": "baseline",
+            "x": 0,
+            "y": 0
+          },
+          "spec": {
+            "version": 1,
+            "className": "Box8",
+            "namespace": "TestSubassembly",
+            "params": [
+              {
+                "name": "Side",
+                "kind": "long",
+                "default": 0,
+                "displayName": "Side",
+                "min": null,
+                "max": null
+              },
+              {
+                "name": "W",
+                "kind": "double",
+                "default": 2,
+                "displayName": "W",
+                "min": null,
+                "max": null
+              }
+            ],
+            "targets": [],
+            "points": [
+              {
+                "id": "P1",
+                "codes": [],
+                "def": {
+                  "type": "origin"
+                }
+              },
+              {
+                "id": "P2",
+                "codes": [
+                  "Top",
+                  "Edge"
+                ],
+                "def": {
+                  "type": "delta",
+                  "from": "P1",
+                  "dx": "W",
+                  "dy": "0"
+                }
+              }
+            ],
+            "links": [
+              {
+                "id": "L1",
+                "points": [
+                  "P1",
+                  "P2"
+                ],
+                "codes": [
+                  "Top"
+                ]
+              }
+            ],
+            "shapes": [],
+            "side": {
+              "param": "Side",
+              "mirror": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "a2",
+      "name": "B",
+      "baseline": {
+        "x": 30,
+        "y": 0
+      },
+      "items": [
+        {
+          "id": "j4",
+          "sourceName": "x.cs",
+          "source": "// inline code",
+          "params": {},
+          "attach": {
+            "type": "baseline",
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "id": "j5",
+          "file": "lib\\hand.cs",
+          "params": {},
+          "attach": {
+            "type": "baseline",
+            "x": 0,
+            "y": 0
+          }
+        }
+      ]
+    }
+  ]
+}

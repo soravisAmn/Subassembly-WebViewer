@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Palette FileRevision="18.0.0" Revision="18.0.0" option="0">
+  <ItemID idValue="{10C519FC-614C-55FD-8795-04632CC2819D}" />
+  <Properties>
+    <ItemName>T7</ItemName>
+    <Images option="0">
+      <Image cx="93" cy="123" src=".\icons\T7\PavementAssembly.png" />
+    </Images>
+    <Description>Subassemblies in T7.dll (SA Drawing Studio)</Description>
+  </Properties>
+  <Source />
+  <Tools>
+    <Tool>
+      <ItemID idValue="{C0D234B4-CCBB-52C7-A001-021A7310D882}" />
+      <Properties>
+        <ItemName>PavementAssembly</ItemName>
+        <Images>
+          <Image cx="64" cy="64" src=".\icons\T7\PavementAssembly.png" />
+        </Images>
+        <Description>TestSubassembly.PavementAssembly (T7.dll)</Description>
+        <Keywords>_pavementassembly subassembly</Keywords>
+      </Properties>
+      <Source />
+      <StockToolRef idValue="{7F55AAC0-0256-48D7-BFA5-914702663FDE}" />
+      <Data>
+        <AeccDbSubassembly>
+          <GeometryGenerateMode>UseDotNet</GeometryGenerateMode>
+          <DotNetClass Assembly="T7.dll">TestSubassembly.PavementAssembly</DotNetClass>
+          <Params>
+            <Side DataType="Long" DisplayName="Side" Description="Side">0<Enum><Right DisplayName="Right">0</Right><Left DisplayName="Left">1</Left></Enum></Side>
+            <MinDrop DataType="Double" TypeInfo="0" DisplayName="MinDrop" Description="MinDrop">2</MinDrop>
+          </Params>
+        </AeccDbSubassembly>
+        <Units>m</Units>
+      </Data>
+    </Tool>
+    <Tool>
+      <ItemID idValue="{7B25A008-3BA8-5B3B-8CA2-C2FC8EDAD499}" />
+      <Properties>
+        <ItemName>RockPitchingBaseWeb</ItemName>
+        <Images>
+          <Image cx="64" cy="64" src=".\icons\T7\RockPitchingBaseWeb.png" />
+        </Images>
+        <Description>TestSubassembly.RockPitchingBaseWeb (T7.dll)</Description>
+        <Keywords>_rockpitchingbaseweb subassembly</Keywords>
+      </Properties>
+      <Source />
+      <StockToolRef idValue="{7F55AAC0-0256-48D7-BFA5-914702663FDE}" />
+      <Data>
+        <AeccDbSubassembly>
+          <GeometryGenerateMode>UseDotNet</GeometryGenerateMode>
+          <DotNetClass Assembly="T7.dll">TestSubassembly.RockPitchingBaseWeb</DotNetClass>
+          <Params>
+            <Side DataType="Long" DisplayName="Side" Description="Side">0<Enum><Right DisplayName="Right">0</Right><Left DisplayName="Left">1</Left></Enum></Side>
+            <TopWidth DataType="Double" TypeInfo="16" DisplayName="Top Width" Description="Top Width">2</TopWidth>
+            <SideSlope DataType="Double" TypeInfo="10" DisplayName="Side Slope (1:x)" Description="Side Slope (1:x)">1.5</SideSlope>
+            <Depth DataType="Double" TypeInfo="16" DisplayName="Depth" Description="Depth">2</Depth>
+          </Params>
+        </AeccDbSubassembly>
+        <Units>m</Units>
+      </Data>
+    </Tool>
+    <Tool>
+      <ItemID idValue="{482FE3B7-73AB-57F5-A8EA-CA9833432531}" />
+      <Properties>
+        <ItemName>RockPitchingBodyWeb</ItemName>
+        <Images>
+          <Image cx="64" cy="64" src=".\icons\T7\RockPitchingBodyWeb.png" />
+        </Images>
+        <Description>TestSubassembly.RockPitchingBodyWeb (T7.dll)</Description>
+        <Keywords>_rockpitchingbodyweb subassembly</Keywords>
+      </Properties>
+      <Source />
+      <StockToolRef idValue="{7F55AAC0-0256-48D7-BFA5-914702663FDE}" />
+      <Data>
+        <AeccDbSubassembly>
+          <GeometryGenerateMode>UseDotNet</GeometryGenerateMode>
+          <DotNetClass Assembly="T7.dll">TestSubassembly.RockPitchingBodyWeb</DotNetClass>
+          <Params>
+            <Side DataType="Long" DisplayName="Side" Description="Side">0<Enum><Right DisplayName="Right">0</Right><Left DisplayName="Left">1</Left></Enum></Side>
+            <Height DataType="Double" TypeInfo="16" DisplayName="Height" Description="Height">5</Height>
+            <FaceSlope DataType="Double" TypeInfo="10" DisplayName="Face Slope (1:x)" Description="Face Slope (1:x)">2.5</FaceSlope>
+            <RockThickness DataType="Double" TypeInfo="16" DisplayName="Rock Thickness" Description="Rock Thickness">0.5</RockThickness>
+            <MinSoilThickness DataType="Double" TypeInfo="16" DisplayName="Min Soil Thickness" Description="Min Soil Thickness">1</MinSoilThickness>
+            <EndSlope DataType="Double" TypeInfo="10" DisplayName="End Slope (1:x)" Description="End Slope (1:x)">1.5</EndSlope>
+            <CutSlope DataType="Double" TypeInfo="10" DisplayName="Cut Slope (1:x)" Description="Cut Slope (1:x)">1.5</CutSlope>
+            <FillSlope DataType="Double" TypeInfo="10" DisplayName="Fill Slope (1:x)" Description="Fill Slope (1:x)">2</FillSlope>
+            <CutSlope2 DataType="Double" TypeInfo="10" DisplayName="Cut Slope (1:x)" Description="Cut Slope (1:x)">1.5</CutSlope2>
+            <FillSlope2 DataType="Double" TypeInfo="10" DisplayName="Fill Slope (1:x)" Description="Fill Slope (1:x)">2</FillSlope2>
+          </Params>
+        </AeccDbSubassembly>
+        <Units>m</Units>
+      </Data>
+    </Tool>
+  </Tools>
+</Palette>

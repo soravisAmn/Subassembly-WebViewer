@@ -6,7 +6,7 @@ Thai labels in quotes are the text shown in the web.
 
 | Part | Where | Contents |
 |---|---|---|
-| Menu bar | Top | **"ไฟล์ ▾"** (Import .cs, new .cs, Open / Save project, Export scenarios), **"✎ แก้โค้ด"** |
+| Menu bar | Top | **"ไฟล์ ▾"** (Import .cs, new .cs, Open / Save / Save as / New project, recent projects, Export / Import scenarios, ตั้งค่า…), **"✎ แก้โค้ด"** |
 | Workspace tree | Left | Workspace → Surface / Assembly → Subassembly → Points / Links / Shapes / Parameters · Scenarios |
 | Workspace | Centre | Cross-section (dark CAD-style background) + result bar below (Messages / Log / Points of the selected item) |
 | Drawer + Properties | Right | Drawing tools (usable in Edit mode) · values of the selection (parameters, values of drawn points are edited here) |
@@ -94,7 +94,7 @@ No shortcut works while typing in a field / the code panel / a dialog.
 ## Undo / Redo and Delete
 
 - **`Ctrl+Z`** = Undo · **`Ctrl+Y`** or **`Ctrl+Shift+Z`** = Redo, everywhere (in and out of Edit mode), up to 200 steps.
-- Covers every action that changes the work: drawing, deleting, editing values in Properties (point values, codes, parameters, parameter table, Datum, Corridor/Layout), dragging / adding / deleting surface points, shifting the whole surface line, moving / attaching / mirroring / adding / removing subassemblies, moving the assembly axis, adding / deleting assemblies, loading a scenario / project.
+- Covers every action that changes the work: drawing, deleting, editing values in Properties (point values, codes, parameters, parameter table, Datum, Corridor/Layout), dragging / adding / deleting surface points, shifting the whole surface line, moving / attaching / mirroring / adding / removing subassemblies, moving the assembly axis, adding / deleting assemblies, opening a project. Switching scenarios is not an undo step (round 8).
 - **1 action = 1 step**: a continuous drag = one step (counted on mouse release) · typing in a Properties field = one step per field (counted on leaving the field) · deleting several = one step.
 - The notice bar on top shows what was undone, e.g. `Undo: ย้ายแกน Assembly 1`, `Undo: แก้ dx · pavement-assembly.cs · P6`, `Undo: ลบ 3 objects`.
 - **Not undone**: saving a .cs file / project (a file written to disk is not changed back; undo and Save again if needed), view (zoom / pan), selection, bottom-bar buttons, entering / leaving Edit · Undo history is lost on page refresh.

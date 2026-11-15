@@ -1,0 +1,183 @@
+{
+  "baseline": {
+    "x": 0,
+    "y": 0
+  },
+  "name": "V1",
+  "originElevation": 100,
+  "surface": [
+    {
+      "x": -10,
+      "y": -1
+    },
+    {
+      "x": 10,
+      "y": -2
+    }
+  ],
+  "surfaceOn": true,
+  "layout": false,
+  "items": [
+    {
+      "id": "i1",
+      "file": "box.cs",
+      "name": "box",
+      "params": {
+        "W": 3
+      },
+      "attach": {
+        "type": "baseline",
+        "x": 0,
+        "y": 0
+      },
+      "spec": {
+        "version": 1,
+        "className": "Box8",
+        "namespace": "TestSubassembly",
+        "params": [
+          {
+            "name": "Side",
+            "kind": "long",
+            "default": 0,
+            "displayName": "Side",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "W",
+            "kind": "double",
+            "default": 2,
+            "displayName": "W",
+            "min": null,
+            "max": null
+          }
+        ],
+        "targets": [],
+        "points": [
+          {
+            "id": "P1",
+            "codes": [],
+            "def": {
+              "type": "origin"
+            }
+          },
+          {
+            "id": "P2",
+            "codes": [
+              "Top",
+              "Edge"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "W",
+              "dy": "0"
+            }
+          }
+        ],
+        "links": [
+          {
+            "id": "L1",
+            "points": [
+              "P1",
+              "P2"
+            ],
+            "codes": [
+              "Top"
+            ]
+          }
+        ],
+        "shapes": [],
+        "side": {
+          "param": "Side",
+          "mirror": true
+        }
+      },
+      "savedSpec": "{\"version\":1,\"className\":\"Box8\",\"namespace\":\"TestSubassembly\",\"params\":[{\"name\":\"Side\",\"kind\":\"long\",\"default\":0,\"displayName\":\"Side\",\"min\":null,\"max\":null},{\"name\":\"W\",\"kind\":\"double\",\"default\":2,\"displayName\":\"W\",\"min\":null,\"max\":null}],\"targets\":[],\"points\":[{\"id\":\"P1\",\"codes\":[],\"def\":{\"type\":\"origin\"}},{\"id\":\"P2\",\"codes\":[\"Top\",\"Edge\"],\"def\":{\"type\":\"delta\",\"from\":\"P1\",\"dx\":\"W\",\"dy\":\"0\"}}],\"links\":[{\"id\":\"L1\",\"points\":[\"P1\",\"P2\"],\"codes\":[\"Top\"]}],\"shapes\":[],\"side\":{\"param\":\"Side\",\"mirror\":true}}",
+      "generatedFile": true
+    },
+    {
+      "id": "i2",
+      "file": "hand.cs",
+      "params": {},
+      "attach": {
+        "type": "point",
+        "item": "i1",
+        "code": "Edge"
+      }
+    },
+    {
+      "name": "ร่าง",
+      "fileName": "draft.cs",
+      "params": {},
+      "attach": {
+        "type": "baseline",
+        "x": 0,
+        "y": 0
+      },
+      "spec": {
+        "version": 1,
+        "className": "Box8",
+        "namespace": "TestSubassembly",
+        "params": [
+          {
+            "name": "Side",
+            "kind": "long",
+            "default": 0,
+            "displayName": "Side",
+            "min": null,
+            "max": null
+          },
+          {
+            "name": "W",
+            "kind": "double",
+            "default": 2,
+            "displayName": "W",
+            "min": null,
+            "max": null
+          }
+        ],
+        "targets": [],
+        "points": [
+          {
+            "id": "P1",
+            "codes": [],
+            "def": {
+              "type": "origin"
+            }
+          },
+          {
+            "id": "P2",
+            "codes": [
+              "Top",
+              "Edge"
+            ],
+            "def": {
+              "type": "delta",
+              "from": "P1",
+              "dx": "W",
+              "dy": "-1"
+            }
+          }
+        ],
+        "links": [
+          {
+            "id": "L1",
+            "points": [
+              "P1",
+              "P2"
+            ],
+            "codes": [
+              "Top"
+            ]
+          }
+        ],
+        "shapes": [],
+        "side": {
+          "param": "Side",
+          "mirror": true
+        }
+      }
+    }
+  ]
+}

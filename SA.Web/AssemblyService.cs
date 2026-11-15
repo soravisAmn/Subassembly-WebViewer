@@ -1,4 +1,4 @@
-// ประกอบ subassembly หลายตัวเป็น assembly
+﻿// ประกอบ subassembly หลายตัวเป็น assembly
 //
 // พิกัดบนจอ (web): X = ระยะแนวราบ, Y = ระดับเทียบ datum (ระดับจริง = Datum + Y)
 // แกน assembly (baseline) วางที่ (Baseline.X, Baseline.Y) ได้อิสระ; alignment จำลองอยู่ที่แกนนี้ (offset 0)
@@ -84,8 +84,11 @@ public class AssemblyService
         _compiler = compiler; _runner = runner; _folder = folder;
     }
 
-    public List<ItemResult> Run(AssemblyReq req)
+    // resolve (round 8) = a file name of an item -> absolute path in the tab's project (null = not allowed);
+    // default = the folder given to the constructor
+    public List<ItemResult> Run(AssemblyReq req, Func<string, string?>? resolve = null)
     {
+        resolve ??= n => SA.Projects.ProjectPaths.Resolve(_folder, n, null, ".cs");
         double bx = req.Baseline.X, by = req.Baseline.Y;
         double baselineElev = req.Datum + by;
 
@@ -160,7 +163,7 @@ public class AssemblyService
                 }
 
                 // 2) คอมไพล์และรัน
-                RunItem(item, res, world, bx, req.Datum, baselineElev, req.Sites);
+                RunItem(item, res, world, bx, req.Datum, baselineElev, req.Sites, resolve);
                 visiting.Remove(item.Id);
             }
 
@@ -172,7 +175,7 @@ public class AssemblyService
         return req.Items.Where(i => done.ContainsKey(i.Id)).Select(i => done[i.Id]).ToList();
     }
 
-    private void RunItem(ItemReq item, ItemResult res, SimWorld world, double bx, double datum, double baselineElev, bool sites)
+    private void RunItem(ItemReq item, ItemResult res, SimWorld world, double bx, double datum, double baselineElev, bool sites, Func<string, string?> resolve)
     {
         string source, name;
         string? disk = null;
@@ -204,8 +207,8 @@ public class AssemblyService
         else if (!string.IsNullOrEmpty(item.File))
         {
             name = Path.GetFileName(item.File);
-            var path = Path.Combine(_folder, name);
-            if (!System.IO.File.Exists(path))
+            var path = resolve(item.File);
+            if (path == null || !System.IO.File.Exists(path))
             {
                 res.Stage = "file"; res.File = name;
                 res.Message = $"ไม่พบไฟล์ {name} ในโฟลเดอร์";
@@ -270,6 +273,29 @@ public static class FileUtil
                 return sr.ReadToEnd();
             }
             catch (IOException) when (i < 5) { Thread.Sleep(80); }
+        }
+    }
+
+    // เขียนผ่านไฟล์ชั่วคราวแล้วสลับ (ไฟล์ไม่ขาดครึ่งถ้าเขียนไม่จบ) และคง BOM เดิมของไฟล์ไว้
+    public static void WriteText(string path, string text)
+    {
+        bool bom = true;   // ไฟล์ใหม่: UTF-8 มี BOM (เครื่องมือบน Windows อ่านคอมเมนต์ภาษาไทยถูกแน่นอน)
+        if (File.Exists(path))
+        {
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var head = new byte[3];
+            int n = fs.Read(head, 0, 3);
+            bom = n == 3 && head[0] == 0xEF && head[1] == 0xBB && head[2] == 0xBF;
+        }
+        var bytes = new System.Text.UTF8Encoding(bom).GetPreamble().Concat(new System.Text.UTF8Encoding(false).GetBytes(text)).ToArray();
+        var tmp = Path.Combine(Path.GetDirectoryName(path)!, "." + Path.GetFileName(path) + ".saving");
+        File.WriteAllBytes(tmp, bytes);
+        try { File.Move(tmp, path, overwrite: true); }
+        catch (IOException)
+        {
+            // ไฟล์ถูกโปรแกรมอื่นจับไว้ -> เขียนตรงแทน
+            File.Delete(tmp);
+            File.WriteAllBytes(path, bytes);
         }
     }
 

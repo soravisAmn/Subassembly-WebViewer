@@ -74,5 +74,5 @@ If the code throws an uncaught exception, the web shows a red box with the line 
 ## Good to know
 
 - The simulator is written to match the real names and behaviour as closely as possible, but it is **not real Civil 3D**. For example, if `IntersectSurface` finds no intersection the simulator throws an exception (the real one may behave differently). Check final results in Civil 3D.
-- Cases saved under Scenarios (left panel) live in the browser; back them up as JSON via "ไฟล์ ▾" → Export scenarios. Scenarios saved from earlier web versions still load.
+- Cases saved under Scenarios (left panel) live in the project file (round 8): ground, changed parameter values, mode only; applying one never changes the drawing. Details in [projects.md](projects.md#scenarios). Old browser scenarios are offered once per project ("นำเข้า scenario เก่า").
 - The folders `SA.Core`, `SA.Civil3D` come from the first approach (separating the Trapezoid logic); the web no longer uses them. (`SA.Tests` still uses them to test the web — do not delete.)

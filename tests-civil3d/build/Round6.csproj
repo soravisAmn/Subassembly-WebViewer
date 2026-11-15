@@ -20,9 +20,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\pavement-assembly.cs" />
-    <Compile Include="..\..\base_rock-pitching-web.cs" />
-    <Compile Include="..\..\body_rock-pitching-web.cs" />
+    <!-- round 8: snapshot of the 3 files (15 Nov 2026) in tests-civil3d/round6/; the user's SR03 project lives outside
+         the repo (D:\test_cad\SA-Projects\SR03) and is built from the web's Build dialog -->
+    <Compile Include="..\round6\pavement-assembly.cs" />
+    <Compile Include="..\round6\base_rock-pitching-web.cs" />
+    <Compile Include="..\round6\body_rock-pitching-web.cs" />
   </ItemGroup>
 
   <!-- Autodesk DLLs are referenced in place: never copied to the output, never committed -->

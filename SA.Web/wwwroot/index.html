@@ -21,13 +21,17 @@
       <button data-cmd="open-proj">Open project…</button>
       <button data-cmd="save-proj">Save project</button>
       <button data-cmd="save-proj-as">Save project as…</button>
-      <button data-cmd="new-proj">New project (ว่าง)</button>
+      <button data-cmd="new-proj">New project… (โฟลเดอร์ใหม่)</button>
+      <button data-cmd="pack">Pack project… (zip)</button>
+      <div id="dd-recent"></div>
       <hr>
       <button data-cmd="export" disabled title="มาใน Milestone 5">Save / Export .cs…</button>
       <button data-cmd="build">Build… (DLL สำหรับ Civil 3D)</button>
       <hr>
       <button data-cmd="sc-export">Export scenarios (.json)</button>
       <button data-cmd="sc-import">Import scenarios…</button>
+      <hr>
+      <button data-cmd="settings">ตั้งค่า…</button>
     </div>
   </div>
   <button id="b-build" title="Build: DLL สำหรับ Civil 3D จากไฟล์ .cs ของ project ที่เปิดอยู่">Build</button>
@@ -49,7 +53,7 @@
   <div class="pane-hsplit" id="split-left" title="ลากปรับความสูง Scenarios · ดับเบิลคลิก = ค่าเริ่มต้น"></div>
   <section class="pane-sec sized" id="sec-sc">
     <div class="pane-h fold" data-fold="sc" title="คลิก = พับ / กาง Scenarios"><span class="fold-car">▾</span>Scenarios
-      <button id="b-save" title="บันทึกสถานะ workspace ตอนนี้ไว้ในเบราว์เซอร์">+ บันทึกกรณีนี้</button>
+      <button id="b-save" title="เก็บผิวดิน / ค่า parameter / โหมด ตอนนี้เป็นกรณีใหม่ในโปรเจกต์ (ส่วนที่วาดไม่ถูกเก็บ)">+ บันทึกกรณีนี้</button>
     </div>
     <div class="pane-body"><div id="sc-list" class="sc-list"></div></div>
   </section>
@@ -213,6 +217,8 @@
 <script src="js/editor.js"></script>
 <script src="js/codelink.js"></script>
 <script src="js/build.js"></script>
+<script src="js/project.js"></script>
+<script src="js/scenarios.js"></script>
 <!-- ตัวลากความกว้างแถบซ้าย / ขวา (position: fixed ไม่กินช่อง grid) -->
 <div class="pane-resize" id="lw-resize" title="ลากปรับความกว้างแถบซ้าย · ดับเบิลคลิก = ค่าเริ่มต้น"></div>
 <div class="pane-resize" id="rw-resize" title="ลากปรับความกว้างแถบขวา · ดับเบิลคลิก = ค่าเริ่มต้น"></div>

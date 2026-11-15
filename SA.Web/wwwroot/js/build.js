@@ -10,20 +10,15 @@ const Build = (() => {
     .then(r => r.json()).catch(() => ({ ok: false, message: NO_SERVER }));
   const get = url => fetch(url).then(r => r.json()).catch(() => null);
 
-  // Saved scenarios (browser) of the items whose file is built: ground relative to the item origin, as sa_check
+  // Scenarios of the project (round 8) for the items with a file: ground relative to the item origin, as sa_check
   function savedScenarios(){
     const out = [];
-    for (const s of scenarios){
-      const w = s.ws || s.asm; if (!w) continue;
-      const items = w.assemblies ? w.assemblies.flatMap(a => a.items || []) : (w.items || []);
-      for (const si of items){
-        if (!si.file) continue;
-        const cur = itemById(si.id), o = cur ? itemOrigin(cur) : (si.attach && si.attach.x != null ? { x: si.attach.x, y: si.attach.y } : { x: 0, y: 0 });
-        const sf = w.surface || [];
-        out.push({ file: si.file, name: s.name, values: si.params || {}, layout: !!w.layout,
-                   surface: w.surfaceOn !== false && sf.length >= 2 ? sf.map(p => ({ x: p.x - o.x, y: p.y - o.y })) : null });
+    for (const s of projScenarios())
+      for (const it of allItems()){
+        if (!it.file) continue;
+        const c = scenarioCtxOf(s, it, itemOrigin(it));
+        out.push({ file: it.file, name: s.name, values: c.values, layout: c.layout, surface: c.surface });
       }
-    }
     return out;
   }
 
@@ -31,11 +26,11 @@ const Build = (() => {
   const unsaved = () => allItems().filter(it => it.file && drawingDirty(it) && (!st.check || st.check.files.includes(it.file)));
 
   async function open(){
-    if (!WS().name){ alert("Save project ก่อน (ไฟล์ ▾ → Save project) — Build ใช้ไฟล์ project และไฟล์ .cs ที่บันทึกแล้ว"); return; }
+    if (!WS().path){ alert("Save project ก่อน (ไฟล์ ▾ → Save project) — Build ใช้ไฟล์ project และไฟล์ .cs ที่บันทึกแล้ว"); return; }
     if (st.project !== WS().name){ st.project = WS().name; st.files = null; st.allFiles = []; st.dllName = ""; st.result = null; st.years.clear(); }
     openDialog("Build — " + st.project, b => { b.innerHTML = '<div class="hint">กำลังอ่าน…</div>'; });
     $("modal").firstElementChild.classList.add("wide");
-    const [v, s] = await Promise.all([get("/api/build/versions"), get("/api/build/settings")]);
+    const [v, s] = await Promise.all([get("/api/build/versions"), get("/api/settings")]);
     st.versions = v && v.versions || [];
     if (s) st.settings = { copyTo: s.copyTo || "", copyToOn: !!s.copyToOn };
     if (!st.years.size){ const top = st.versions.filter(x => x.canBuild).map(x => x.year).sort().pop(); if (top) st.years.add(top); }
@@ -139,22 +134,13 @@ const Build = (() => {
     const ys = c.years.filter(y => st.years.has(y.year));
     ov.innerHTML = ys.length ? ys.map(y => `<div class="mono bd-path">${esc(y.outDir)}</div>`).join("") : '<span class="hint">เลือก Civil 3D ก่อน</span>';
 
-    // Copy to (machine setting)
+    // Copy to: app settings ("ตั้งค่า…", round 8), shown here only
     div("bd-l", "Copy to", g);
     const cv = div("bd-v", null, g);
-    const cOn = document.createElement("input"); cOn.type = "checkbox"; cOn.checked = st.settings.copyToOn;
-    const cPath = input(st.settings.copyTo, "เช่น D:\\test_cad\\C3D_Custom\\SA"); cPath.classList.add("bd-copy"); cPath.disabled = !cOn.checked;
-    const save = async () => {
-      const r = await post("/api/build/settings", { copyTo: cPath.value.trim(), copyToOn: cOn.checked });
-      if (!r.ok){ alert(r.message); cOn.checked = false; cPath.disabled = true; return; }
-      st.settings = { copyTo: cPath.value.trim(), copyToOn: cOn.checked };
-      recheck();
-    };
-    cOn.onchange = () => { cPath.disabled = !cOn.checked; if (!cOn.checked || cPath.value.trim()) save(); else cPath.focus(); };
-    cPath.onchange = save;
-    const lab = document.createElement("label"); lab.append(cOn, " คัดลอก DLL + .atc + icons ไปที่ ");
-    cv.append(lab, cPath);
-    cv.insertAdjacentHTML("beforeend", "<small>ค่าของเครื่องนี้ (ไม่อยู่ในไฟล์ project) · คัดลอกหลัง build สำเร็จ · เลือกหลายปี = คัดลอกเฉพาะปีล่าสุด</small>");
+    cv.innerHTML = st.settings.copyToOn && st.settings.copyTo
+      ? `<span class="mono">${esc(st.settings.copyTo)}</span>` : '<span class="hint">ปิดอยู่</span>';
+    cv.appendChild(btn("ตั้งค่า…", () => { closeDialog(); openSettings(); }, false, "Copy to อยู่ใน ไฟล์ ▾ → ตั้งค่า… (ค่าของเครื่องนี้)"));
+    cv.insertAdjacentHTML("beforeend", "<small>ค่าของเครื่องนี้ (ไม่อยู่ในไฟล์ project) · คัดลอกหลัง build สำเร็จ · เลือกหลายปี = คัดลอกเฉพาะปีล่าสุด · แก้ใน ไฟล์ ▾ → ตั้งค่า…</small>");
 
     // checks
     const head = div("pg-h", `ตรวจก่อน build <small>${st.checking ? "กำลังตรวจ…" : `${c.scenarioRuns} scenario run · ${(c.ms / 1000).toFixed(1)} s`}</small>`, b);
@@ -196,7 +182,7 @@ const Build = (() => {
       if (okY) d.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(y.dll)));
       if (okY && y.atc){
         const atc = y.copiedTo ? y.copiedTo.replace(/\\?$/, "\\") + y.atc.split("\\").pop() : y.atc;
-        const a = div("bd-sub", `Tool Catalog: <span class="mono">${esc(atc)}</span> · ไอคอน ${y.icons} รูป — Civil 3D: CONTENTBROWSER → Add Catalog → เลือกไฟล์นี้`, box);
+        const a = div("bd-sub", `Tool Catalog: <span class="mono">${esc(atc)}</span> · ไอคอน ${y.icons} รูป — Civil 3D: CONTENTBROWSER → Add Catalog → เลือกไฟล์นี้ · ลากทั้ง palette ครั้งแรก · build ใหม่แล้วคลิกขวา palette → Refresh Palette`, box);
         a.appendChild(btn("คัดลอก path", () => navigator.clipboard && navigator.clipboard.writeText(atc)));
       }
       if (y.copiedTo) div("bd-sub", `คัดลอก DLL + .atc + icons ไป <span class="mono">${esc(y.copiedTo)}</span> แล้ว`, box);

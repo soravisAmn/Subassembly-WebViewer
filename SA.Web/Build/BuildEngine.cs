@@ -70,10 +70,22 @@ public partial class BuildEngine
         _folder = Path.GetFullPath(folder);
         MachineDir = machineDir ?? BuildPaths.DefaultMachineDir();
         History = new BuildHistory(MachineDir);
-        _installs = installs ?? (() => C3DVersions.DetectThisMachine());
+        // round 8: the Civil 3D install folder from the app settings ("ตั้งค่า…") is searched too
+        _installs = installs ?? (() => C3DVersions.DetectThisMachine(MachineSettings.Load(MachineDir).C3dInstall is { } c ? new[] { c } : null));
     }
 
     public List<C3DInstall> Installs() => _installs();
+
+    // Round 8: the same engine on another project folder (each browser tab has its own project).
+    // allowOutside = files outside the folder that the project file references (relative "..\x.cs" entries).
+    Func<string, bool>? _allowOutside;
+    public BuildEngine For(string folder, Func<string, bool>? allowOutside = null) =>
+        new(_compiler, _runner, folder, MachineDir, _installs) { _allowOutside = allowOutside };
+
+    public string Folder => _folder;
+
+    // Absolute path of a project file entry (as listed in BuildResult.Files)
+    string Full(string rel) => Path.GetFullPath(Path.Combine(_folder, rel));
 
     // DLL name = a file name Civil 3D and MSBuild both accept: letters, digits, _ - . (no spaces, no Thai)
     public static bool ValidDllName(string? s) => !string.IsNullOrEmpty(s) && s.Length <= 100 && Regex.IsMatch(s, @"^[A-Za-z0-9_][A-Za-z0-9_.-]*$") && !s.EndsWith('.');
@@ -138,7 +150,7 @@ public partial class BuildEngine
         {
             var path = SafeFile(f);
             if (path == null || !File.Exists(path)) { r.Issues.Add(new("error", f, $"ไม่พบไฟล์ {f}")); continue; }
-            r.Files.Add(Path.GetFileName(path));
+            r.Files.Add(f);
             var cls = ClassReader.Read(FileUtil.ReadShared(path), Path.GetFileName(path));
             if (cls.Count == 0) empty.Add(Path.GetFileName(path));
             r.Classes.AddRange(cls);
@@ -157,7 +169,7 @@ public partial class BuildEngine
 
         var installs = Installs();
         var proj = ProjectPath(req.Project)!;
-        var files = r.Files.Select(f => Path.Combine(_folder, f)).ToList();
+        var files = r.Files.Select(Full).ToList();
         lock (Gate)
         {
             var check = Check(new CheckRequest(req.Project, r.DllName, years.ToArray(), req.Files, req.Scenarios));
@@ -266,10 +278,10 @@ public partial class BuildEngine
         return y;
     }
 
-    // Copy-to: the DLL, both .atc files and icons\<DLL>\ (that subfolder is replaced; nothing else in the folder is touched)
+    // Copy-to: the DLL, the three .atc files and icons\<DLL>\ (that subfolder is replaced; nothing else in the folder is touched)
     static void CopyOut(string outDir, string copyDir, string dllName)
     {
-        foreach (var f in new[] { dllName + ".dll", dllName + ".atc", AtcWriter.CategoryFile(dllName) })
+        foreach (var f in new[] { dllName + ".dll", dllName + ".atc", AtcWriter.CategoryFile(dllName), AtcWriter.PaletteFile(dllName) })
             File.Copy(Path.Combine(outDir, f), Path.Combine(copyDir, f), true);
         var src = Path.Combine(outDir, "icons", dllName);
         var dst = Path.Combine(copyDir, "icons", dllName);
@@ -287,7 +299,10 @@ public partial class BuildEngine
     }
 
     public record CatalogOutput(string Catalog, string Category, Dictionary<string, byte[]> Icons, List<AtcTool> Tools,
-                                Dictionary<string, string> FileOf, List<BuildIssue> Warnings);
+                                Dictionary<string, string> FileOf, List<BuildIssue> Warnings)
+    {
+        public string Palette { get; init; } = "";      // round 8: <DLL>_palette.atc
+    }
 
     // .atc text + icons for the classes of these files. Parameters as GetInputParameters gives them (order included), read by
     // running each class in the simulator with default values (Side = Right, layout mode: also the run the icon is drawn from).
@@ -338,18 +353,19 @@ public partial class BuildEngine
                 fileOf[c.FullName] = name;
             }
         }
-        var (catalog, category) = AtcWriter.Write(dllName, assemblyRef, tools);
-        foreach (var e in AtcWriter.Validate(catalog, category, dllName, tools.Select(t => t.FullName)))
+        var (catalog, category, palette) = AtcWriter.Write(dllName, assemblyRef, tools);
+        foreach (var e in AtcWriter.Validate(catalog, category, dllName, tools.Select(t => t.FullName), palette))
             warnings.Add(new("warning", null, e));
-        return new CatalogOutput(catalog, category, icons, tools, fileOf, warnings);
+        return new CatalogOutput(catalog, category, icons, tools, fileOf, warnings) { Palette = palette };
     }
 
-    // <DLL>.atc, <DLL>_tools.atc, icons\<DLL>\ (old icons removed: a renamed class leaves no stale image). The DLL
+    // <DLL>.atc, <DLL>_tools.atc, <DLL>_palette.atc, icons\<DLL>\ (old icons removed: a renamed class leaves no stale image). The DLL
     // subfolder keeps icons of different DLLs apart in a shared Copy-to folder.
     public static void WriteCatalog(string outDir, string dllName, CatalogOutput cat)
     {
         File.WriteAllText(Path.Combine(outDir, dllName + ".atc"), cat.Catalog);
         File.WriteAllText(Path.Combine(outDir, AtcWriter.CategoryFile(dllName)), cat.Category);
+        File.WriteAllText(Path.Combine(outDir, AtcWriter.PaletteFile(dllName)), cat.Palette);
         var iconDir = Path.Combine(outDir, "icons", dllName);
         if (Directory.Exists(iconDir)) foreach (var f in Directory.GetFiles(iconDir, "*.png")) File.Delete(f);
         Directory.CreateDirectory(iconDir);
@@ -423,12 +439,6 @@ public partial class BuildEngine
         lock (sb) return (p.ExitCode, sb.ToString());
     }
 
-    // A file name at the top of the project folder (no path that leads outside it)
-    string? SafeFile(string name)
-    {
-        name = name.Trim();
-        if (name != Path.GetFileName(name) || name.StartsWith('.') || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return null;
-        if (!name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)) return null;
-        return Path.Combine(_folder, name);
-    }
+    // A .cs path relative to the project folder (subfolders; outside only when the project file references it)
+    string? SafeFile(string name) => SA.Projects.ProjectPaths.Resolve(_folder, name, _allowOutside, ".cs");
 }

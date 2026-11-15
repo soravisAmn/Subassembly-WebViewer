@@ -310,7 +310,7 @@ static class BuildTests
             True(System.Text.RegularExpressions.Regex.IsMatch(a, @"^\{[0-9A-F]{8}-[0-9A-F]{4}-5[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}\}$"), "รูปแบบ " + a);
         });
 
-        test(".atc ของ fixture 3 ไฟล์ ตรงกับไฟล์ที่ล็อกไว้ (fixtures/round7/T7.atc, T7_tools.atc) + ไอคอน PNG", () =>
+        test(".atc ของ fixture 3 ไฟล์ ตรงกับไฟล์ที่ล็อกไว้ (fixtures/round7/T7.atc, T7_tools.atc, T7_palette.atc) + ไอคอน PNG", () =>
         {
             var dir = Project(fixtures, "T7", Fixtures);
             var eng = new BuildEngine(compiler, runner, dir, Path.Combine(dir, "machine"), () => new List<C3DInstall>());
@@ -318,7 +318,7 @@ static class BuildTests
             var cat = eng.MakeCatalog("T7", plan.Classes, plan.Files.Select(f => Path.Combine(dir, f)), "T7.dll");
             Eq(0, cat.Warnings.Count, "warning: " + string.Join(" | ", cat.Warnings.Select(w => w.Message)));
             var exp = Path.Combine(root, "SA.Tests", "fixtures", "round7");
-            foreach (var (file, text) in new[] { ("T7.atc", cat.Catalog), ("T7_tools.atc", cat.Category) })
+            foreach (var (file, text) in new[] { ("T7.atc", cat.Catalog), ("T7_tools.atc", cat.Category), ("T7_palette.atc", cat.Palette) })
             {
                 var want = File.Exists(Path.Combine(exp, file)) ? File.ReadAllText(Path.Combine(exp, file)) : null;
                 if (want?.Replace("\r\n", "\n") != text.Replace("\r\n", "\n"))
@@ -335,6 +335,26 @@ static class BuildTests
                 True(rel.StartsWith("icons\\") && rel.EndsWith(".png"), rel);
             }
             True(IconRenderer.Size(IconRenderer.Generic()) != null, "รูปทั่วไป");
+        });
+
+        test(".atc palette (round 8): tools catalog ชี้ไปที่ <DLL>_palette.atc, palette มีทุก class ครั้งเดียว, id คงที่และไม่ซ้ำกับเครื่องมือใน catalog", () =>
+        {
+            var tools = new List<AtcTool> { new("N.A", "A", @"icons\X\A.png", new()), new("N.B", "B", @"icons\X\B.png", new()) };
+            var (cat1, cate1, pal1) = AtcWriter.Write("X", @"D:\c\X.dll", tools);
+            var (_, cate2, pal2) = AtcWriter.Write("X", @"D:\c\X.dll", tools);
+            Eq(pal1, pal2, "build ซ้ำได้ palette เดิม (id เดิม)");
+            Eq(cate1, cate2, "build ซ้ำได้ catalog เดิม");
+            Eq(0, AtcWriter.Validate(cat1, cate1, "X", new[] { "N.A", "N.B" }, pal1).Count, "ผ่าน Validate");
+            var p = XDocument.Parse(pal1).Root!;
+            Eq("Palette", p.Name.LocalName, "root");
+            Eq(@".\X_palette.atc", (string?)XDocument.Parse(cate1).Descendants("Palette").Single().Element("Url")!.Attribute("href"), "Url");
+            Eq((string?)p.Element("ItemID")!.Attribute("idValue"), (string?)XDocument.Parse(cate1).Descendants("Palette").Single().Element("ItemID")!.Attribute("idValue"), "id ของ palette ตรงกัน");
+            var catIds = XDocument.Parse(cate1).Root!.Element("Tools")!.Elements("Tool").Select(t => (string?)t.Element("ItemID")!.Attribute("idValue")).ToList();
+            var palIds = p.Element("Tools")!.Elements("Tool").Select(t => (string?)t.Element("ItemID")!.Attribute("idValue")).ToList();
+            Eq(2, palIds.Distinct().Count(), "เครื่องมือใน palette");
+            True(!palIds.Intersect(catIds).Any(), "id ใน palette ไม่ซ้ำกับใน catalog");
+            Eq(@"D:\c\X.dll", (string?)p.Descendants("DotNetClass").First().Attribute("Assembly"), "DLL แบบ path เต็ม");
+            True(AtcWriter.Validate(cat1, cate1, "X", new[] { "N.A", "N.B", "N.C" }, pal1).Any(e => e.Contains("palette")), "class ที่ขาดใน palette ถูกเตือน");
         });
 
         test(".atc จาก spec: คำอธิบาย, ตัวเลือก (Enum), TypeInfo ตามชนิดค่า, comment ในโค้ดที่สร้าง · ไฟล์เขียนเอง: Side = Right / Left", () =>
@@ -439,7 +459,7 @@ static class BuildTests
             True(r.Ok && File.Exists(r.Zip!) && r.Zip == Path.Combine(dir, "build", "T7", "T7-source.zip"), "zip " + r.Zip);
             using var z = System.IO.Compression.ZipFile.OpenRead(r.Zip!);
             var names = z.Entries.Select(e => e.FullName.Replace('\\', '/')).OrderBy(n => n, StringComparer.Ordinal).ToList();
-            foreach (var want in Fixtures.Concat(new[] { "T7.csproj", "build.bat", "T7.atc", "T7_tools.atc.template", "report.md", "README.txt", "icons/T7/PavementAssembly.png" }))
+            foreach (var want in Fixtures.Concat(new[] { "T7.csproj", "build.bat", "T7.atc", "T7_tools.atc.template", "T7_palette.atc.template", "report.md", "README.txt", "icons/T7/PavementAssembly.png" }))
                 True(names.Contains(want), "ไม่มี " + want + ": " + string.Join(", ", names));
             True(!names.Any(n => n.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)), "ไม่มี DLL");
             string Read(string n) { using var s = new StreamReader(z.GetEntry(n)!.Open()); return s.ReadToEnd(); }
@@ -451,7 +471,8 @@ static class BuildTests
             True(bat.StartsWith("@echo off\r\n") && bat.Contains("chcp 65001") && bat.Contains("AeccDbMgd.dll") && bat.Contains("T7.csproj"), "build.bat");
             True(Read("README.txt").Contains("TestSubassembly.RockPitchingBodyWeb"), "README");
             True(!names.Contains("T7_tools.atc") && XDocument.Parse(Read("T7_tools.atc.template")).Descendants("DotNetClass").All(d => (string?)d.Attribute("Assembly") == BuildEngine.DllPathToken), "template ของ .atc (build.bat เขียน path เต็ม)");
-            True(bat.Contains("T7_tools.atc.template") && bat.Contains(BuildEngine.DllPathToken), "build.bat เขียน .atc");
+            True(bat.Contains("T7_tools.atc") && bat.Contains("T7_palette.atc") && bat.Contains(".template") && bat.Contains(BuildEngine.DllPathToken), "build.bat เขียน .atc ทั้งสองไฟล์");
+            True(!names.Contains("T7_palette.atc") && XDocument.Parse(Read("T7_palette.atc.template")).Descendants("DotNetClass").All(d => (string?)d.Attribute("Assembly") == BuildEngine.DllPathToken), "template ของ palette");
         });
 
         var c3d = C3DVersions.DetectThisMachine().Where(i => i.CanBuild).OrderByDescending(i => i.Year).FirstOrDefault();

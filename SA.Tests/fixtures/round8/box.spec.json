@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "className": "Box8",
+  "namespace": "TestSubassembly",
+  "params": [
+    {
+      "name": "Side",
+      "kind": "long",
+      "default": 0,
+      "displayName": "Side",
+      "min": null,
+      "max": null
+    },
+    {
+      "name": "W",
+      "kind": "double",
+      "default": 2,
+      "displayName": "W",
+      "min": null,
+      "max": null
+    }
+  ],
+  "targets": [],
+  "points": [
+    {
+      "id": "P1",
+      "codes": [],
+      "def": {
+        "type": "origin"
+      }
+    },
+    {
+      "id": "P2",
+      "codes": [
+        "Top",
+        "Edge"
+      ],
+      "def": {
+        "type": "delta",
+        "from": "P1",
+        "dx": "W",
+        "dy": "0"
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "L1",
+      "points": [
+        "P1",
+        "P2"
+      ],
+      "codes": [
+        "Top"
+      ]
+    }
+  ],
+  "shapes": [],
+  "side": {
+    "param": "Side",
+    "mirror": true
+  }
+}

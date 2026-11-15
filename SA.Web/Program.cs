@@ -22,8 +22,11 @@ builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
     o.SerializerOptions.NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals;
 });
+// Round 8: SubassemblyFolder = the old fixed folder (requests without a project handle, until the page sends handles);
+// ProjectsFolder = start folder of the web file dialog (default: SubassemblyFolder)
 var folder = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath,
     builder.Configuration["SubassemblyFolder"] ?? ".."));
+var startFolder = builder.Configuration["ProjectsFolder"] is { Length: > 0 } pf && Directory.Exists(pf) ? pf : folder;
 
 SA.Mcp.McpSetup.AddSaMcp(builder.Services);
 builder.Services.AddSingleton<SubassemblyCompiler>();
@@ -32,8 +35,22 @@ builder.Services.AddSingleton(sp => new AssemblyService(
     sp.GetRequiredService<SubassemblyCompiler>(), sp.GetRequiredService<SubassemblyRunner>(), folder));
 builder.Services.AddSingleton(sp => new SA.Build.BuildEngine(
     sp.GetRequiredService<SubassemblyCompiler>(), sp.GetRequiredService<SubassemblyRunner>(), folder));
+// projects open in browser tabs (handle in the X-SA-Project header); no handle = the old folder
+builder.Services.AddSingleton(sp =>
+{
+    var reg = new SA.Projects.ProjectRegistry(folder, Path.Combine(SA.Build.BuildPaths.DefaultMachineDir(), "scratch"));
+    var hub = sp.GetRequiredService<SA.Mcp.PageHub>();
+    reg.SocketHandles = () => hub.Handles;
+    hub.Focused = reg.Focused;
+    return reg;
+});
 
 var app = builder.Build();
+var projects = app.Services.GetRequiredService<SA.Projects.ProjectRegistry>();   // links the page hub now
+SA.Projects.ProjectHttp.MapProjectApi(app, startFolder);
+// the project of the tab that sent the request (null = handle unknown: the page re-opens its project)
+SA.Projects.ProjectContext? Proj(HttpContext h) => projects.Get(SA.Projects.ProjectHttp.HandleOf(h));
+
 SA.Mcp.McpSetup.UseSaMcpGuard(app);
 SA.Mcp.McpSetup.MapSaMcp(app);
 app.UseDefaultFiles();
@@ -43,15 +60,23 @@ var startedAt = DateTime.Now;
 
 app.Logger.LogInformation("Subassembly folder: {Folder}", folder);
 
-app.MapGet("/api/info", () => new
+app.MapGet("/api/info", (HttpContext h) =>
 {
-    buildId = $"{startedAt:O}#{HotReloadTracker.Version}",
-    folder
+    var p = Proj(h);
+    return new
+    {
+        buildId = $"{startedAt:O}#{HotReloadTracker.Version}",
+        folder = p?.ProjectDir ?? folder,
+        project = p?.ProjectFile, readOnly = p?.ReadOnly ?? false, projectLost = p == null,
+    };
 });
 
 // รายการไฟล์ .cs และไฟล์ .assembly.json ในโฟลเดอร์ (ไม่รวมโฟลเดอร์ย่อย) พร้อมเวลาแก้ไขล่าสุด
-app.MapGet("/api/files", () =>
+app.MapGet("/api/files", (HttpContext h) =>
 {
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    var folder = p.ProjectDir;
     List<object> List(string pattern) => Directory.Exists(folder)
         ? Directory.GetFiles(folder, pattern, SearchOption.TopDirectoryOnly)
             .Select(f => new FileInfo(f))
@@ -59,29 +84,41 @@ app.MapGet("/api/files", () =>
             .Select(f => new { name = f.Name, mtime = Mtime(f.FullName), size = f.Length })
             .ToList<object>()
         : new List<object>();
-    return new { folder, files = List("*.cs"), assemblies = List("*.assembly.json") };
+    return Results.Ok(new { folder, files = List("*.cs"), assemblies = List("*.assembly.json") });
 });
 
 // ---------------- assembly: ประกอบหลาย subassembly ----------------
 
-app.MapPost("/api/assembly", (AssemblyReq req, AssemblyService svc) => new { items = svc.Run(req) });
+app.MapPost("/api/assembly", (HttpContext h, AssemblyReq req, AssemblyService svc) =>
+{
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    return Results.Ok(new { items = svc.Run(req, n => p.Resolve(n, ".cs")) });
+});
 
 // เปิด / บันทึกไฟล์ .assembly.json ในโฟลเดอร์
-app.MapGet("/api/assembly-file", (string name) =>
+app.MapGet("/api/assembly-file", (HttpContext h, string name) =>
 {
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    var folder = p.ProjectDir;
     var file = FileUtil.AssemblyFileName(name);
     var path = file == null ? null : Path.Combine(folder, file);
     if (path == null || !File.Exists(path)) return Results.NotFound(new { message = $"ไม่พบไฟล์ {name}" });
     return Results.Text(ReadShared(path), "application/json");
 });
 
-app.MapPost("/api/assembly-file", (AssemblySaveRequest req) =>
+app.MapPost("/api/assembly-file", (HttpContext h, AssemblySaveRequest req) =>
 {
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    if (p.ReadOnly) return SA.Projects.ProjectHttp.ReadOnly();
+    var folder = p.ProjectDir;
     var file = FileUtil.AssemblyFileName(req.Name);
     if (file == null) return Results.BadRequest(new { message = "ชื่อไฟล์ไม่ถูกต้อง" });
     try
     {
-        WriteText(Path.Combine(folder, file), JsonSerializer.Serialize(req.Content, new JsonSerializerOptions { WriteIndented = true }));
+        FileUtil.WriteText(Path.Combine(folder, file), JsonSerializer.Serialize(req.Content, new JsonSerializerOptions { WriteIndented = true }));
         return Results.Ok(new { name = file });
     }
     catch (Exception e)
@@ -90,8 +127,11 @@ app.MapPost("/api/assembly-file", (AssemblySaveRequest req) =>
     }
 });
 
-app.MapPost("/api/run", (RunRequest req, SubassemblyCompiler compiler, SubassemblyRunner runner) =>
+app.MapPost("/api/run", (HttpContext h, RunRequest req, SubassemblyCompiler compiler, SubassemblyRunner runner) =>
 {
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    var folder = p.ProjectDir;
     // 1) หา source
     string source, name;
     if (!string.IsNullOrEmpty(req.Source))
@@ -102,9 +142,9 @@ app.MapPost("/api/run", (RunRequest req, SubassemblyCompiler compiler, Subassemb
     else if (!string.IsNullOrEmpty(req.File))
     {
         name = Path.GetFileName(req.File);
-        var path = Path.Combine(folder, name);
-        if (!File.Exists(path))
-            return Results.Ok(new { ok = false, stage = "file", message = $"ไม่พบไฟล์ {name} ในโฟลเดอร์ {folder}" });
+        var path = p.Resolve(req.File, ".cs");
+        if (path == null || !File.Exists(path))
+            return Results.Ok(new { ok = false, stage = "file", message = $"ไม่พบไฟล์ {req.File} ในโฟลเดอร์ {folder}" });
         source = ReadShared(path);
     }
     else
@@ -140,18 +180,24 @@ app.MapPost("/api/run", (RunRequest req, SubassemblyCompiler compiler, Subassemb
 // ---------------- แถบแก้โค้ด: อ่าน / บันทึก / สร้างไฟล์ .cs ในโฟลเดอร์ ----------------
 // mtime ส่งเป็นข้อความ (ticks) เพราะตัวเลขขนาดนี้ JavaScript เก็บได้ไม่ครบทุกหลัก
 
-app.MapGet("/api/source", (string file) =>
+app.MapGet("/api/source", (HttpContext h, string file) =>
 {
-    var path = FolderFile(folder, file);
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    var folder = p.ProjectDir;
+    var path = p.Resolve(file, ".cs");
     if (path == null) return Results.Ok(new { ok = false, message = $"ชื่อไฟล์ไม่ถูกต้อง: {file}" });
     if (!File.Exists(path)) return Results.Ok(new { ok = false, message = $"ไม่พบไฟล์ {file} ในโฟลเดอร์ {folder}" });
-    return Results.Ok(new { ok = true, file = Path.GetFileName(path), source = ReadShared(path), mtime = Mtime(path) });
+    return Results.Ok(new { ok = true, file, source = ReadShared(path), mtime = Mtime(path) });
 });
 
 // บันทึกทับไฟล์เดิม: ถ้าไฟล์ถูกแก้จากโปรแกรมอื่นหลัง baseMtime จะไม่เขียนทับ (ตอบ conflict) เว้นแต่ force = true
-app.MapPost("/api/save", (SaveRequest req) =>
+app.MapPost("/api/save", (HttpContext h, SaveRequest req) =>
 {
-    var path = FolderFile(folder, req.File);
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    if (p.ReadOnly) return SA.Projects.ProjectHttp.ReadOnly();
+    var path = p.Resolve(req.File, ".cs");
     if (path == null) return Results.Ok(new { ok = false, message = $"ชื่อไฟล์ไม่ถูกต้อง: {req.File}" });
     if (req.Source == null) return Results.Ok(new { ok = false, message = "ไม่มีเนื้อหาให้บันทึก" });
 
@@ -165,8 +211,8 @@ app.MapPost("/api/save", (SaveRequest req) =>
 
     try
     {
-        WriteText(path, req.Source);
-        return Results.Ok(new { ok = true, file = Path.GetFileName(path), mtime = Mtime(path) });
+        FileUtil.WriteText(path, req.Source);
+        return Results.Ok(new { ok = true, file = req.File, mtime = Mtime(path) });
     }
     catch (Exception e)
     {
@@ -175,16 +221,19 @@ app.MapPost("/api/save", (SaveRequest req) =>
 });
 
 // สร้างไฟล์ .cs ใหม่จาก template (ไม่เขียนทับไฟล์ที่มีอยู่)
-app.MapPost("/api/new", (NewRequest req) =>
+app.MapPost("/api/new", (HttpContext h, NewRequest req) =>
 {
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    if (p.ReadOnly) return SA.Projects.ProjectHttp.ReadOnly();
     var name = (req.Name ?? "").Trim();
     if (name.Length > 0 && !name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)) name += ".cs";
-    var path = FolderFile(folder, name);
+    var path = FolderFile(p.ProjectDir, name);
     if (path == null) return Results.Ok(new { ok = false, message = $"ตั้งชื่อไฟล์แบบนี้ไม่ได้: {req.Name}" });
     if (File.Exists(path)) return Results.Ok(new { ok = false, message = $"มีไฟล์ชื่อ {Path.GetFileName(path)} อยู่แล้ว" });
     try
     {
-        WriteText(path, SubassemblyTemplate.Create(Path.GetFileNameWithoutExtension(path)));
+        FileUtil.WriteText(path, SubassemblyTemplate.Create(Path.GetFileNameWithoutExtension(path)));
         return Results.Ok(new { ok = true, file = Path.GetFileName(path), mtime = Mtime(path) });
     }
     catch (Exception e)
@@ -195,13 +244,15 @@ app.MapPost("/api/new", (NewRequest req) =>
 
 // ---------------- ส่วนที่วาดในเว็บ (DrawingSpec) -> โค้ด C# ----------------
 // ดูโค้ดที่สร้าง (แถบโค้ด read-only): ไม่มีไฟล์ = ทั้งไฟล์ใหม่; มีไฟล์ที่มีช่วง SA-DRAWING = ไฟล์เดิมที่แทนช่วงนั้นแล้ว
-app.MapPost("/api/drawing/code", (DrawingReq req) =>
+app.MapPost("/api/drawing/code", (HttpContext h, DrawingReq req) =>
 {
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
     try
     {
         var spec = DrawingSpec.Parse(req.Spec);
         var raw = req.Spec.GetRawText();
-        var path = string.IsNullOrEmpty(req.File) ? null : FolderFile(folder, req.File);
+        var path = string.IsNullOrEmpty(req.File) ? null : p.Resolve(req.File, ".cs");
         if (path != null && File.Exists(path))
         {
             var src = ReadShared(path);
@@ -219,9 +270,11 @@ app.MapPost("/api/drawing/code", (DrawingReq req) =>
 });
 
 // อ่านส่วนที่วาดกลับจากไฟล์ (sa-spec) ตอน import / เปิด project
-app.MapGet("/api/drawing/spec", (string file) =>
+app.MapGet("/api/drawing/spec", (HttpContext h, string file) =>
 {
-    var path = FolderFile(folder, file);
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    var path = p.Resolve(file, ".cs");
     if (path == null || !File.Exists(path)) return Results.Ok(new { ok = false, message = $"ไม่พบไฟล์ {file}" });
     var block = CodeGenerator.FindBlock(ReadShared(path));
     if (block?.SpecJson == null) return Results.Ok(new { ok = true, spec = (JsonElement?)null, edited = false });
@@ -238,9 +291,12 @@ app.MapGet("/api/drawing/spec", (string file) =>
 
 // Save .cs: ไฟล์ยังไม่มี = สร้างทั้งไฟล์; มีช่วง SA-DRAWING = แทนที่เฉพาะช่วงนั้น (ส่วนอื่นไม่เปลี่ยนแม้แต่ไบต์เดียว)
 //   ชื่อซ้ำกับไฟล์ที่ไม่มีช่วงนี้ -> ถาม (overwrite) · ช่วงในไฟล์ถูกแก้ด้วยมือ -> ถาม (force)
-app.MapPost("/api/drawing/save", (DrawingReq req) =>
+app.MapPost("/api/drawing/save", (HttpContext h, DrawingReq req) =>
 {
-    var path = FolderFile(folder, req.File);
+    var p = Proj(h);
+    if (p == null) return SA.Projects.ProjectHttp.Lost();
+    if (p.ReadOnly) return SA.Projects.ProjectHttp.ReadOnly();
+    var path = p.Resolve(req.File, ".cs");
     if (path == null) return Results.Ok(new { ok = false, message = $"ตั้งชื่อไฟล์แบบนี้ไม่ได้: {req.File}" });
     var name = Path.GetFileName(path);
     try
@@ -288,8 +344,8 @@ app.MapPost("/api/drawing/save", (DrawingReq req) =>
                 text = CodeGenerator.ReplaceBlock(src, block, CodeGenerator.GenerateBlock(spec, raw, block.Indent));
             }
         }
-        WriteText(path, text);
-        return Results.Ok(new { ok = true, file = name, created, mtime = Mtime(path) });
+        FileUtil.WriteText(path, text);
+        return Results.Ok(new { ok = true, file = req.File, created, mtime = Mtime(path) });
     }
     catch (Exception e) when (e is FormatException or JsonException)
     {
@@ -307,15 +363,22 @@ app.MapPost("/api/drawing/save", (DrawingReq req) =>
 
 app.MapGet("/api/build/versions", (SA.Build.BuildEngine eng) => new { versions = eng.Installs() });
 
-app.MapPost("/api/build/plan", (SA.Build.BuildRequest req, SA.Build.BuildEngine eng) => eng.Plan(req));
+// the tab's project folder (round 8); a read-only tab cannot build (a build writes build\ next to the project)
+SA.Build.BuildEngine? Eng(HttpContext h, SA.Build.BuildEngine eng) { var p = Proj(h); return p == null ? null : eng.For(p.ProjectDir, p.Referenced.Contains); }
 
-app.MapPost("/api/build", (SA.Build.BuildRequest req, SA.Build.BuildEngine eng) => eng.Build(req));
+app.MapPost("/api/build/plan", (HttpContext h, SA.Build.BuildRequest req, SA.Build.BuildEngine eng) =>
+    Eng(h, eng) is { } e ? Results.Ok(e.Plan(req)) : SA.Projects.ProjectHttp.Lost());
+
+app.MapPost("/api/build", (HttpContext h, SA.Build.BuildRequest req, SA.Build.BuildEngine eng) =>
+    Proj(h) is { ReadOnly: true } ? SA.Projects.ProjectHttp.ReadOnly() : Eng(h, eng) is { } e ? Results.Ok(e.Build(req)) : SA.Projects.ProjectHttp.Lost());
 
 // source package (zip for a machine with Civil 3D): build\<DLL>\<DLL>-source.zip next to the project, no build here
-app.MapPost("/api/build/source", (SA.Build.BuildRequest req, SA.Build.BuildEngine eng) => eng.SourcePackage(req));
+app.MapPost("/api/build/source", (HttpContext h, SA.Build.BuildRequest req, SA.Build.BuildEngine eng) =>
+    Proj(h) is { ReadOnly: true } ? SA.Projects.ProjectHttp.ReadOnly() : Eng(h, eng) is { } e ? Results.Ok(e.SourcePackage(req)) : SA.Projects.ProjectHttp.Lost());
 
 // pre-build checks for the dialog (simulator runs, codes, locked / same-name DLL, parameter changes); no build
-app.MapPost("/api/build/check", (SA.Build.CheckRequest req, SA.Build.BuildEngine eng) => eng.Check(req));
+app.MapPost("/api/build/check", (HttpContext h, SA.Build.CheckRequest req, SA.Build.BuildEngine eng) =>
+    Eng(h, eng) is { } e ? Results.Ok(e.Check(req)) : SA.Projects.ProjectHttp.Lost());
 
 // machine settings (Copy-to folder): %LOCALAPPDATA%\SA-Studio\settings.json, never in a project
 app.MapGet("/api/build/settings", (SA.Build.BuildEngine eng) => SA.Build.MachineSettings.Load(eng.MachineDir));
@@ -324,7 +387,8 @@ app.MapPost("/api/build/settings", (SA.Build.MachineSettings s, SA.Build.BuildEn
     s.CopyTo = string.IsNullOrWhiteSpace(s.CopyTo) ? null : s.CopyTo.Trim();
     var err = s.CopyToOn ? SA.Build.MachineSettings.CopyToError(s.CopyTo) : null;
     if (err != null) return Results.Ok(new { ok = false, message = "Copy to: " + err });
-    s.Save(eng.MachineDir);
+    // round 8: only the Copy-to fields change here (the settings dialog owns the rest)
+    SA.Build.MachineSettings.Update(eng.MachineDir, m => { m.CopyTo = s.CopyTo; m.CopyToOn = s.CopyToOn; });
     return Results.Ok(new { ok = true });
 });
 
@@ -342,29 +406,6 @@ static string? FolderFile(string folder, string? name)
 }
 
 static string Mtime(string path) => File.GetLastWriteTimeUtc(path).Ticks.ToString();
-
-// เขียนผ่านไฟล์ชั่วคราวแล้วสลับ (ไฟล์ไม่ขาดครึ่งถ้าเขียนไม่จบ) และคง BOM เดิมของไฟล์ไว้
-static void WriteText(string path, string text)
-{
-    bool bom = true;   // ไฟล์ใหม่: UTF-8 มี BOM (เครื่องมือบน Windows อ่านคอมเมนต์ภาษาไทยถูกแน่นอน)
-    if (File.Exists(path))
-    {
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        var head = new byte[3];
-        int n = fs.Read(head, 0, 3);
-        bom = n == 3 && head[0] == 0xEF && head[1] == 0xBB && head[2] == 0xBF;
-    }
-    var bytes = new System.Text.UTF8Encoding(bom).GetPreamble().Concat(new System.Text.UTF8Encoding(false).GetBytes(text)).ToArray();
-    var tmp = Path.Combine(Path.GetDirectoryName(path)!, "." + Path.GetFileName(path) + ".saving");
-    File.WriteAllBytes(tmp, bytes);
-    try { File.Move(tmp, path, overwrite: true); }
-    catch (IOException)
-    {
-        // ไฟล์ถูกโปรแกรมอื่นจับไว้ -> เขียนตรงแทน
-        File.Delete(tmp);
-        File.WriteAllBytes(path, bytes);
-    }
-}
 
 // อ่านไฟล์แม้ editor กำลังเปิด/เขียนอยู่
 static string ReadShared(string path)

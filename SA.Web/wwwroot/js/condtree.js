@@ -26,7 +26,7 @@ function treeConditions(node, h, it, ik, depth, leaf){
          name: `Conditions <small>(${decs.length})</small>`, after: btns ? `<div class="lg-acts" style="padding-left:${6 + depth * 14 + 18}px">${btns}</div>` : "" });
   if (!isOpen(key)) return;
   if (!decs.length){ h.push(`<div class="att" style="padding-left:${6 + (depth + 1) * 14 + 18}px">ยังไม่มี${ed_ ? " — กด + Condition / + Switch" : " (เข้า Edit เพื่อเพิ่ม)"}</div>`); return; }
-  const cov = scenarios.length ? logicCoverage(it) : null;
+  const cov = projScenarios().length ? logicCoverage(it) : null;
   const walk = (parent, dep) => {
     for (const d of decs.filter(x => (x.parent || null) === parent)){
       const dk = ik + ":d:" + d.id, sw = d.kind === "switch";
@@ -103,7 +103,7 @@ const arrChipHtml = (r, g) => { const n = arrNow(r, g); return n === "off" ? `<s
 function arrSetObjs(g, k){ const m = k === 0 ? g.source : g.members[k - 1]; return m ? [...m.points.map(id => ["dpt", id]), ...m.links.map(id => ["dlink", id]), ...m.shapes.map(id => ["dshape", id])] : []; }
 function treeArrays(node, h, it, ik, depth){
   const sp = it.spec, arrs = sp.arrays || []; if (!arrs.length) return;
-  const r = drawRes[it.id], key = ik + ":arrs", cov = scenarios.length ? logicCoverage(it) : null;
+  const r = drawRes[it.id], key = ik + ":arrs", cov = projScenarios().length ? logicCoverage(it) : null;
   node({ key, depth, cls: "lg-root", s: { type: "lg", item: it.id, k: "arrs" }, name: `Arrays <small>(${arrs.length})</small>` });
   if (!isOpen(key)) return;
   for (const g of arrs){

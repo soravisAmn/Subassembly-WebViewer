@@ -38,18 +38,18 @@ function aiAccept(p){
   flashBanner(`รับข้อเสนอ ${p.id} แล้ว — ยังไม่ได้เขียนไฟล์ กด Save (.cs) เมื่อพร้อม (Ctrl+Z ย้อนได้)`);
   renderAll();
 }
+// accepted AI scenarios -> scenarios of the project (round 8 format; ground given relative to the item origin)
 function aiAddScenarios(p, it){
   if (!p.scenarios.length) return;
   const o = itemOrigin(it);
   for (const c of p.scenarios){
-    const s = snapshot(c.name), ws_ = s.ws;
-    const si = (ws_.assemblies ? ws_.assemblies.flatMap(a => a.items || []) : (ws_.items || [])).find(x => x.id === it.id);
-    if (si) si.params = { ...(si.params || {}), ...(c.values || {}) };
-    ws_.layout = !!c.layout;
-    if (c.ground){ ws_.surface = c.ground.map(q => ({ x: q.x + o.x, y: q.y + o.y })); ws_.surfaceOn = true; } else ws_.surfaceOn = false;
-    scenarios.push(s);
+    const s = { name: Scen.freeName(projScenarios(), c.name) };
+    if (c.ground) s.ground = c.ground.map(q => [q.x + o.x, q.y + o.y]);
+    if (c.values && Object.keys(c.values).length) s.params = { [it.id]: { ...c.values } };
+    s.mode = c.layout ? "layout" : c.ground ? "normal" : "notarget";
+    projScenarios().push(s);
   }
-  saveScenarios(); renderScenarios();
+  persist(); renderScenarios();
 }
 function aiReject(p){
   if (p.status !== "pending") return;

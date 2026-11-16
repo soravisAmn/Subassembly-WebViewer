@@ -81,11 +81,11 @@ header#top{grid-column:1/-1;display:flex;flex-direction:column;background:var(--
 .appbtn:hover:not(:disabled){filter:brightness(1.1)}
 .appname{font-size:12px;color:var(--muted);white-space:nowrap;margin-left:8px}
 .qa{display:flex;gap:1px;flex:none}
-.rb-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);overflow:hidden;flex:none}
+.rb-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;flex:none}
 .rb-tab{border:1px solid transparent;border-bottom:0;border-radius:4px 4px 0 0;background:transparent;padding:3px 16px;margin-bottom:-1px;color:var(--muted);white-space:nowrap}
 .rb-tab:hover:not(:disabled){border-color:transparent;color:var(--ink)}
 .rb-tab.cur{background:var(--paper);border-color:var(--line);color:var(--ink);font-weight:600}
-.ribbon{background:var(--paper);overflow-x:auto;overflow-y:hidden;flex:none}
+.ribbon{background:var(--paper);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;flex:none}
 .rb-page{display:flex;min-width:max-content;height:90px}
 .rb-panel{display:flex;flex-direction:column;border-right:1px solid var(--line);padding:3px 4px 0}
 .rb-body{flex:1;display:flex;gap:2px;align-items:flex-start}
@@ -126,6 +126,9 @@ body.rb-min.rb-peek .ribbon{display:block;position:absolute;top:100%;left:0;righ
 .rb-tip{position:fixed;z-index:40;max-width:340px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;line-height:1.55;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none}
 .rb-tip kbd{font:11px "IBM Plex Mono",monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;margin-left:4px}
 .rb-tip .why{color:var(--warn);margin-top:2px}
+/* narrow window: the ribbon panels scroll sideways (never a second row); the title row drops the app name, then the folder */
+@media (max-width:1100px){ .appname{display:none} }
+@media (max-width:760px){ .titlerow #folder{display:none} .rb-tab{padding:3px 10px} }
 header>button,.menu>button{white-space:nowrap;flex:none}
 header .proj{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 header .proj b{color:var(--ink);font-weight:500}
@@ -280,8 +283,6 @@ header .hint{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 #center{display:flex;flex-direction:column;min-width:0;min-height:0;height:100%;background:var(--paper)}
 .edit-bar{display:flex;align-items:center;gap:10px;padding:6px 14px;background:#123f8c;color:#fff;font-size:13px;min-height:40px}
 .edit-bar>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.edit-bar button{background:#fff;color:#123f8c;border-color:#fff;white-space:nowrap;flex:none}
-.edit-bar button.ghost{background:transparent;color:#fff;border-color:#9fb6e0}
 #main{position:relative;overflow:hidden;flex:1;min-height:0}
 svg#view{width:100%;height:100%;display:block;touch-action:none;user-select:none}
 .legend{position:absolute;right:10px;bottom:10px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;display:flex;gap:12px;flex-wrap:wrap;max-width:calc(100% - 20px)}

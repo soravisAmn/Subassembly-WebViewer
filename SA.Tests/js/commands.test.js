@@ -141,6 +141,15 @@ test("keyboard: contextual keys ignored outside Edit; X / B ignored during Move 
   eq(false, Commands.keyAllowed(Commands.forKey("x"), { editing: true, cmdRunning: true }), "X during Move");
 });
 
+console.log("? / F1 table");
+test("generated from the registry: every command key is in the table, rows have key + Thai / English text", () => {
+  const rows = Commands.helpRows(), keys = new Set();
+  for (const [g, list] of rows){ ok(g && list.length, "empty group " + g); for (const [k, t] of list){ ok(k && t, `${g}: row ${k} / ${t}`); keys.add(k); } }
+  const listed = rows.flatMap(([, list]) => list.map(r => r[0])).join(" / ");
+  for (const c of Commands.LIST.filter(c => c.keys && c.keys.length)) ok(listed.includes(c.shortcut), `${c.id} (${c.shortcut}) not in the ? table`);
+  ok(rows.some(([g]) => /Ribbon/.test(g)), "ribbon / palette group");
+});
+
 console.log("inventory (docs/prompts/prompt-9-design.md §1)");
 // every entry point of the UI before round 9 (frozen list)
 const OLD_ENTRIES = {

@@ -4,7 +4,7 @@ Thai labels in quotes are the text shown in the web.
 
 ## Opening a .cs file (Import)
 
-**"ไฟล์ ▾" → Import .cs** (or right-click an assembly), then choose:
+**ไฟล์ → Import .cs** (or Home › Import .cs) (or right-click an assembly), then choose:
 - **"ไฟล์ในโฟลเดอร์นี้"**: `.cs` files at the top of the open project's folder (no project = a scratch folder of this machine, `%LOCALAPPDATA%\SA-Studio\scratch`). See [projects.md](projects.md).
 - **"เปิดจากเครื่อง…"**: a file from anywhere; in Chrome or Edge the web also follows saves of that file. (After a page refresh, that item uses the remembered code; Import again to keep following the file.)
 - **"+ สร้างไฟล์ใหม่จาก template"**: creates a new `.cs` in the folder (crest of width Width + fill/cut slopes reaching Target Surface) and opens the code panel.
@@ -17,7 +17,7 @@ A `.cs` file must have a public class with a `public void Draw()` method (the sa
 
 ## Editing code in the web
 
-- **"✎ แก้โค้ด"** (or `Ctrl+E`) opens / closes the code panel for the selected subassembly; drag the panel's right edge to resize. Selecting another item in the tree switches the panel to that item's file.
+- **Output › Edit code** (or `Ctrl+E`) opens / closes the **Code** palette for the selected subassembly (a tab next to Properties; move / resize it like any palette). Selecting another item in the tree switches the panel to that item's file.
 - After typing, the drawing updates once you stop for ~0.4 s (using the panel's code even if unsaved).
 - **Auto-save to file** after ~1 s without typing (`Ctrl+S` = save now), preserving the file's format (BOM, CRLF/LF).
 - Compiler errors appear as squiggles · click a line in the red box to jump to that code.
@@ -49,12 +49,12 @@ A workspace can hold several assemblies (right-click the Workspace → **"+ Asse
 3. The assembly axis can be dragged anywhere and attached items follow as a set · the axis elevation is numeric in the assembly's Properties.
 
 - **Attach by point code** (e.g. `TrapTopOutside`): the attachment stays correct even when the point moves with the surface. A point with no code attaches by point index (the tree says "ไม่มี code" because the index can shift). If the parent no longer has that code, the tree shows ⚠ and the last position is used.
-- Clicking an item in the tree or drawing → Properties / result bar (Messages / Log / Points) are for that item, and the code panel ("✎ แก้โค้ด") opens its file. Editing code redraws every item using the same file at once.
+- Clicking an item in the tree or drawing → Properties / result palettes (Messages / Log / Points) are for that item, and the Code palette (if open) shows its file. Editing code redraws every item using the same file at once.
 - Each item has its own parameters (one file can be used by several items, e.g. left / right) · **Rename** changes only the displayed name, not the file name.
 - **Mirror** creates a copy on the opposite side (flips parameter `Side`) with everything attached to it.
 - **Remove from assembly** (the `.cs` file is not deleted): items attached to it float where they are.
-- **"ไฟล์ ▾" → Save project / Save project as… / Open project… / New project…**: see [projects.md](projects.md).
-- Points in the result bar and Properties are **relative to the origin of the selected item** (the values the code gives `Points.Add`). Tooltips on the drawing and the bottom bar show offset from the assembly axis and real elevation.
+- **ไฟล์ → Save project / Save project as… / Open project… / New project…**: see [projects.md](projects.md).
+- Points in the Points palette and Properties are **relative to the origin of the selected item** (the values the code gives `Points.Add`). Tooltips on the drawing and the bottom bar show offset from the assembly axis and real elevation.
 
 In the simulator each item gets `CurrentOffset/CurrentElevation` = the real position of its attachment point, and `CurrentSubassemblyOffset/Elevation` = the attachment point relative to the assembly axis (per the API Reference).
 

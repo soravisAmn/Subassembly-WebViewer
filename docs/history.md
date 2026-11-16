@@ -1,4 +1,4 @@
-# Project history (rounds 3 to 5b)
+# Project history (rounds 3 to 9)
 
 Condensed from the old `CLAUDE.md`. Prompts and design docs of each round are in `docs/prompts/`. Rounds 1, 2, 3 and 3b were finished in commit `ha`. Feature details are in the topic docs (see `README.md`).
 
@@ -100,6 +100,16 @@ Answers: 1-7 as proposed; 8 changed to one project per browser tab (handle in ev
 - M3: scenarios in the project file (`js/scenarios.js`): ground / differing values / mode only, Default, pending edits, export / import, old-scenario import dialog; the old snapshot code removed.
 - M4: Pack project (zip, outside files into `ext\`), `.atc` palette (`<DLL>_palette.atc`), user files moved, CLAUDE.md rules.
 - M5: `docs/projects.md`, `tests-civil3d/round8-checklist.md`.
+
+## Round 9: new UI shell (`prompt-9.md`, `prompt-9-design.md`)
+
+No Figma pass. Answers: all as proposed (Code palette tabbed with Properties, floating palettes, Build not in Quick Access, ribbon minimise remembered, dead placeholders removed; Mirror in Home › Assembly, ถ้าตัด / ถม = Daylight Cut/Fill in both panels, Regular Polygon added).
+
+- M0: inventory of every UI entry point → new place (design doc §1), dockview-core check (MIT, UMD, floating built in).
+- M1: command registry `js/commands.js`, `js/ribbon.js` (title row, ไฟล์ menu, Quick Access, Home / View / Output / AI); keyboard through the registry; Tabler icons vendored.
+- M2: contextual Draw / Modify / Logic + Finish, Edit flow (switch to Draw, return), Drawer removed (its SVGs are the Draw icons), styled tooltips with the reason a button is off, ribbon minimise.
+- M3: dockview palettes (`js/dock.js`, `lib/dockview`), layout per machine + Reset layout, View › Palettes, `panes.js` removed; MCP e2e passes (its helper fixed for the two-block `sa_status` of round 8).
+- M4: `?` table generated from the registry, narrow window (ribbon scrolls, palette minimum sizes), old layout state dropped, `docs/screen.md` rewritten, `SA.Tests/e2e/ui-smoke.js` (headless Chrome / Edge, Playwright not installed).
 
 ## Long-term plan notes
 

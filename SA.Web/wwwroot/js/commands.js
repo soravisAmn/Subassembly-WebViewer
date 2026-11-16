@@ -51,7 +51,7 @@ const Commands = (() => {
     { id: "undo", label: "Undo", icon: "arrow-back-up", shortcut: "Ctrl+Z", keys: ["ctrl+z"], tip: "ย้อนการกระทำล่าสุด",
       enabled: c => c.undo ? true : "ไม่มีอะไรให้ย้อน",
       run: () => { if (!drag){ if (cmd.name) endCmd(); undoRedo(false); } } },
-    { id: "redo", label: "Redo", icon: "arrow-forward-up", shortcut: "Ctrl+Y", keys: ["ctrl+y", "ctrl+shift+z", "ctrl+shift+y"], tip: "ทำซ้ำสิ่งที่ย้อนไป (Ctrl+Shift+Z ก็ได้)",
+    { id: "redo", label: "Redo", icon: "arrow-forward-up", shortcut: "Ctrl+Y / Ctrl+Shift+Z", keys: ["ctrl+y", "ctrl+shift+z", "ctrl+shift+y"], tip: "ทำซ้ำสิ่งที่ย้อนไป",
       enabled: c => c.redo ? true : "ไม่มีอะไรให้ทำซ้ำ",
       run: () => { if (!drag){ if (cmd.name) endCmd(); undoRedo(true); } } },
 
@@ -271,6 +271,45 @@ const Commands = (() => {
     "id:drawer-hint": "คำใบ้ใต้หัว Drawer — tooltip บอกแทน"
   };
 
+  // ---------- ? / F1 shortcut table: command rows take their key from the command, Thai text as before round 9 ----------
+  // row: "id" | { ids: [...], text } (keys joined with " / ") | { id, text } | [key, text] (mouse / typing, not a command)
+  const HELP = [
+    ["ทั่วไป", [{ id: "undo", text: "Undo" }, { id: "redo", text: "Redo" }, { id: "finish.save", text: "Save (.cs) ตอน Edit / บันทึกแถบโค้ด" },
+                { id: "code.edit", text: "แถบแก้โค้ด" }, { id: "view.fit", text: "Fit (ดูทั้งหมด)" }, { id: "surf.add", text: "Add point บนเส้น surface" },
+                { id: "help.keys", text: "ตารางนี้" }, ["Esc", "ยกเลิกคำสั่ง / เครื่องมือ / การเลือก"]]],
+    ["เลือก", [["คลิก", "เพิ่มเข้าชุดที่เลือก"], ["ลากซ้าย → ขวา", "Window (อยู่ในกรอบทั้งตัว)"], ["ลากขวา → ซ้าย", "Crossing (แตะกรอบ)"],
+               ["Shift + คลิก / คลุม", "เอาออกจากชุด"], ["Ctrl + คลิก (ต้นไม้)", "เพิ่ม / เอาออก"], { id: "sel.all", text: "เลือกทั้งหมด" }, { id: "sel.delete", text: "ลบที่เลือก" }]],
+    ["แก้ไข", [{ id: "mod.move", text: "Move" }, { id: "mod.copy", text: "Copy (วางได้หลายครั้ง, Enter = จบ)" },
+               { id: "mod.rotate", text: "Rotate (Edit mode) · ระหว่างระบุมุม: C = หมุนสำเนา · R = Reference" },
+               { id: "draw.aux", text: "Auxiliary: ระหว่างวาด = สลับโหมดของชิ้นที่จะสร้าง · มีของเลือก = สลับ point / link ที่เลือก" },
+               { ids: ["clip.copy", "clip.cut", "clip.paste"], text: "คัดลอก / ตัด / วาง" },
+               ["Enter / คลิกขวา", "จบการเลือก / จบ Copy"]]],
+    ["วาด (Edit mode)", [{ ids: ["draw.point", "draw.link", "draw.shape"], text: "Point / Link / Shape" },
+               { id: "draw.intersect", text: "Intersect: คลิก link 2 เส้น → T = ตัด / ยืดเส้นให้จบที่จุดตัด · N = ไม่ตัด (ได้แค่จุดตัด)" },
+               { id: "draw.offset", text: "Offset: คลิก link → คลิกด้าน (Tab / ตัวเลข = ตั้งระยะ · ทำซ้ำได้จน Esc)" },
+               ["Tab", "snap ตัวถัดไป (มีหลายตัว) / พิมพ์ค่า"], ["พิมพ์ตัวเลข", "พิมพ์ค่า / ระยะ"],
+               ["Enter / คลิกขวา", "จบเส้น"], ["C (ตอนวาด Polygon)", "ปิดรูป Polygon อิสระ (≥ 3 จุด)"],
+               ["Tab (Regular Polygon)", "พิมพ์ N / R / θ / ถึงกึ่งกลางด้าน · ปุ่ม + = สร้าง parameter จากช่อง"],
+               ["T / E (ตอนวาด Arc)", "Arc 3 จุด / เริ่ม-ปลาย-รัศมี (Tab ตอนเลือกความโค้ง = พิมพ์ R, ตามเข็ม, ทางยาว)"],
+               ["Tab / ตัวเลข (Fillet)", "ตั้งรัศมี Fillet (นิพจน์ / parameter ได้)"],
+               { id: "logic.branch", text: "วาดลงกิ่ง… (object ที่วาดต่อจากนี้เข้ากิ่งที่เลือก · banner บอกกิ่ง)" }]],
+    ["แถบล่าง", [{ id: "bar.osnap", text: "OSNAP เปิด/ปิด" }, ["▾ / คลิกขวาที่ OSNAP", "เมนูเลือกชนิด snap"], { id: "bar.ortho", text: "Ortho" },
+               { id: "bar.snap", text: "Grid snap (ดับเบิลคลิกปุ่ม = ตั้งระยะ ถึง 0.001 m)" },
+               { id: "bar.track", text: "Object snap tracking (ชี้ค้างบน snap = จับจุด · ชี้ค้างซ้ำ = ปล่อย · Esc = ล้าง)" },
+               ["ปุ่ม Aux", "แสดง / ซ่อน Auxiliary (ซ่อน = snap / คลุมเลือกไม่ได้)"], ["ปุ่ม ดูแบบ Civil 3D", "เห็นเฉพาะที่จะส่งออกไปจริง"]]],
+    ["พิมพ์ค่า", [["ตัวเลข", "dx / dy (มีจุดที่จับไว้ = คิดจากจุดนั้น)"], ["ระยะ<มุม ในช่อง dx", "เช่น 5<30 = ห่าง 5 ทำมุม 30° (ทวนเข็มจาก +x)"]]],
+    ["มุมมอง", [["ปุ่มกลางเมาส์ลาก / Space + ลาก", "Pan"], ["ล้อเมาส์", "Zoom"], ["Shift + ล้อเมาส์", "Zoom ทีละน้อย"],
+               { id: "view.zoomSel", text: "Zoom ไปที่ของที่เลือก (ไม่มีที่เลือก = Fit)" }]],
+    ["Ribbon / palette", [["ดับเบิลคลิกแท็บ ribbon", "ย่อ / ขยาย ribbon (ย่ออยู่: คลิกแท็บ = เปิดชั่วคราว)"],
+               ["ลากแท็บ palette", "ย้าย / รวมเป็นแท็บ / ชิดขอบ · Shift + ลาก = palette ลอย"], ["View › Palettes", "เปิด / ปิด palette · Reset layout"]]]
+  ];
+  // → [[group, [[key, text], …]], …]
+  const helpRows = () => HELP.map(([g, rows]) => [g, rows.map(r => {
+    if (Array.isArray(r)) return r;
+    if (typeof r === "string") r = { id: r };
+    const ids = r.ids || [r.id];
+    return [ids.map(id => BY_ID[id].shortcut).join(" / "), r.text || BY_ID[ids[0]].label];
+  })]);
   const get = id => BY_ID[id];
   const enabled = (id, c) => {
     const x = BY_ID[id]; if (!x) return "ไม่มีคำสั่งนี้";
@@ -292,6 +331,6 @@ const Commands = (() => {
     const x = BY_ID[id], e = c ? enabled(id, c) : true;
     return `${x.label}${x.shortcut ? ` (${x.shortcut})` : ""}\n${x.tip}${e === true ? "" : `\nใช้ไม่ได้ตอนนี้: ${e}`}`;
   };
-  return { LIST, RIBBON, FINISH, FILE_MENU, QUICK, MENU_LABEL, OLD, REMOVED, get, enabled, active, keyOf, forKey, keyAllowed, tooltip };
+  return { LIST, RIBBON, FINISH, HELP, helpRows, FILE_MENU, QUICK, MENU_LABEL, OLD, REMOVED, get, enabled, active, keyOf, forKey, keyAllowed, tooltip };
 })();
 if (typeof module !== "undefined") module.exports = Commands;

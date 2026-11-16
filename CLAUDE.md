@@ -56,9 +56,10 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 
 ## Status
 
-- Last finished: round 8 (project folders: per-tab projects, v3 project file with drafts, web file dialog, settings, scenarios in the project, Pack, `.atc` palette), M0-M5. Docs: `docs/projects.md`. History: `docs/history.md`.
+- Last finished: round 9 (new UI shell: command registry `js/commands.js`, ribbon + ไฟล์ menu + Quick Access `js/ribbon.js`, contextual Draw / Modify / Logic, dockable palettes `js/dock.js` with dockview, Drawer removed), M0-M4. Docs: `docs/screen.md`. History: `docs/history.md`. Round 8 (project folders): `docs/projects.md`.
 - The user's projects are in `D:\test_cad\SA-Projects\` (SR03, rock-pitching-compare); none left at the repo root.
-- Round 8 Civil 3D checklist passed (whole-palette drag + Refresh Palette without duplicates, Thai text OK). Next: round 9 (`prompt-9.md`): new UI shell, no Figma pass.
+- Round 8 Civil 3D checklist passed (whole-palette drag + Refresh Palette without duplicates, Thai text OK). Next: round 10 (web display: style by code, notes, dimensions, Civil 3D preview mode).
+- UI rules since round 9: a new command = an entry in `js/commands.js` (label, icon, Thai tip, enable rule, keys) placed in `RIBBON` / `FILE_MENU` and, if it has a key, in `HELP` (the `?` table); a new palette = `DockLayout.PALETTES` + `.pal` in `index.html` + a View › Palettes toggle. UI smoke: `SA.Tests/e2e/ui-smoke.js` against a test server.
 - Round 7 Civil 3D run: `.atc` needs the full DLL path (now the only form), Side list OK, re-adding the catalog duplicated the tools (round 8 adds a palette + Refresh Palette to test).
 - Round 6 M5 Civil 3D run: shapes filled crossed (link order in `Shapes.Add`). Fixed in shim + generator (`docs/civil3d-testing.md`).
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.

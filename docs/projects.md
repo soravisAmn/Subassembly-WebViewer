@@ -20,7 +20,7 @@ D:\test_cad\SA-Projects\SR03\     ← any folder, any drive; move / copy / zip i
 - **Machine values are not in the project**: Copy-to, Civil 3D install folder, recent projects, start folder (app settings, below), window / panel layout (browser).
 - Your projects (since 15 Nov 2026): `D:\test_cad\SA-Projects\SR03\`, `D:\test_cad\SA-Projects\rock-pitching-compare\`. The repo keeps only test copies (`SA.Tests/fixtures/`, `tests-civil3d/round6/`).
 
-## "ไฟล์ ▾" menu
+## "ไฟล์" menu (application button left of the ribbon tabs; the common commands are also in Home › Project)
 
 | Item | Does |
 |---|---|
@@ -74,7 +74,7 @@ Test cases of the project (left panel), saved in the project file.
 - **"Default"** (always first) = the project's own values. Click a case = apply it: only the ground / values / mode change, **the drawing never changes**, and it is not an undo step.
 - **"+ บันทึกกรณีนี้"** = a new case from the values in use now (it becomes the active one).
 - Editing the ground or a parameter while a case is active is **temporary**: the case gets `*`; **"อัปเดต"** saves the edits into it. Switching case / going to Default with edits asks **อัปเดตกรณีนี้ / ทิ้ง / ยกเลิก**. The project's values (what Save project writes) never change while a case is active.
-- Row buttons: ✎ rename · ⇩ export `name.scenario.json` · × delete. "ไฟล์ ▾" → Export scenarios = all cases as `project.scenarios.json`; Import accepts one case, a list, or old-format files (converted).
+- Row buttons: ✎ rename · ⇩ export `name.scenario.json` · × delete. ไฟล์ → Export scenarios (or Output › Export scenarios) = all cases as `project.scenarios.json`; Import accepts one case, a list, or old-format files (converted).
 - Branch / Loop coverage (Logic tab), Build checks and `sa_check` use these cases; cases from an accepted AI proposal are added here.
 - **"นำเข้า scenario เก่า"**: the first time a project opens in a browser that still has the old browser list (`sav2.scenarios`), the web lists those cases (name, items, how many match this project by id or file) to tick and import (ground + mode + differing values; drawings skipped). Asked once per project; the old list is never deleted.
 

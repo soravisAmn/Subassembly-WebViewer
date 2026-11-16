@@ -43,8 +43,8 @@ function baseState(){
     view: { cx: 1.5, cy: -1.8, scale: 42, ve: 1 },
     showCodes: true, bar: defaultBar(),
     file: null,                 // ไฟล์ที่แถบแก้โค้ดเปิดอยู่ (ตาม subassembly ที่เลือก)
-    dock: { open: true, tab: "msg" },
-    editorOpen: false
+    editorOpen: false,
+    ribbon: { tab: "home" }     // ribbon tab (js/ribbon.js) · palettes: js/dock.js (per machine)
   };
 }
 // Round 8: each browser tab holds its own project. The tab's workspace lives in sessionStorage (survives a reload of
@@ -71,11 +71,13 @@ function loadState(){
     st.bar.osnap = Object.assign(defaultBar().osnap, s.bar && s.bar.osnap);
     if (!st.ws.assemblies || !st.ws.assemblies.length) st.ws.assemblies = [newAssembly("Assembly 1")];
     st.view.scale = View.clampScale(st.view.scale);            // ซูมที่จำไว้ต้องอยู่ในช่วงที่ใช้ได้
+    // panel sizes / bottom dock of the layout before round 9 (now dockview palettes, js/dock.js)
+    for (const k of ["dock", "edWidth", "leftW", "rightW", "scH", "scFold", "drawerH", "drawerFold"]) delete st[k];
     return st;
   }
   // ครั้งแรกหลังอัปเดต: ย้ายค่าจาก viewer เดิม (โหมด Assembly หรือไฟล์เดียว) เข้า workspace
   const old = store.get("sav2.state", {}), st = baseState();
-  for (const k of ["surface", "surfaceOn", "layout", "originElevation", "extendEnds", "showCodes", "edWidth", "editorOpen"])
+  for (const k of ["surface", "surfaceOn", "layout", "originElevation", "extendEnds", "showCodes", "editorOpen"])
     if (old[k] != null) st[k] = old[k];
   if (old.view) st.view = old.view;
   if (old.snap) st.bar.snap = true;

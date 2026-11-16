@@ -4,25 +4,48 @@ Thai labels in quotes are the text shown in the web.
 
 ## Screen layout
 
-| Part | Where | Contents |
-|---|---|---|
-| Ribbon (round 9) | Top | Title row: **"ไฟล์"** application menu (Import .cs, new .cs, Open / Save / Save as / New / Pack project, recent projects, Build, Export / Import scenarios, ตั้งค่า…), **Quick Access** (Save project, Undo, Redo), project name `*` + folder. Tabs **Home** (Project, Import, Assembly, Surface, Clipboard) · **View** (Fit / Zoom selection, Design / Civil 3D preview, Aux / Codes / Grid, VE, Scenario) · **Output** (Build, Edit code (Ctrl+E), View generated code, Export / Import scenarios) · **AI** (Proposals + count, เชื่อม Claude + status). Every button comes from the command registry `js/commands.js` (tooltip = name, shortcut, Thai line, why it is disabled); View toggles are the same state as the status-bar buttons. In Edit mode the teal contextual tabs **Draw** (Draw, Surface, Construct) · **Modify** · **Logic** (Parameters, Variables, Conditions, Draw into branch, ถ้าตัด / ถม) appear, each ending with **Finish** (Save (.cs), ออกจาก Edit); entering Edit switches to Draw, leaving returns to the previous tab. **Double-click a tab** = minimise / restore the ribbon (remembered on this machine); minimised, a click on a tab shows its panels until a command runs |
-| Palettes (round 9 M3, `js/dock.js` + dockview) | Around the workspace | **Workspace** (tree) and **Scenarios** on the left · **Properties** on the right (**Code** opens as a tab next to it with Ctrl+E) · **Messages / Log / Points / Logic / AI** as one tab group under the workspace (dark like the drawing; each says which subassembly it shows; badges on the tabs) |
-| Workspace | Centre | Cross-section (dark CAD-style background); no tab, cannot be closed or floated; palettes dock beside it, never over it |
-| Status bar | Bottom | Mouse coordinates, Grid, Grid snap (F9), Ortho (F8), preset slopes, OSNAP (F3) + `▾` type menu, Aux, ดูแบบ Civil 3D, codes, VE, Fit, server status |
+Round 9 shell (AutoCAD / Civil 3D style): title row + ribbon on top, dockable palettes around the workspace, status bar at the bottom.
 
-- **Palettes** can be dragged by their tab: onto another palette's tab bar = tab together, to an edge = dock beside; **Shift + drag** a tab out = floating palette. Drag the border between palettes to resize. **×** on a tab closes it; **View › Palettes** reopens / closes each palette and **Reset layout** puts everything back.
-- The layout is remembered **per machine** (browser storage, key `sa.layout`); a saved layout from an older version or a broken one is ignored (default layout, no error). Open / closed Code palette follows the code panel of each browser tab.
+```
+┌ title row  [ไฟล์] [Save][Undo][Redo] │ project name *  folder ┐
+├ tab row    Home  View  Output  AI  │ Draw  Modify  Logic   (contextual, Edit only, teal) ┤
+├ ribbon     panels of the active tab … [Finish: Save (.cs) | ออกจาก Edit] ┤
+├ edit bar   "✎ กำลังแก้ X …" (only in Edit) ┤
+├ palettes   Workspace / Scenarios │ workspace (centre) │ Properties / Code ; Messages · Log · Points · Logic · AI under the workspace ┤
+└ status bar ┘
+```
+
+| Part | Contents |
+|---|---|
+| **ไฟล์** (application button) | Import .cs, new .cs from template, Open / Save / Save as / New / Pack project, recent projects, Build, Export / Import scenarios, ตั้งค่า… |
+| **Quick Access** | Save project, Undo, Redo |
+| **Home** | Project (New, Open, Save, Save as, Pack) · Import (Import .cs, New .cs) · Assembly (Edit, New assembly, Add subassembly, Mirror) · Surface (Add point `A`, Reset surface) · Clipboard (Cut, Copy, Paste, Delete, Select all) |
+| **View** | Navigate (Fit `F`, Zoom selection `Z`) · Mode (Design / Civil 3D preview) · Show (Aux, Codes, Grid) · VE 1 / 2 / 5 · Scenario dropdown (same as clicking in Scenarios) · Palettes (one toggle per palette + Reset layout) |
+| **Output** | Build · Code (Edit code `Ctrl+E`, View generated code) · Scenarios (Export, Import) |
+| **AI** | Proposals (opens the AI palette, count badge) · Claude (เชื่อม Claude = the steps of [connect-claude.md](connect-claude.md), connection status) |
+| **Draw** (Edit) | Draw (Point `P`, Link `L`, Shape `S`, Polygon, Regular Polygon, Arc) · Surface (Slope to Surface, Follow Surface, Extend to Surface, Clipped Surface Link, Daylight Cut/Fill) · Construct (Intersect `I`, Offset `O`, Fillet, Array, Auxiliary `X`) |
+| **Modify** (Edit) | Move `M`, Copy `C`, Rotate `R`, Delete |
+| **Logic** (Edit) | Parameters (table in Properties), Variables (node in the Workspace tree), Conditions (Logic palette), Draw into branch `B`, ถ้าตัด / ถม (= Daylight Cut/Fill) |
+| **Finish** (right end of Draw / Modify / Logic) | Save (.cs) `Ctrl+S`, ออกจาก Edit |
+| Palettes | **Workspace** (tree) and **Scenarios** on the left · **Properties** on the right, **Code** opens as a tab next to it with `Ctrl+E` · **Messages / Log / Points / Logic / AI** as one tab group under the workspace (dark like the drawing; each says which subassembly it shows; counts on the tabs) |
+| Workspace (centre) | Cross-section (dark CAD-style background); no tab, cannot be closed or floated; palettes dock beside it, never on it |
+| Status bar | Mouse coordinates, Grid, Grid snap (F9), Ortho (F8), preset slopes, OSNAP (F3) + `▾` type menu, Aux, ดูแบบ Civil 3D, codes, VE, Fit, Claude status, server status |
+
+- **Ribbon**: every button, the ไฟล์ menu, Quick Access, keys and the `?` table come from one command registry (`js/commands.js`). **Tooltip** = name, shortcut, one Thai line, and why the button is off (a click on an off button says it in the banner). View toggles (Aux, Codes, Grid, Civil 3D preview, VE) are the same state as the status-bar buttons.
+- **Edit flow** (as Civil 3D): entering Edit (tree, right-click, Home › Edit, ADD) shows the teal Draw / Modify / Logic tabs and switches to Draw; leaving returns to the tab you were on.
+- **Double-click a ribbon tab** = minimise / restore the ribbon (remembered on this machine); minimised, a click on a tab shows its panels over the drawing until a command runs or you click elsewhere. Narrow window: panels scroll sideways (never a second row), the title row drops the app name, then the folder.
+- **Palettes** are moved by their tab: onto another palette's tab bar = tab together, to an edge = dock beside; **Shift + drag** a tab out = floating palette. Drag the border between palettes to resize (each keeps a minimum size, the workspace at least 320 px). **×** on a tab closes it; **View › Palettes** reopens / closes each palette and **Reset layout** puts everything back.
+- The palette layout is remembered **per machine** (browser storage `sa.layout`); a layout saved by an older version or a broken one is ignored (default layout, no error). The Code palette follows the code panel of each browser tab.
 - **Dialogs** (Daylight Cut/Fill, Extend to Surface, Clipped Surface Link, Array, Import, Open project, Shortcut, etc.): **×** / **"ยกเลิก"** / **`Esc`** / clicking the dark background all cancel the same way: close the dialog + end the tool that opened it (nothing changes).
   - If a field has typed / pending edits, clicking the background does not close (a warning appears in the dialog; press × / "ยกเลิก" / Esc to discard) · small value boxes (Offset, Fillet, Move, etc.) have a **×** in their header = `Esc` for that box.
 - **Click** in the tree or on the drawing = select (selected points / links / shapes turn orange on the drawing and their values appear in Properties). For multiple selection see [Selection](#selection-window--crossing).
 - **Pan** = drag with the middle mouse button (AutoCAD-style) or hold `Space` and drag with the left button (touchpad) · wheel = zoom (see [View / zoom](#view--zoom)).
-- **Right-click** a subassembly (tree or drawing): Edit, "✎ แก้โค้ด", Rename, Save as .cs, Move, Copy, Mirror, remove from assembly ("My Shapes" comes in phase two) · right-click a drawn point / link / shape: Move, Copy, delete.
+- **Right-click** a subassembly (tree or drawing): Edit, "✎ แก้โค้ด", Rename, Save as .cs, Move, Copy, Mirror, remove from assembly · right-click a drawn point / link / shape: Move, Copy, Rotate, Auxiliary, delete. Entries that repeat a ribbon command take its name / shortcut from the registry.
 - **Right-click** an assembly (or the ⊞ axis on the drawing): **ADD** (new subassembly, then enters Edit), Import .cs into this assembly, Rename, delete assembly.
 - **Right-click** the Workspace / empty space: + new Assembly, Import .cs, Fit.
-- **Edit mode**: a blue bar on top reads "กำลังแก้ X"; other items are dimmed and cannot be clicked / dragged · press **"ออกจาก Edit"** to go back (see [drawing-tools.md](drawing-tools.md)). The **Save (.cs)** button (or Ctrl+S) writes the drawn part to the file (see [code-generation.md](code-generation.md)).
+- **Edit mode**: a blue bar under the ribbon reads "กำลังแก้ X"; other items are dimmed and cannot be clicked / dragged · **Finish › ออกจาก Edit** goes back (see [drawing-tools.md](drawing-tools.md)). **Finish › Save (.cs)** (or Ctrl+S) writes the drawn part to the file (see [code-generation.md](code-generation.md)).
 - Ortho, preset slopes (click = lock, double-click = edit value) and OSNAP apply while drawing.
-- All settings (workspace, expanded tree nodes, bottom bar) are remembered in the browser and survive a refresh. On the first run after an update the web migrates old data itself: the old assembly → Assembly 1, a file opened in single-file mode → one subassembly attached to the axis.
+- Workspace, expanded tree nodes, status bar and ribbon tab are remembered per browser tab and survive a refresh. On the first run after an update the web migrates old data itself: the old assembly → Assembly 1, a file opened in single-file mode → one subassembly attached to the axis; panel sizes of the layout before round 9 are dropped.
 
 ## Selection (Window / Crossing)
 
@@ -46,7 +69,7 @@ AutoCAD-style (as with PICKADD = add to the set):
 
 ## Shortcuts (press `?` or `F1` in the web for this table)
 
-No shortcut works while typing in a field / the code panel / a dialog.
+No shortcut works while typing in a field / the code panel / a dialog. The web's `?` table is generated from the command registry (`js/commands.js`, `HELP`): a new shortcut goes there, and `commands.test.js` fails if a key is missing from the table or used twice. Options inside a command (Arc T / E, Intersect T / N, Polygon C, Rotate C / R) beat general shortcuts.
 
 | Key | Action |
 |---|---|

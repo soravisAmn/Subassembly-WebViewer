@@ -68,7 +68,7 @@ Read tools show the pending proposal when there is one; `view: "real"` shows the
 
 ## Proposals
 
-- The AI tab in the bottom dock lists pending proposals: Claude's summary, a diff, warnings, and the buttons **"รับทั้งหมด"** / **"ปฏิเสธ"**. With more than one op, a slider steps through the result (view only).
+- The **AI** palette (under the workspace; ribbon **AI › Proposals** opens it, with the count) lists pending proposals: Claude's summary, a diff, warnings, and the buttons **"รับทั้งหมด"** / **"ปฏิเสธ"**. With more than one op, a slider steps through the result (view only).
 - While a proposal is pending, the drawing shows it instead: green = added, orange = changed, red dashes = removed.
 - Accepting is one Undo step and does not write a file; press **Save (.cs)** yourself.
 - If you edit the subassembly while a proposal is pending, the proposal is cancelled with a notice, and Claude is told to read again.

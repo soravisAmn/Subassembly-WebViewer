@@ -4,7 +4,7 @@ Builds the subassemblies of one project (`*.assembly.json`) into one DLL per Civ
 
 ## Build dialog (`js/build.js`)
 
-Open it from **"ไฟล์ ▾" → "Build…"** or the **Build** button on the menu bar. The project must be saved first, because the build uses the saved project file and the `.cs` files on disk.
+Open it from **ไฟล์ → Build…** or **Output › Build** on the ribbon. The project must be saved first, because the build uses the saved project file and the `.cs` files on disk.
 
 | Part | Does |
 |---|---|
@@ -15,7 +15,7 @@ Open it from **"ไฟล์ ▾" → "Build…"** or the **Build** button on th
 | ชื่อ DLL | Default = project name |
 | Civil 3D | One tick per version found; versions that cannot be built are greyed with the reason. Default: the newest that can be built |
 | Output | `build\<DLL>\<year>\` per ticked version |
-| Copy to | Machine setting (tick + absolute folder that exists) in `settings.json`; since round 8 it is edited in "ไฟล์ ▾ → ตั้งค่า…" and the Build dialog only shows it (button "ตั้งค่า…"). After a successful build: `<DLL>.dll`, both `.atc` files and `icons\<DLL>\` are copied there (only that icon subfolder is replaced; nothing else in the folder is touched). With several versions ticked, only the newest is copied (one folder cannot hold two same-named DLLs) |
+| Copy to | Machine setting (tick + absolute folder that exists) in `settings.json`; since round 8 it is edited in "ไฟล์ → ตั้งค่า…" and the Build dialog only shows it (button "ตั้งค่า…"). After a successful build: `<DLL>.dll`, both `.atc` files and `icons\<DLL>\` are copied there (only that icon subfolder is replaced; nothing else in the folder is touched). With several versions ticked, only the newest is copied (one folder cannot hold two same-named DLLs) |
 | ตรวจก่อน build | Runs when the dialog opens, on every change, and on "ตรวจอีกครั้ง". Errors first, then warnings. The page adds "ส่วนที่วาดยังไม่ได้ Save (.cs)" for unsaved drawings of built files |
 | Build | Disabled while there is an error (or nothing to build). A same-named DLL in another folder → OK / Cancel box "มี DLL ชื่อนี้อยู่แล้ว" (decision 4), OK = build with `allowSameName`. Shows progress, then per version: DLL path, `.atc` path (in the Copy-to folder when copied), copy result, compiler errors, parameter changes ("ลบเครื่องมือเก่าออกจาก palette แล้วลากใหม่"), and "ดูรายงาน" (the report rendered in the dialog + the path of `report.md`) |
 | สร้าง Source package | Writes the zip (below) and shows its path, warnings and the report |

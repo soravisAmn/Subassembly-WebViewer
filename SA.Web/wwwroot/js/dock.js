@@ -111,6 +111,14 @@ const Dock = typeof window === "undefined" || !window["dockview-core"] ? null : 
     const p = api.getPanel("main"); if (!p) return;
     p.group.header.hidden = true;      // no tab: the workspace cannot be dragged, floated or closed
     p.group.locked = true;             // palettes dock beside it, never as tabs over it
+    sizeLimits();
+  }
+  // minimum sizes (narrow window: palettes stop shrinking before their text breaks letter by letter; the workspace keeps 320 px)
+  function sizeLimits(){
+    for (const g of api.groups){
+      const main = g.panels.some(p => p.id === "main");
+      try{ g.api.setConstraints(main ? { minimumWidth: 320, minimumHeight: 200 } : { minimumWidth: 190, minimumHeight: 90 }); }catch{}
+    }
   }
   function buildDefault(){
     quiet++;
@@ -146,6 +154,7 @@ const Dock = typeof window === "undefined" || !window["dockview-core"] ? null : 
     // the Code palette follows the code panel of this tab (state.editorOpen opens it again in main.js)
     if (has("code") && !(typeof ed !== "undefined" && ed.open)){ quiet++; try{ api.getPanel("code").api.close(); }finally{ quiet--; } }
     api.onDidLayoutChange(() => { save(); if (typeof updateRibbon === "function") updateRibbon(); });
+    api.onDidAddGroup(() => setTimeout(sizeLimits));
     api.onDidRemovePanel(p => {
       if (quiet) return;
       if (p.id === "code" && typeof ed !== "undefined" && ed.open) closeEditor();

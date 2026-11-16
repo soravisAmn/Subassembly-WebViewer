@@ -8,7 +8,7 @@ Test sets live in `tests-civil3d/`. Thai labels in quotes are the text shown in 
 
 - Build like your other `.cs` files, then follow `tests-civil3d/round3-checklist.md` (7 items in Thai + a table of expected coordinates).
 - The same file passes the JS vs C# comparison (Right / Left) in `dotnet run --project SA.Tests`. What remains to check in real Civil 3D is appearance, corridor weight, Code Set Style.
-- View in the web: copy `round3-demo.assembly.json` to the folder of `run-viewer.bat` → "ไฟล์ ▾" → Open project (the web opens files only in that folder).
+- View in the web: copy `round3-demo.assembly.json` to the folder of `run-viewer.bat` → ไฟล์ → Open project (the web opens files only in that folder).
 
 ## Round 4
 
@@ -19,7 +19,7 @@ Test sets live in `tests-civil3d/`. Thai labels in quotes are the text shown in 
 
 ## Round 8: project folders, .atc palette
 
-Open SR03 from `D:\test_cad\SA-Projects\SR03\`, set Copy-to in "ไฟล์ ▾ → ตั้งค่า…", Build, then in Civil 3D drag the **whole palette** `SR03` once from the catalog; after a new build, right-click the palette → **Refresh Palette** (does it update without duplicates?). Also checks Thai text, read-only second tab, scenarios and Pack. Follow `tests-civil3d/round8-checklist.md` (results table at the end).
+Open SR03 from `D:\test_cad\SA-Projects\SR03\`, set Copy-to in "ไฟล์ → ตั้งค่า…", Build, then in Civil 3D drag the **whole palette** `SR03` once from the catalog; after a new build, right-click the palette → **Refresh Palette** (does it update without duplicates?). Also checks Thai text, read-only second tab, scenarios and Pack. Follow `tests-civil3d/round8-checklist.md` (results table at the end).
 
 ## Round 7: Build dialog, .atc, icons, report
 
@@ -49,7 +49,7 @@ Also found with the stricter simulator:
 
 ## Round 5b: round5b-demo, fill embankment with a berm every BermInterval (Loop)
 
-`tests-civil3d/round5b-demo.cs` = subassembly `TestSubassembly.Round5bDemo` built with the web's tools only (sequence = `buildRound5b()` in `SA.Tests/js/round5bdemo.test.js`, every step through the Logic API), saved through `/api/drawing/save` · view in the web: "ไฟล์ ▾" → Open project → `round5b-demo.assembly.json` (drag the ground point at the shoulder up / down and the number of benches changes live).
+`tests-civil3d/round5b-demo.cs` = subassembly `TestSubassembly.Round5bDemo` built with the web's tools only (sequence = `buildRound5b()` in `SA.Tests/js/round5bdemo.test.js`, every step through the Logic API), saved through `/api/drawing/save` · view in the web: ไฟล์ → Open project → `round5b-demo.assembly.json` (drag the ground point at the shoulder up / down and the number of benches changes live).
 
 - **Variable `FillH`** = fill height at the shoulder (`P2.y - ground(P2)` · no ground = `LayoutH`) → **`HighFill`** = `FillH > BermInterval`.
 - Branch with berms: **Loop A1**, set "slope down `BermInterval` → berm `BermW`", N = `max(1, floor(FillH / BermInterval))`, max 10 · sets joined by a shared point · dx = `BermW + BermInterval * (FillSlope + SlopeInc * i)` (lower benches are flatter) · **last-set point** (lastOf) → final slope to the ground at 1:(FillSlope + SlopeInc × `count(A1)`).
@@ -59,7 +59,7 @@ Also found with the stricter simulator:
 
 ## Round 5: round5-demo, embankment
 
-`tests-civil3d/round5-demo.cs` = subassembly `TestSubassembly.Round5Demo` built with the web's tools only (sequence = `buildRound5()` in `SA.Tests/js/round5demo.test.js`, every step through the Logic API), saved through `/api/drawing/save` (the path of the Save (.cs) button) · view in the web: "ไฟล์ ▾" → Open project → `round5-demo.assembly.json`.
+`tests-civil3d/round5-demo.cs` = subassembly `TestSubassembly.Round5Demo` built with the web's tools only (sequence = `buildRound5()` in `SA.Tests/js/round5demo.test.js`, every step through the Logic API), saved through `/api/drawing/save` (the path of the Save (.cs) button) · view in the web: ไฟล์ → Open project → `round5-demo.assembly.json`.
 
 - **switch `ProtectionType`**: 1 rock (shape `Rock`) · 2 concrete (shape `Concrete`) · others no protection layer, on top of the crest.
 - **Daylight Cut/Fill** at the shoulder → **elif `HighFill`** in the fill branch (shoulder higher than ground by more than `BermH`): high fill = slope down `BermH` → **berm** `BermW` → slope to the ground · normal fill = the original fill slope.

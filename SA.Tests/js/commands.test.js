@@ -61,14 +61,25 @@ test("ribbon, ไฟล์ menu and Quick Access name existing commands", () => 
   for (const id of [...ribbonIds(), ...Commands.QUICK, ...Commands.FILE_MENU.filter(x => x !== "-" && x !== "recent")])
     ok(Commands.get(id), "unknown command " + id);
 });
-test("always-visible tabs are Home, View, Output, AI (no empty tabs)", () => {
-  eq("home,view,output,ai", Commands.RIBBON.map(t => t.id).join(","), "tabs");
+test("always-visible tabs Home, View, Output, AI + contextual Draw, Modify, Logic (no empty tabs)", () => {
+  eq("home,view,output,ai", Commands.RIBBON.filter(t => !t.contextual).map(t => t.id).join(","), "tabs");
+  eq("draw,modify,logic", Commands.RIBBON.filter(t => t.contextual).map(t => t.id).join(","), "contextual tabs");
   for (const t of Commands.RIBBON) ok(t.panels.length && t.panels.every(p => p.items.length), t.id + ": empty panel");
+  eq("finish.save,finish.exit", Commands.FINISH.items.join(","), "Finish panel");
 });
-test("ribbon / menu / Quick Access icons exist in lib/tabler (VE buttons are text only)", () => {
-  for (const id of new Set([...ribbonIds(), ...Commands.QUICK])){
+test("every Edit-only command is on a contextual tab; contextual tabs hold only Edit commands (+ Move / Copy / Rotate / Delete)", () => {
+  const onCtx = new Set(Commands.RIBBON.filter(t => t.contextual).flatMap(t => t.panels.flatMap(p => p.items.map(x => Array.isArray(x) ? x[0] : x))).concat(Commands.FINISH.items));
+  for (const c of Commands.LIST.filter(c => c.edit)) ok(onCtx.has(c.id), c.id + " not on a contextual tab");
+  for (const id of onCtx) ok(Commands.get(id).edit || /^(mod\.|sel\.delete)/.test(id), id + " is not an Edit command");
+  ok(onCtx.has("draw.ngon"), "Regular Polygon (Q6)");
+  const logic = Commands.RIBBON.find(t => t.id === "logic").panels[0].items.map(x => Array.isArray(x) ? x[0] : x);
+  ok(logic.includes("draw.cutfill"), "ถ้าตัด / ถม in Logic (Q2)");
+});
+test("ribbon / menu / Quick Access icons exist in lib/tabler or are Drawer SVGs (VE buttons are text only)", () => {
+  for (const id of new Set([...ribbonIds(), ...Commands.QUICK, ...Commands.FINISH.items])){
     const c = Commands.get(id);
     if (/^view\.ve/.test(id)) continue;
+    if (c.svg){ ok(/^<(path|circle|text)/.test(c.svg), id + ": bad svg"); continue; }
     ok(c.icon, id + ": no icon");
     ok(fs.existsSync(path.join(WWW, "lib/tabler", c.icon + ".svg")), `${id}: lib/tabler/${c.icon}.svg missing`);
   }

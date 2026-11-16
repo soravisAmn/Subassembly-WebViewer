@@ -4,7 +4,7 @@ Thai labels in quotes are the text shown in the web. Arrays and Loops are in [ar
 
 Right-click a subassembly → **Edit** (or right-click an assembly → **ADD** = a new empty subassembly with point P1 at the origin).
 
-| Tool (Drawer) | Key | Use |
+| Tool (ribbon Draw tab) | Key | Use |
 |---|---|---|
 | Point | `P` | Click to place a point (referenced from the selected point; nothing selected = from the origin) |
 | Link | `L` | Keep clicking = polyline · end points are created automatically · clicking an existing point reuses it · right-click / `Enter` = finish the line |

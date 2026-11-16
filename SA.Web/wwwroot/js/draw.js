@@ -1,4 +1,4 @@
-// วาดใน Edit mode: เครื่องมือใน Drawer, snap, พิมพ์ค่า (Tab), Undo/Redo
+// วาดใน Edit mode: เครื่องมือของแท็บ Draw, snap, พิมพ์ค่า (Tab), Undo/Redo
 //
 // ทุกคลิกถูกแปลงเป็น "ความหมาย" ก่อนเก็บลง spec ของ subassembly ที่แก้อยู่ (ดู spec.js):
 //   ชนจุดที่มีอยู่ = ใช้จุดเดิม · จุดของโค้ดเดิม = external (point code) · กึ่งกลาง link = between 0.5
@@ -222,7 +222,7 @@ function setTool(t){
   draw.tool = t; draw.chain = []; draw.cand = null; draw.hover = null; draw.ix = null; draw.list = []; draw.lastCyc = null; closeTyping(); tip.style.display = "none";
   if (!t) document.body.classList.remove("aux-mode");
   trackClear();                                   // จบ / เปลี่ยนเครื่องมือ = ล้างจุดที่จับไว้ (แบบ AutoCAD)
-  for (const b of document.querySelectorAll("#drawer [data-tool]")) b.classList.toggle("on", b.dataset.tool === t);
+  if (typeof updateRibbon === "function") updateRibbon();      // the tool button on the Draw tab shows as pressed
   showBanner(drawBanner());
   render();
 }
@@ -268,11 +268,7 @@ function setArcMode(m){
   draw.chain = draw.chain.slice(0, 1);
   showBanner(drawBanner()); refreshSnap();
 }
-document.getElementById("drawer").addEventListener("click", e => {
-  const b = e.target.closest("[data-tool]"); if (!b || b.disabled) return;
-  pickTool(b.dataset.tool);
-});
-// a draw tool from a button (Drawer / ribbon Draw tab): toggles the tool; Daylight Cut/Fill and Array act on the selection first
+// a draw tool from a button (ribbon Draw tab): toggles the tool; Daylight Cut/Fill and Array act on the selection first
 function pickTool(t){
   // ถ้าตัด / ถม: เลือกจุดไว้จุดเดียว = ใช้เป็นจุดบานพับเลย ไม่งั้นให้คลิกจุด
   if (t === "cutfill"){ const it = editItem(), s = pickedList().filter(o => o.item === it.id); if (s.length === 1 && s[0].type === "dpt"){ setTool(null); return openCutFill(it, s[0].id); } }
@@ -280,10 +276,9 @@ function pickTool(t){
   if (t === "array"){ setTool(null); return openArray(editItem()); }
   setTool(draw.tool === t ? null : t);
 }
+// leaving Edit drops the tool (the Draw tab buttons themselves: js/ribbon.js)
 function renderDrawer(){
-  const on = !!state.editing;
-  for (const b of document.querySelectorAll("#drawer [data-tool]")) b.disabled = !on || !!b.dataset.later;
-  if (!on && draw.tool) setTool(null);
+  if (!state.editing && draw.tool) setTool(null);
 }
 
 // ---------------- snap ----------------

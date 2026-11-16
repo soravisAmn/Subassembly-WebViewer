@@ -1,9 +1,9 @@
-// ลากปรับความกว้างแถบซ้าย (ต้นไม้ Workspace) / แถบขวา (Drawer + Properties) แบบ VS Code (รอบ 4d)
+// ลากปรับความกว้างแถบซ้าย (ต้นไม้ Workspace) / แถบขวา (Properties) แบบ VS Code (รอบ 4d)
 //   ค่าเก็บใน state.leftW / state.rightW (จำในเบราว์เซอร์พร้อม state อื่น — store อ่าน / เขียนแบบ try/catch) → ตัวแปร CSS --lw / --rw
 //   ขอบเขต: ซ้าย 200–600 · ขวา 240–600 · workspace ตรงกลางเหลืออย่างน้อย 320 px (จอเล็ก = บีบแถบก่อน ไม่เปลี่ยนค่าที่จำไว้)
 //   ดับเบิลคลิกที่ขอบ = ค่าเริ่มต้น 280 / 300 · จอแคบ (≤ 900 px) ซ่อนตัวลาก (CSS)
-// แต่ละแถบแบ่งเป็น 2 แผงเลื่อนแยกกัน: ซ้าย = ต้นไม้ / Scenarios · ขวา = Drawer / Properties
-//   เส้นลากแนวนอนปรับความสูง Scenarios / Drawer (state.scH / drawerH) · คลิกหัวแผง = พับ / กาง (state.scFold / drawerFold)
+// แถบซ้ายแบ่งเป็น 2 แผงเลื่อนแยกกัน: ต้นไม้ / Scenarios · แถบขวา = Properties
+//   เส้นลากแนวนอนปรับความสูง Scenarios (state.scH) · คลิกหัวแผง = พับ / กาง (state.scFold) · the right side has only Properties since round 9
 "use strict";
 const PANE = { left: { def: 280, min: 200, max: 600, key: "leftW", css: "--lw" }, right: { def: 300, min: 240, max: 600, key: "rightW", css: "--rw" } };
 const CENTER_MIN = 320;
@@ -57,15 +57,14 @@ for (const [id, side] of [["lw-resize", "left"], ["rw-resize", "right"]]){
   h.addEventListener("dblclick", () => { delete state[PANE[side].key]; applyPaneWidths(); persist(); flashBanner(`ความกว้างแถบ${side === "left" ? "ซ้าย" : "ขวา"}กลับเป็นค่าเริ่มต้น ${PANE[side].def} px`); });
 }
 // ---------------- แบ่งแถบเป็น 2 แผง (แนวนอน) ----------------
-// แผง .sized (Drawer / Scenarios) สูงตามที่ลาก — ยังไม่ลาก = ตามเนื้อหาไม่เกิน --auto-max (CSS) · แผง .grow ได้ที่เหลือ
+// แผง .sized (Scenarios) สูงตามที่ลาก — ยังไม่ลาก = ตามเนื้อหาไม่เกิน --auto-max (CSS) · แผง .grow ได้ที่เหลือ
 //   sizedBelow = แผงที่ปรับได้อยู่ใต้เส้นแบ่ง (Scenarios) → ลากขึ้น = สูงขึ้น · state[key] = ความสูง (px) · state[fold] = พับอยู่
 const SPLITS = {
-  right: { split: "split-right", sec: "sec-drawer", key: "drawerH", fold: "drawerFold", name: "Drawer", min: 60, keep: 120, sizedBelow: false },
   left:  { split: "split-left",  sec: "sec-sc",     key: "scH",     fold: "scFold",     name: "Scenarios", min: 50, keep: 120, sizedBelow: true }
 };
 // ความสูงสูงสุดของแผงที่ปรับได้ = สูงของแถบ − keep (แผงอีกฝั่งเหลืออย่างน้อย keep px)
 function applySplits(){
-  for (const side of ["left", "right"]){
+  for (const side of Object.keys(SPLITS)){
     const s = SPLITS[side], sec = $(s.sec), folded = !!state[s.fold];
     sec.classList.toggle("folded", folded);
     $(s.split).classList.toggle("off", folded);
@@ -95,7 +94,7 @@ function startSplitDrag(side, e){
   };
   addEventListener("pointermove", move); addEventListener("pointerup", up);
 }
-for (const side of ["left", "right"]){
+for (const side of Object.keys(SPLITS)){
   const s = SPLITS[side];
   $(s.split).addEventListener("pointerdown", e => startSplitDrag(side, e));
   $(s.split).addEventListener("dblclick", () => { delete state[s.key]; applySplits(); persist(); flashBanner(`ความสูง ${s.name} กลับเป็นค่าเริ่มต้น (ตามเนื้อหา)`); });

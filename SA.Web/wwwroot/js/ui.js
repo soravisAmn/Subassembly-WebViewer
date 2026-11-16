@@ -192,17 +192,19 @@ $("tree").addEventListener("contextmenu", e => {
 });
 
 // ---------------- คลิกขวา ----------------
+// entries that repeat a ribbon command take its label / shortcut from the registry (js/commands.js)
+const CL = id => Commands.get(id).label, CK = id => Commands.get(id).shortcut || "";
 function ctxItems(kind, id, extra){
   if (kind === "lg") return condCtxItems(id, extra);                // ต้นไม้ Conditions (condtree.js)
   if (kind === "drawn"){
     const it = itemById(id), k = { dpt: "point", dlink: "link", dshape: "shape" }[extra.type];
     return [
       { h: `${itemLabel(it)} · ${extra.id}` },
-      { label:"Move", cmd: () => startCmd("move"), disabled: state.editing !== id, note: "M" },
-      { label:"Copy", cmd: () => startCmd("copy"), disabled: state.editing !== id, note: "C" },
-      { label:"Rotate", cmd: () => startCmd("rotate"), disabled: state.editing !== id, note: "R" },
+      { label: CL("mod.move"), cmd: () => startCmd("move"), disabled: state.editing !== id, note: CK("mod.move") },
+      { label: CL("mod.copy"), cmd: () => startCmd("copy"), disabled: state.editing !== id, note: CK("mod.copy") },
+      { label: CL("mod.rotate"), cmd: () => startCmd("rotate"), disabled: state.editing !== id, note: CK("mod.rotate") },
       ...(k !== "shape" ? [auxMenuItem(it, extra, state.editing !== id)] : []),
-      { label:`ลบ ${extra.id}`, cmd: () => deleteDrawn(it, k, extra.id), disabled: state.editing !== id, note: state.editing !== id ? "เข้า Edit ก่อน" : "Delete" }
+      { label:`ลบ ${extra.id}`, cmd: () => deleteDrawn(it, k, extra.id), disabled: state.editing !== id, note: state.editing !== id ? "เข้า Edit ก่อน" : CK("sel.delete") }
     ];
   }
   if (kind === "item"){
@@ -215,10 +217,9 @@ function ctxItems(kind, id, extra){
       { label:"Rename…", cmd: () => renameItem(id) },
       { label:"Save เป็น .cs", cmd: () => saveDrawing(it), disabled: !canSaveDrawing(it),
         note: canSaveDrawing(it) ? (drawingDirty(it) ? "ยังไม่ได้ save" : "") : it.spec ? "Milestone 4" : "ไม่มีส่วนที่วาด" },
-      { label:"Move", cmd: () => { if (!selHas("item", id)) setSel({ type:"item", item:id }); startCmd("move"); }, disabled: !!state.editing, note: "M" },
-      { label:"Copy", cmd: () => { if (!selHas("item", id)) setSel({ type:"item", item:id }); startCmd("copy"); }, disabled: !!state.editing, note: "C" },
-      { label:"Mirror", cmd: () => mirrorItem(id), disabled: !!state.editing },
-      { label:"เพิ่มเข้า \"My Shapes\"", disabled: true, note:"ระยะสอง" },
+      { label: CL("mod.move"), cmd: () => { if (!selHas("item", id)) setSel({ type:"item", item:id }); startCmd("move"); }, disabled: !!state.editing, note: CK("mod.move") },
+      { label: CL("mod.copy"), cmd: () => { if (!selHas("item", id)) setSel({ type:"item", item:id }); startCmd("copy"); }, disabled: !!state.editing, note: CK("mod.copy") },
+      { label: CL("item.mirror"), cmd: () => mirrorItem(id), disabled: !!state.editing },
       { sep: true },
       { label:"เอาออกจาก assembly", cmd: () => removeItem(id), disabled: !!state.editing && !editingThis }
     ];
@@ -237,14 +238,14 @@ function ctxItems(kind, id, extra){
   }
   if (kind === "surface") return [
     { h:"Surface: EG" },
-    { label: addMode ? "ออกจากโหมด Add point" : "Add point (A)", cmd: () => setAddMode(!addMode) },
+    { label: addMode ? "ออกจากโหมด Add point" : CL("surf.add"), cmd: () => setAddMode(!addMode), note: CK("surf.add") },
     { label:"รีเซ็ตเส้น surface", cmd: resetSurface }
   ];
   return [
     { h:"Workspace" },
     { label:"+ Assembly ใหม่", cmd: addAsm, disabled: !!state.editing },
     { label:"Import .cs…", cmd: () => openImport() },
-    { label:"Fit (F)", cmd: fit }
+    { label: CL("view.fit"), cmd: fit, note: CK("view.fit") }
   ];
 }
 function openCtx(e, kind, id, extra){
@@ -278,7 +279,7 @@ function renameItem(id){
 }
 
 // ---------------- Edit mode ----------------
-// เข้า Edit = วาดเพิ่มใน subassembly นั้นได้ (Drawer ใช้ได้) ตัวอื่นจางและแก้ไม่ได้
+// เข้า Edit = วาดเพิ่มใน subassembly นั้นได้ (แท็บ Draw / Modify / Logic ใช้ได้) ตัวอื่นจางและแก้ไม่ได้
 // ไฟล์ที่เขียนเอง: ส่วนที่วาดเก็บแยกใน it.spec (Milestone 4 จะเขียนลงไฟล์ในช่วงที่มีป้ายกำกับ)
 function enterEdit(id){
   const it = itemById(id); if (!it) return;
@@ -311,14 +312,7 @@ function renderEditBar(){
   $("edit-bar").hidden = !it;
   if (it) $("edit-name").textContent = itemLabel(it) + (hasCode(it) ? "" : " (ยังไม่มีไฟล์ .cs)") + (drawingDirty(it) ? " ●" : "")
                                        + (drawBranch() ? ` · วาดลงกิ่ง ${branchPath(it.spec, draw.branch)} (B)` : "");
-  const sv = $("edit-save");
-  sv.disabled = !canSaveDrawing(it);
-  sv.title = !it ? "" : !it.spec ? "ยังไม่ได้วาดอะไร"
-    : canSaveDrawing(it) ? (hasCode(it) ? `เขียนส่วนที่วาดลง ${it.file} (เฉพาะช่วง SA-DRAWING) — Ctrl+S` : `สร้างไฟล์ ${it.fileName || "?"} — Ctrl+S`)
-    : "ไฟล์ที่เขียนเองยังไม่มีช่วง SA-DRAWING — การแทรกให้เองมาใน Milestone 4";
-  $("drawer-hint").textContent = it ? "Undo Ctrl+Z · Redo Ctrl+Y" : "เข้า Edit ก่อน (คลิกขวาที่ subassembly)";
 }
-$("edit-save").onclick = () => saveDrawing(editItem());
 
 // Save (.cs): ยังไม่มีไฟล์ = สร้างทั้งไฟล์; มีช่วง SA-DRAWING = แทนที่เฉพาะช่วงนั้น
 //   ชื่อซ้ำกับไฟล์อื่น / ช่วงในไฟล์ถูกแก้ด้วยมือ -> ถามก่อนเสมอ
@@ -392,7 +386,6 @@ function toClassName(name){
   }
   return !out || /^\d/.test(out) ? "Subassembly" + out : out;
 }
-$("edit-exit").onclick = exitEdit;
 
 // ---------------- 4 · Properties ----------------
 let propsSig = "";
@@ -1804,7 +1797,7 @@ function renderLogic(){
   // ---- เงื่อนไข ----
   const s1 = div("lg-sec", "<h4>เงื่อนไข <small>ค่าตอนนี้อัปเดตตามผิวดิน / parameter</small></h4>", box);
   if (ed_) s1.querySelector("h4").appendChild(btn("+ เงื่อนไขใหม่", () => specEdit(s => newCondition(s, null, it), it, "เพิ่มเงื่อนไข"), false, "เงื่อนไข + กิ่ง ใช่ / ไม่ใช่ (ยังไม่มี object) — ใส่ object เข้ากิ่งที่ Properties → เกิดเมื่อ หรือ B ตอนวาด"));
-  if (!conds.length) div("empty", "ยังไม่มีเงื่อนไข — ปุ่ม Daylight Cut/Fill ใน Drawer หรือ Properties → เกิดเมื่อ → + เงื่อนไขใหม่", s1);
+  if (!conds.length) div("empty", "ยังไม่มีเงื่อนไข — Draw → Daylight Cut/Fill (หรือ Logic → ถ้าตัด / ถม) หรือ Properties → เกิดเมื่อ → + เงื่อนไขใหม่", s1);
   const names = specNames(it), xo = { ...Spec.exprOpts(sp), want: "bool" };
   for (const c of conds){
     const row = div("lg-row", `<span class="nm">${esc(c.name)}</span>`, s1);

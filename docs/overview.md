@@ -36,8 +36,8 @@ It can also **draw** a subassembly CAD-style and generate the `.cs` file automat
 - **Civil 3D test set**: `tests-civil3d/round3-demo.cs` (+ `.assembly.json`) has everything from round 3 + auxiliary · follow `tests-civil3d/round3-checklist.md`.
 - **Auxiliary** points / links in SAC style: computed / referenced / snappable, but not exported to Civil 3D.
 - **Rotate (`R`)** AutoCAD-style: pivot → drag / type an angle (expression / parameter allowed) · options `C` = rotate a copy, `R` = Reference · stored as a **rotation group** whose angle can be edited later in Properties.
-- **Curves** (Drawer): **Arc** by 3 points / start-end-radius and **Fillet** at the corner of 2 links. In C# they are split into short straight links (Civil 3D links are straight only) · the radius can be a parameter.
-- **Polygon** (Drawer): **free** (click point by point; click the first point / `C` / `Enter` closes) and **regular** (centre + radius, N 3–24, to corner / to edge midpoint) · R / θ can be parameters; edit N / R / θ later in Properties.
+- **Curves** (Draw tab): **Arc** by 3 points / start-end-radius and **Fillet** at the corner of 2 links. In C# they are split into short straight links (Civil 3D links are straight only) · the radius can be a parameter.
+- **Polygon** (Draw tab): **free** (click point by point; click the first point / `C` / `Enter` closes) and **regular** (centre + radius, N 3–24, to corner / to edge midpoint) · R / θ can be parameters; edit N / R / θ later in Properties.
 - **Object snap tracking (F11)**: hover on a snap point to acquire it → move along its vertical / horizontal, or type dx dy / distance<angle from it · the new point is tied to the acquired point.
 - **New point types**: distance + angle (polar) and **Auxiliary point** (computed in code, not added to Civil 3D).
 - **Fine zoom**: in to 20000 px/m (1 cm ≈ 200 px), out to 0.5 px/m · grid down to 1 mm · `Shift` + wheel = small zoom steps · `Z` = zoom to selection.

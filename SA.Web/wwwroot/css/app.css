@@ -113,6 +113,26 @@ button.rb.on{background:var(--accent-soft);border-color:var(--accent);color:var(
 .rb-sc select{width:170px;font-family:"IBM Plex Sans Thai",sans-serif}
 .rb-status{align-self:center;font-size:12px;color:var(--muted);padding:0 6px;white-space:nowrap}
 .rb-status.ok{color:var(--ok)}
+/* off = cannot run now (aria-disabled, so the tooltip still shows why) */
+.rb.off,.dropdown button.off{opacity:.45;cursor:default}
+.rb.off:hover{background:transparent;border-color:transparent}
+.dropdown button.off:hover{background:transparent}
+.rb.L .rsvg{width:30px;height:26px}
+.rb.s .rsvg{width:20px;height:16px}
+/* contextual tabs (Edit only): teal as in Civil 3D (--l6) · Finish panel at the right end */
+.rb-csep{width:1px;background:var(--line);margin:4px 6px}
+.rb-tab.ctxl{color:var(--l6)}
+.rb-tab.ctxl.cur{color:var(--l6);border-color:var(--l6);border-top-width:3px;padding-top:1px}
+.rb-page.ctxl{width:100%;box-shadow:inset 0 2px 0 var(--l6)}
+.rb-panel.finish{margin-left:auto;border-left:1px solid var(--line);border-right:0}
+.rb-panel.finish .rb-title{color:var(--l6)}
+/* minimised ribbon (double-click a tab): only the tabs; a click on a tab shows the panels over the drawing */
+header#top{position:relative}
+body.rb-min .ribbon{display:none}
+body.rb-min.rb-peek .ribbon{display:block;position:absolute;top:100%;left:0;right:0;z-index:25;border-bottom:1px solid var(--line);box-shadow:0 8px 20px rgba(0,0,0,.25)}
+.rb-tip{position:fixed;z-index:40;max-width:340px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;line-height:1.55;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none}
+.rb-tip kbd{font:11px "IBM Plex Mono",monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;margin-left:4px}
+.rb-tip .why{color:var(--warn);margin-top:2px}
 header>button,.menu>button{white-space:nowrap;flex:none}
 header .proj{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 header .proj b{color:var(--ink);font-weight:500}
@@ -140,7 +160,6 @@ aside.split{display:flex;flex-direction:column;overflow:hidden}
 .pane-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
 #sec-tree .pane-body{padding-bottom:10px}
 #sec-sc{--auto-max:35%;border-top:1px solid var(--line)}
-#sec-drawer{--auto-max:55%}
 .pane-sec.folded{height:auto !important;max-height:none}
 .pane-sec.folded .pane-body{display:none}
 .pane-h.fold{cursor:pointer;user-select:none}
@@ -221,22 +240,16 @@ body.row-resizing #main,body.row-resizing .pane-sec{pointer-events:none}
 .sc-list button{padding:2px 7px}
 
 /* ---------- 4 · แถบขวา ---------- */
-.drawer{padding:0 14px 10px;display:flex;flex-direction:column;gap:6px}
-.dgroup{font-size:12px;color:var(--muted)}
-.dgroup small{font-size:11px}
-.dgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.dgrid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
-.tool{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px 4px;font-size:11.5px;font-weight:400;line-height:1.2;text-align:center}
-.tool svg{width:28px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.tool svg .fill{fill:currentColor}
-.tool svg .hollow{fill:var(--paper)}
-.tool svg .tint{fill:var(--accent-soft)}
-.tool svg .warm{stroke:var(--hot)}
-.tool svg .ground{stroke:var(--ground)}
-.tool svg .good{fill:var(--ok);stroke:var(--ok)}
-.tool svg .goodline{stroke:var(--ok);stroke-width:2.6}
-.tool svg text{font-size:8px;fill:currentColor;stroke:none}
-.tool.mine{border-style:dashed}
+/* Draw tab icons = the old Drawer SVGs (js/commands.js TOOL_SVG) */
+.rsvg{width:28px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.rsvg .fill{fill:currentColor}
+.rsvg .hollow{fill:var(--paper)}
+.rsvg .tint{fill:var(--accent-soft)}
+.rsvg .warm{stroke:var(--hot)}
+.rsvg .ground{stroke:var(--ground)}
+.rsvg .good{fill:var(--ok);stroke:var(--ok)}
+.rsvg .goodline{stroke:var(--ok);stroke-width:2.6}
+.rsvg text{font-size:8px;fill:currentColor;stroke:none}
 .props-h{border-top:1px solid var(--line)}
 .props{padding:0 14px 20px;font-size:12.5px}
 .pg{margin:2px 0 10px}

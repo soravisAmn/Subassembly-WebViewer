@@ -9,6 +9,24 @@
 "use strict";
 const Commands = (() => {
   const NEED_EDIT = "เข้า Edit ก่อน (คลิกขวาที่ subassembly → Edit)";
+  // Draw tab icons: the Drawer SVGs (viewBox 0 0 28 22, classes styled in css/app.css) — drawn for these tools, Tabler has nothing as clear
+  const TOOL_SVG = {
+    point: "<circle cx=\"14\" cy=\"11\" r=\"3\" class=\"fill\"/><path d=\"M14 3v4M14 15v4M6 11h4M18 11h4\"/>",
+    link: "<path d=\"M5 17L23 5\"/><circle cx=\"5\" cy=\"17\" r=\"2.2\" class=\"hollow\"/><circle cx=\"23\" cy=\"5\" r=\"2.2\" class=\"hollow\"/>",
+    shape: "<path d=\"M4 6H24L20 17H8Z\" class=\"tint\"/>",
+    polygon: "<path d=\"M5 17L4 7L13 3L24 8L20 18Z\" class=\"tint\"/><circle cx=\"5\" cy=\"17\" r=\"1.6\" class=\"hollow\"/><circle cx=\"4\" cy=\"7\" r=\"1.6\" class=\"hollow\"/><circle cx=\"13\" cy=\"3\" r=\"1.6\" class=\"hollow\"/><circle cx=\"24\" cy=\"8\" r=\"1.6\" class=\"hollow\"/><circle cx=\"20\" cy=\"18\" r=\"1.6\" class=\"hollow\"/>",
+    ngon: "<path d=\"M14 2L23 8.5L19.6 19H8.4L5 8.5Z\" class=\"tint\"/><path d=\"M12.5 11H15.5M14 9.5V12.5\"/>",
+    arc: "<path d=\"M4 18C6 8 22 8 24 18\"/><circle cx=\"4\" cy=\"18\" r=\"1.8\" class=\"hollow\"/><circle cx=\"14\" cy=\"10.5\" r=\"1.6\" class=\"hollow\"/><circle cx=\"24\" cy=\"18\" r=\"1.8\" class=\"hollow\"/>",
+    fillet: "<path d=\"M4 4V12\" /><path d=\"M12 19H24\"/><path d=\"M4 12C4 16 8 19 12 19\" class=\"warm\"/><path d=\"M4 12V19H12\" stroke-dasharray=\"2 2\"/>",
+    intersect: "<path d=\"M4 18L16 6\"/><path d=\"M4 6L14 12\" /><path d=\"M14 12L24 18\" stroke-dasharray=\"2 2\"/><circle cx=\"12.3\" cy=\"10.8\" r=\"2.4\" class=\"good\"/>",
+    offset: "<path d=\"M4 17L22 5\"/><path d=\"M7 21L25 9\" class=\"warm\"/><path d=\"M13 11L15.5 14.5\" stroke-dasharray=\"1.5 1.5\"/>",
+    array: "<path d=\"M3 4H8V8\"/><path d=\"M8 8H13V12\" class=\"warm\"/><path d=\"M13 12H18V16\" class=\"warm\"/><path d=\"M18 16H23V20\" class=\"warm\"/>",
+    daylight: "<path d=\"M2 18H26\" class=\"ground\"/><path d=\"M5 4L17 18\" stroke-dasharray=\"3 2\"/><circle cx=\"5\" cy=\"4\" r=\"2\" class=\"hollow\"/><circle cx=\"17\" cy=\"18\" r=\"2.4\" class=\"good\"/>",
+    follow: "<path d=\"M2 12L8 15L14 10L20 16L26 13\" class=\"ground\"/><path d=\"M8 15L14 10L20 16\" class=\"goodline\"/>",
+    extend: "<path d=\"M2 18L10 15L18 17L26 14\" class=\"ground\"/><path d=\"M6 3L13 10\"/><path d=\"M13 10L18 16\" stroke-dasharray=\"2 2\" class=\"goodline\"/><circle cx=\"13\" cy=\"10\" r=\"1.8\" class=\"hollow\"/><circle cx=\"18\" cy=\"16.5\" r=\"2\" class=\"good\"/>",
+    clip: "<path d=\"M2 8L9 17L16 9L26 14\" class=\"ground\"/><path d=\"M2 12H26\" stroke-dasharray=\"2 2\"/><path d=\"M4 10.5L5.3 12H12.5L16 9L20 11L22.6 12\" class=\"goodline\"/>",
+    cutfill: "<path d=\"M14 2L24 11L14 20L4 11Z\"/><text x=\"14\" y=\"14\" text-anchor=\"middle\">?</text>"
+  };
   const IN_EDIT = "ออกจาก Edit ก่อน";
 
   const LIST = [
@@ -135,40 +153,40 @@ const Commands = (() => {
         ["offset", "Offset", "O", "ตั้งระยะ (Tab) → คลิก link → คลิกด้าน"],
         ["fillet", "Fillet", null, "ตั้งรัศมี (Tab) แล้วคลิก link 2 เส้นที่ต่อกันที่มุม"],
         ["array", "Array", null, "ทำซ้ำของที่เลือก N ชุด ห่างชุดละ dx, dy"]]
-      .map(([t, label, key, tip]) => ({ id: "draw." + t, label, edit: true, tool: t, tip,
+      .map(([t, label, key, tip]) => ({ id: "draw." + t, label, edit: true, tool: t, tip, svg: TOOL_SVG[t],
         // button = toggle the tool (as the Drawer) · key = start the tool (pressing P again restarts it, as before)
         ...(key ? { shortcut: key, keys: [key.toLowerCase()], keyRun: () => setTool(t) } : {}),
         active: c => c.tool === t,
         run: () => pickTool(t) })),
-    { id: "draw.aux", label: "Auxiliary", edit: true, shortcut: "X", keys: ["x"], keyIdle: true,
+    { id: "draw.aux", label: "Auxiliary", icon: "line-dashed", edit: true, shortcut: "X", keys: ["x"], keyIdle: true,
       tip: "ระหว่างวาด = สลับโหมดของชิ้นที่จะสร้าง · มีของเลือก = สลับ point / link ที่เลือก",
       run: () => { if (draw.tool) toggleDrawAux(); else toggleAuxSel(); } },
 
     // ---------- contextual: Modify (Move / Copy also work outside Edit on subassemblies) ----------
-    { id: "mod.move", label: "Move", shortcut: "M", keys: ["m"], tip: "คลิกจุดฐาน แล้วคลิกปลายทาง",
+    { id: "mod.move", label: "Move", icon: "arrows-move", shortcut: "M", keys: ["m"], tip: "คลิกจุดฐาน แล้วคลิกปลายทาง",
       run: () => startCmd("move") },
-    { id: "mod.copy", label: "Copy", shortcut: "C", keys: ["c"], tip: "คลิกจุดฐาน แล้วคลิกปลายทาง (วางได้หลายครั้ง Enter = จบ)",
+    { id: "mod.copy", label: "Copy", icon: "copy", shortcut: "C", keys: ["c"], tip: "คลิกจุดฐาน แล้วคลิกปลายทาง (วางได้หลายครั้ง Enter = จบ)",
       run: () => startCmd("copy") },
-    { id: "mod.rotate", label: "Rotate", shortcut: "R", keys: ["r"], tip: "คลิกจุดหมุน แล้วลากมุม / พิมพ์มุม · C = หมุนสำเนา · R = Reference",
+    { id: "mod.rotate", label: "Rotate", icon: "rotate-clockwise", shortcut: "R", keys: ["r"], tip: "คลิกจุดหมุน แล้วลากมุม / พิมพ์มุม · C = หมุนสำเนา · R = Reference",
       enabled: c => c.editing ? true : NEED_EDIT,
       run: () => startCmd("rotate") },
 
     // ---------- contextual: Logic ----------
-    { id: "logic.params", label: "Parameters", edit: true, tip: "ตาราง Parameter ของตัวที่แก้ (ใน Properties)",
+    { id: "logic.params", label: "Parameters", icon: "adjustments-horizontal", edit: true, tip: "ตาราง Parameter ของตัวที่แก้ (ใน Properties)",
       run: () => { const e = editItem(); state.open["i:" + e.id] = true; setSel({ type: "params", item: e.id }); } },
-    { id: "logic.vars", label: "Variables", edit: true, tip: "Variables ของตัวที่แก้ (ในต้นไม้ Workspace)",
+    { id: "logic.vars", label: "Variables", icon: "variable", edit: true, tip: "Variables ของตัวที่แก้ (ในต้นไม้ Workspace)",
       run: () => showVariables() },
-    { id: "logic.conds", label: "Conditions", edit: true, tip: "เงื่อนไข / กิ่ง ของส่วนที่วาด (แท็บ Logic)",
+    { id: "logic.conds", label: "Conditions", icon: "git-branch", edit: true, tip: "เงื่อนไข / กิ่ง ของส่วนที่วาด (แท็บ Logic)",
       run: () => { state.dock.tab = "logic"; state.dock.open = true; persist(); renderDock(); } },
-    { id: "logic.branch", label: "Draw into branch", edit: true, shortcut: "B", keys: ["b"], keyIdle: true,
+    { id: "logic.branch", label: "Draw into branch", icon: "git-fork", edit: true, shortcut: "B", keys: ["b"], keyIdle: true,
       tip: "object ที่วาดต่อจากนี้เข้ากิ่งที่เลือก",
       run: () => chooseDrawBranch() },
 
     // ---------- contextual: Finish ----------
-    { id: "finish.save", label: "Save (.cs)", edit: true, shortcut: "Ctrl+S", tip: "เขียนส่วนที่วาดลงไฟล์ .cs (ไม่ได้อยู่ใน Edit: Ctrl+S = บันทึกแถบโค้ด)",
-      enabled: c => !c.editing ? NEED_EDIT : c.canSaveDrawing ? true : "ยังไม่มีส่วนที่วาดที่บันทึกได้",
+    { id: "finish.save", label: "Save (.cs)", icon: "device-floppy", edit: true, shortcut: "Ctrl+S", tip: "เขียนส่วนที่วาดลงไฟล์ .cs ของตัวที่แก้",
+      enabled: c => !c.editing ? NEED_EDIT : c.canSaveDrawing ? true : c.saveReason || "ยังไม่มีส่วนที่วาดที่บันทึกได้",
       run: () => saveDrawing(editItem()) },
-    { id: "finish.exit", label: "ออกจาก Edit", edit: true, tip: "จบการแก้ subassembly นี้",
+    { id: "finish.exit", label: "ออกจาก Edit", icon: "door-exit", edit: true, tip: "จบการแก้ subassembly นี้",
       run: () => exitEdit() }
   ];
 
@@ -177,7 +195,7 @@ const Commands = (() => {
   for (const c of LIST) for (const k of c.keys || []) BY_KEY[k] = c;
 
   // ---------- where commands appear ----------
-  // ribbon item: "id" (large) | ["id", "s"] (small) | { widget }
+  // ribbon item: "id" (large) | ["id", "s"] (small) | ["id", size, label shown here] | { widget }
   const RIBBON = [
     { id: "home", label: "Home", panels: [
       { title: "Project", items: ["proj.new", "proj.open", "proj.save", ["proj.saveAs", "s"], ["proj.pack", "s"]] },
@@ -197,8 +215,18 @@ const Commands = (() => {
       { title: "Scenarios", items: [["sc.export", "s"], ["sc.import", "s"]] }] },
     { id: "ai", label: "AI", panels: [
       { title: "Proposals", items: ["ai.open"] },
-      { title: "Claude", items: ["ai.connect", { widget: "aistatus" }] }] }
+      { title: "Claude", items: ["ai.connect", { widget: "aistatus" }] }] },
+    // contextual (Edit only, teal, as in Civil 3D); every one ends with the Finish panel (FINISH)
+    { id: "draw", label: "Draw", contextual: true, panels: [
+      { title: "Draw", items: ["draw.point", "draw.link", "draw.shape", ["draw.polygon", "s"], ["draw.ngon", "s"], ["draw.arc", "s"]] },
+      { title: "Surface", items: [["draw.daylight", "s"], ["draw.follow", "s"], ["draw.extend", "s"], ["draw.clip", "s"], ["draw.cutfill", "s"]] },
+      { title: "Construct", items: [["draw.intersect", "s"], ["draw.offset", "s"], ["draw.fillet", "s"], ["draw.array", "s"], ["draw.aux", "s"]] }] },
+    { id: "modify", label: "Modify", contextual: true, panels: [
+      { title: "Modify", items: ["mod.move", "mod.copy", "mod.rotate", "sel.delete"] }] },
+    { id: "logic", label: "Logic", contextual: true, panels: [
+      { title: "Logic", items: ["logic.params", "logic.vars", "logic.conds", ["logic.branch", "s"], ["draw.cutfill", "s", "ถ้าตัด / ถม"]] }] }
   ];
+  const FINISH = { title: "Finish", items: ["finish.save", "finish.exit"] };
   // ไฟล์ application menu (same order as the old ไฟล์ ▾); "recent" = Recent projects submenu
   const FILE_MENU = ["cs.import", "cs.new", "-", "proj.open", "proj.save", "proj.saveAs", "proj.new", "proj.pack", "recent", "-",
                      "build", "-", "sc.export", "sc.import", "-", "settings"];
@@ -248,6 +276,6 @@ const Commands = (() => {
     const x = BY_ID[id], e = c ? enabled(id, c) : true;
     return `${x.label}${x.shortcut ? ` (${x.shortcut})` : ""}\n${x.tip}${e === true ? "" : `\nใช้ไม่ได้ตอนนี้: ${e}`}`;
   };
-  return { LIST, RIBBON, FILE_MENU, QUICK, MENU_LABEL, OLD, REMOVED, get, enabled, active, keyOf, forKey, keyAllowed, tooltip };
+  return { LIST, RIBBON, FINISH, FILE_MENU, QUICK, MENU_LABEL, OLD, REMOVED, get, enabled, active, keyOf, forKey, keyAllowed, tooltip };
 })();
 if (typeof module !== "undefined") module.exports = Commands;

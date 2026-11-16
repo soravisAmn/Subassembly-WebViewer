@@ -58,7 +58,7 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 
 - Last finished: round 8 (project folders: per-tab projects, v3 project file with drafts, web file dialog, settings, scenarios in the project, Pack, `.atc` palette), M0-M5. Docs: `docs/projects.md`. History: `docs/history.md`.
 - The user's projects are in `D:\test_cad\SA-Projects\` (SR03, rock-pitching-compare); none left at the repo root.
-- Open for the user in Civil 3D: `tests-civil3d/round8-checklist.md` (whole-palette drag + Refresh Palette without duplicates, Thai text from round 7). Next: round 9 (new UI shell, after the Figma pass).
+- Round 8 Civil 3D checklist passed (whole-palette drag + Refresh Palette without duplicates, Thai text OK). Next: round 9 (`prompt-9.md`): new UI shell, no Figma pass.
 - Round 7 Civil 3D run: `.atc` needs the full DLL path (now the only form), Side list OK, re-adding the catalog duplicated the tools (round 8 adds a palette + Refresh Palette to test).
 - Round 6 M5 Civil 3D run: shapes filled crossed (link order in `Shapes.Add`). Fixed in shim + generator (`docs/civil3d-testing.md`).
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
@@ -71,7 +71,7 @@ Decided ideas: `docs/ideas/IDEA#1.md` (Thai). Read only the item for the current
 |---|---|
 | 7 | Build + report + `.atc` + source package (3–4) |
 | 8 | Project-folder storage: relative paths, spec only in `.cs`, scenarios in the project file, Pack, relink (8) |
-| 9 | New UI shell: ribbon, contextual Edit tabs, dockable palettes (7) — after the Figma pass |
+| 9 | New UI shell: ribbon, contextual Edit tabs, dockable palettes (7) |
 | 10 | Web display: style by code (`.style.json`), notes, dimensions, Civil 3D preview mode (1) |
 | 11 | Icon generator (5) |
 | 12 | Browser palette: folder roots, thumbnails, copy into `lib\` (2) |

@@ -203,6 +203,7 @@ function renderScenarios(){
     n.title = "ใช้กรณีนี้ (เปลี่ยนแค่ผิวดิน / ค่า parameter / โหมด — ส่วนที่วาดไม่เปลี่ยน)" + (on && pend ? "\n* = มีค่าที่แก้ค้าง กด อัปเดต เพื่อเก็บ" : "");
   }
   if (!projScenarios().length) div("empty", "ยังไม่มีกรณี — ตั้งผิวดิน / parameter แล้วกด + บันทึกกรณีนี้", box);
+  if (typeof updateRibbon === "function") updateRibbon();
 }
 $("b-save").onclick = addScenario;
 

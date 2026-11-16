@@ -9,36 +9,22 @@
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-<!-- 3 · เมนูบาร์ -->
-<header>
-  <h1>SA Drawing Studio</h1>
-  <div class="menu">
-    <button id="m-file" aria-haspopup="true">ไฟล์ ▾</button>
-    <div class="dropdown" id="dd-file" hidden>
-      <button data-cmd="import">Import .cs (เข้า workspace)…</button>
-      <button data-cmd="new-cs">สร้าง .cs ใหม่จาก template…</button>
-      <hr>
-      <button data-cmd="open-proj">Open project…</button>
-      <button data-cmd="save-proj">Save project</button>
-      <button data-cmd="save-proj-as">Save project as…</button>
-      <button data-cmd="new-proj">New project… (โฟลเดอร์ใหม่)</button>
-      <button data-cmd="pack">Pack project… (zip)</button>
-      <div id="dd-recent"></div>
-      <hr>
-      <button data-cmd="export" disabled title="มาใน Milestone 5">Save / Export .cs…</button>
-      <button data-cmd="build">Build… (DLL สำหรับ Civil 3D)</button>
-      <hr>
-      <button data-cmd="sc-export">Export scenarios (.json)</button>
-      <button data-cmd="sc-import">Import scenarios…</button>
-      <hr>
-      <button data-cmd="settings">ตั้งค่า…</button>
+<!-- 3 · ribbon (round 9, js/ribbon.js): title row (ไฟล์ menu, Quick Access, project) · tabs · panels — all from js/commands.js -->
+<header id="top">
+  <div class="titlerow">
+    <div class="menu">
+      <button id="m-file" class="appbtn" aria-haspopup="true" title="เมนูไฟล์: โปรเจกต์, Import .cs, Build, Scenarios, ตั้งค่า">ไฟล์</button>
+      <div class="dropdown" id="dd-file" hidden></div>
     </div>
+    <div class="qa" id="qa" aria-label="Quick Access"></div>
+    <span class="vsep"></span>
+    <span class="proj" id="proj-name"></span>
+    <span class="spacer"></span>
+    <span class="hint mono" id="folder"></span>
+    <span class="appname">SA Drawing Studio</span>
   </div>
-  <button id="b-build" title="Build: DLL สำหรับ Civil 3D จากไฟล์ .cs ของ project ที่เปิดอยู่">Build</button>
-  <button id="b-edit" title="แสดง/ซ่อนแถบแก้โค้ดของ subassembly ที่เลือก (Ctrl+E)">✎ แก้โค้ด</button>
-  <span class="proj" id="proj-name"></span>
-  <span class="spacer"></span>
-  <span class="hint mono" id="folder"></span>
+  <div class="rb-tabs" id="rb-tabs" role="tablist"></div>
+  <div class="ribbon" id="ribbon"></div>
   <input id="f-open" type="file" accept=".cs" hidden>
   <input id="f-import" type="file" accept=".json" hidden>
 </header>
@@ -76,7 +62,7 @@
       <button id="ed-take">ใช้ฉบับในไฟล์</button>
     </div>
   </div>
-  <div id="ed-host"><div class="ed-empty" id="ed-empty">เลือก subassembly ในต้นไม้ด้านซ้าย หรือ <b>&nbsp;ไฟล์ ▾ → Import .cs&nbsp;</b></div></div>
+  <div id="ed-host"><div class="ed-empty" id="ed-empty">เลือก subassembly ในต้นไม้ด้านซ้าย หรือ <b>&nbsp;ไฟล์ → Import .cs&nbsp;</b></div></div>
   <div id="ed-resize" title="ลากเพื่อปรับความกว้าง"></div>
 </div>
 
@@ -94,7 +80,7 @@
     <div class="problem" id="problem"></div>
     <div class="welcome" id="welcome"><div>
       <p><b>Workspace ยังว่าง</b></p>
-      <p>กด <b>ไฟล์ ▾ → Import .cs</b> เพื่อเปิดไฟล์ subassembly (ไฟล์ในโฟลเดอร์ <span class="mono" id="welcome-folder"></span> หรือไฟล์จากที่อื่น)</p>
+      <p>กด <b>ไฟล์ → Import .cs</b> (หรือ Home → Import .cs) เพื่อเปิดไฟล์ subassembly (ไฟล์ในโฟลเดอร์ <span class="mono" id="welcome-folder"></span> หรือไฟล์จากที่อื่น)</p>
       <p>ตัวแรกของ assembly จะเกาะแกนให้เอง ตัวต่อไปลอยอยู่ ลากไปเกาะแกนหรือจุดของตัวอื่น</p>
     </div></div>
     <div class="legend" id="legend"></div>
@@ -212,6 +198,7 @@
 <script src="js/draw.js"></script>
 <script src="js/history.js"></script>
 <script src="js/cmd.js"></script>
+<script src="js/commands.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/condtree.js"></script>
 <script src="js/editor.js"></script>
@@ -225,6 +212,7 @@
 <script src="js/panes.js"></script>
 <script src="js/aipanel.js"></script>
 <script src="js/mcp.js"></script>
+<script src="js/ribbon.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

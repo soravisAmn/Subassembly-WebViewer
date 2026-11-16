@@ -80,8 +80,39 @@ tr.hl td{background:var(--accent-soft)}
 .chip{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;display:flex;gap:6px;align-items:center}
 
 /* ---------- 3 · เมนูบาร์ ---------- */
-header{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
-header h1{font-size:15px;font-weight:600;margin:0 8px 0 0;white-space:nowrap}
+/* ---------- ribbon (round 9, js/ribbon.js): title row · tabs · panels ---------- */
+header#top{grid-column:1/-1;display:flex;flex-direction:column;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+.titlerow{display:flex;align-items:center;gap:6px;padding:4px 10px;min-width:0}
+.titlerow .vsep{width:1px;height:18px;background:var(--line);margin:0 4px;flex:none}
+.appbtn{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;padding:3px 14px}
+.appbtn:hover:not(:disabled){filter:brightness(1.1)}
+.appname{font-size:12px;color:var(--muted);white-space:nowrap;margin-left:8px}
+.qa{display:flex;gap:1px;flex:none}
+.rb-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--line);overflow:hidden;flex:none}
+.rb-tab{border:1px solid transparent;border-bottom:0;border-radius:4px 4px 0 0;background:transparent;padding:3px 16px;margin-bottom:-1px;color:var(--muted);white-space:nowrap}
+.rb-tab:hover:not(:disabled){border-color:transparent;color:var(--ink)}
+.rb-tab.cur{background:var(--paper);border-color:var(--line);color:var(--ink);font-weight:600}
+.ribbon{background:var(--paper);overflow-x:auto;overflow-y:hidden;flex:none}
+.rb-page{display:flex;min-width:max-content;height:90px}
+.rb-panel{display:flex;flex-direction:column;border-right:1px solid var(--line);padding:3px 4px 0}
+.rb-body{flex:1;display:flex;gap:2px;align-items:flex-start}
+.rb-col{display:flex;flex-direction:column}
+.rb-title{font-size:11px;color:var(--muted);text-align:center;padding:0 4px 2px;white-space:nowrap}
+.rb{position:relative;border-color:transparent;background:transparent;font-weight:400;font-size:12px;line-height:1.4;white-space:nowrap}
+.rb:hover:not(:disabled){background:var(--accent-soft);border-color:var(--accent-soft)}
+button.rb.on{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.rb.L{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;padding:5px 6px 2px;min-width:52px;height:66px}
+.rb.L .ri{width:26px;height:26px}
+.rb.s{display:flex;align-items:center;gap:6px;padding:0 6px;height:22px}
+.rb.q{padding:3px 5px}
+.rb .badge{position:absolute;top:2px;right:2px;min-width:16px;padding:0 4px;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;line-height:16px}
+.rb .badge:empty{display:none}
+.ri{display:inline-block;width:16px;height:16px;flex:none;background:currentColor;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat}
+.dropdown .ri{margin-right:2px;color:var(--muted)}
+.rb-sc{display:flex;flex-direction:column;gap:4px;padding:6px 4px 0;font-size:12px;color:var(--muted)}
+.rb-sc select{width:170px;font-family:"IBM Plex Sans Thai",sans-serif}
+.rb-status{align-self:center;font-size:12px;color:var(--muted);padding:0 6px;white-space:nowrap}
+.rb-status.ok{color:var(--ok)}
 header>button,.menu>button{white-space:nowrap;flex:none}
 header .proj{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 header .proj b{color:var(--ink);font-weight:500}

@@ -270,13 +270,16 @@ function setArcMode(m){
 }
 document.getElementById("drawer").addEventListener("click", e => {
   const b = e.target.closest("[data-tool]"); if (!b || b.disabled) return;
-  const t = b.dataset.tool;
+  pickTool(b.dataset.tool);
+});
+// a draw tool from a button (Drawer / ribbon Draw tab): toggles the tool; Daylight Cut/Fill and Array act on the selection first
+function pickTool(t){
   // ถ้าตัด / ถม: เลือกจุดไว้จุดเดียว = ใช้เป็นจุดบานพับเลย ไม่งั้นให้คลิกจุด
   if (t === "cutfill"){ const it = editItem(), s = pickedList().filter(o => o.item === it.id); if (s.length === 1 && s[0].type === "dpt"){ setTool(null); return openCutFill(it, s[0].id); } }
   // Array: คำสั่งกับชุดที่เลือก (ไม่ใช่เครื่องมือวาด)
   if (t === "array"){ setTool(null); return openArray(editItem()); }
   setTool(draw.tool === t ? null : t);
-});
+}
 function renderDrawer(){
   const on = !!state.editing;
   for (const b of document.querySelectorAll("#drawer [data-tool]")) b.disabled = !on || !!b.dataset.later;

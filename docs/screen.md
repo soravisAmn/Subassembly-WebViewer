@@ -6,7 +6,7 @@ Thai labels in quotes are the text shown in the web.
 
 | Part | Where | Contents |
 |---|---|---|
-| Menu bar | Top | **"ไฟล์ ▾"** (Import .cs, new .cs, Open / Save / Save as / New project, recent projects, Export / Import scenarios, ตั้งค่า…), **"✎ แก้โค้ด"** |
+| Ribbon (round 9) | Top | Title row: **"ไฟล์"** application menu (Import .cs, new .cs, Open / Save / Save as / New / Pack project, recent projects, Build, Export / Import scenarios, ตั้งค่า…), **Quick Access** (Save project, Undo, Redo), project name `*` + folder. Tabs **Home** (Project, Import, Assembly, Surface, Clipboard) · **View** (Fit / Zoom selection, Design / Civil 3D preview, Aux / Codes / Grid, VE, Scenario) · **Output** (Build, Edit code (Ctrl+E), View generated code, Export / Import scenarios) · **AI** (Proposals + count, เชื่อม Claude + status). Every button comes from the command registry `js/commands.js` (tooltip = name, shortcut, Thai line, why it is disabled); View toggles are the same state as the status-bar buttons. Contextual Draw / Modify / Logic tabs come in round 9 M2 |
 | Workspace tree | Left | Workspace → Surface / Assembly → Subassembly → Points / Links / Shapes / Parameters · Scenarios |
 | Workspace | Centre | Cross-section (dark CAD-style background) + result bar below (Messages / Log / Points of the selected item) |
 | Drawer + Properties | Right | Drawing tools (usable in Edit mode) · values of the selection (parameters, values of drawn points are edited here) |

@@ -22,6 +22,7 @@ function renderAll(){
   mapSelected();
   render(); renderTree(); renderProps(); renderDock(); renderAi(); renderProblem(); applyMarkers(); renderEditBar(); renderDrawer(); renderProjName(); renderScenarios();
   refreshGenerated();
+  if (typeof updateRibbon === "function") updateRibbon();   // ribbon.js (loads later)
 }
 const isSel = selHas;
 // ตั้งชุดที่เลือก: 0 ชิ้น = ตัวที่แก้อยู่ / Workspace · 1 ชิ้น = เลือกแบบเดิม · หลายชิ้น = multi
@@ -1964,15 +1965,19 @@ function renderBar(){
     sl.appendChild(x);
   });
   $("ve").value = state.view.ve;
+  if (typeof updateRibbon === "function") updateRibbon();
 }
 $("bar").addEventListener("click", e => {
   if (e.target.closest("#b-osmenu")) return toggleOsMenu();
   const t = e.target.closest("[data-tg]"); if (!t) return;
-  const k = t.dataset.tg;
+  barClick(t.dataset.tg);
+});
+// a status-bar toggle button; the View tab's Aux / Codes / Grid / Civil 3D preview call this too (one state, two buttons)
+function barClick(k){
   if (k === "codes"){ state.showCodes = !state.showCodes; render(); }
   else { state.bar[k] = !state.bar[k]; if (k === "grid") render(); }
   persist(); renderBar(); refreshSnap();
-});
+}
 const OSNAP_HELP = { end: "จุดที่วาด / จุดของโค้ดเดิม / origin", mid: "กึ่งกลาง link", cen: "ศูนย์กลางของโค้ง / polygon ด้านเท่า",
   int: "จุดตัดของ 2 link", perp: "ตั้งฉากจากจุดก่อนหน้าไปยัง link", near: "จุดบน link ที่ใกล้เมาส์",
   surf: "จุดบนผิวดินที่ใกล้เมาส์ (ล็อก slope อยู่ = จุดที่ลาดชนดิน)" };
@@ -2042,20 +2047,11 @@ function barBanner(k){
   setTimeout(() => { if ($("banner").textContent === t) showBanner(draw.tool ? drawBanner() : ""); }, 1200);
   return t;
 }
-$("ve").onchange = () => { state.view.ve = +$("ve").value; persist(); render(); };
+$("ve").onchange = () => setVe(+$("ve").value);
 $("b-fit").onclick = fit;
 
 // ---------------- 3 · เมนูไฟล์ ----------------
-$("m-file").onclick = () => { const d = $("dd-file"); const h = d.hidden; closeMenus(); d.hidden = !h; if (h){ renderRecent(); refreshSettings(); renderFileMenu(); } };
-// Save project is off in a read-only tab (the project is open in another tab)
-function renderFileMenu(){ const b = $("dd-file").querySelector('[data-cmd="save-proj"]'); if (b) b.disabled = Proj.readOnly; }
-$("dd-file").addEventListener("click", e => {
-  const b = e.target.closest("[data-cmd]"); if (!b || b.disabled) return;
-  closeMenus();
-  ({ "import": () => openImport(), "new-cs": () => newCs(), "open-proj": openProject, "save-proj": () => saveProject(),
-     "save-proj-as": saveProjectAs, "new-proj": newProject, "sc-export": exportScenarios, "sc-import": () => $("f-import").click(),
-     "build": () => openBuild(), "settings": openSettings, "pack": () => openPack() })[b.dataset.cmd]();
-});
+// ไฟล์ menu, Quick Access and ribbon: js/ribbon.js (round 9)
 // renderProjName: project.js
 
 // ---------------- หน้าต่าง ----------------

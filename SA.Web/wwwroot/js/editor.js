@@ -134,7 +134,7 @@ async function openEditor(){
   // ไฟล์จากปุ่ม Open: ขอสิทธิ์เขียนตอนที่ผู้ใช้เพิ่งคลิก (เบราว์เซอร์ยอมถามเฉพาะจังหวะนี้)
   if (state.file === OPENED && opened && opened.handle) await askWrite(opened.handle);
   ed.open = true; state.editorOpen = true; persist();
-  document.body.classList.add("editing"); $("b-edit").classList.add("on");
+  document.body.classList.add("editing"); if (typeof updateRibbon === "function") updateRibbon();
   if (typeof applyPaneWidths === "function") applyPaneWidths();   // แถบโค้ดกินที่ → บีบแถบซ้าย / ขวาถ้าจอไม่พอ
   renderEditorBar();
   E = await loadEditor();
@@ -148,7 +148,7 @@ async function openEditor(){
 function closeEditor(){
   flushSave();
   ed.open = false; state.editorOpen = false; persist();
-  document.body.classList.remove("editing"); $("b-edit").classList.remove("on");
+  document.body.classList.remove("editing"); if (typeof updateRibbon === "function") updateRibbon();
   if (typeof applyPaneWidths === "function") applyPaneWidths();
   renderProblem(); run();           // กลับไปแสดงจากไฟล์บนดิสก์
 }
@@ -356,7 +356,6 @@ function download(){
   URL.revokeObjectURL(a.href);
 }
 
-$("b-edit").onclick = toggleEditor;
 $("ed-close").onclick = closeEditor;
 $("ed-save").onclick = saveNow;
 $("ed-dl").onclick = download;

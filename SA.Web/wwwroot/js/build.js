@@ -299,4 +299,3 @@ const Build = (() => {
 })();
 
 function openBuild(){ Build.open(); }
-$("b-build").onclick = openBuild;

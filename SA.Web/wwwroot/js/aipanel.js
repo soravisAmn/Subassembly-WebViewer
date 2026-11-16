@@ -104,6 +104,7 @@ function renderAi(){
   const st = $("ai-status");
   st.textContent = aiLastCall ? `Claude เชื่อมต่อแล้ว${pend.length ? ` · ข้อเสนอรอ ${pend.length}` : ""}` : "";
   st.classList.toggle("wait", pend.length > 0);
+  if (typeof updateRibbon === "function") updateRibbon();
   const box = $("ai-pane");
   if (state.dock.tab !== "ai" || !state.dock.open) return;
   box.innerHTML = "";

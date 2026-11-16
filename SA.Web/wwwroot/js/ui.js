@@ -1646,12 +1646,8 @@ function renameSpecParam(it, p, v){
 // ---------------- แถบผลลัพธ์ (Messages / Log / Points) ----------------
 function renderDock(){
   const it = selItem(), rr = it ? asmRes[it.id] : null;
-  const dock = $("dock");
-  dock.classList.toggle("closed", !state.dock.open);
-  $("dock-toggle").textContent = state.dock.open ? "▾" : "▴";
-  for (const b of dock.querySelectorAll("[data-tab]")) b.classList.toggle("cur", b.dataset.tab === state.dock.tab);
-  for (const p of dock.querySelectorAll("[data-pane]")) p.classList.toggle("cur", p.dataset.pane === state.dock.tab);
-  $("dock-of").textContent = it ? "· " + itemLabel(it) : "· เลือก subassembly เพื่อดูผล";
+  // each result palette (Messages / Log / Points / Logic / AI) says which subassembly it shows
+  for (const e of document.querySelectorAll(".dock-of")) e.textContent = it ? itemLabel(it) : "เลือก subassembly เพื่อดูผล";
 
   const iss = $("issues"), tb = $("pt-table"), log = $("log");
   iss.innerHTML = ""; tb.innerHTML = "";
@@ -1723,7 +1719,7 @@ function lgChip(e, v, kind){
 }
 // ค่าในแผง Logic ตามผลคำนวณล่าสุด (เรียกจาก render ทุกครั้ง — ไม่สร้าง DOM ใหม่ ช่องที่พิมพ์อยู่ไม่หลุด)
 function updateLogicLive(){
-  if (!state.dock.open || state.dock.tab !== "logic") return;
+  if (!palShown("logic")) return;
   const box = $("logic-pane"), it = logicItem(), r = it && drawRes[it.id];
   if (!box || !r || !r.logic) return;
   const pre = box.querySelector("#lg-text"); if (pre) pre.textContent = Logic.toText(it.spec, r);   // มุมมองข้อความ: ค่าตอนนี้สด
@@ -1769,7 +1765,7 @@ function renderLogic(){
   const box = $("logic-pane"), it = logicItem();
   const lg = it ? it.spec.logic || {} : {}, nC = (lg.conditions || []).length;
   $("n-logic").textContent = nC ? String(nC) : "";
-  if (state.dock.tab !== "logic" || !state.dock.open) return;
+  if (!palShown("logic")) return;
   // กำลังพิมพ์ในแผงอยู่: อัปเดตแค่ค่า (สร้างใหม่ตอนออกจากช่อง)
   if (box.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName)) return updateLogicLive();
   box.innerHTML = "";
@@ -1890,11 +1886,6 @@ function removeDecisionsDialog(it, decs, title){
 }
 
 
-$("dock").querySelector(".dock-tabs").addEventListener("click", e => {
-  const b = e.target.closest("[data-tab]");
-  if (b){ state.dock.tab = b.dataset.tab; state.dock.open = true; persist(); renderDock(); renderAi(); }
-});
-$("dock-toggle").onclick = () => { state.dock.open = !state.dock.open; persist(); renderDock(); };
 
 // ---------------- กรอบแดง (compile error / exception ของตัวที่เลือก) ----------------
 function renderProblem(){

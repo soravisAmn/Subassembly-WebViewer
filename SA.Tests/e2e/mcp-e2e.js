@@ -13,7 +13,7 @@ async function call(name, args){
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args || {} } }) });
   const t = await r.text(), d = t.split("\n").find(l => l.startsWith("data: "));
   const res = JSON.parse(d ? d.slice(6) : t).result;
-  return { error: !!res.isError, text: (res.content.find(c => c.type === "text") || {}).text || "", image: res.content.find(c => c.type === "image") };
+  return { error: !!res.isError, text: res.content.filter(c => c.type === "text").map(c => c.text).join("\n"),   /* sa_status has 2 text blocks since round 8 */ image: res.content.find(c => c.type === "image") };
 }
 const gapLinks = text => [...new Set([...text.matchAll(/\d \S*?(L\d+)(?:\+L\d+)* \[/g)].map(m => m[1]))];
 

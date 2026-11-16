@@ -129,6 +129,13 @@ const Commands = (() => {
     // ---------- AI ----------
     { id: "ai.open", label: "Proposals", icon: "sparkles", tip: "เปิดแท็บ AI: ข้อเสนอจาก Claude (รับ / ปฏิเสธ)",
       run: () => { aiFocus(); renderDock(); renderAi(); } },
+    // View › Palettes: one toggle per palette (js/dock.js) + Reset layout
+    ...[["tree", "Workspace"], ["scenarios", "Scenarios"], ["props", "Properties"], ["code", "Code"], ["msg", "Messages"], ["log", "Log"],
+        ["pts", "Points"], ["logic", "Logic"], ["ai", "AI"]].map(([p, label]) => ({ id: "pal." + p, label, tip: `เปิด / ปิด palette ${label}`,
+      active: c => (c.pals || []).includes(p),
+      run: () => Dock.toggle(p) })),
+    { id: "pal.reset", label: "Reset layout", icon: "restore", tip: "palette ทั้งหมดกลับตำแหน่งเริ่มต้น (ตำแหน่งที่จัดไว้ในเครื่องนี้หายไป)",
+      run: () => Dock.reset() },
     { id: "ai.connect", label: "เชื่อม Claude", icon: "plug-connected", tip: "วิธีเชื่อม Claude Code / Claude Desktop กับหน้านี้ (MCP)",
       run: () => showConnectClaude() },
 
@@ -177,7 +184,7 @@ const Commands = (() => {
     { id: "logic.vars", label: "Variables", icon: "variable", edit: true, tip: "Variables ของตัวที่แก้ (ในต้นไม้ Workspace)",
       run: () => showVariables() },
     { id: "logic.conds", label: "Conditions", icon: "git-branch", edit: true, tip: "เงื่อนไข / กิ่ง ของส่วนที่วาด (แท็บ Logic)",
-      run: () => { state.dock.tab = "logic"; state.dock.open = true; persist(); renderDock(); } },
+      run: () => { Dock.show("logic"); } },
     { id: "logic.branch", label: "Draw into branch", icon: "git-fork", edit: true, shortcut: "B", keys: ["b"], keyIdle: true,
       tip: "object ที่วาดต่อจากนี้เข้ากิ่งที่เลือก",
       run: () => chooseDrawBranch() },
@@ -208,7 +215,9 @@ const Commands = (() => {
       { title: "Mode", items: ["view.design", "view.c3d"] },
       { title: "Show", items: [["view.aux", "s"], ["view.codes", "s"], ["view.grid", "s"]] },
       { title: "VE", items: [["view.ve1", "s"], ["view.ve2", "s"], ["view.ve5", "s"]] },
-      { title: "Scenario", items: [{ widget: "scenario" }] }] },
+      { title: "Scenario", items: [{ widget: "scenario" }] },
+      { title: "Palettes", items: [["pal.tree", "s"], ["pal.scenarios", "s"], ["pal.props", "s"], ["pal.code", "s"], ["pal.msg", "s"], ["pal.log", "s"],
+                                   ["pal.pts", "s"], ["pal.logic", "s"], ["pal.ai", "s"], ["pal.reset", "s"]] }] },
     { id: "output", label: "Output", panels: [
       { title: "Build", items: ["build"] },
       { title: "Code", items: ["code.edit", ["code.generated", "s"]] },
@@ -243,6 +252,7 @@ const Commands = (() => {
     "data-tool": { point: "draw.point", link: "draw.link", shape: "draw.shape", polygon: "draw.polygon", ngon: "draw.ngon", arc: "draw.arc",
                    fillet: "draw.fillet", intersect: "draw.intersect", offset: "draw.offset", array: "draw.array", daylight: "draw.daylight",
                    follow: "draw.follow", extend: "draw.extend", clip: "draw.clip", cutfill: "draw.cutfill" },
+    "data-tab": { msg: "pal.msg", log: "pal.log", pts: "pal.pts", logic: "pal.logic", ai: "pal.ai" },
     "id": { "b-build": "build", "b-edit": "code.edit", "edit-save": "finish.save", "edit-exit": "finish.exit", "b-fit": "view.fit",
             "b-aux": "view.aux", "b-c3d": "view.c3d" }
   };
@@ -252,6 +262,12 @@ const Commands = (() => {
     "data-tool:level": "Cut at Level ไม่เคยใช้ได้",
     "my-shapes": "My Shapes ไม่เคยใช้ได้ — Browser มาในรอบ 12",
     "id:dock-toggle": "ย่อ dock ล่าง — ใช้ปรับขนาด / ปิด palette แทน",
+    "id:ed-close": "× ของแถบโค้ด — ใช้ × ของ palette Code / Ctrl+E",
+    "id:ed-resize": "ลากความกว้างแถบโค้ด — dockview ปรับขนาดแทน",
+    "id:lw-resize": "ลากความกว้างแถบซ้าย — dockview ปรับขนาดแทน",
+    "id:rw-resize": "ลากความกว้างแถบขวา — dockview ปรับขนาดแทน",
+    "id:split-left": "เส้นแบ่ง Workspace / Scenarios — dockview ปรับขนาดแทน",
+    "fold:sc": "พับ / กาง Scenarios — ปิด / เปิด palette แทน",
     "id:drawer-hint": "คำใบ้ใต้หัว Drawer — tooltip บอกแทน"
   };
 

@@ -3,7 +3,7 @@
 const AI_COLOR = { added: "#2f9e44", changed: "#e8890c", removed: "#d6336c" };
 let aiLastCall = null;
 
-function aiFocus(){ state.dock.tab = "ai"; state.dock.open = true; persist(); }
+function aiFocus(){ if (Dock) Dock.show("ai"); }          // AI palette (js/dock.js)
 function aiItemOf(p){ return p.item || itemById(p.itemId); }
 
 // The user edited the subassembly, or it is gone: the proposal is cancelled (the AI must read again)
@@ -106,7 +106,7 @@ function renderAi(){
   st.classList.toggle("wait", pend.length > 0);
   if (typeof updateRibbon === "function") updateRibbon();
   const box = $("ai-pane");
-  if (state.dock.tab !== "ai" || !state.dock.open) return;
+  if (!palShown("ai")) return;                // hidden palette: drawn when it is shown (js/dock.js)
   box.innerHTML = "";
   if (!pend.length){
     const done = Proposals.all().slice(-1)[0];

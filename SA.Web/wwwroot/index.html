@@ -30,31 +30,28 @@
   <input id="f-import" type="file" accept=".json" hidden>
 </header>
 
-<!-- 2 · แถบซ้าย: ต้นไม้ workspace -->
-<!--   2 แผงเลื่อนแยกกัน (js/panes.js): ต้นไม้ (ยืดเต็มที่เหลือ) / Scenarios (ลากเส้นแบ่งปรับความสูง · คลิกหัว = พับ / กาง) -->
-<aside id="left" class="split">
-  <section class="pane-sec grow" id="sec-tree">
-    <div class="pane-h">Workspace</div>
-    <div class="pane-body"><div id="tree" class="tree" tabindex="0"></div></div>
-  </section>
-  <div class="pane-hsplit" id="split-left" title="ลากปรับความสูง Scenarios · ดับเบิลคลิก = ค่าเริ่มต้น"></div>
-  <section class="pane-sec sized" id="sec-sc">
-    <div class="pane-h fold" data-fold="sc" title="คลิก = พับ / กาง Scenarios"><span class="fold-car">▾</span>Scenarios
-      <button id="b-save" title="เก็บผิวดิน / ค่า parameter / โหมด ตอนนี้เป็นกรณีใหม่ในโปรเจกต์ (ส่วนที่วาดไม่ถูกเก็บ)">+ บันทึกกรณีนี้</button>
-    </div>
-    <div class="pane-body"><div id="sc-list" class="sc-list"></div></div>
-  </section>
-</aside>
+<!-- 1 · dockview (round 9, js/dock.js): centre = workspace, palettes around it (move / tab / float / close; layout per machine) -->
+<div id="dv" class="dv-host"></div>
 
-<!-- แถบแก้โค้ด (ของเดิม) -->
-<div id="ed">
+<!-- palette contents: js/dock.js moves each .pal into its dockview panel (ids unchanged: the MCP bridge and render code use them) -->
+<div id="pal-src" hidden>
+<div class="pal" data-pal="tree"><div id="tree" class="tree" tabindex="0"></div></div>
+<div class="pal" data-pal="scenarios">
+  <div class="pal-bar"><span class="spacer"></span><button id="b-save" title="เก็บผิวดิน / ค่า parameter / โหมด ตอนนี้เป็นกรณีใหม่ในโปรเจกต์ (ส่วนที่วาดไม่ถูกเก็บ)">+ บันทึกกรณีนี้</button></div>
+  <div class="pal-body"><div id="sc-list" class="sc-list"></div></div>
+</div>
+<div class="pal" data-pal="props">
+  <div class="pal-bar"><span class="sub" id="props-of"></span></div>
+  <div class="pal-body"><div id="props" class="props"></div></div>
+</div>
+<!-- Code palette: the code panel (Ctrl+E) -->
+<div class="pal" data-pal="code"><div id="ed">
   <div class="ed-bar">
     <span class="name" id="ed-name">—</span>
     <span class="chip" id="ed-state" title=""><span class="dot idle" id="ed-dot"></span><span id="ed-txt">—</span></span>
     <span class="spacer"></span>
     <button id="ed-save" title="บันทึกตอนนี้ (Ctrl+S) — ปกติบันทึกเองหลังหยุดพิมพ์ 1 วินาที">บันทึก</button>
     <button id="ed-dl" title="ดาวน์โหลดโค้ดในแถบนี้เป็นไฟล์ .cs">ดาวน์โหลด</button>
-    <button id="ed-close" title="ซ่อนแถบโค้ด (Ctrl+E)">×</button>
   </div>
   <div class="ed-conflict" id="ed-conflict">
     <div id="ed-conflict-msg"></div>
@@ -63,12 +60,10 @@
       <button id="ed-take">ใช้ฉบับในไฟล์</button>
     </div>
   </div>
-  <div id="ed-host"><div class="ed-empty" id="ed-empty">เลือก subassembly ในต้นไม้ด้านซ้าย หรือ <b>&nbsp;ไฟล์ → Import .cs&nbsp;</b></div></div>
-  <div id="ed-resize" title="ลากเพื่อปรับความกว้าง"></div>
-</div>
-
-<!-- 1 · workspace -->
-<section id="center">
+  <div id="ed-host"><div class="ed-empty" id="ed-empty">เลือก subassembly ในต้นไม้ (Workspace) หรือ <b>&nbsp;ไฟล์ → Import .cs&nbsp;</b></div></div>
+</div></div>
+<!-- centre: the workspace (not closable, not floatable) -->
+<div class="pal" data-pal="main" id="center">
   <div class="edit-bar" id="edit-bar" hidden>
     <span>✎ กำลังแก้ <b id="edit-name"></b> — ส่วนอื่นจางลงและแก้ไม่ได้</span>
   </div>
@@ -85,34 +80,24 @@
     <div class="tip" id="tip"></div>
     <div class="dyn" id="dyn" hidden></div>
   </div>
-  <div class="dock" id="dock">
-    <div class="dock-tabs" role="tablist">
-      <button data-tab="msg" role="tab">Messages <span class="badge" id="n-msg"></span><span class="badge i" id="n-info"></span></button>
-      <button data-tab="log" role="tab">Log <span class="badge" id="n-log"></span></button>
-      <button data-tab="pts" role="tab">Points <span class="badge" id="n-pts"></span></button>
-      <button data-tab="logic" role="tab" title="เงื่อนไข / กิ่ง ของส่วนที่วาด (ค่าตอนนี้ + scenario ที่ทดสอบแต่ละกิ่ง)">Logic <span class="badge" id="n-logic"></span></button>
-      <button data-tab="ai" role="tab" title="ข้อเสนอจาก Claude (รับ / ปฏิเสธ)">AI <span class="badge" id="n-ai"></span></button>
-      <span class="dock-of" id="dock-of"></span>
-      <span class="spacer"></span>
-      <button id="dock-toggle" class="ghost" title="ย่อ/ขยายแถบผลลัพธ์">▾</button>
-    </div>
-    <div class="dock-body">
-      <div data-pane="msg" id="issues" class="msgs"></div>
-      <pre data-pane="log" id="log" class="log"></pre>
-      <div data-pane="logic" id="logic-pane" class="lg-tab"></div>
-      <div data-pane="ai" id="ai-pane" class="ai-tab"></div>
-      <div data-pane="pts"><table><thead><tr><th>#</th><th>Codes</th><th class="n">Offset</th><th class="n">Elev</th></tr></thead><tbody id="pt-table"></tbody></table></div>
-    </div>
-  </div>
-</section>
-
-<!-- 4 · แถบขวา: Properties (the Drawer tools moved to the contextual Draw / Logic tabs, round 9) -->
-<aside id="right" class="split">
-  <section class="pane-sec grow" id="sec-props">
-    <div class="pane-h props-h">Properties <span class="sub" id="props-of"></span></div>
-    <div class="pane-body"><div id="props" class="props"></div></div>
-  </section>
-</aside>
+</div>
+<!-- results of the selected subassembly (dark like the workspace) -->
+<div class="pal cad" data-pal="msg"><div class="dock-of"></div><div id="issues" class="msgs"></div></div>
+<div class="pal cad" data-pal="log"><div class="dock-of"></div><pre id="log" class="log"></pre></div>
+<div class="pal cad" data-pal="pts"><div class="dock-of"></div><table><thead><tr><th>#</th><th>Codes</th><th class="n">Offset</th><th class="n">Elev</th></tr></thead><tbody id="pt-table"></tbody></table></div>
+<div class="pal cad" data-pal="logic"><div class="dock-of"></div><div id="logic-pane" class="lg-tab"></div></div>
+<div class="pal cad" data-pal="ai"><div class="dock-of"></div><div id="ai-pane" class="ai-tab"></div></div>
+<!-- palette tab labels (badges keep their ids) -->
+<span class="pal-tab" data-tab="tree">Workspace</span>
+<span class="pal-tab" data-tab="scenarios">Scenarios</span>
+<span class="pal-tab" data-tab="props">Properties</span>
+<span class="pal-tab" data-tab="code">Code</span>
+<span class="pal-tab" data-tab="msg">Messages <span class="badge" id="n-msg"></span><span class="badge i" id="n-info"></span></span>
+<span class="pal-tab" data-tab="log">Log <span class="badge" id="n-log"></span></span>
+<span class="pal-tab" data-tab="pts">Points <span class="badge" id="n-pts"></span></span>
+<span class="pal-tab" data-tab="logic" title="เงื่อนไข / กิ่ง ของส่วนที่วาด (ค่าตอนนี้ + scenario ที่ทดสอบแต่ละกิ่ง)">Logic <span class="badge" id="n-logic"></span></span>
+<span class="pal-tab" data-tab="ai" title="ข้อเสนอจาก Claude (รับ / ปฏิเสธ)">AI <span class="badge" id="n-ai"></span></span>
+</div>
 
 <!-- 5 · แถบล่าง (แบบแถบสถานะ AutoCAD) -->
 <footer id="bar">
@@ -142,6 +127,7 @@
   <div class="dlg-b" id="dlg-body"></div>
 </div></div>
 
+<script src="lib/dockview/dockview-core.min.js"></script>
 <script src="js/view.js"></script>
 <script src="js/core.js"></script>
 <script src="js/expr.js"></script>
@@ -165,12 +151,9 @@
 <script src="js/build.js"></script>
 <script src="js/project.js"></script>
 <script src="js/scenarios.js"></script>
-<!-- ตัวลากความกว้างแถบซ้าย / ขวา (position: fixed ไม่กินช่อง grid) -->
-<div class="pane-resize" id="lw-resize" title="ลากปรับความกว้างแถบซ้าย · ดับเบิลคลิก = ค่าเริ่มต้น"></div>
-<div class="pane-resize" id="rw-resize" title="ลากปรับความกว้างแถบขวา · ดับเบิลคลิก = ค่าเริ่มต้น"></div>
-<script src="js/panes.js"></script>
 <script src="js/aipanel.js"></script>
 <script src="js/mcp.js"></script>
+<script src="js/dock.js"></script>
 <script src="js/ribbon.js"></script>
 <script src="js/main.js"></script>
 </body>

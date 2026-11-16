@@ -24,6 +24,7 @@ function ctxNow(){
     clip: !!clip, addMode, readOnly: !!Proj.readOnly, undo: h.undo > 0, redo: h.redo > 0,
     bar: state.bar, showCodes: !!state.showCodes, ve: +state.view.ve, edOpen: !!ed.open, tool: draw.tool, cmdRunning: !!cmd.name,
     canSaveDrawing: !!ei && canSaveDrawing(ei),
+    pals: Dock ? DockLayout.PALETTES.filter(p => Dock.has(p.id)).map(p => p.id) : [],
     saveReason: !ei ? "" : !ei.spec ? "ยังไม่ได้วาดอะไร" : "ไฟล์ที่เขียนเองยังไม่มีช่วง SA-DRAWING — แก้ในแถบโค้ดแทน"
   };
 }

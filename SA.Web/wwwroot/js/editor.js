@@ -134,8 +134,8 @@ async function openEditor(){
   // ไฟล์จากปุ่ม Open: ขอสิทธิ์เขียนตอนที่ผู้ใช้เพิ่งคลิก (เบราว์เซอร์ยอมถามเฉพาะจังหวะนี้)
   if (state.file === OPENED && opened && opened.handle) await askWrite(opened.handle);
   ed.open = true; state.editorOpen = true; persist();
-  document.body.classList.add("editing"); if (typeof updateRibbon === "function") updateRibbon();
-  if (typeof applyPaneWidths === "function") applyPaneWidths();   // แถบโค้ดกินที่ → บีบแถบซ้าย / ขวาถ้าจอไม่พอ
+  if (Dock) Dock.show("code");      // Code palette (js/dock.js)
+  if (typeof updateRibbon === "function") updateRibbon();
   renderEditorBar();
   E = await loadEditor();
   if (!ed.hooked){ ed.hooked = true; E.onChange(onEdit); E.onCursor(codeCursor); }
@@ -148,8 +148,8 @@ async function openEditor(){
 function closeEditor(){
   flushSave();
   ed.open = false; state.editorOpen = false; persist();
-  document.body.classList.remove("editing"); if (typeof updateRibbon === "function") updateRibbon();
-  if (typeof applyPaneWidths === "function") applyPaneWidths();
+  if (Dock) Dock.hide("code");
+  if (typeof updateRibbon === "function") updateRibbon();
   renderProblem(); run();           // กลับไปแสดงจากไฟล์บนดิสก์
 }
 function toggleEditor(){ ed.open ? closeEditor() : openEditor(); }
@@ -356,7 +356,6 @@ function download(){
   URL.revokeObjectURL(a.href);
 }
 
-$("ed-close").onclick = closeEditor;
 $("ed-save").onclick = saveNow;
 $("ed-dl").onclick = download;
 $("ed-keep").onclick = () => { ed.conflict = null; save(true); };
@@ -371,20 +370,6 @@ $("ed-keep").addEventListener("click", () => E && E.focus());
 $("problem").addEventListener("click", e => {
   const d = e.target.closest("[data-line]");
   if (d && editorActive()) E.goto(+d.dataset.line, +(d.dataset.col || 1));
-});
-
-// ปรับความกว้างแถบโค้ด
-$("ed-resize").addEventListener("pointerdown", e => {
-  const x0 = e.clientX, w0 = $("ed").getBoundingClientRect().width;
-  const move = ev => {
-    // ที่เหลือ = จอ − แถบซ้าย − แถบขวา − workspace ขั้นต่ำ (แถบซ้าย / ขวาลากปรับได้ — panes.js)
-    const side = $("left").getBoundingClientRect().width + $("right").getBoundingClientRect().width;
-    state.edWidth = Math.round(Math.max(280, Math.min(innerWidth - side - 320, w0 + ev.clientX - x0)));
-    document.body.style.setProperty("--edw", state.edWidth + "px");
-  };
-  const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); persist(); };
-  addEventListener("pointermove", move); addEventListener("pointerup", up);
-  e.preventDefault();
 });
 
 // ปิดหน้าเว็บระหว่างที่ยังไม่บันทึก: ไฟล์ในโฟลเดอร์ส่งบันทึกครั้งสุดท้าย, แบบอื่นให้เบราว์เซอร์ถามก่อน

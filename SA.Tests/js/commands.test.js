@@ -75,10 +75,10 @@ test("every Edit-only command is on a contextual tab; contextual tabs hold only 
   const logic = Commands.RIBBON.find(t => t.id === "logic").panels[0].items.map(x => Array.isArray(x) ? x[0] : x);
   ok(logic.includes("draw.cutfill"), "ถ้าตัด / ถม in Logic (Q2)");
 });
-test("ribbon / menu / Quick Access icons exist in lib/tabler or are Drawer SVGs (VE buttons are text only)", () => {
+test("ribbon / menu / Quick Access icons exist in lib/tabler or are Drawer SVGs (VE and palette toggles are text only)", () => {
   for (const id of new Set([...ribbonIds(), ...Commands.QUICK, ...Commands.FINISH.items])){
     const c = Commands.get(id);
-    if (/^view\.ve/.test(id)) continue;
+    if (/^view\.ve|^pal\.(?!reset)/.test(id)) continue;
     if (c.svg){ ok(/^<(path|circle|text)/.test(c.svg), id + ": bad svg"); continue; }
     ok(c.icon, id + ": no icon");
     ok(fs.existsSync(path.join(WWW, "lib/tabler", c.icon + ".svg")), `${id}: lib/tabler/${c.icon}.svg missing`);
@@ -147,7 +147,9 @@ const OLD_ENTRIES = {
   "data-cmd": ["import", "new-cs", "open-proj", "save-proj", "save-proj-as", "new-proj", "pack", "export", "build", "sc-export", "sc-import", "settings"],
   "data-tool": ["point", "link", "shape", "polygon", "ngon", "arc", "fillet", "intersect", "offset", "array", "marked", "daylight", "follow", "extend",
                 "clip", "level", "cutfill"],
-  "id": ["b-build", "b-edit", "edit-save", "edit-exit", "b-fit", "b-aux", "b-c3d", "dock-toggle", "drawer-hint"]
+  "data-tab": ["msg", "log", "pts", "logic", "ai"],
+  "id": ["b-build", "b-edit", "edit-save", "edit-exit", "b-fit", "b-aux", "b-c3d", "dock-toggle", "drawer-hint", "ed-close", "ed-resize",
+         "lw-resize", "rw-resize", "split-left"]
 };
 test("every old entry point maps to a command or is in the removed list", () => {
   for (const [kind, list] of Object.entries(OLD_ENTRIES)) for (const v of list){
@@ -156,6 +158,7 @@ test("every old entry point maps to a command or is in the removed list", () => 
     if (to) ok(Commands.get(to), `${kind}=${v} → unknown command ${to}`);
   }
   ok(Commands.REMOVED["my-shapes"], "My Shapes placeholder not listed");
+  ok(Commands.REMOVED["fold:sc"], "Scenarios fold header not listed");
 });
 test("index.html: every data-cmd / data-tool still in the page has a command", () => {
   const html = fs.readFileSync(path.join(WWW, "index.html"), "utf8");

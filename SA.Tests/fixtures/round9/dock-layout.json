@@ -1,0 +1,161 @@
+{
+ "v": 1,
+ "layout": {
+  "grid": {
+   "root": {
+    "type": "branch",
+    "data": [
+     {
+      "type": "branch",
+      "data": [
+       {
+        "type": "leaf",
+        "data": {
+         "views": [
+          "tree"
+         ],
+         "activeView": "tree",
+         "id": "7"
+        },
+        "size": 492
+       },
+       {
+        "type": "leaf",
+        "data": {
+         "views": [
+          "scenarios"
+         ],
+         "activeView": "scenarios",
+         "id": "8"
+        },
+        "size": 220
+       }
+      ],
+      "size": 260
+     },
+     {
+      "type": "branch",
+      "data": [
+       {
+        "type": "leaf",
+        "data": {
+         "views": [
+          "main"
+         ],
+         "activeView": "main",
+         "id": "6",
+         "locked": true,
+         "hideHeader": true
+        },
+        "size": 502
+       },
+       {
+        "type": "leaf",
+        "data": {
+         "views": [
+          "msg",
+          "pts",
+          "logic",
+          "ai"
+         ],
+         "activeView": "msg",
+         "id": "10"
+        },
+        "size": 210
+       }
+      ],
+      "size": 800
+     },
+     {
+      "type": "leaf",
+      "data": {
+       "views": [
+        "props"
+       ],
+       "activeView": "props",
+       "id": "9"
+      },
+      "size": 340
+     }
+    ],
+    "size": 712
+   },
+   "width": 1400,
+   "height": 712,
+   "orientation": "HORIZONTAL"
+  },
+  "panels": {
+   "main": {
+    "id": "main",
+    "contentComponent": "main",
+    "title": "Workspace"
+   },
+   "tree": {
+    "id": "tree",
+    "contentComponent": "tree",
+    "tabComponent": "tree",
+    "title": "Workspace"
+   },
+   "scenarios": {
+    "id": "scenarios",
+    "contentComponent": "scenarios",
+    "tabComponent": "scenarios",
+    "title": "Scenarios"
+   },
+   "props": {
+    "id": "props",
+    "contentComponent": "props",
+    "tabComponent": "props",
+    "title": "Properties"
+   },
+   "msg": {
+    "id": "msg",
+    "contentComponent": "msg",
+    "tabComponent": "msg",
+    "title": "Messages"
+   },
+   "pts": {
+    "id": "pts",
+    "contentComponent": "pts",
+    "tabComponent": "pts",
+    "title": "Points"
+   },
+   "logic": {
+    "id": "logic",
+    "contentComponent": "logic",
+    "tabComponent": "logic",
+    "title": "Logic"
+   },
+   "ai": {
+    "id": "ai",
+    "contentComponent": "ai",
+    "tabComponent": "ai",
+    "title": "AI"
+   },
+   "log": {
+    "id": "log",
+    "contentComponent": "log",
+    "tabComponent": "log",
+    "title": "Log"
+   }
+  },
+  "activeGroup": "11",
+  "floatingGroups": [
+   {
+    "data": {
+     "views": [
+      "log"
+     ],
+     "activeView": "log",
+     "id": "11"
+    },
+    "position": {
+     "top": 200,
+     "left": 300,
+     "width": 400,
+     "height": 250
+    }
+   }
+  ]
+ }
+}

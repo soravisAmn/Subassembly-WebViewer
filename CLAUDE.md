@@ -52,27 +52,23 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 
 ## Tests
 
-`build-c3d.bat` builds the round 6 subassemblies (snapshot in `tests-civil3d/round6/`) against real Civil 3D; projects are built from the web's Build dialog. `test-all.bat` at the root runs the C# suite and every JS suite: one line per suite plus only the failures; full log in `SA.Tests/test-all.log`. Close the viewer first (it locks the build output). Details: `docs/testing.md`. Real Civil 3D test sets: `tests-civil3d/`, see `docs/civil3d-testing.md`.
+`test-all.bat` at the root runs the C# suite and every JS suite: one line per suite plus only the failures; full log in `SA.Tests/test-all.log`. Close the viewer first (it locks the build output). Details: `docs/testing.md`. Real Civil 3D (`build-c3d.bat`, `tests-civil3d/`): `docs/civil3d-testing.md`.
 
 ## Status
 
-- Last finished: round 9 (new UI shell: command registry `js/commands.js`, ribbon + ไฟล์ menu + Quick Access `js/ribbon.js`, contextual Draw / Modify / Logic, dockable palettes `js/dock.js` with dockview, Drawer removed), M0-M4. Docs: `docs/screen.md`. History: `docs/history.md`. Round 8 (project folders): `docs/projects.md`.
+- Last finished: round 9 (new UI shell: command registry `js/commands.js`, ribbon `js/ribbon.js`, dockable palettes `js/dock.js`), M0-M4. Docs: `docs/screen.md`. History: `docs/history.md`.
 - The user's projects are in `D:\test_cad\SA-Projects\` (SR03, rock-pitching-compare); none left at the repo root.
 - Round 8 Civil 3D checklist passed (whole-palette drag + Refresh Palette without duplicates, Thai text OK). Next: round 10 (web display: style by code, notes, dimensions, Civil 3D preview mode).
-- UI rules since round 9: a new command = an entry in `js/commands.js` (label, icon, Thai tip, enable rule, keys) placed in `RIBBON` / `FILE_MENU` and, if it has a key, in `HELP` (the `?` table); a new palette = `DockLayout.PALETTES` + `.pal` in `index.html` + a View › Palettes toggle. UI smoke: `SA.Tests/e2e/ui-smoke.js` against a test server.
-- Round 7 Civil 3D run: `.atc` needs the full DLL path (now the only form), Side list OK, re-adding the catalog duplicated the tools (round 8 adds a palette + Refresh Palette to test).
-- Round 6 M5 Civil 3D run: shapes filled crossed (link order in `Shapes.Add`). Fixed in shim + generator (`docs/civil3d-testing.md`).
+- Project skills: `sa-spec-change`, `sa-civil3d-parity`, `sa-add-command` (in `.claude/skills/`). Generic agents `reviewer`, `test-runner` are user-level.
+- Civil 3D results of each round (round 6 shape link order, round 7 `.atc` DLL path): `docs/civil3d-testing.md`.
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.
 
 ## Plan
 
 Decided ideas: `docs/ideas/IDEA#1.md` (Thai). Read only the item for the current round, not the whole file. UI wireframes: Design canvas "SA Drawing Studio — UI wireframe" on claude.ai (the user shares screenshots).
 
-| Round | Work (IDEA#1 item) |
+| Round (7-9 done: `docs/history.md`) | Work (IDEA#1 item) |
 |---|---|
-| 7 | Build + report + `.atc` + source package (3–4) |
-| 8 | Project-folder storage: relative paths, spec only in `.cs`, scenarios in the project file, Pack, relink (8) |
-| 9 | New UI shell: ribbon, contextual Edit tabs, dockable palettes (7) |
 | 10 | Web display: style by code (`.style.json`), notes, dimensions, Civil 3D preview mode (1) |
 | 11 | Icon generator (5) |
 | 12 | Browser palette: folder roots, thumbnails, copy into `lib\` (2) |

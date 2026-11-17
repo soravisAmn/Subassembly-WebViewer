@@ -20,7 +20,7 @@ static class DisplayTests
         Directory.CreateDirectory(TempRoot);
 
         JsonObject BoxSpec() => JsonNode.Parse(File.ReadAllText(Path.Combine(fixtures, "round8", "box.spec.json")))!.AsObject();
-        const string DisplayJson = """{"overrides":{"L1":{"link":{"linetype":"hidden","weight":0.5}},"P2":{"point":{"marker":"triangle"}}},"notes":[{"id":"N1","text":"ระวัง {W}","at":{"point":"P2","dx":0.5,"dy":0.8}}],"dims":[{"id":"D1","kind":"h","a":"P1","b":"P2","offset":-1.2,"label":"auto","decimals":2},{"id":"D2","kind":"aligned","a":"P1","b":"P2","offset":0.5,"label":null,"decimals":3}],"slopes":[{"id":"G1","link":"L1","format":"auto"}]}""";   // M2: dims + slopes
+        const string DisplayJson = """{"overrides":{"L1":{"link":{"linetype":"hidden","weight":0.5}},"P2":{"point":{"marker":"triangle"}}},"notes":[{"id":"N1","text":"ระวัง {W}","at":{"point":"P2","dx":0.5,"dy":0.8},"leader":"P2"},{"id":"N2","text":"{W*2} m","at":{"point":"P1","dx":-1,"dy":0},"leader":null}],"dims":[{"id":"D1","kind":"h","a":"P1","b":"P2","offset":-1.2,"label":"auto","decimals":2},{"id":"D2","kind":"aligned","a":"P1","b":"P2","offset":0.5,"label":null,"decimals":3}],"slopes":[{"id":"G1","link":"L1","format":"auto"}]}""";   // M2: dims + slopes; M3: notes with leader / {expression}
         (string Plain, string WithDisplay) Raws(Action<JsonObject>? tweak = null)
         {
             var a = BoxSpec(); tweak?.Invoke(a);
@@ -194,6 +194,47 @@ static class DisplayTests
             // two outside files with the same name: the suffix goes before ".style.json" so the copy is still a style file
             Eq("ext/std-2.style.json", ProjectPack.ExtName("std.style.json", 2), "style suffix");
             Eq("ext/o-3.cs", ProjectPack.ExtName("o.cs", 3), ".cs suffix");
+        });
+
+        // ---------- round 10 M3: cross-item annotations in the project file ----------
+        test("project file \"display\" (cross-item dimensions) survives open -> save -> Save as -> Pack unchanged; version stays 3", () =>
+        {
+            const string ProjDisplay = """{"dims":[{"id":"D1","kind":"h","a":{"item":"i1","point":"P1"},"b":{"item":"i2","point":"P3"},"offset":1.5,"label":"auto","decimals":2}],"seq":{"D":1}}""";
+            var dir = Proj("pd", null);
+            var pf = Path.Combine(dir, "P.assembly.json");
+            var c0 = JsonNode.Parse(File.ReadAllText(pf))!.AsObject();
+            c0["display"] = JsonNode.Parse(ProjDisplay);
+            File.WriteAllText(pf, ProjectFile.Serialize(c0));
+            string Disp(JsonNode? root) => root!["display"]!.ToJsonString();
+            var want = JsonNode.Parse(ProjDisplay)!.ToJsonString();
+
+            var machine = Path.Combine(TempRoot, "pd", "machine");
+            var reg = new ProjectRegistry(dir, Path.Combine(machine, "scratch"));
+            var o = J(ProjectHttp.Open(reg, machine, new OpenReq(pf, "t1")));
+            True((bool)o["ok"]!, o.ToJsonString());
+            var content = o["content"]!.AsObject();
+            Eq(want, Disp(content), "open");
+            Eq(3, (int)content["version"]!, "version");
+            var ctx = reg.Get((string)o["handle"]!)!;
+
+            True((bool)J(ProjectHttp.Save(reg, machine, ctx, new SaveProjectReq((JsonObject)content.DeepClone(), null)))["ok"]!, "save");
+            Eq(want, Disp(JsonNode.Parse(File.ReadAllText(pf))), "saved file");
+
+            var asDir = Path.Combine(TempRoot, "pd", "copy");
+            Directory.CreateDirectory(asDir);
+            var asPath = Path.Combine(asDir, "Q.assembly.json");
+            var sa = J(ProjectHttp.Save(reg, machine, ctx, new SaveProjectReq((JsonObject)content.DeepClone(), asPath)));
+            True((bool)sa["ok"]!, sa.ToJsonString());
+            Eq(want, Disp(JsonNode.Parse(File.ReadAllText(asPath))), "Save as");
+            Eq(3, (int)JsonNode.Parse(File.ReadAllText(asPath))!["version"]!, "Save as version");
+
+            var outZip = Path.Combine(TempRoot, "pd", "Q.zip");
+            var pack = ProjectPack.Pack(ctx, new PackReq((JsonObject)content.DeepClone(), outZip), new DateTime(2026, 11, 17));
+            True(pack.Ok, pack.Message ?? "");
+            using var z = System.IO.Compression.ZipFile.OpenRead(outZip);
+            var entry = z.Entries.First(e => e.FullName.EndsWith(".assembly.json"));
+            using var sr = new StreamReader(entry.Open());
+            Eq(want, Disp(JsonNode.Parse(sr.ReadToEnd())), "Pack");
         });
     }
 

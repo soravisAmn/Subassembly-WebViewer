@@ -42,6 +42,17 @@ Set codes completely: Civil 3D Code Set Styles use point, link and shape codes f
 
 Bottom boundary task: `sa_check` with `code: "Datum"` lists missing stretches as offset from..to + link. The boundary differs per scenario, so check every scenario, not only the default one. A `followClipped` link has separate `codes`, `codesGround`, `codesLine`; add to `codes` to cover every stretch (`editLink`).
 
+## Annotations (web only)
+
+Notes, dimensions and slope labels are web-only display data in the spec's `display` (`sa_get_spec`; `sa_describe` lists `annotations`). They never change the generated C# or what Civil 3D draws. Add them only when the user asks.
+
+- `addNote({ text, at: { point, dx, dy }, leader })`: text at a point + (dx, dy) in drawing units (Side = Right frame). `{Hcrest}` or `{Wcrest*2}` in the text shows the current value. `leader: true` draws a line to the point.
+- `addDim({ kind: "h" | "v" | "aligned", a, b, offset })`: between two point ids. The label shows the parameter automatically when one definition joins the two points with exactly that parameter.
+- `addSlopeLabel({ link, format: "auto" | "ratio" | "percent" })`: straight links only.
+- `updateAnnotation(id, { … })`, `removeAnnotation(ids)`. Ids: N1… notes, D1… dimensions, G1… slope labels.
+
+They are bound to point / link ids, so define the points first. A dimension between two subassemblies lives in the project file and is made by the user, not through `sa_apply`. The style file (`.style.json`) is not editable through MCP.
+
 ## Ops
 
 `sa_apply` takes `[{ fn, args, as? }]`, all or nothing. `${name.result}` in any string reads an earlier op's result in the same call, including inside expressions: `"${p2.result}.y - H"`. Functions and fields: `sa_catalog`.

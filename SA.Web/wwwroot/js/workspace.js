@@ -68,6 +68,9 @@ function mapSelected(){
 const niceStep = View.niceStep, gridLabel = View.gridLabel;   // view.js
 const ptsPath = (P, idx) => idx.map((k, j) => (j ? "L" : "M") + sx(P[k].x) + " " + sy(P[k].y)).join(" ");
 
+// layers drawn after every item (design §6: ... points -> annotations -> labels -> selection): renderSpec and the hand-written
+// part queue closures here; render() flushes them in that order so an item drawn later never covers another item's annotations
+let layers = { ann: [], lbl: [], sel: [] };
 function render(){
   const r = main.getBoundingClientRect();
   W = r.width; H = r.height;
@@ -107,6 +110,8 @@ function render(){
   const selIds = new Set(selList().map(x => x.item).filter(Boolean));
   const dragId = drag && drag.type === "item" ? drag.id : null;
   evalAll();
+  layers = { ann: [], lbl: [], sel: [] };
+  const show = showNow();
   for (const p of Proposals.pending()) if (p.item) renderProposal(p.item, p, null, el("g", { class: "item" }, svg));   // new subassembly proposed by the AI
   for (const it of allItems()){
     const rr = asmRes[it.id], dr = drawRes[it.id];
@@ -142,16 +147,17 @@ function render(){
       // a point code with a marker in the style file: that marker; otherwise the small circle as before
       if (pst.source.startsWith("code:")) pointMarker(pst, sx(p.x), sy(p.y), pcls, {"data-kind":"pt", "data-id":it.id, "data-i":i}, grp);
       else el("circle", {cx:sx(p.x), cy:sy(p.y), r:3.6, class:pcls, "data-kind":"pt", "data-id":it.id, "data-i":i}, grp);
-      if (state.showCodes && isSel && p.codes.length)
-        el("text", {x:sx(p.x)+7, y:sy(p.y)-7, class:"pt-lbl"}, grp).textContent = p.codes.join(", ");
+      // labels layer: point name (#index for hand-written code, View › Show › Point names) and codes of the selected item
+      const lbl = [show.ptnames ? "#" + i : "", show.codes && isSel && p.codes.length ? p.codes.join(", ") : ""].filter(Boolean).join(" ");
+      if (lbl) layers.lbl.push(L => { el("text", {x:sx(p.x)+7, y:sy(p.y)-7, class:"pt-lbl"}, layerGroup(L, cls)).textContent = lbl; });
     });
     // object ที่เลือก (จุด / link / shape) เน้นสีด้านบน
-    if (isSel){
+    if (isSel) layers.sel.push(() => {
       if (s.type === "shape" && res.shapes[s.i] && res.shapes[s.i].polygon)
         el("polygon", {points: res.shapes[s.i].polygon.map(k => sx(P[k].x)+","+sy(P[k].y)).join(" "), class:"sel-shape"}, svg);
       else if (s.type === "link" && res.links[s.i]) el("path", {d: ptsPath(P, res.links[s.i].pts), class:"sel-link"}, svg);
       else if (s.type === "pt" && P[s.i]) el("circle", {cx:sx(P[s.i].x), cy:sy(P[s.i].y), r:8, class:"sel-pt"}, svg);
-    }
+    });
   }
 
   if (pts.length >= 2){
@@ -165,6 +171,14 @@ function render(){
     const z = pts[pts.length-1];
     el("text", {x: Math.min(sx(z.x), W - 8) - 4, y: sy(z.y) + 20, class:"gnd-lbl", "text-anchor":"end"}, svg).textContent = "Surface: EG";
   }
+
+  // annotations (items, then the project's cross-item dimensions) -> labels (codes, point names) -> selection
+  const annL = el("g", {class:"layer-ann"}, svg);
+  for (const f of layers.ann) f(annL);
+  renderProjAnnots(annL);                  // js/annot.js
+  const lblL = el("g", {class:"layer-lbl"}, svg);
+  for (const f of layers.lbl) f(lblL);
+  for (const f of layers.sel) f();
 
   // origin ◇ ของแต่ละตัว
   for (const it of allItems()){
@@ -213,7 +227,7 @@ function render(){
 // แสดงทุกกรณี (ตัวที่แก้อยู่ ไม่ได้ดูแบบ Civil 3D): object ที่ไม่เกิดตอนนี้ = เส้นประจางสีของกิ่ง + ป้ายชื่อกิ่ง (คลิก / คลุมเลือกได้)
 function renderSpec(it, r, grp, isSel){
   const spec = it.spec, X = p => sx(r.ox + p.x), Y = p => sy(r.oy + p.y), s = state.sel;
-  const editingThis = state.editing === it.id;
+  const editingThis = state.editing === it.id, cls = grp.getAttribute("class"), show = showNow();
   const geo = (kind, id) => { const q = r[kind][id]; return q && !q.err ? q : ghostOf(it, r, kind, id); };
   const offBr = (kind, id) => { const q = r[kind][id]; return q && q.err && q.off ? q.off : null; };
   for (const sh of spec.shapes){
@@ -261,8 +275,10 @@ function renderSpec(it, r, grp, isSel){
       el("path", {d:`M${X(q)-4} ${Y(q)-4}L${X(q)+4} ${Y(q)+4}M${X(q)+4} ${Y(q)-4}L${X(q)-4} ${Y(q)+4}`, class:"dcons" + (ob ? " ghost" : ""), ...gs}, grp);
       el("rect", {x:X(q)-5, y:Y(q)-5, width:10, height:10, class:"dcons-hit", "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
     } else pointMarker(ob ? null : resolveStyle("point", p.codes, ovrOf(spec, p.id)), X(q), Y(q), "dpt" + (ob ? " ghost" : ""), { ...gs, "data-kind":"dpt", "data-id":it.id, "data-sid":p.id }, grp);
-    const lbl = [editingThis ? p.id : "", state.showCodes && (isSel || editingThis) ? p.codes.join(", ") : ""].filter(Boolean).join(" ");
-    if (lbl) el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl" + (Spec.isAux(p) ? " cons" : "") + (ob ? " ghost-lbl" : "")}, grp).textContent = lbl;
+    // labels layer: point name (in Edit, or View › Show › Point names) and codes (View › Show › Codes, selected / edited item)
+    // Civil 3D preview hides point names in Edit too (decision 11)
+    const lbl = [(editingThis && !state.bar.c3d) || show.ptnames ? p.id : "", show.codes && (isSel || editingThis) ? p.codes.join(", ") : ""].filter(Boolean).join(" ");
+    if (lbl) layers.lbl.push(L => { el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl" + (Spec.isAux(p) ? " cons" : "") + (ob ? " ghost-lbl" : "")}, layerGroup(L, cls)).textContent = lbl; });
   }
   // ป้าย "A1 ×3" ที่จุดแรกของชุดต้นฉบับของ Loop (ตัวที่แก้อยู่) — ×N = จำนวนชุดตอนนี้ (รอบ 5b)
   if (editingThis) for (const g of spec.arrays || []){
@@ -271,17 +287,23 @@ function renderSpec(it, r, grp, isSel){
     const t = el("text", {x: X(q) - 8, y: Y(q) - 10, class: "arr-lbl", "text-anchor": "end"}, grp);
     t.textContent = `${g.id} ×${n}`;
   }
-  renderAnnots(it, r, grp);                 // dimensions / slope labels (js/annot.js), on top of the points
+  layers.ann.push(L => renderAnnots(it, r, layerGroup(L, cls)));     // dimensions / slope labels / notes (js/annot.js)
   if (!isSel) return;
-  for (const o of selList()){
-    if (o.item !== it.id) continue;
-    const kind = { dshape: "shapes", dlink: "links", dpt: "pts" }[o.type], q = kind && geo(kind, o.id);
-    if (!q) continue;
-    if (o.type === "dshape" && q.poly) el("polygon", {points: q.poly.map(p => X(p) + "," + Y(p)).join(" "), class:"sel-shape"}, svg);
-    else if (o.type === "dlink" && q.path) el("path", {d: q.path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" "), class:"sel-link"}, svg);
-    else if (o.type === "dpt") el("circle", {cx:X(q), cy:Y(q), r:9, class:"sel-pt"}, svg);
-  }
+  layers.sel.push(() => {
+    for (const o of selList()){
+      if (o.item !== it.id) continue;
+      const kind = { dshape: "shapes", dlink: "links", dpt: "pts" }[o.type], q = kind && geo(kind, o.id);
+      if (!q) continue;
+      if (o.type === "dshape" && q.poly) el("polygon", {points: q.poly.map(p => X(p) + "," + Y(p)).join(" "), class:"sel-shape"}, svg);
+      else if (o.type === "dlink" && q.path) el("path", {d: q.path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" "), class:"sel-link"}, svg);
+      else if (o.type === "dpt") el("circle", {cx:X(q), cy:Y(q), r:9, class:"sel-pt"}, svg);
+    }
+  });
 }
+// a group in a layer with the item's classes (dim / locked / drag look the same as the item itself)
+const layerGroup = (L, cls) => el("g", { class: cls || "item" }, L);
+// display groups drawn now (Civil 3D preview hides style / annotations / codes / point names, keeping their values)
+const showNow = () => Display.showFlags(state.bar, state.showCodes);
 
 // ---------------- คลุมเลือก (Window / Crossing) ----------------
 // object ที่คลุมเลือกได้ เป็น px บนจอ: Edit mode = point / link / shape ที่วาดของตัวที่แก้ · นอก Edit = subassembly ทั้งตัว
@@ -374,6 +396,7 @@ function removeItem(id){
     k.attach = { type:"free", x: r ? r.originX : k.attach.x, y: r ? r.originY : k.attach.y };
   }
   a.items = a.items.filter(i => i.id !== id);
+  projCascade();                          // cross-item annotations bound to it go too (warning in Messages, js/annot.js)
   if (selItemId() === id) setSel({ type:"asm", asm: a.id }); else persist();
   run();
 }
@@ -415,6 +438,7 @@ function removeAsm(id){
   if (a.items.some(i => i.id === state.editing)) state.editing = null;
   WS().assemblies = asms().filter(x => x.id !== id);
   if (!asms().length) WS().assemblies.push(newAssembly("Assembly 1"));
+  projCascade();
   setSel({ type:"ws" }); run();
 }
 
@@ -496,7 +520,7 @@ svg.addEventListener("pointerdown", e => {
   if (ann.tool){ annClick(px, py); e.preventDefault(); return; }               // Annotate: Dimension / Slope label (js/annot.js)
   if (cmdPlacing()){ cmdClick(px, py); e.preventDefault(); return; }       // Move / Copy / Paste: จุดฐาน / ปลายทาง
   if (state.editing && draw.tool){ if (draw.typing) closeTyping(); drawClick(px, py); e.preventDefault(); return; }
-  if (kind === "dann" && annPointerDown(t, px, py)){ svg.setPointerCapture(e.pointerId); e.preventDefault(); return; }
+  if ((kind === "dann" || kind === "pann") && annPointerDown(t, px, py)){ svg.setPointerCapture(e.pointerId); e.preventDefault(); return; }
   if (kind === "h"){
     const i = +t.dataset.i;
     state.sel = { type:"spt", i };
@@ -636,6 +660,7 @@ svg.addEventListener("contextmenu", e => {
   const t = e.target, k = t.dataset.kind;
   if (ann.tool) return annEnd();                              // Annotate: right-click = cancel
   if (k === "dann"){ setSel({ type: "dann", item: t.dataset.id, id: t.dataset.sid }); return; }
+  if (k === "pann"){ setSel({ type: "pann", id: t.dataset.sid }); return; }
   if (cmd.name) return cmdEnter();                            // Move / Copy: คลิกขวา = Enter (แบบ AutoCAD)
   if (state.editing && draw.tool) return finishChain();     // ตอนวาด: คลิกขวา = จบเส้น
   if (k === "h") return deleteSurfacePoint(+t.dataset.i);

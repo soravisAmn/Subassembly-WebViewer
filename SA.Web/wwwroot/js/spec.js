@@ -1047,6 +1047,7 @@ const Spec = (() => {
     if (!c) return;
     const re = new RegExp(`\\b${oldName}\\b`, "g");
     for (const s of exprSlots(spec)) if (typeof s.obj[s.key] === "string") s.obj[s.key] = s.obj[s.key].replace(re, name);
+    renameInNotes(spec, oldName, name);
     for (const d of spec.logic.decisions || []) if (d.label === oldName) d.label = name;
     for (const b of spec.logic.branches || []){ if (b.label === oldName) b.label = name; else if (b.label === "ไม่ " + oldName) b.label = "ไม่ " + name; }
     c.name = name;
@@ -1157,19 +1158,31 @@ const Spec = (() => {
       spec.rotations = spec.rotations.filter(g => g.points.length && !gone.points.has(g.pivot));
     }
     // display overrides of what is gone go too, and the annotations bound to removed points / links (round 10 M2)
-    const d = spec.display;
-    if (d && typeof d === "object"){
-      if (d.overrides) for (const id of [...gone.points, ...gone.links, ...gone.shapes]) delete d.overrides[id];
-      const P = id => gone.points.has(id);
-      if (Array.isArray(d.dims)) d.dims = d.dims.filter(x => !P(x.a) && !P(x.b));
-      if (Array.isArray(d.slopes)) d.slopes = d.slopes.filter(x => !gone.links.has(x.link));
-      if (Array.isArray(d.notes)){
-        d.notes = d.notes.filter(x => !(x.at && P(x.at.point)));
-        for (const x of d.notes) if (x.leader && P(x.leader)) x.leader = null;
-      }
-      cleanDisplay(spec);
-    }
+    pruneDisplay(spec);
     return [...gone.points, ...gone.links, ...gone.shapes];
+  }
+  // display data bound to objects that no longer exist (removeCascade, rebuildArray): overrides of missing ids, dimensions / notes
+  // whose point is gone, slope labels whose link is gone; a note whose leader point is gone keeps its text (leader off).
+  // Returns the ids of the annotations removed (round 10 M3)
+  function pruneDisplay(spec){
+    const d = spec.display;
+    if (!d || typeof d !== "object") return [];
+    const P = new Set(spec.points.map(o => o.id)), L = new Set(spec.links.map(o => o.id)), S = new Set(spec.shapes.map(o => o.id));
+    const lost = [];
+    if (d.overrides && typeof d.overrides === "object") for (const id of Object.keys(d.overrides)) if (!P.has(id) && !L.has(id) && !S.has(id)) delete d.overrides[id];
+    const keep = (k, ok) => { if (Array.isArray(d[k])) d[k] = d[k].filter(x => ok(x) || (lost.push(x.id), false)); };
+    keep("dims", x => P.has(x.a) && P.has(x.b));
+    keep("slopes", x => L.has(x.link));
+    keep("notes", x => !!x.at && P.has(x.at.point));
+    for (const x of Array.isArray(d.notes) ? d.notes : []) if (x.leader && !P.has(x.leader)) x.leader = null;
+    cleanDisplay(spec);
+    return lost;
+  }
+  // rename a name inside the {expression} parts of note text (parameter / variable / condition rename, round 10 M3)
+  function renameInNotes(spec, from, to){
+    const notes = spec.display && Array.isArray(spec.display.notes) ? spec.display.notes : [];
+    const re = new RegExp(`\\b${from}\\b`, "g");
+    for (const n of notes) if (typeof n.text === "string") n.text = n.text.replace(/\{([^{}]*)\}/g, (m, e) => `{${e.replace(re, to)}}`);
   }
   // ชื่อที่จะลบไปด้วยถ้าลบ id นี้ (ใช้ถามก่อนลบ)
   function cascadePreview(spec, kind, id){
@@ -1504,7 +1517,9 @@ const Spec = (() => {
     g.n = next.n; g.join = next.join;
     if (next.loop) g.loop = next.loop; else delete g.loop;
     buildArray(spec, g);
-    return { block: [] };
+    // display data of members that no longer exist (fewer sets) is removed, not left behind (round 10 M3).
+    // Member ids are handed out again on every rebuild, so data bound to a removed member could not come back reliably anyway.
+    return { block: [], lostDisplay: pruneDisplay(spec) };
   }
   // array ที่ object นี้เป็นส่วนหนึ่ง (ต้นฉบับหรือสมาชิก)
   function arrayOf(spec, type, id){
@@ -1603,7 +1618,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, offLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, SIDE_OPTIONS, paramOptions, optionsText, parseOptions, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, addLastOf, arraySetPoint, withI, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cleanDisplay, cascadePreview, dependsOn,
+           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, SIDE_OPTIONS, paramOptions, optionsText, parseOptions, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, addLastOf, arraySetPoint, withI, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cleanDisplay, pruneDisplay, renameInNotes, cascadePreview, dependsOn,
            chainOrder, walkShape, polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();

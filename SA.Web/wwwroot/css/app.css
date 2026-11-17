@@ -367,6 +367,9 @@ svg#view{width:100%;height:100%;display:block;touch-action:none;user-select:none
 .ann-txt.sel{fill:var(--hot)}
 .ann-hit{stroke:transparent;stroke-width:10;fill:none;cursor:move}
 .annots.preview{opacity:.75;pointer-events:none}
+.ann.ghost{opacity:.45}
+.ann.ghost:not(.ann-txt){stroke-dasharray:3 3}
+.ann-txt.ann-note{cursor:move}
 
 /* ส่วนที่วาด (DrawingSpec) */
 .dlink{stroke-width:3}

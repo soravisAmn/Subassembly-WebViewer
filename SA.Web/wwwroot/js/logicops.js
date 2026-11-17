@@ -385,6 +385,7 @@ const Logic = (() => {
       const bad = nameError(s, name, opts, oldName); if (bad) fail(bad);
       const re = new RegExp(`\\b${oldName}\\b`, "g");
       for (const sl of Spec.exprSlots(s)) if (typeof sl.obj[sl.key] === "string") sl.obj[sl.key] = sl.obj[sl.key].replace(re, name);
+      Spec.renameInNotes(s, oldName, name);                // {expression} in note text (round 10 M3)
       needVar(s, oldName).name = name;
       return { name };
     });
@@ -430,10 +431,13 @@ const Logic = (() => {
   const needArr = (s, id) => byId(s.arrays, id) || fail(`ไม่มี Array ${id}`);
   // สร้างสมาชิกใหม่ (n / nMax / Loop เปิด-ปิด) — มีของนอก Array อ้างสมาชิกอยู่ = ไม่ยอม (บอกรายการ)
   const rebuild = (s, g, o) => { const r = Spec.rebuildArray(s, g, o); if (r.error) fail(r.error); if (r.block && r.block.length) fail(`เปลี่ยนจำนวนชุดของ ${g.id} ไม่ได้ — มีของนอก Array อ้างสมาชิกอยู่: ${r.block.join(", ")}`); return r; };
+  // annotations on Array members that a rebuild removed (fewer sets): { warnings } like removeObjects (round 10 M3)
+  const lostWarn = lost => lost && lost.length ? { warnings: [`Annotations removed with them: ${lost.join(", ")}`] } : {};
   // o = { dx?, dy?, n?, nMax?, nRound? } — Loop: n = นิพจน์ / nRound แก้ได้เลย · nMax = สร้างสมาชิกใหม่ · Array N คงที่: n = ตัวเลข (สร้างใหม่)
   function updateArray(spec, id, o, opts){
     return tx(spec, s => {
       const g = needArr(s, id); o = o || {};
+      let lost = null;
       if ("dx" in o || "dy" in o){
         for (const k of ["dx", "dy"]) if (k in o) checkExpr(s, String(o[k]).trim() || "0", "num", opts, `${id} ${k}`);
         Spec.updateArray(s, g, o);
@@ -441,22 +445,23 @@ const Logic = (() => {
       if (g.loop){
         if ("n" in o) g.loop.n = checkExpr(s, o.n, "num", opts, `${id} N`);
         if ("nRound" in o){ if (o.nRound && !Spec.LOOP_ROUND.includes(o.nRound)) fail("ปัดเศษ N ต้องเป็น floor / ceil / round"); if (o.nRound) g.loop.nRound = o.nRound; else delete g.loop.nRound; }
-        if ("nMax" in o && Math.round(+o.nMax) !== g.loop.nMax) rebuild(s, g, { loop: { ...g.loop, nMax: o.nMax } });
+        if ("nMax" in o && Math.round(+o.nMax) !== g.loop.nMax) lost = rebuild(s, g, { loop: { ...g.loop, nMax: o.nMax } }).lostDisplay;
       } else {
         if ("nMax" in o || "nRound" in o) fail(`${id} ไม่ใช่ Loop — เปิด Loop ก่อน (setArrayLoop)`);
-        if ("n" in o && Math.round(+o.n) !== g.n) rebuild(s, g, { n: o.n });
+        if ("n" in o && Math.round(+o.n) !== g.n) lost = rebuild(s, g, { n: o.n }).lostDisplay;
       }
-      return { array: id };
+      return { array: id, ...lostWarn(lost) };
     });
   }
-  const rebuildArray = wrap((s, id, o) => { const g = needArr(s, id); return Spec.rebuildArray(s, g, o); });
+  const rebuildArray = wrap((s, id, o) => { const g = needArr(s, id), r = Spec.rebuildArray(s, g, o); return r.error ? r : { ...r, ...lostWarn(r.lostDisplay) }; });
   // เปิด Loop (loop = { n, nMax?, nRound? }) / ปิด (null = Array N คงที่ เท่าจำนวนชุดที่สร้างไว้)
   function setArrayLoop(spec, id, loop, opts){
     return tx(spec, s => {
       const g = needArr(s, id);
-      if (loop){ checkExpr(s, loop.n, "num", opts, `${id} N`); rebuild(s, g, { loop }); }
-      else if (g.loop) rebuild(s, g, { loop: null, n: g.n });
-      return { array: id, loop: g.loop || null };
+      let lost = null;
+      if (loop){ checkExpr(s, loop.n, "num", opts, `${id} N`); lost = rebuild(s, g, { loop }).lostDisplay; }
+      else if (g.loop) lost = rebuild(s, g, { loop: null, n: g.n }).lostDisplay;
+      return { array: id, loop: g.loop || null, ...lostWarn(lost) };
     });
   }
   // เลิกเป็น Array: object ทุกชิ้นอยู่ต่อ (Loop: ชุดที่เคยไม่เกิดจะเกิดทั้งหมด — แจ้งใน warnings)
@@ -490,6 +495,11 @@ const Logic = (() => {
       arrays: (spec.arrays || []).map(g => ({ id: g.id, sets: g.n, dx: g.dx, dy: g.dy, source: [...g.source.points, ...g.source.links, ...g.source.shapes],
         ...(g.loop ? { loop: { n: g.loop.n, nMax: g.loop.nMax, nRound: g.loop.nRound || "floor" }, ...(L && L.loops ? { value: L.loops[g.id] } : {}) } : {}) })),
       always: { points: spec.points.filter(always).map(o => o.id), links: spec.links.filter(always).map(o => o.id), shapes: spec.shapes.filter(always).map(o => o.id) },
+      // web-only annotations (round 10): ids and what they are bound to; edit with addDim / addSlopeLabel / addNote / updateAnnotation / removeAnnotation
+      ...(spec.display && (spec.display.dims || spec.display.slopes || spec.display.notes) ? { annotations: [
+        ...(spec.display.dims || []).map(d => ({ id: d.id, dim: d.kind, a: d.a, b: d.b, label: d.label })),
+        ...(spec.display.slopes || []).map(g => ({ id: g.id, slope: g.link, format: g.format })),
+        ...(spec.display.notes || []).map(n => ({ id: n.id, note: n.text, at: n.at && n.at.point, leader: n.leader ?? null })) ] } : {}),
       risks: Spec.branchRisks(spec)
     };
   }
@@ -783,6 +793,7 @@ const Logic = (() => {
         if (s.side && s.side.param === name) s.side.param = c.name;
         for (const x of Spec.exprSlots(s)) if (typeof x.obj[x.key] === "string") x.obj[x.key] = x.obj[x.key].replace(re, c.name);
         for (const d of (s.display && s.display.dims) || []) if (d.label === name) d.label = c.name;     // dimension labels follow the rename
+        Spec.renameInNotes(s, name, c.name);                                                            // {expression} in note text (M3)
       }
       return { result: p.name };
     });
@@ -795,6 +806,7 @@ const Logic = (() => {
       if (used.length) fail(`Parameter ${name} is still used by: ${used.join(", ")}.`);
       s.params = s.params.filter(x => x.name !== name);
       for (const d of (s.display && s.display.dims) || []) if (d.label === name) d.label = "auto";     // a dimension that named it goes back to auto
+      // a note that uses it in {…} is left as it is: it shows {?} (round 10 M3)
       return { result: name };
     });
   }
@@ -1025,8 +1037,10 @@ const Logic = (() => {
     });
   }
 
-  // ---------- Display (round 10 M2): dimensions and slope labels in spec.display.dims / slopes ----------
-  // Bound to point / link ids (never coordinates). Web only. Ids D1… / G1… (next free number). Pure helpers: js/display.js (Display).
+  // ---------- Display (round 10 M2 / M3): dimensions, slope labels and notes in spec.display.dims / slopes / notes ----------
+  // Bound to point / link ids (never coordinates). Web only. Ids D1… / G1… / N1… (never reused). Pure helpers: js/display.js (Display).
+  // The same functions also work on a project doc (project-level, cross-item dimensions, M3): { display, items: { <item id>: { points } } }
+  // built by Display.projDoc; there a point is { item, point } and the two points must be in different subassemblies.
   const ANN = { dim: "dims", slope: "slopes", note: "notes" }, ANN_PRE = { dim: "D", slope: "G", note: "N" };
   const DIM_KINDS = ["h", "v", "aligned"], SLOPE_FMT = ["auto", "ratio", "percent"];
   const annList = (s, kind) => { const d = s.display = s.display && typeof s.display === "object" ? s.display : {}; return (d[ANN[kind]] = Array.isArray(d[ANN[kind]]) ? d[ANN[kind]] : []); };
@@ -1041,12 +1055,27 @@ const Logic = (() => {
   const annIds = s => Object.keys(ANN).flatMap(k => ((s.display || {})[ANN[k]] || []).map(x => x.id));
   // { warnings: ["Annotations removed with them: …"] } when objects removed since an0 (= annIds before) took annotations with them, else {}
   const annLostWarn = (s, an0) => { const now = new Set(annIds(s)), lost = an0.filter(id => !now.has(id)); return lost.length ? { warnings: [`Annotations removed with them: ${lost.join(", ")}`] } : {}; };
+  const isProjDoc = s => !!(s && s.items && typeof s.items === "object" && !Array.isArray(s.points));
+  // project doc: a point is { item, point } of a drawn subassembly
+  function checkProjRef(s, r, k){
+    if (!r || typeof r !== "object" || typeof r.item !== "string" || typeof r.point !== "string")
+      fail(`Dimension point ${k} must be { item, point } in the project file, got ${JSON.stringify(r)}.`);
+    const it = s.items[r.item] || fail(`Dimension point ${k}: there is no subassembly ${r.item}.`);
+    if (!Array.isArray(it.points)) fail(`Dimension point ${k}: ${r.item} has no drawn points (file missing or hand-written).`);
+    if (!it.points.includes(r.point)) fail(`Dimension point ${k}: ${r.point} is not a point of ${r.item}.`);
+  }
   function checkDim(s, d){
     if (!DIM_KINDS.includes(d.kind)) fail(`Dimension kind must be h, v or aligned, got ${JSON.stringify(d.kind)}.`);
-    for (const k of ["a", "b"])
-      if (typeof d[k] !== "string" || !byId(s.points, d[k])) fail(`Dimension point ${k} = ${JSON.stringify(d[k])} is not a point of this subassembly.`);
-    if (d.a === d.b) fail("A dimension needs two different points.");
+    if (isProjDoc(s)){
+      for (const k of ["a", "b"]) checkProjRef(s, d[k], k);
+      if (d.a.item === d.b.item) fail(`Both points are in ${d.a.item}: a dimension inside one subassembly belongs in its .cs (addDim on that subassembly).`);
+    } else {
+      for (const k of ["a", "b"])
+        if (typeof d[k] !== "string" || !byId(s.points, d[k])) fail(`Dimension point ${k} = ${JSON.stringify(d[k])} is not a point of this subassembly.`);
+      if (d.a === d.b) fail("A dimension needs two different points.");
+    }
     if (typeof d.offset !== "number" || !isFinite(d.offset)) fail(`offset must be a number (drawing units), got ${JSON.stringify(d.offset)}.`);
+    if (isProjDoc(s) && d.label !== null && d.label !== "auto") fail(`label of a dimension between two subassemblies must be "auto" or null (no parameter label), got ${JSON.stringify(d.label)}.`);
     if (d.label !== null && d.label !== "auto" && !(s.params || []).some(p => p.name === d.label))
       fail(`label must be "auto", null or a parameter name; there is no parameter ${JSON.stringify(d.label)}.`);
     if (!Number.isInteger(d.decimals) || d.decimals < 0 || d.decimals > 6) fail(`decimals must be a whole number 0-6, got ${JSON.stringify(d.decimals)}.`);
@@ -1069,22 +1098,51 @@ const Logic = (() => {
   function addSlopeLabel(spec, o){
     return tx(spec, s => {
       o = o || {};
+      if (isProjDoc(s)) fail("Slope labels belong to one subassembly; only dimensions can span two.");
       const g = { id: annNext(s, "slope"), link: o.link, format: o.format ?? "auto" };
       checkSlope(s, g);
       annList(s, "slope").push(g);
       return { result: g.id };
     });
   }
-  const ANN_FIELDS = { dim: ["kind", "a", "b", "offset", "label", "decimals"], slope: ["link", "format"], note: [] };
+  // notes (M3): { id, text, at: { point, dx, dy }, leader: <point id> | null } · text may hold {expression} (shown with its value, {?} when bad)
+  function checkNote(s, n){
+    if (typeof n.text !== "string" || !n.text.trim()) fail(`Note text must be a non-empty string, got ${JSON.stringify(n.text)}.`);
+    if (n.text.length > 500) fail("Note text is too long (500 characters at most).");
+    const at = n.at;
+    if (!at || typeof at !== "object" || Array.isArray(at)) fail(`at must be { point, dx, dy }, got ${JSON.stringify(at)}.`);
+    if (typeof at.point !== "string" || !byId(s.points, at.point)) fail(`Note point ${JSON.stringify(at.point)} is not a point of this subassembly.`);
+    for (const k of ["dx", "dy"]) if (typeof at[k] !== "number" || !isFinite(at[k])) fail(`at.${k} must be a number (drawing units), got ${JSON.stringify(at[k])}.`);
+    for (const k of Object.keys(at)) if (!["point", "dx", "dy"].includes(k)) fail(`at has no field ${k} (point, dx, dy).`);
+    if (n.leader !== null && (typeof n.leader !== "string" || !byId(s.points, n.leader))) fail(`leader must be null or a point of this subassembly, got ${JSON.stringify(n.leader)}.`);
+  }
+  // leader: true = to the anchor point, false / null = none, "P5" = to that point
+  const leaderOf = (o, point) => o.leader === true ? point : o.leader === false || o.leader == null ? null : o.leader;
+  function addNote(spec, o){
+    return tx(spec, s => {
+      o = o || {};
+      if (isProjDoc(s)) fail("Notes belong to one subassembly; only dimensions can span two.");
+      const at = o.at && typeof o.at === "object" ? { point: o.at.point, dx: o.at.dx ?? 0, dy: o.at.dy ?? 0 } : o.at;
+      const n = { id: annNext(s, "note"), text: o.text, at, leader: leaderOf(o, at && at.point) };
+      checkNote(s, n);
+      annList(s, "note").push(n);
+      return { result: n.id };
+    });
+  }
+  const ANN_FIELDS = { dim: ["kind", "a", "b", "offset", "label", "decimals"], slope: ["link", "format"], note: ["text", "at", "leader"] };
   const ANN_NAME = { dim: "dimension", slope: "slope label", note: "note" };
   function updateAnnotation(spec, id, patch){
     return tx(spec, s => {
       const [kind, a] = annFind(s, id) || fail(`No annotation ${id}.`);
       if (!patch || typeof patch !== "object" || Array.isArray(patch) || !Object.keys(patch).length) fail(`patch must be an object of fields: ${ANN_FIELDS[kind].join(", ")}.`);
       for (const k of Object.keys(patch))
-        if (!ANN_FIELDS[kind].includes(k)) fail(`${id} is a ${ANN_NAME[kind]}: field ${k} is not one of ${ANN_FIELDS[kind].join(", ") || "(notes come in a later milestone)"}.`);
+        if (!ANN_FIELDS[kind].includes(k)) fail(`${id} is a ${ANN_NAME[kind]}: field ${k} is not one of ${ANN_FIELDS[kind].join(", ")}.`);
       const next = { ...a, ...JSON.parse(JSON.stringify(patch)) };
-      if (kind === "dim") checkDim(s, next); else if (kind === "slope") checkSlope(s, next);
+      if (kind === "note"){
+        if (patch.at && typeof patch.at === "object") next.at = { ...a.at, ...patch.at };      // dragging the text = { at: { dx, dy } }
+        if ("leader" in patch) next.leader = leaderOf(patch, next.at && next.at.point);
+      }
+      if (kind === "dim") checkDim(s, next); else if (kind === "slope") checkSlope(s, next); else checkNote(s, next);
       Object.assign(a, next);
       return { result: id };
     });
@@ -1201,8 +1259,9 @@ const Logic = (() => {
     M("Display", "clearOverride", "id, kind?", 2, "Back to ByCode: removes the override of the object (or only its kind).", "Missing id, wrong kind"),
     M("Display", "addDim", "{ kind, a, b, offset?, label?, decimals? }", 1, "Web-only dimension between two points (ids, never coordinates). kind: h | v | aligned. offset = distance of the dimension line from the middle of the two points (Side = Right frame: h up +, v outward +, aligned left of a -> b). label: \"auto\" (default: shows the parameter when one delta / slopeLength / polar definition joins the two points with exactly that name) | a parameter name | null (number only). decimals 0-6 (default 2). Returns the id (D1 …, never reused: display.seq). Never reaches the generated C#.", "Bad kind, missing point, same point twice, bad offset / label / decimals"),
     M("Display", "addSlopeLabel", "{ link, format? }", 1, "Web-only slope label on a straight link. format: auto (default: 1:x when steeper than 5 %, else %) | ratio (1:2.00) | percent (5.0%). Returns the id (G1 …, never reused).", "Missing / not straight link, bad format"),
-    M("Display", "updateAnnotation", "id, { … }", 2, "Change fields of a dimension (kind, a, b, offset, label, decimals) or a slope label (link, format). Dragging a dimension line changes offset only.", "Missing id, field of another kind, bad value"),
-    M("Display", "removeAnnotation", "ids", 1, "Delete dimensions / slope labels. Deleting a point / link (removeObjects) also deletes the annotations bound to it (listed in warnings).", "Missing id"),
+    M("Display", "addNote", "{ text, at: { point, dx?, dy? }, leader? }", 1, "Web-only note: text placed at point + (dx, dy) (drawing units, Side = Right frame; Side Left mirrors the position, never the text). Text may hold {expression} (same as number fields: {Hcrest}, {Wcrest*2}), shown with its current value; an unknown name or bad expression shows {?}. leader: true = a line to the anchor point, a point id = to that point, false / null (default) = none. Returns the id (N1 …, never reused). Never reaches the generated C#.", "Empty text, missing point, bad dx / dy / leader"),
+    M("Display", "updateAnnotation", "id, { … }", 2, "Change fields of a dimension (kind, a, b, offset, label, decimals), a slope label (link, format) or a note (text, at, leader; at is merged, so { at: { dx, dy } } moves the text only). Dragging a dimension line changes offset only.", "Missing id, field of another kind, bad value"),
+    M("Display", "removeAnnotation", "ids", 1, "Delete dimensions / slope labels / notes. Deleting a point / link (removeObjects) also deletes the annotations bound to it (listed in warnings); a note whose leader point goes keeps its text without the leader.", "Missing id"),
     M("Tools", "addCutFill", "{ hinge, cut, fill, params, dir, … }", 1, "Daylight Cut/Fill. cut / fill = number x of 1:x, or text like a slope field: 1:1.5, 0.667, 2%, parameter name, expression.", "As the tool"),
     M("Tools", "addIntersect", "link1, link2, { trim, keep1, keep2, aux }", 3, "Intersect two straight links.", "Parallel, not straight"),
     M("Tools", "addOffset", "linkId, dist, side, { aux }", 4, "Parallel line: 2 points + link.", "Not straight, bad expression"),
@@ -1237,9 +1296,9 @@ const Logic = (() => {
   const API = { setClassName, setParamInfo, addCondition, editCondition, renameCondition, removeCondition, addDecision, editDecision, removeDecision, moveDecision,
                 addCase, editCase, removeCase, moveCase, renameBranch, setBranch, addVariable, editVariable, renameVariable, removeVariable, moveVariable,
                 addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setArrayLoop, removeArray, addLastOf, setParamBounds, setParamUnit,
-                addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride, addDim, addSlopeLabel, updateAnnotation, removeAnnotation };
+                addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride, addDim, addSlopeLabel, addNote, updateAnnotation, removeAnnotation };
 
-  return { META, catalog, applyBatch, newSubassembly, setClassName, setParamInfo, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride, addDim, addSlopeLabel, updateAnnotation, removeAnnotation,
+  return { META, catalog, applyBatch, newSubassembly, setClassName, setParamInfo, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride, addDim, addSlopeLabel, addNote, updateAnnotation, removeAnnotation,
            RESERVED, nameError, freeCondName, toText, diffText,
            addCondition, editCondition, renameCondition, removeCondition,
            addDecision, editDecision, removeDecision, moveDecision,

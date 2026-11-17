@@ -47,8 +47,8 @@ function selectAll(){
 function deleteSelection(){
   const s = state.sel;
   if (s.type === "spt") return deleteSurfacePoint(s.i);
-  const an = selList().filter(o => o.type === "dann");
-  if (an.length) return deleteAnnots(an);                 // dimensions / slope labels (js/annot.js)
+  const an = selList().filter(o => o.type === "dann" || o.type === "pann");      // both kinds together = one Undo step (deleteAnnots)
+  if (an.length) return deleteAnnots(an);                 // notes / dimensions / slope labels, also the project's (js/annot.js)
   if (state.editing){
     const it = editItem(), list = selList().filter(o => DRAWN_KIND[o.type]);
     if (it && list.length) deleteDrawnSet(it, list);
@@ -366,6 +366,7 @@ async function loadSpecFromFile(it){
   it.spec = Spec.normalize(r.spec, dropped); it.generatedFile = true; it.specEdited = !!r.edited;
   limitDroppedNotice(it, dropped);
   it.savedSpec = JSON.stringify(r.spec);
+  projCascade();             // cross-item dimensions bound to a point the file no longer has (own warning, js/annot.js)
   History.rebase();          // ส่วนของการ Import (ก้อน Undo "เพิ่ม …" เดียวกัน)
   persist(); run();
 }
@@ -408,6 +409,7 @@ function renderProps(force){
   else if (s.type === "surface" || s.type === "spt"){ of = s.type === "spt" ? `Surface #${s.i}` : "Surface: EG"; propsSurface(box); }
   else if (s.type === "asm"){ const a = asmById(s.asm); if (a){ of = a.name; propsAsm(box, a); } }
   else if (s.type === "multi"){ of = `${s.list.length} objects`; propsMulti(box, s.list); }
+  else if (s.type === "pann" && projAnnFind(s.id)){ of = "Project · " + s.id; propsProjAnnot(box, s); }   // cross-item dimension (js/annot.js)
   else if (it){
     of = itemLabel(it);
     if (s.type === "pt" && res && res.points[s.i]){ of += ` · #${s.i}`; propsPoint(box, it, rr, s.i); propsCode(box, it, s); }
@@ -1637,14 +1639,15 @@ function renameSpecParam(it, p, v){
   if (RESERVED.has(v) || /^([PpLlSsBbDd]\d+|surface\d+)$/.test(v)){ alert(`ตั้งชื่อ ${v} ไม่ได้ — โค้ดที่สร้างใช้ชื่อนี้เอง (เช่น F, P1, cs, double)`); return false; }
   if (Expr.KEYWORDS.has(v.toLowerCase())){ alert(`ตั้งชื่อ ${v} ไม่ได้ — เป็นคำในนิพจน์ (and or not true false)`); return false; }
   if (specNames(it).includes(v) || Expr.FUNCS[v.toLowerCase()]){ alert(`มีชื่อ ${v} อยู่แล้ว (หรือเป็นชื่อฟังก์ชัน)`); return false; }
-  const old = p.name, re = new RegExp(`\\b${old}\\b`, "g");
-  specEdit(sp => {
-    p.name = v; if (p.displayName === old) p.displayName = v;
-    if (sp.side && sp.side.param === old) sp.side.param = v;
-    for (const s of Spec.exprSlots(sp)) if (typeof s.obj[s.key] === "string") s.obj[s.key] = s.obj[s.key].replace(re, v);
-    if (it.params && old in it.params){ it.params[v] = it.params[old]; delete it.params[old]; }
-  }, it);
-  return true;
+  const old = p.name;
+  // Logic API (round 10 M3 review): expressions, Side, display name, dimension labels and {…} in notes follow the rename.
+  // The item's own parameter values (workspace data, not the spec) follow in the same Undo step.
+  const r = specEdit(sp => {
+    const x = Logic.editParam(sp, old, { name: v }, { codeParams: codeParamsOf(it) });
+    if (x.ok && it.params && old in it.params){ it.params[v] = it.params[old]; delete it.params[old]; }
+    return x;
+  }, it, `เปลี่ยนชื่อ ${old} → ${v}`);
+  return !!(r && r.ok);
 }
 
 // ---------------- แถบผลลัพธ์ (Messages / Log / Points) ----------------
@@ -1704,6 +1707,13 @@ function renderDock(){
       row.onclick = () => setSel({ type:"dpt", item: it.id, id: p.id });
       tb.appendChild(row);
     }
+  }
+  // project-level messages (cross-item annotations removed with an item / point, js/annot.js): shown whatever is selected; click = dismiss
+  for (const m of [...projMsgs].reverse()){
+    const d = document.createElement("div"); d.className = "w link"; d.textContent = "project · " + m; d.title = "คลิก = ปิดข้อความนี้";
+    d.onclick = () => { projMsgs.splice(projMsgs.indexOf(m), 1); renderDock(); };
+    const e = iss.querySelector(".empty"); if (e) e.remove();
+    iss.insertBefore(d, iss.firstChild); nw++;
   }
   const nm = $("n-msg");
   nm.textContent = ne + nw ? String(ne + nw) : ""; nm.className = "badge" + (ne ? " e" : nw ? " w" : "");
@@ -1971,7 +1981,7 @@ function barClick(k){
   else {
     // style / annot: missing in an older stored bar = on
     state.bar[k] = k === "style" || k === "annot" ? state.bar[k] === false : !state.bar[k];
-    if (k === "grid") render();
+    if (k === "grid" || k === "ptnames") render();
     if (k === "style" || k === "c3d" || k === "annot"){ render(); renderStylePal(); renderProps(true); }
   }
   persist(); renderBar(); refreshSnap();

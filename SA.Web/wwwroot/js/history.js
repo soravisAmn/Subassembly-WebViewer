@@ -54,9 +54,10 @@ function makeHistory(snap, apply, limit = 200){
 // ---------------- เอกสารของหน้าเว็บ ----------------
 // ข้อมูลของ item ที่ Undo ไม่ย้อน: สถานะการ Save / ไฟล์ที่ผูก / โค้ดที่เปิดจากเครื่อง (คงค่าปัจจุบันไว้ตอนคืนค่า)
 const KEEP = ["file", "fileName", "sourceName", "source", "savedSpec", "generatedFile", "specEdited"];
+// projDisplay = the project file's cross-item annotations (round 10 M3; undefined = none, so older snapshots compare the same)
 function docOf(){
   return { assemblies: state.ws.assemblies, surface: state.surface, surfaceOn: state.surfaceOn, layout: state.layout,
-           originElevation: state.originElevation, extendEnds: state.extendEnds };
+           originElevation: state.originElevation, extendEnds: state.extendEnds, projDisplay: state.ws.display };
 }
 function docSnap(){
   const d = docOf();
@@ -77,6 +78,7 @@ function applyDoc(full){
     if (it.attach.type !== "free"){ it.attach.x = o.attach.x; it.attach.y = o.attach.y; }
   }
   state.ws.assemblies = d.assemblies;
+  if (d.projDisplay) state.ws.display = d.projDisplay; else delete state.ws.display;
   for (const k of ["surface", "surfaceOn", "layout", "originElevation", "extendEnds"]) state[k] = d[k];
   // ตัวที่แก้อยู่หายไป / ไม่มีส่วนที่วาดแล้ว = ออกจาก Edit · เส้นที่วาดค้างอยู่อ้างจุดที่อาจหายไป = เริ่มใหม่
   const ed_ = itemById(state.editing);
@@ -91,6 +93,8 @@ function fixSel(){
   if (s.type === "multi"){ state.sel = { ...s, list: s.list.filter(ok) }; if (state.sel.list.length < 2) state.sel = state.sel.list[0] || (state.editing ? { type:"item", item: state.editing } : { type:"ws" }); }
   else if (s.item && !it) state.sel = { type:"ws" };
   else if (/^d(pt|link|shape)$/.test(s.type) && !ok(s)) state.sel = { type:"item", item: s.item };
+  else if (s.type === "dann" && !(it && it.spec && Display.find(it.spec, s.id))) state.sel = { type:"item", item: s.item };
+  else if (s.type === "pann" && !projAnnFind(s.id)) state.sel = { type:"ws" };
   else if (s.type === "spt" && !state.surface[s.i]) state.sel = { type:"surface" };
   else if (s.type === "asm" && !asmById(s.asm)) state.sel = { type:"ws" };
 }
@@ -100,6 +104,7 @@ const History = makeHistory(docSnap, applyDoc);
 function undoRedo(redo){
   const l = History.step(redo);
   if (l == null){ flashBanner(redo ? "ไม่มีอะไรให้ Redo" : "ไม่มีอะไรให้ Undo"); return; }
+  if (typeof projMsgsClear === "function") projMsgsClear();      // "removed with …" messages no longer describe the workspace
   persist(); run(); renderAll();
   flashBanner(`${redo ? "Redo" : "Undo"}: ${l}`);
 }

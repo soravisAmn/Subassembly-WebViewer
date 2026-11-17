@@ -30,7 +30,11 @@ const Commands = (() => {
     dimH: "<path d=\"M5 4V18M23 4V18M5 13H23\"/><path d=\"M5 13L9 11V15ZM23 13L19 11V15Z\" class=\"fill\"/>",
     dimV: "<path d=\"M6 3H20M6 19H20M14 3V19\"/><path d=\"M14 3L12 7H16ZM14 19L12 15H16Z\" class=\"fill\"/>",
     dimA: "<path d=\"M3 14L7 19M19 3L23 8M7 19L23 8\"/><path d=\"M7 19L9.3 15.6L11 18.1ZM23 8L20.7 11.4L19 8.9Z\" class=\"fill\"/>",
-    slope: "<path d=\"M3 18L25 6\"/><path d=\"M15 18.5H25V12\" stroke-dasharray=\"2 2\"/><circle cx=\"10\" cy=\"9\" r=\"2\" class=\"fill\"/>"
+    slope: "<path d=\"M3 18L25 6\"/><path d=\"M15 18.5H25V12\" stroke-dasharray=\"2 2\"/><circle cx=\"10\" cy=\"9\" r=\"2\" class=\"fill\"/>",
+    // round 10 M3: note (text lines), note with leader (arrow to a point), point names (P1 beside a point)
+    note: "<path d=\"M6 6H22M6 11H22M6 16H16\"/>",
+    noteL: "<path d=\"M12 6H25M12 11H22\"/><path d=\"M11 9L4 18\"/><path d=\"M4 18L5 13.8L7.6 15.8Z\" class=\"fill\"/>",
+    ptnames: "<path d=\"M3 13H8V18H3Z\" class=\"fill\"/><text x=\"10\" y=\"11\">P1</text>"
   };
   const IN_EDIT = "ออกจาก Edit ก่อน";
 
@@ -116,6 +120,9 @@ const Commands = (() => {
     { id: "view.annot", label: "Annotations", svg: TOOL_SVG.dimH, tip: "แสดง / ซ่อน note, dimension, slope label (ซ่อนเฉยๆ ไม่ลบ · ดูแบบ Civil 3D = ซ่อนเสมอ)",
       active: c => c.bar.annot !== false,
       run: () => barClick("annot") },
+    { id: "view.ptnames", label: "Point names", svg: TOOL_SVG.ptnames, tip: "แสดงชื่อจุด P1, P2 … ของส่วนที่วาด (#ลำดับ ของโค้ดที่เขียนเอง) แม้ไม่ได้ Edit (ดูแบบ Civil 3D = ซ่อนเสมอ)",
+      active: c => !!c.bar.ptnames,
+      run: () => barClick("ptnames") },
     { id: "view.grid", label: "Grid", icon: "grid-dots", tip: "แสดงเส้น grid",
       active: c => !!c.bar.grid,
       run: () => barClick("grid") },
@@ -123,8 +130,10 @@ const Commands = (() => {
       active: c => c.ve === n,
       run: () => setVe(n) })),
 
-    // ---------- Annotate (round 10 M2): always visible, works outside Edit; no single-letter keys ----------
-    ...[["h", "dimH", "Horizontal", "บอกระยะแนวราบ: คลิกจุด 1 → จุด 2 → วางเส้น (Tab = พิมพ์ระยะห่าง)"],
+    // ---------- Annotate (round 10 M2 / M3): always visible, works outside Edit; no single-letter keys ----------
+    ...[["note", "note", "Note", "ข้อความผูกกับจุด: คลิกจุด → คลิกวางข้อความ → พิมพ์ ({Hcrest} = แสดงค่า)"],
+        ["noteL", "noteL", "Note with leader", "ข้อความมีเส้นชี้ไปที่จุด: คลิกจุด → คลิกวางข้อความ → พิมพ์"],
+        ["h", "dimH", "Horizontal", "บอกระยะแนวราบ: คลิกจุด 1 → จุด 2 → วางเส้น (Tab = พิมพ์ระยะห่าง) · จุดอยู่คนละตัว = เก็บในไฟล์ project"],
         ["v", "dimV", "Vertical", "บอกระยะแนวดิ่ง: คลิกจุด 1 → จุด 2 → วางเส้น (Tab = พิมพ์ระยะห่าง)"],
         ["aligned", "dimA", "Aligned", "บอกระยะตามแนวสองจุด: คลิกจุด 1 → จุด 2 → วางเส้น (Tab = พิมพ์ระยะห่าง)"],
         ["slope", "slope", "Slope label", "ป้ายความลาดบน link เส้นตรง: คลิก link (1:x หรือ %)"]]
@@ -237,12 +246,13 @@ const Commands = (() => {
     { id: "view", label: "View", panels: [
       { title: "Navigate", items: ["view.fit", ["view.zoomSel", "s"]] },
       { title: "Mode", items: ["view.design", "view.c3d"] },
-      { title: "Show", items: [["view.style", "s"], ["view.annot", "s"], ["view.aux", "s"], ["view.codes", "s"], ["view.grid", "s"]] },
+      { title: "Show", items: [["view.style", "s"], ["view.annot", "s"], ["view.aux", "s"], ["view.codes", "s"], ["view.ptnames", "s"], ["view.grid", "s"]] },
       { title: "VE", items: [["view.ve1", "s"], ["view.ve2", "s"], ["view.ve5", "s"]] },
       { title: "Scenario", items: [{ widget: "scenario" }] },
       { title: "Palettes", items: [["pal.tree", "s"], ["pal.scenarios", "s"], ["pal.props", "s"], ["pal.style", "s"], ["pal.code", "s"], ["pal.msg", "s"], ["pal.log", "s"],
                                    ["pal.pts", "s"], ["pal.logic", "s"], ["pal.ai", "s"], ["pal.reset", "s"]] }] },
     { id: "annotate", label: "Annotate", panels: [
+      { title: "Note", items: ["annot.note", ["annot.noteL", "s"]] },
       { title: "Dimension", items: ["annot.dimH", ["annot.dimV", "s"], ["annot.dimA", "s"]] },
       { title: "Slope", items: ["annot.slope"] },
       { title: "Style", items: [["pal.style", "s", "Style palette"], ["style.fromColours", "s"], ["style.open", "s"]] }] },

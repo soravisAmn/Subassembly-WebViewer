@@ -189,6 +189,7 @@ function specEdit(fn, it, label){
   }
   // Logic API คืน { ok: false, error } = ไม่ได้แก้อะไร (History ไม่นับ) → บอกใน banner
   if (r && r.ok === false && r.error) flashBanner(r.error);
+  else projCascade();                     // cross-item annotations bound to a point that is gone (js/annot.js), same Undo step
   persist(); renderAll();
   return r;
 }

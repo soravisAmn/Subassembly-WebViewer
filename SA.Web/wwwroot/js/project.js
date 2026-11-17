@@ -29,6 +29,9 @@ const ProjectV3 = (() => {
                 assemblies: ws.assemblies.map(a => ({ id: a.id, name: a.name, baseline: a.baseline, items: a.items.map(it => itemOut(it, dirty)) })),
                 scenarios: ws.scenarios || [] };
     if (ws.styleFile) c.styleFile = ws.styleFile;           // round 10: written only after the user saved / opened a style file
+    // round 10 M3: annotations between two subassemblies (dims with refs { item, point }); written only when there is one
+    const d = ws.display;
+    if (d && typeof d === "object" && ["dims", "notes", "slopes"].some(k => Array.isArray(d[k]) && d[k].length)) c.display = d;
     return c;
   }
   // v3 item -> workspace item. draftSpec is applied after the .cs spec is read (applyFileSpec)
@@ -145,7 +148,7 @@ async function toScratch(clear){
   if (clear){
     WS().assemblies = [newAssembly("Assembly 1")];
     WS().name = null; WS().path = null; WS().dir = null; WS().scenarios = []; WS().savedHash = null; resetScenarioState();
-    WS().styleFile = null; WS().styleDraft = null;
+    WS().styleFile = null; WS().styleDraft = null; delete WS().display; projMsgsClear();
     asmRes = {}; state.editing = null; persist();
   }
 }
@@ -175,6 +178,8 @@ async function loadOpened(r, quiet){
   }));
   WS().scenarios = c.scenarios || [];
   resetScenarioState();
+  if (c.display && typeof c.display === "object") WS().display = c.display; else delete WS().display;   // cross-item annotations (M3)
+  projMsgsClear();
   loadProjContent({ ...c, assemblies: asmList }, ProjectV3.baseName(r.path));
   WS().styleFile = c.styleFile || null; WS().styleDraft = null;
   setProjectPath(r);
@@ -183,6 +188,8 @@ async function loadOpened(r, quiet){
   loadStyle();
   if (!quiet) setStatus("ok", "เปิด " + projBaseName() + (r.fromVersion < ProjectV3.VERSION ? ` (แปลงจากรุ่น ${r.fromVersion} — Save project เพื่อเขียนเป็นรุ่น 3)` : ""));
   if (r.questions && r.questions.length) await askMigration(r.questions);
+  // the .cs files may have lost points a cross-item dimension was bound to: remove those now (own warning, project becomes *)
+  projCascade(); History.rebase(); persist(); renderAll();
   if (r.missing && r.missing.length) showMissing(r.missing);
   else maybeImportOldScenarios();
 }

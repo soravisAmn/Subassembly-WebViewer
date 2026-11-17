@@ -136,17 +136,21 @@ test("View toggles read the same state as the status bar", () => {
   eq(false, Commands.active("view.style", ctx({ bar: { style: false } })), "style off");
   eq(true, Commands.active("view.annot", ctx({ bar: {} })), "annotations on by default (older stored bar)");
   eq(false, Commands.active("view.annot", ctx({ bar: { annot: false } })), "annotations off");
+  eq(false, Commands.active("view.ptnames", ctx({ bar: {} })), "point names off by default (M3)");
+  eq(true, Commands.active("view.ptnames", ctx({ bar: { ptnames: true } })), "point names on");
+  ok(Commands.RIBBON.find(t => t.id === "view").panels.find(p => p.title === "Show").items.some(x => (Array.isArray(x) ? x[0] : x) === "view.ptnames"), "in View › Show");
 });
-test("Annotate tab (round 10 M2): Dimension h / v / aligned + Slope label, enabled outside Edit, no keys, pressed while running", () => {
+test("Annotate tab (round 10 M2 / M3): Note / Note with leader, Dimension h / v / aligned + Slope label, enabled outside Edit, no keys, pressed while running", () => {
   const tab = Commands.RIBBON.find(t => t.id === "annotate");
-  eq("Dimension,Slope,Style", tab.panels.map(p => p.title).join(","), "panels");
-  for (const id of ["annot.dimH", "annot.dimV", "annot.dimA", "annot.slope"]){
+  eq("Note,Dimension,Slope,Style", tab.panels.map(p => p.title).join(","), "panels");
+  for (const id of ["annot.note", "annot.noteL", "annot.dimH", "annot.dimV", "annot.dimA", "annot.slope"]){
     const c = Commands.get(id);
     eq(true, Commands.enabled(id, ctx()), id + " outside Edit");
     ok(!c.keys && !c.edit, id + ": no key, not contextual");
   }
   eq(true, Commands.active("annot.dimV", ctx({ annTool: "v" })), "Vertical pressed");
   eq(false, Commands.active("annot.dimH", ctx({ annTool: "v" })), "Horizontal not pressed");
+  eq(true, Commands.active("annot.noteL", ctx({ annTool: "noteL" })), "Note with leader pressed");
 });
 test("keyboard: contextual keys ignored outside Edit; X / B ignored during Move / Copy / Rotate", () => {
   eq(false, Commands.keyAllowed(Commands.forKey("p"), { editing: false }), "P outside Edit");

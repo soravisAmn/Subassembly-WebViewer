@@ -158,3 +158,11 @@ Proposed defaults 1-6 are from `prompt-10.md` §8. 7-8 are new from M0.
 2026-11-17: the user accepted every proposal (1-8) as written in section 8, and the stable hash-based automatic colour (section 2.2).
 - 7: Ctrl+S outside Edit saves the selected drawn item's `.cs` when it is unsaved and no code editor has focus.
 - 8: Civil 3D preview = one neutral light-grey for every link, default shape fill, plain square points.
+
+### Changes agreed during M2-M3 (reviewed)
+
+- Param rename renames an explicit dim label (remove -> "auto"); see section 3.
+- Only dimensions can span two items (project file `display`); notes and slope labels always belong to one item.
+- Cross-item dimensions show the value only (no parameter label); offset and mirroring follow the first item's Side. A cross-item dimension whose item `.cs` is missing is kept but hidden.
+- Annotation ids are never reused within a session (`display.seq`); a project display that becomes empty is not written, so its ids may repeat after reopening (nothing outside the project file refers to them).
+- Civil 3D preview hides point ids while editing too (decision 11).

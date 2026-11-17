@@ -15,7 +15,7 @@ D:\test_cad\SA-Projects\SR03\     ← any folder, any drive; move / copy / zip i
 └─ build\                         ← Build output (round 7), can be rebuilt
 ```
 
-- **The `.cs` is the only place a saved drawing lives.** The project file keeps file names, parameters, attachments, ground line, scenarios, bottom-bar values and `styleFile` (the style file it uses, relative path; written only after Save style / Open style file…; no key = `{name}.style.json` if it exists, else automatic colours).
+- **The `.cs` is the only place a saved drawing lives.** The project file keeps file names, parameters, attachments, ground line, scenarios, bottom-bar values, `styleFile` (the style file it uses, relative path; written only after Save style / Open style file…; no key = `{name}.style.json` if it exists, else automatic colours) and `display` (round 10 M3: dimensions between two subassemblies, refs `{ item, point }`; written only when there is one; see [display.md](display.md)). Both are optional keys: the version stays 3. The server carries `display` through open, Save, Save as (item ids do not change, so the refs stay valid) and Pack unchanged.
 - **Drafts:** work that is not in a `.cs` yet is kept in the project file as `draft`, so nothing is lost: a drawing not saved to its `.cs` (●), a drawn item with no file yet, inline code from "เปิดจากเครื่อง…". Opening restores the ● state; Save (.cs) clears it.
 - **Paths are relative to the project file** (`pavement.cs`, `lib\x.cs`, `..\shared\x.cs`); no `D:\…` is written. A file outside the folder is allowed (Pack copies it in).
 - **Machine values are not in the project**: Copy-to, Civil 3D install folder, recent projects, start folder (app settings, below), window / panel layout (browser).

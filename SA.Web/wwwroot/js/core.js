@@ -28,7 +28,8 @@ function defaultBar(){
   // aux = แสดง Auxiliary (ซ่อน = snap ไม่ได้ด้วย) · c3d = ดูแบบ Civil 3D (ซ่อน aux + ของที่ไม่ถูกส่งออก, สีกลาง ไม่ใช้ style)
   // style = ใช้ style by code (.style.json + override) · ปิด = สีอัตโนมัติ (round 10)
   // annot = show notes / dimensions / slope labels (round 10 M2; hidden in c3d, the value is kept)
-  return { grid: true, snap: false, gridStep: 0.05, ortho: false, slopes: ["1:1.5", "1:2", "1:3"], slope: -1, osOn: true, track: false, trackMs: 500, aux: true, c3d: false, style: true, annot: true,
+  // ptnames = point names P1, P2 … (#index for hand-written code) outside Edit too (round 10 M3; off by default, hidden in c3d)
+  return { grid: true, snap: false, gridStep: 0.05, ortho: false, slopes: ["1:1.5", "1:2", "1:3"], slope: -1, osOn: true, track: false, trackMs: 500, aux: true, c3d: false, style: true, annot: true, ptnames: false,
            osnap: { end: true, mid: false, cen: true, int: true, surf: true, perp: false, near: false } };
 }
 // แสดง / snap / คลุมเลือก object auxiliary ได้ไหม (ปุ่ม Aux เปิด และไม่ได้อยู่ในโหมดดูแบบ Civil 3D)
@@ -178,6 +179,7 @@ function selMatch(s, type, a, b){
   if (type === "item" || type === "params") return s.item === a;
   if (type === "pt" || type === "link" || type === "shape") return s.item === a && s.i === b;
   if (type === "dpt" || type === "dlink" || type === "dshape" || type === "dann") return s.item === a && s.id === b;
+  if (type === "pann") return s.id === a;                 // project-level (cross-item) annotation (round 10 M3)
   if (type === "spt") return s.i === a;
   return true;
 }

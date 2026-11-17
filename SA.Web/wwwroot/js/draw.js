@@ -204,9 +204,12 @@ function deleteDrawnSet(it, list){
   const picked = new Set(objs.map(o => o.id)), trial = JSON.parse(JSON.stringify(it.spec)), gone = new Set();
   for (const o of objs) for (const g of Spec.removeCascade(trial, DRAWN_KIND[o.type], o.id)) gone.add(g);
   const extra = [...gone].filter(g => !picked.has(g));
+  // dimensions / slope labels bound to what goes (round 10 M2) are named too
+  const annLeft = new Set(Display.all(trial).map(x => x.ann.id)), annLost = Display.all(it.spec).map(x => x.ann.id).filter(id => !annLeft.has(id));
   const what = objs.length === 1 ? objs[0].id : `${objs.length} objects ที่เลือก`;
   const list_ = extra.length > 15 ? extra.slice(0, 15).join(", ") + ` … และอีก ${extra.length - 15} ชิ้น` : extra.join(", ");
-  if (extra.length && !confirm(`ลบ ${what} จะลบ ${list_} ที่พึ่งอยู่ไปด้วย (รวม ${extra.length} ชิ้น) ตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
+  const annTxt = annLost.length ? `annotation ${annLost.join(", ")}` : "";
+  if ((extra.length || annLost.length) && !confirm(`ลบ ${what} จะลบ ${[extra.length ? `${list_} ที่พึ่งอยู่ (รวม ${extra.length} ชิ้น)` : "", annTxt].filter(Boolean).join(" และ ")} ไปด้วย ตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
   // Array ที่เสียชิ้นส่วน = เลิกเป็นกลุ่ม (ถามก่อน)
   const lostArr = (it.spec.arrays || []).filter(g => !(trial.arrays || []).some(x => x.id === g.id)).map(g => g.id);
   if (lostArr.length && !confirm(`${what} เป็นส่วนของ Array ${lostArr.join(", ")} — ลบแล้วจะเลิกเป็น Array (ที่เหลือเป็นจุด / link ธรรมดา แก้ N / dx / dy รวมไม่ได้อีก) ตกลงไหม? (Ctrl+Z ย้อนได้)`)) return;
@@ -219,6 +222,7 @@ function deleteDrawnSet(it, list){
 function setTool(t){
   if (t && !state.editing) return;
   if (t && cmd.name) endCmd();
+  if (t && ann.tool) annEnd();
   draw.tool = t; draw.chain = []; draw.cand = null; draw.hover = null; draw.ix = null; draw.list = []; draw.lastCyc = null; closeTyping(); tip.style.display = "none";
   if (!t) document.body.classList.remove("aux-mode");
   trackClear();                                   // จบ / เปลี่ยนเครื่องมือ = ล้างจุดที่จับไว้ (แบบ AutoCAD)

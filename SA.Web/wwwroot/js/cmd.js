@@ -21,6 +21,7 @@ const cmdPlacing = () => !!cmd.name && cmd.stage !== "select";
 
 function startCmd(name){
   if (draw.tool) setTool(null);
+  if (ann.tool) annEnd();
   closeTyping();
   const fresh = { name, base: null, pt: null, cand: null, convert: false, ghost: null, geom: null, n: 0,
                   baseCand: null, ang: 0, copyRot: false, sub: null, ref1: null, refAng: 0, refText: null };

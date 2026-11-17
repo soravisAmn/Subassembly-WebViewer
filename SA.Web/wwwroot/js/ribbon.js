@@ -20,9 +20,9 @@ function ctxNow(){
     editing: !!state.editing, item: it ? it.id : null, asm: ribbonAsm(),
     itemGenerated: !!(it && it.spec && !hasCode(it)),
     picked: pickedList().length > 0,
-    deletable: s.type === "spt" || many.some(o => state.editing ? DRAWN_KIND[o.type] : o.type === "item"),
+    deletable: s.type === "spt" || many.some(o => o.type === "dann" || (state.editing ? DRAWN_KIND[o.type] : o.type === "item")),
     clip: !!clip, addMode, readOnly: !!Proj.readOnly, undo: h.undo > 0, redo: h.redo > 0,
-    bar: state.bar, showCodes: !!state.showCodes, ve: +state.view.ve, edOpen: !!ed.open, tool: draw.tool, cmdRunning: !!cmd.name,
+    bar: state.bar, showCodes: !!state.showCodes, ve: +state.view.ve, edOpen: !!ed.open, tool: draw.tool, cmdRunning: !!cmd.name, annTool: ann.tool,
     canSaveDrawing: !!ei && canSaveDrawing(ei),
     pals: Dock ? DockLayout.PALETTES.filter(p => Dock.has(p.id)).map(p => p.id) : [],
     saveReason: !ei ? "" : !ei.spec ? "ยังไม่ได้วาดอะไร" : "ไฟล์ที่เขียนเองยังไม่มีช่วง SA-DRAWING — แก้ในแถบโค้ดแทน"

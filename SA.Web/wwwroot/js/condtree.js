@@ -388,7 +388,7 @@ function condCtxItems(itemId, x){
         E("↑ เลื่อนขึ้น", () => specEdit(s => Logic.moveCase(s, b.id, i - 1), it, `เลื่อน ${b.id}`), { disabled: !can || i <= 0 }),
         E("↓ เลื่อนลง", () => specEdit(s => Logic.moveCase(s, b.id, i + 1), it, `เลื่อน ${b.id}`), { disabled: !can || i >= cases.length - 1 }),
         E("ลบ case…", () => askHow(it, `ลบ case ${b.label}`, objs, d.parent ? `กิ่ง ${branchPath(sp, d.parent)}` : "เกิดเสมอ",
-                                   how => specEdit(s => Logic.removeCase(s, b.id, { how }), it, `ลบ case ${b.id}`)))
+                                   how => { const r = specEdit(s => Logic.removeCase(s, b.id, { how }), it, `ลบ case ${b.id}`); if (r && r.ok && r.warnings) flashBanner(r.warnings.join(" · ")); }))
       ] : []),
       { sep: true },
       { label: objs.length ? `เลือก object ในกิ่ง (${objs.length})` : "ยังไม่มี object", cmd: () => setSelList(objs.map(id => ({ type: id[0] === "P" ? "dpt" : id[0] === "L" ? "dlink" : "dshape", item: it.id, id }))), disabled: !objs.length }

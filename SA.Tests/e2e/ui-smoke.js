@@ -43,11 +43,11 @@ const errors = [];
   const tabs = `[...document.querySelectorAll("#rb-tabs .rb-tab")].filter(b => !b.hidden).map(b => b.dataset.tab + (b.classList.contains("cur") ? "*" : "")).join(",")`;
 
   check("page loads with the ribbon and the workspace palette", await ev(`!!document.querySelector("#ribbon .rb-page") && !!Dock && Dock.has("main")`));
-  for (const t of ["home", "view", "output", "ai"]){
+  for (const t of ["home", "view", "annotate", "output", "ai"]){
     await ev(`document.querySelector('.rb-tab[data-tab="${t}"]').click()`); await sleep(150);
     check(`tab ${t} switches`, await ev(`!document.querySelector('[data-page="${t}"]').hidden && document.querySelector('.rb-tab[data-tab="${t}"]').classList.contains("cur")`));
   }
-  check("contextual tabs hidden outside Edit", (await ev(tabs)) === "home,view,output,ai*");
+  check("contextual tabs hidden outside Edit", (await ev(tabs)) === "home,view,annotate,output,ai*");
   if (!(await ev(`allItems().length`)) && (await ev(`fetch("/api/files").then(r => r.json()).then(i => i.files.some(f => f.name === "pavement-assembly.cs"))`))){
     await ev(`loadSpecFromFile(addItem({ file: "pavement-assembly.cs" }, asms()[0] || null))`); await sleep(3000);
   }
@@ -55,11 +55,11 @@ const errors = [];
     await ev(`setSel({ type: "item", item: allItems()[0].id })`);
     await ev(`document.querySelector('.rb-tab[data-tab="home"]').click()`);
     await ev(`document.querySelector('[data-page="home"] [data-cmd="edit.enter"]').click()`); await sleep(400);
-    check("Home › Edit shows Draw / Modify / Logic and switches to Draw", (await ev(tabs)) === "home,view,output,ai,draw*,modify,logic", await ev(tabs));
+    check("Home › Edit shows Draw / Modify / Logic and switches to Draw", (await ev(tabs)) === "home,view,annotate,output,ai,draw*,modify,logic", await ev(tabs));
     await ev(`document.querySelector('[data-page="draw"] [data-cmd="draw.point"]').click()`);
     check("Draw › Point starts the tool", (await ev(`draw.tool`)) === "point");
     await ev(`document.querySelector('[data-page="draw"] [data-cmd="finish.exit"]').click()`); await sleep(300);
-    check("Finish › ออกจาก Edit returns to Home", (await ev(tabs)) === "home*,view,output,ai", await ev(tabs));
+    check("Finish › ออกจาก Edit returns to Home", (await ev(tabs)) === "home*,view,annotate,output,ai", await ev(tabs));
   } else console.log("  (no subassembly open: Edit steps skipped)");
   await ev(`Dock.hide("props")`);
   check("closing a palette", !(await ev(`Dock.has("props")`)));

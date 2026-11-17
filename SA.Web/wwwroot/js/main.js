@@ -58,6 +58,8 @@ document.addEventListener("keydown", e => {
   const k = e.key.toLowerCase(), editing = !!state.editing;
   // Space ค้าง + ลากปุ่มซ้าย = pan (กันหน้าเลื่อน / กดปุ่มที่ focus อยู่)
   if (e.key === " "){ e.preventDefault(); if (!e.repeat) setSpace(true); return; }
+  // Annotate (Dimension / Slope label): Esc = cancel · Tab / digit while placing = type the distance
+  if (annKey(e)) return;
   // Ctrl+A = เลือกทั้งหมด (Edit mode: ส่วนที่วาดของตัวที่แก้ · นอก Edit: ทุก subassembly)
   if (is("sel.all")){ e.preventDefault(); kc.run(); return; }
   // Undo / Redo ทุกการกระทำ: Ctrl+Z · Ctrl+Y / Ctrl+Shift+Z (ในช่องพิมพ์ / แถบโค้ด = undo ของช่องนั้นเอง)

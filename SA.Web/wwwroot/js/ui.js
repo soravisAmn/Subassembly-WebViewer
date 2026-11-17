@@ -47,6 +47,8 @@ function selectAll(){
 function deleteSelection(){
   const s = state.sel;
   if (s.type === "spt") return deleteSurfacePoint(s.i);
+  const an = selList().filter(o => o.type === "dann");
+  if (an.length) return deleteAnnots(an);                 // dimensions / slope labels (js/annot.js)
   if (state.editing){
     const it = editItem(), list = selList().filter(o => DRAWN_KIND[o.type]);
     if (it && list.length) deleteDrawnSet(it, list);
@@ -411,6 +413,7 @@ function renderProps(force){
     if (s.type === "pt" && res && res.points[s.i]){ of += ` · #${s.i}`; propsPoint(box, it, rr, s.i); propsCode(box, it, s); }
     else if (s.type === "link" && res && res.links[s.i]){ of += ` · L${s.i}`; propsLink(box, it, rr, s.i); propsCode(box, it, s); }
     else if (s.type === "shape" && res && res.shapes[s.i]){ of += ` · S${s.i}`; propsShape(box, it, rr, s.i); propsCode(box, it, s); }
+    else if (s.type === "dann" && it.spec && Display.find(it.spec, s.id)){ of += " · " + s.id; propsAnnot(box, it, s); }
     else if (/^d(pt|link|shape)$/.test(s.type) && specObj(it, s)){ of += " · " + s.id; propsDrawn(box, it, s); }
     else propsItem(box, it, rr, s.type === "params");
   } else { of = "Workspace"; state.sel = { type:"ws" }; propsWorkspace(box); }
@@ -1865,7 +1868,7 @@ function deleteCondition(it, c){
   const sp = it.spec, uses = Spec.condUses(sp, c.name);
   if (uses.length) return alert(`${c.name} ใช้อยู่ใน ${uses.join(", ")} — แก้นิพจน์เหล่านั้นก่อนลบ`);
   const decs = ((sp.logic || {}).decisions || []).filter(d => d.test === c.name);
-  if (!decs.length) return specEdit(s => Logic.removeCondition(s, c.name), it, `ลบเงื่อนไข ${c.name}`);
+  if (!decs.length){ const r = specEdit(s => Logic.removeCondition(s, c.name), it, `ลบเงื่อนไข ${c.name}`); if (r && r.ok && r.warnings) flashBanner(r.warnings.join(" · ")); return r; }
   removeDecisionsDialog(it, decs, `ลบเงื่อนไข ${c.name}`);
 }
 function deleteDecision(it, d){ removeDecisionsDialog(it, [d], `ลบ decision ${d.label || d.id}`); }
@@ -1876,7 +1879,12 @@ function removeDecisionsDialog(it, decs, title){
   const objs = trees.flatMap(x => x.t.branches.flatMap(b => Spec.branchObjects(sp, b)));
   const lose = trees.flatMap(x => x.t.branches).map(b => branchPath(sp, b));
   // Logic API: how = parent (กิ่งแม่ / เกิดเสมอถ้าไม่มีกิ่งแม่) | remove · decision ที่ซ้อนอยู่ในตัวที่ลบไปก่อนแล้ว = ข้าม
-  const go = how => { closeDialog(); specEdit(s => { for (const x of trees) if (Spec.byId((s.logic || {}).decisions || [], x.d.id)) Logic.removeDecision(s, x.d.id, { how: how === "remove" ? "remove" : "parent" }); }, it, title); };
+  const go = how => {
+    closeDialog();
+    const warn = [];
+    specEdit(s => { for (const x of trees) if (Spec.byId((s.logic || {}).decisions || [], x.d.id)){ const r = Logic.removeDecision(s, x.d.id, { how: how === "remove" ? "remove" : "parent" }); warn.push(...(r.warnings || [])); } }, it, title);
+    if (warn.length) flashBanner(warn.join(" · "));          // annotations removed with the objects (round 10 M2)
+  };
   if (!objs.length) return go("move");
   openDialog(title, b => {
     kv(b, [["กิ่งที่จะหาย", lose.join(", ")], ["object ในกิ่ง", objs.map(o => o.id).join(", ")]]);
@@ -1961,10 +1969,10 @@ $("bar").addEventListener("click", e => {
 function barClick(k){
   if (k === "codes"){ state.showCodes = !state.showCodes; render(); }
   else {
-    // style: missing in an older stored bar = on
-    state.bar[k] = k === "style" ? state.bar.style === false : !state.bar[k];
+    // style / annot: missing in an older stored bar = on
+    state.bar[k] = k === "style" || k === "annot" ? state.bar[k] === false : !state.bar[k];
     if (k === "grid") render();
-    if (k === "style" || k === "c3d"){ render(); renderStylePal(); renderProps(true); }
+    if (k === "style" || k === "c3d" || k === "annot"){ render(); renderStylePal(); renderProps(true); }
   }
   persist(); renderBar(); refreshSnap();
 }

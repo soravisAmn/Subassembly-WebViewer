@@ -99,6 +99,10 @@ Logic.applyBatch(spec, [
 |---|---|---|
 | `setOverride(id, { link \| shape \| point: { field: value } })` | Web-only style of one point / link / shape, merged field by field over the style of its code (like an object not using ByLayer). link: color, linetype solid \| dashed \| center \| hidden, weight mm. shape: fill, alpha, hatch (SOLID, ANSI31, ANSI37, AR-CONC, EARTH, GRAVEL, NONE or { pattern, scale, angle, color }). point: marker square \| circle \| cross \| triangle \| none, color, size. null removes one field. Never reaches the generated C#. | Missing id, field of another kind, bad value |
 | `clearOverride(id, kind?)` | Back to ByCode: removes the override of the object (or only its kind). | Missing id, wrong kind |
+| `addDim({ kind, a, b, offset?, label?, decimals? })` | Web-only dimension between two points (ids, never coordinates). kind: h \| v \| aligned. offset = distance of the dimension line from the middle of the two points (Side = Right frame: h up +, v outward +, aligned left of a -> b). label: "auto" (default: shows the parameter when one delta / slopeLength / polar definition joins the two points with exactly that name) \| a parameter name \| null (number only). decimals 0-6 (default 2). Returns the id (D1 …, never reused: display.seq). Never reaches the generated C#. | Bad kind, missing point, same point twice, bad offset / label / decimals |
+| `addSlopeLabel({ link, format? })` | Web-only slope label on a straight link. format: auto (default: 1:x when steeper than 5 %, else %) \| ratio (1:2.00) \| percent (5.0%). Returns the id (G1 …, never reused). | Missing / not straight link, bad format |
+| `updateAnnotation(id, { … })` | Change fields of a dimension (kind, a, b, offset, label, decimals) or a slope label (link, format). Dragging a dimension line changes offset only. | Missing id, field of another kind, bad value |
+| `removeAnnotation(ids)` | Delete dimensions / slope labels. Deleting a point / link (removeObjects) also deletes the annotations bound to it (listed in warnings). | Missing id |
 
 ### Tools
 
@@ -160,6 +164,16 @@ Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่�
 - `display` is web only: the generator ignores it, and it is written only when it holds something (`Spec.cleanDisplay`), so a spec with no overrides stays byte-identical to before.
 - Cascades: `removeObjects` (and everything that removes objects through `Spec.removeCascade`) removes the overrides of removed ids and lists them in `warnings`; `copyObjects` copies the overrides of copied points / links / shapes to the copies.
 - In the web: Properties › Display (`propsDisplay` in `js/stylepal.js`) calls them through `specEdit` (one Undo step).
+
+## Dimensions and slope labels (round 10 M2)
+
+`addDim(spec, { kind, a, b, offset?, label?, decimals? })` adds `{ id: "D1", kind, a, b, offset, label, decimals }` to `spec.display.dims`; `addSlopeLabel(spec, { link, format? })` adds `{ id: "G1", link, format }` to `spec.display.slopes`. Both return the new id in `result`. Ids are never reused within a spec: `display.seq = { D, G, N }` keeps the highest number handed out (written by the add ops, so Undo restores it). `updateAnnotation(spec, id, patch)` changes fields of one kind only (a dimension: `kind, a, b, offset, label, decimals`; a slope label: `link, format`) and checks the result; `removeAnnotation(spec, ids)` is all or nothing. Errors are in English and leave the spec unchanged.
+
+- `kind`: `h | v | aligned`. `a`, `b`: two different point ids. `offset`: distance of the dimension line from the middle of the two points, in drawing units, in the Side = Right frame (h: up +, v: outward +, aligned: left of a -> b); Side Left mirrors it.
+- `label`: `"auto"` (default) shows `(name)` after the value when one `delta` (`dx` for h, `dy` for v, the non-zero one for aligned), `slopeLength` (`length` measured `dx` / `dy` / along) or `polar` (`length`, aligned) definition joins the two points and that field is exactly one parameter name (a leading minus is allowed); an expression such as `Wcrest/2` gives no label. A parameter name = always that name. `null` = number only. `decimals` 0-6, default 2.
+- `format`: `auto` (default; `1:x` when steeper than 5 %, else `%`), `ratio` (`1:2.00`), `percent` (`5.0%`). Straight links only.
+- Cascades: `removeObjects` (via `Spec.removeCascade`) removes dimensions on removed points and slope labels on removed links, listed in `warnings` ("Annotations removed with them"); `removeDecision`, `removeCase` and `removeCondition` with `how: remove` give the same warning; `removeParam` sets a dimension label naming it back to `"auto"`; renaming a parameter (`editParam` name) renames the label; `copyObjects` does not copy annotations.
+- Pure helpers in `js/display.js` (`Display`, no DOM): `dimValue`, `dimText`, `autoLabel`, `labelOf`, `slopeText`, `dimGeom`, `offsetAt`, `visible`, `upright`. The page code is `js/annot.js` (Annotate tab, drawing, drag, Properties).
 
 ## Lower-level functions from round 4c
 

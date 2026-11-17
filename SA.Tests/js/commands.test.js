@@ -61,8 +61,8 @@ test("ribbon, ไฟล์ menu and Quick Access name existing commands", () => 
   for (const id of [...ribbonIds(), ...Commands.QUICK, ...Commands.FILE_MENU.filter(x => x !== "-" && x !== "recent")])
     ok(Commands.get(id), "unknown command " + id);
 });
-test("always-visible tabs Home, View, Output, AI + contextual Draw, Modify, Logic (no empty tabs)", () => {
-  eq("home,view,output,ai", Commands.RIBBON.filter(t => !t.contextual).map(t => t.id).join(","), "tabs");
+test("always-visible tabs Home, View, Annotate, Output, AI + contextual Draw, Modify, Logic (no empty tabs)", () => {
+  eq("home,view,annotate,output,ai", Commands.RIBBON.filter(t => !t.contextual).map(t => t.id).join(","), "tabs");
   eq("draw,modify,logic", Commands.RIBBON.filter(t => t.contextual).map(t => t.id).join(","), "contextual tabs");
   for (const t of Commands.RIBBON) ok(t.panels.length && t.panels.every(p => p.items.length), t.id + ": empty panel");
   eq("finish.save,finish.exit", Commands.FINISH.items.join(","), "Finish panel");
@@ -134,6 +134,19 @@ test("View toggles read the same state as the status bar", () => {
   eq(true, Commands.active("view.ve2", ctx({ ve: 2 })), "VE 2");
   eq(true, Commands.active("view.style", ctx({ bar: {} })), "style on by default (older stored bar)");
   eq(false, Commands.active("view.style", ctx({ bar: { style: false } })), "style off");
+  eq(true, Commands.active("view.annot", ctx({ bar: {} })), "annotations on by default (older stored bar)");
+  eq(false, Commands.active("view.annot", ctx({ bar: { annot: false } })), "annotations off");
+});
+test("Annotate tab (round 10 M2): Dimension h / v / aligned + Slope label, enabled outside Edit, no keys, pressed while running", () => {
+  const tab = Commands.RIBBON.find(t => t.id === "annotate");
+  eq("Dimension,Slope,Style", tab.panels.map(p => p.title).join(","), "panels");
+  for (const id of ["annot.dimH", "annot.dimV", "annot.dimA", "annot.slope"]){
+    const c = Commands.get(id);
+    eq(true, Commands.enabled(id, ctx()), id + " outside Edit");
+    ok(!c.keys && !c.edit, id + ": no key, not contextual");
+  }
+  eq(true, Commands.active("annot.dimV", ctx({ annTool: "v" })), "Vertical pressed");
+  eq(false, Commands.active("annot.dimH", ctx({ annTool: "v" })), "Horizontal not pressed");
 });
 test("keyboard: contextual keys ignored outside Edit; X / B ignored during Move / Copy / Rotate", () => {
   eq(false, Commands.keyAllowed(Commands.forKey("p"), { editing: false }), "P outside Edit");

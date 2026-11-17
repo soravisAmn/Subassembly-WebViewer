@@ -155,10 +155,10 @@ const Logic = (() => {
       const how = needHow(o && o.how);
       const users = Spec.condUses(s, name);
       if (users.length) fail(`ลบ ${name} ไม่ได้ — ยังใช้อยู่ใน ${users.join(", ")} (แก้ที่ใช้ก่อน)`);
-      const touched = [];
+      const touched = [], an0 = annIds(s);
       for (const d of [...LG(s).decisions]) if (d.test === name && byId(LG(s).decisions, d.id)) touched.push(...removeDecisionIn(s, d.id, how));
       const lg = LG(s); lg.conditions = lg.conditions.filter(c => c.name !== name);
-      return { touched };
+      return { touched, ...annLostWarn(s, an0) };
     });
   }
 
@@ -217,7 +217,7 @@ const Logic = (() => {
     return moved.concat(Spec.removeDecision(s, id, how === "remove" ? "remove" : "move"));
   }
   function removeDecision(spec, id, o){
-    return tx(spec, s => { needDec(s, id); return { touched: removeDecisionIn(s, id, needHow(o && o.how)) }; });
+    return tx(spec, s => { needDec(s, id); const an0 = annIds(s); return { touched: removeDecisionIn(s, id, needHow(o && o.how)), ...annLostWarn(s, an0) }; });
   }
   // ย้าย decision ทั้งก้อนไปซ้อนในกิ่งอื่น (null = ระดับบนสุด) — ห้ามย้ายเข้ากิ่งของตัวเอง / ที่ซ้อนอยู่ข้างใน
   function moveDecision(spec, id, parentBranch){
@@ -263,7 +263,7 @@ const Logic = (() => {
     return tx(spec, s => {
       const b = needBr(s, bid), d = needSwitch(s, b.decision), how = needHow(o && o.how);
       if (isElse(b)) fail("ลบกิ่ง อื่นๆ (else) ไม่ได้ — switch ต้องมี else เสมอ");
-      const lg = LG(s), touched = [];
+      const lg = LG(s), touched = [], an0 = annIds(s);
       for (const x of [...lg.decisions]) if (x.parent === bid && byId(lg.decisions, x.id)) touched.push(...removeDecisionIn(s, x.id, how));
       for (const ob of objsIn(s, new Set([bid]))){
         if (how === "remove"){
@@ -272,7 +272,7 @@ const Logic = (() => {
         } else { if (how === "parent" && d.parent) ob.branch = d.parent; else delete ob.branch; touched.push(ob.id); }
       }
       lg.branches = lg.branches.filter(x => x.id !== bid);
-      return { touched };
+      return { touched, ...annLostWarn(s, an0) };
     });
   }
   // เรียง case: index = ลำดับใหม่ในบรรดา case ที่มีค่า (else อยู่ท้ายเสมอ)
@@ -782,6 +782,7 @@ const Logic = (() => {
         p.name = c.name;
         if (s.side && s.side.param === name) s.side.param = c.name;
         for (const x of Spec.exprSlots(s)) if (typeof x.obj[x.key] === "string") x.obj[x.key] = x.obj[x.key].replace(re, c.name);
+        for (const d of (s.display && s.display.dims) || []) if (d.label === name) d.label = c.name;     // dimension labels follow the rename
       }
       return { result: p.name };
     });
@@ -793,6 +794,7 @@ const Logic = (() => {
       const used = paramUsers(s, name);
       if (used.length) fail(`Parameter ${name} is still used by: ${used.join(", ")}.`);
       s.params = s.params.filter(x => x.name !== name);
+      for (const d of (s.display && s.display.dims) || []) if (d.label === name) d.label = "auto";     // a dimension that named it goes back to auto
       return { result: name };
     });
   }
@@ -842,7 +844,7 @@ const Logic = (() => {
   }
   function removeObjects(spec, ids){
     return tx(spec, s => {
-      const gone = new Set(), want = asList(ids), ov0 = Object.keys((s.display && s.display.overrides) || {});
+      const gone = new Set(), want = asList(ids), ov0 = Object.keys((s.display && s.display.overrides) || {}); const an0 = annIds(s);
       for (const id of want){
         if (gone.has(id)) continue;
         const [k, x] = needObj(s, id);
@@ -853,6 +855,7 @@ const Logic = (() => {
       const warnings = extra.length ? [`Also removed because they depended on it: ${extra.join(", ")}`] : [];
       const lost = [...gone].filter(g => ov0.includes(g));
       if (lost.length) warnings.push(`Display overrides removed with them: ${lost.join(", ")}`);
+      warnings.push(...(annLostWarn(s, an0).warnings || []));
       return { result: [...gone], warnings };
     });
   }
@@ -1022,6 +1025,81 @@ const Logic = (() => {
     });
   }
 
+  // ---------- Display (round 10 M2): dimensions and slope labels in spec.display.dims / slopes ----------
+  // Bound to point / link ids (never coordinates). Web only. Ids D1… / G1… (next free number). Pure helpers: js/display.js (Display).
+  const ANN = { dim: "dims", slope: "slopes", note: "notes" }, ANN_PRE = { dim: "D", slope: "G", note: "N" };
+  const DIM_KINDS = ["h", "v", "aligned"], SLOPE_FMT = ["auto", "ratio", "percent"];
+  const annList = (s, kind) => { const d = s.display = s.display && typeof s.display === "object" ? s.display : {}; return (d[ANN[kind]] = Array.isArray(d[ANN[kind]]) ? d[ANN[kind]] : []); };
+  const annFind = (s, id) => { for (const kind of Object.keys(ANN)){ const a = ((s.display || {})[ANN[kind]] || []).find(x => x.id === id); if (a) return [kind, a]; } return null; };
+  // ids are never reused within a spec: display.seq = { D, G, N } keeps the highest number handed out (Undo restores it with the spec)
+  const annNext = (s, kind) => {
+    const pre = ANN_PRE[kind], d = s.display = s.display && typeof s.display === "object" ? s.display : {};
+    const n = Math.max(+(d.seq && d.seq[pre]) || 0, +nextId(annList(s, kind), pre).slice(pre.length) - 1) + 1;
+    d.seq = { ...(d.seq && typeof d.seq === "object" ? d.seq : {}), [pre]: n };
+    return pre + n;
+  };
+  const annIds = s => Object.keys(ANN).flatMap(k => ((s.display || {})[ANN[k]] || []).map(x => x.id));
+  // { warnings: ["Annotations removed with them: …"] } when objects removed since an0 (= annIds before) took annotations with them, else {}
+  const annLostWarn = (s, an0) => { const now = new Set(annIds(s)), lost = an0.filter(id => !now.has(id)); return lost.length ? { warnings: [`Annotations removed with them: ${lost.join(", ")}`] } : {}; };
+  function checkDim(s, d){
+    if (!DIM_KINDS.includes(d.kind)) fail(`Dimension kind must be h, v or aligned, got ${JSON.stringify(d.kind)}.`);
+    for (const k of ["a", "b"])
+      if (typeof d[k] !== "string" || !byId(s.points, d[k])) fail(`Dimension point ${k} = ${JSON.stringify(d[k])} is not a point of this subassembly.`);
+    if (d.a === d.b) fail("A dimension needs two different points.");
+    if (typeof d.offset !== "number" || !isFinite(d.offset)) fail(`offset must be a number (drawing units), got ${JSON.stringify(d.offset)}.`);
+    if (d.label !== null && d.label !== "auto" && !(s.params || []).some(p => p.name === d.label))
+      fail(`label must be "auto", null or a parameter name; there is no parameter ${JSON.stringify(d.label)}.`);
+    if (!Number.isInteger(d.decimals) || d.decimals < 0 || d.decimals > 6) fail(`decimals must be a whole number 0-6, got ${JSON.stringify(d.decimals)}.`);
+  }
+  function checkSlope(s, g){
+    const l = typeof g.link === "string" ? byId(s.links, g.link) : null;
+    if (!l) fail(`Slope label link ${JSON.stringify(g.link)} is not a link of this subassembly.`);
+    if (!(Array.isArray(l.points) && l.points.length === 2 && !l.type)) fail(`${g.link} is not a straight link; slope labels go on straight links only.`);
+    if (!SLOPE_FMT.includes(g.format)) fail(`format must be auto, ratio or percent, got ${JSON.stringify(g.format)}.`);
+  }
+  function addDim(spec, o){
+    return tx(spec, s => {
+      o = o || {};
+      const d = { id: annNext(s, "dim"), kind: o.kind, a: o.a, b: o.b, offset: o.offset ?? 0, label: o.label === undefined ? "auto" : o.label, decimals: o.decimals ?? 2 };
+      checkDim(s, d);
+      annList(s, "dim").push(d);
+      return { result: d.id };
+    });
+  }
+  function addSlopeLabel(spec, o){
+    return tx(spec, s => {
+      o = o || {};
+      const g = { id: annNext(s, "slope"), link: o.link, format: o.format ?? "auto" };
+      checkSlope(s, g);
+      annList(s, "slope").push(g);
+      return { result: g.id };
+    });
+  }
+  const ANN_FIELDS = { dim: ["kind", "a", "b", "offset", "label", "decimals"], slope: ["link", "format"], note: [] };
+  const ANN_NAME = { dim: "dimension", slope: "slope label", note: "note" };
+  function updateAnnotation(spec, id, patch){
+    return tx(spec, s => {
+      const [kind, a] = annFind(s, id) || fail(`No annotation ${id}.`);
+      if (!patch || typeof patch !== "object" || Array.isArray(patch) || !Object.keys(patch).length) fail(`patch must be an object of fields: ${ANN_FIELDS[kind].join(", ")}.`);
+      for (const k of Object.keys(patch))
+        if (!ANN_FIELDS[kind].includes(k)) fail(`${id} is a ${ANN_NAME[kind]}: field ${k} is not one of ${ANN_FIELDS[kind].join(", ") || "(notes come in a later milestone)"}.`);
+      const next = { ...a, ...JSON.parse(JSON.stringify(patch)) };
+      if (kind === "dim") checkDim(s, next); else if (kind === "slope") checkSlope(s, next);
+      Object.assign(a, next);
+      return { result: id };
+    });
+  }
+  function removeAnnotation(spec, ids){
+    return tx(spec, s => {
+      const want = asList(ids);
+      if (!want.length) fail("No annotation ids given.");
+      for (const id of want) annFind(s, id) || fail(`No annotation ${id}.`);
+      for (const kind of Object.keys(ANN)) if (s.display && Array.isArray(s.display[ANN[kind]])) s.display[ANN[kind]] = s.display[ANN[kind]].filter(x => !want.includes(x.id));
+      Spec.cleanDisplay(s);
+      return { result: want };
+    });
+  }
+
   // ---------- applyBatch ----------
   // ops = [{ fn, args, as? }]. "${name.path}" in any string reads the result of an earlier op named by "as".
   // A string that is exactly one reference keeps the value's type. All or nothing.
@@ -1121,6 +1199,10 @@ const Logic = (() => {
     M("Objects", "copyObjects", "ids, { dx, dy, convert? }", 2, "Copy, then move the copy. Returns the new points, links, shapes, map.", "Blocked points without convert"),
     M("Display", "setOverride", "id, { link | shape | point: { field: value } }", 2, "Web-only style of one point / link / shape, merged field by field over the style of its code (like an object not using ByLayer). link: color, linetype solid | dashed | center | hidden, weight mm. shape: fill, alpha, hatch (SOLID, ANSI31, ANSI37, AR-CONC, EARTH, GRAVEL, NONE or { pattern, scale, angle, color }). point: marker square | circle | cross | triangle | none, color, size. null removes one field. Never reaches the generated C#.", "Missing id, field of another kind, bad value"),
     M("Display", "clearOverride", "id, kind?", 2, "Back to ByCode: removes the override of the object (or only its kind).", "Missing id, wrong kind"),
+    M("Display", "addDim", "{ kind, a, b, offset?, label?, decimals? }", 1, "Web-only dimension between two points (ids, never coordinates). kind: h | v | aligned. offset = distance of the dimension line from the middle of the two points (Side = Right frame: h up +, v outward +, aligned left of a -> b). label: \"auto\" (default: shows the parameter when one delta / slopeLength / polar definition joins the two points with exactly that name) | a parameter name | null (number only). decimals 0-6 (default 2). Returns the id (D1 …, never reused: display.seq). Never reaches the generated C#.", "Bad kind, missing point, same point twice, bad offset / label / decimals"),
+    M("Display", "addSlopeLabel", "{ link, format? }", 1, "Web-only slope label on a straight link. format: auto (default: 1:x when steeper than 5 %, else %) | ratio (1:2.00) | percent (5.0%). Returns the id (G1 …, never reused).", "Missing / not straight link, bad format"),
+    M("Display", "updateAnnotation", "id, { … }", 2, "Change fields of a dimension (kind, a, b, offset, label, decimals) or a slope label (link, format). Dragging a dimension line changes offset only.", "Missing id, field of another kind, bad value"),
+    M("Display", "removeAnnotation", "ids", 1, "Delete dimensions / slope labels. Deleting a point / link (removeObjects) also deletes the annotations bound to it (listed in warnings).", "Missing id"),
     M("Tools", "addCutFill", "{ hinge, cut, fill, params, dir, … }", 1, "Daylight Cut/Fill. cut / fill = number x of 1:x, or text like a slope field: 1:1.5, 0.667, 2%, parameter name, expression.", "As the tool"),
     M("Tools", "addIntersect", "link1, link2, { trim, keep1, keep2, aux }", 3, "Intersect two straight links.", "Parallel, not straight"),
     M("Tools", "addOffset", "linkId, dist, side, { aux }", 4, "Parallel line: 2 points + link.", "Not straight, bad expression"),
@@ -1155,9 +1237,9 @@ const Logic = (() => {
   const API = { setClassName, setParamInfo, addCondition, editCondition, renameCondition, removeCondition, addDecision, editDecision, removeDecision, moveDecision,
                 addCase, editCase, removeCase, moveCase, renameBranch, setBranch, addVariable, editVariable, renameVariable, removeVariable, moveVariable,
                 addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setArrayLoop, removeArray, addLastOf, setParamBounds, setParamUnit,
-                addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride };
+                addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride, addDim, addSlopeLabel, updateAnnotation, removeAnnotation };
 
-  return { META, catalog, applyBatch, newSubassembly, setClassName, setParamInfo, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride,
+  return { META, catalog, applyBatch, newSubassembly, setClassName, setParamInfo, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride, addDim, addSlopeLabel, updateAnnotation, removeAnnotation,
            RESERVED, nameError, freeCondName, toText, diffText,
            addCondition, editCondition, renameCondition, removeCondition,
            addDecision, editDecision, removeDecision, moveDecision,

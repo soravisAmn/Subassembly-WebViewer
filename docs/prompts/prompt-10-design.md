@@ -101,7 +101,7 @@ Overrides merge field by field (an override of only `linetype` keeps the code co
 |---|---|
 | `removeObjects` | annotations bound to a removed point / link and overrides of removed ids are removed; listed in warnings |
 | `removeDecision how: remove`, `removeCase` with objects | same through `removeObjects` |
-| `removeParam` / param rename (`editParam` name) | dim `label` with that name -> `"auto"`; `{expr}` in notes renamed like other expressions (rename) or left (remove: the note shows `{?}`) |
+| `removeParam` / param rename (`editParam` name) | dim `label` with that name -> `"auto"` on remove, renamed on rename (changed in M2 after review: an explicit label is the user's choice); `{expr}` in notes renamed like other expressions (rename) or left (remove: the note shows `{?}`) |
 | `copyObjects` | annotations are **not** copied (only geometry); overrides of copied objects are copied |
 | `moveObjects`, `setBranch`, Array / Loop | nothing (annotations follow point ids) |
 | Copy item / Save as | the whole spec incl. `display` |

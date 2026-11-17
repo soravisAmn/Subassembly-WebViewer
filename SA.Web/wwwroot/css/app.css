@@ -4,7 +4,7 @@
   --paper:#fbfaf7; --grid:#e7e4dc; --grid2:#d9d5cb; --axis:#a8a395;
   --accent:#1f5fbf; --accent-soft:#dbe6f7;
   --ground:#7a5530; --ground-fill:rgba(122,85,48,.10);
-  --shape:rgba(31,95,191,.10);
+  --shape:rgba(31,95,191,.10); --ann:#3a5a8c;
   --err:#b42318; --err-soft:#fde8e6; --warn:#a15c00; --warn-soft:#fdf0d9; --ok:#14845f;
   --l1:#1f5fbf; --l2:#c46a12; --l3:#14845f; --l4:#6b3fb8; --l5:#b0306a; --l6:#0f7c8c; --l7:#7a6a00; --l8:#5c6068;
   --base:#b0306a; --hot:#c2410c;
@@ -15,7 +15,7 @@
     --paper:#121417; --grid:#1e2125; --grid2:#2a2e33; --axis:#4a4f57;
     --accent:#6ea4ff; --accent-soft:#1f2c42;
     --ground:#c99a63; --ground-fill:rgba(201,154,99,.10);
-    --shape:rgba(110,164,255,.12);
+    --shape:rgba(110,164,255,.12); --ann:#9fc3ff;
     --err:#ff8a80; --err-soft:#3a1d1b; --warn:#ffc266; --warn-soft:#352a14; --ok:#3fcf9a;
     --l1:#6ea4ff; --l2:#f0a04b; --l3:#3fcf9a; --l4:#b08cff; --l5:#ff7eb6; --l6:#4fd2e0; --l7:#e2cf55; --l8:#9a9ea6;
     --base:#ff7eb6; --hot:#ff9a5c;
@@ -27,7 +27,7 @@
   --paper:#1e2227; --grid:#262b31; --grid2:#30363d; --axis:#4f5660;
   --accent:#6ea4ff; --accent-soft:#1f2c42;
   --ground:#c99a63; --ground-fill:rgba(201,154,99,.12);
-  --shape:rgba(110,164,255,.14);
+  --shape:rgba(110,164,255,.14); --ann:#9fc3ff;
   --err:#ff8a80; --err-soft:#3a1d1b; --warn:#ffc266; --warn-soft:#352a14; --ok:#3fcf9a;
   --l1:#6ea4ff; --l2:#f0a04b; --l3:#3fcf9a; --l4:#b08cff; --l5:#ff7eb6; --l6:#4fd2e0; --l7:#e2cf55; --l8:#9a9ea6;
   --base:#ff7eb6; --hot:#ffd34d;
@@ -358,6 +358,15 @@ svg#view{width:100%;height:100%;display:block;touch-action:none;user-select:none
 .snap{fill:none;stroke:var(--accent);stroke-width:1.2;opacity:.55;pointer-events:none}
 .snap.hot{stroke-width:2.5;opacity:1}
 .snap-lbl{fill:var(--accent);font:11px "IBM Plex Mono",monospace;pointer-events:none;paint-order:stroke;stroke:var(--paper);stroke-width:3px}
+/* annotations (round 10 M2): dimensions / slope labels, screen-constant (docs/display.md) */
+.ann{stroke:var(--ann);fill:none;stroke-width:1;vector-effect:non-scaling-stroke}
+.ann-ext{opacity:.8}
+.ann-arrow{fill:var(--ann);stroke:none}
+.ann-txt{fill:var(--ann);stroke:var(--paper);stroke-width:3px;paint-order:stroke;font-family:"IBM Plex Mono",monospace;cursor:pointer}
+.ann.sel:not(.ann-txt){stroke:var(--hot)}
+.ann-txt.sel{fill:var(--hot)}
+.ann-hit{stroke:transparent;stroke-width:10;fill:none;cursor:move}
+.annots.preview{opacity:.75;pointer-events:none}
 
 /* ส่วนที่วาด (DrawingSpec) */
 .dlink{stroke-width:3}

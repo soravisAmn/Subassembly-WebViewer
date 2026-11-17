@@ -2,7 +2,7 @@
 
 Everything here is **web only**. It never changes what Civil 3D draws: the generated C# body is byte-identical with or without display data, and a display-only change is not a parameter change for Build. In Civil 3D the user styles codes with a Code Set Style.
 
-Status: M1 (style by code, per-object override, View › Show › Style, Civil 3D preview colours). Notes, dimensions and slope labels come in M2 / M3.
+Status: M1 (style by code, per-object override, View › Show › Style, Civil 3D preview colours), M2 (dimensions, slope labels, Annotate tab, View › Show › Annotations). Notes, cross-item dimensions and point names come in M3.
 
 ## Style file `{name}.style.json`
 
@@ -23,7 +23,7 @@ Status: M1 (style by code, per-object override, View › Show › Style, Civil 3
 | shape | `fill`, `alpha` | `#rrggbb`, 0-1 | the workspace shape fill |
 | shape | `hatch` | `{ pattern, scale, angle, color }` or a pattern name | none |
 | point | `marker`, `color`, `size` | `square`, `circle`, `cross`, `triangle`, `none`; `#rrggbb`; px | square, 8 px |
-| — | `text.size` | px (used by annotations, M2) | 11 |
+| — | `text.size` | px, screen-constant size of dimension / slope text | 11 |
 
 - Unknown keys are kept (later rounds add fields). A bad field is ignored with a warning in the status line; a broken file = automatic colours.
 - The project file points at the style file with `styleFile` (relative path, may be outside the folder, e.g. a shared `DPT-standard.style.json`). No key = `{project}.style.json` beside the project file if it exists, else automatic colours. The key is written after **Save style** or **Open style file…** (then Save project). **Save project as…** keeps the same style file: the key is rebased to the new folder, and a default `{project}.style.json` that exists gets a key pointing at it (unsaved style edits follow too).
@@ -62,7 +62,32 @@ Dockable palette `Style` (default: a tab behind Properties on the right; View �
 
 - **View › Show › Style** (`view.style`, stored with the bottom-bar values): off = automatic colours only (style file and overrides ignored, nothing deleted).
 - **Civil 3D preview** (`view.c3d`): one neutral light grey for every link, the default shape fill, plain square points, no hatch (as Civil 3D with no Code Set Style). It keeps the Style toggle's value for when Design mode returns.
+- **View › Show › Annotations** (`view.annot`, `state.bar.annot`, saved like the other bar values): off = dimensions and slope labels hidden (not deleted). Civil 3D preview hides them too and keeps the toggle's value.
+
+## Dimensions and slope labels (M2)
+
+Stored in the `.cs` (sa-spec `display.dims` / `display.slopes`), bound to **point / link ids**, never coordinates, so they follow parameters, scenarios, branches and Side:
+
+```json
+"display": {
+  "dims":   [ { "id": "D1", "kind": "h", "a": "P2", "b": "P5", "offset": -1.2, "label": "auto", "decimals": 2 } ],
+  "slopes": [ { "id": "G1", "link": "L3", "format": "auto" } ] }
+```
+
+- **Annotate tab** (always visible, between View and Output): Dimension › Horizontal / Vertical / Aligned, Slope › Slope label, Style › Style palette / สร้าง style จากสีที่เห็นตอนนี้ / Open style file…. No keyboard shortcuts.
+- **Dimension** (like DIMLINEAR / DIMALIGNED): click point 1 → point 2 → click to place the dimension line (a preview follows the mouse). Picks snap to **real points of drawn items only** (point ids); elsewhere the banner says "ต้องเลือกจุด". `Tab` or a digit while placing = type the distance (m, sign = side). `Esc` or right-click cancels. Both points must be in the same item this milestone (another item = a Thai message; cross-item dimensions are M3). In Edit only the edited item can be picked.
+- **Slope label**: click a straight link. Text is placed at the middle of the link, along it, upright.
+- Works **outside Edit**; the item becomes unsaved (●) until Save (.cs) (Ctrl+S outside Edit saves the selected item). Every change is one Undo step through the Logic API (`addDim`, `addSlopeLabel`, `updateAnnotation`, `removeAnnotation`, [logic-api.md](logic-api.md)).
+- **Value**: h = |dx|, v = |dy|, aligned = distance, from the evaluated points (current parameters / scenario / Side), `decimals` (default 2). **Label** `auto` adds `(Wcrest)` when one `delta` / `slopeLength` / `polar` definition joins the two points and the measured field is exactly that parameter name (`Wcrest/2` → no label); or a picked parameter; or none.
+- **Slope text**: `ratio` `1:2.00` (run / rise), `percent` `5.0%`, `auto` = ratio when steeper than 5 %, else percent. No sign (the direction is in the drawing).
+- **offset** = distance of the dimension line from the middle of the two points (h: up +, v: outward +, aligned: left of a → b), stored in the Side = Right frame; Side Left mirrors the position. Text is never mirrored: it is centred on the dimension line, rotated with aligned dimensions and kept upright (−90° … 90°; vertical text reads from the right, as in AutoCAD).
+- **Drawing**: extension lines (small gap at the point, a little past the line), arrows as one SVG `<marker>` (`orient="auto-start-reverse"`, checked in Chrome and Edge), screen-constant 1 px lines and `text.size` px text in the app colour `--ann` (app-owned, not from the style file). Drawn on top of the item's points.
+- **Hidden** when a point / link does not exist in the current branch / scenario (no value), when View › Show › Annotations is off, and in Civil 3D preview.
+- **Select**: click the text or the dimension line; double-click also opens Properties. **Properties › Display**: kind (h / v / aligned), ป้าย parameter (อัตโนมัติ / a parameter / ไม่แสดง), ทศนิยม 0–6, ระยะห่าง; slope: รูปแบบ (auto / 1:x / %); ลบ. **Drag** a dimension line = change `offset` only. **Delete** removes the selected annotation (in or out of Edit).
+- **Cascades**: deleting a point / link deletes the annotations bound to it; Undo restores both. Delete in Edit names them in its confirmation ("… และ annotation D1, G1 ไปด้วย"); `removeObjects`, `removeDecision`, `removeCase` and `removeCondition` with `how: remove` list them in `warnings` ("Annotations removed with them: …", shown in the banner). Removing a parameter sets a label that named it back to `auto`; renaming a parameter renames the label. Copy does not copy annotations.
+- **Ids** `D1…`, `G1…`: never reused within an item. `display.seq` (`{ "D": 2, "G": 1 }`) keeps the highest number handed out; it stays after the annotations are removed (a spec never annotated has no `display`). Undo restores it with the spec.
+- A hand-written `.cs` without an SA-DRAWING block cannot be saved, so it takes no annotations and no per-object override (the banner / Properties says why).
 
 ## Code
 
-`js/style.js` (pure: resolve, parse / serialize, fromColours, setField, hatches, weights) · `js/stylepal.js` (page: style file state, rendering helpers, Style palette, Properties › Display) · `js/logicops.js` (`setOverride`, `clearOverride`) · `SA.Web/Projects/ProjectApi.cs` (endpoints), `ProjectFile.cs` (`styleFile`, missing), `ProjectPack.cs` · tests `SA.Tests/js/style.test.js`, `SA.Tests/DisplayTests.cs`, fixture `SA.Tests/fixtures/round10/demo.style.json`.
+`js/style.js` (pure: resolve, parse / serialize, fromColours, setField, hatches, weights) · `js/display.js` (pure: dimension values, auto label, slope text, geometry, visibility) · `js/annot.js` (page: Annotate commands, drawing, drag, Properties of an annotation) · `js/stylepal.js` (page: style file state, rendering helpers, Style palette, Properties › Display) · `js/logicops.js` (`setOverride`, `clearOverride`, `addDim`, `addSlopeLabel`, `updateAnnotation`, `removeAnnotation`) · `SA.Web/Projects/ProjectApi.cs` (endpoints), `ProjectFile.cs` (`styleFile`, missing), `ProjectPack.cs` · tests `SA.Tests/js/style.test.js`, `SA.Tests/js/display.test.js`, `SA.Tests/DisplayTests.cs`, fixture `SA.Tests/fixtures/round10/demo.style.json`.

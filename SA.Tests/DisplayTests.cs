@@ -20,7 +20,7 @@ static class DisplayTests
         Directory.CreateDirectory(TempRoot);
 
         JsonObject BoxSpec() => JsonNode.Parse(File.ReadAllText(Path.Combine(fixtures, "round8", "box.spec.json")))!.AsObject();
-        const string DisplayJson = """{"overrides":{"L1":{"link":{"linetype":"hidden","weight":0.5}},"P2":{"point":{"marker":"triangle"}}},"notes":[{"id":"N1","text":"ระวัง {W}","at":{"point":"P2","dx":0.5,"dy":0.8}}]}""";
+        const string DisplayJson = """{"overrides":{"L1":{"link":{"linetype":"hidden","weight":0.5}},"P2":{"point":{"marker":"triangle"}}},"notes":[{"id":"N1","text":"ระวัง {W}","at":{"point":"P2","dx":0.5,"dy":0.8}}],"dims":[{"id":"D1","kind":"h","a":"P1","b":"P2","offset":-1.2,"label":"auto","decimals":2},{"id":"D2","kind":"aligned","a":"P1","b":"P2","offset":0.5,"label":null,"decimals":3}],"slopes":[{"id":"G1","link":"L1","format":"auto"}]}""";   // M2: dims + slopes
         (string Plain, string WithDisplay) Raws(Action<JsonObject>? tweak = null)
         {
             var a = BoxSpec(); tweak?.Invoke(a);
@@ -63,7 +63,7 @@ static class DisplayTests
             Eq(0, CodeGenerator.MissingCalls(text, DrawingSpec.Parse(raw2)).Count, "rename complete");
         });
 
-        test("generated C# body is byte-identical with and without display", () =>
+        test("generated C# body is byte-identical with and without display (overrides, notes, dims, slopes)", () =>
         {
             var (plain, raw) = Raws();
             var a = Gen(plain); var b = Gen(raw);

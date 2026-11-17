@@ -252,6 +252,7 @@ function propsDisplay(box, it, s){
   if (!kind || !o) return;
   const g = group(box, "Display");
   if (Spec.isAux(o)){ div("hint", "Auxiliary ใช้รูปแบบของเว็บ (เส้นประเทา) — ไม่มี style", g); return; }
+  if (annCantSave(it)){ div("hint", annCantSave(it) + " (ใช้ ByCode)", g); return; }          // js/annot.js
   const ov = ovrOf(it.spec, o.id), mine = ov && ov[kind];
   const st = resolveStyle(kind, o.codes, ov, { c3d: false, useStyle: true });
   const src = st.source === "override" ? "ค่าเฉพาะชิ้นนี้" : st.source.startsWith("code:") ? `ByCode (${st.source.slice(5)})` : "ByCode (สีอัตโนมัติ)";

@@ -201,6 +201,7 @@ function render(){
   renderCodeHot();
   renderDrawOverlay();
   renderCmdOverlay();
+  renderAnnOverlay();
   renderSelBox();
   $("welcome").style.display = allItems().length ? "none" : "flex";
   renderLegend();
@@ -270,6 +271,7 @@ function renderSpec(it, r, grp, isSel){
     const t = el("text", {x: X(q) - 8, y: Y(q) - 10, class: "arr-lbl", "text-anchor": "end"}, grp);
     t.textContent = `${g.id} ×${n}`;
   }
+  renderAnnots(it, r, grp);                 // dimensions / slope labels (js/annot.js), on top of the points
   if (!isSel) return;
   for (const o of selList()){
     if (o.item !== it.id) continue;
@@ -491,8 +493,10 @@ svg.addEventListener("pointerdown", e => {
   }
   if (e.button !== 0) return;
   closeMenus();
+  if (ann.tool){ annClick(px, py); e.preventDefault(); return; }               // Annotate: Dimension / Slope label (js/annot.js)
   if (cmdPlacing()){ cmdClick(px, py); e.preventDefault(); return; }       // Move / Copy / Paste: จุดฐาน / ปลายทาง
   if (state.editing && draw.tool){ if (draw.typing) closeTyping(); drawClick(px, py); e.preventDefault(); return; }
+  if (kind === "dann" && annPointerDown(t, px, py)){ svg.setPointerCapture(e.pointerId); e.preventDefault(); return; }
   if (kind === "h"){
     const i = +t.dataset.i;
     state.sel = { type:"spt", i };
@@ -531,6 +535,7 @@ svg.addEventListener("pointerdown", e => {
 svg.addEventListener("pointermove", e => {
   const { px, py } = evtPos(e);
   renderXY(px, py);
+  if (!drag && ann.tool){ annMove(px, py); return; }
   if (!drag && cmdPlacing()){ cmdMove(px, py); return; }
   if (!drag && state.editing && draw.tool){ drawMove(px, py); return; }
   if (!drag){ hoverTip(e, px, py); return; }
@@ -541,6 +546,8 @@ svg.addEventListener("pointermove", e => {
     state.view.cx = drag.cx - (px - drag.px) / state.view.scale;
     state.view.cy = drag.cy + (py - drag.py) / (state.view.scale * state.view.ve);
     render();
+  } else if (drag.type === "ann"){
+    if (drag.moved) annDragMove(px, py);
   } else if (drag.type === "box"){
     if (!drag.moved) return;
     drag.qx = px; drag.qy = py;
@@ -599,6 +606,7 @@ function endDrag(e){
     if (Math.hypot(px - d.px, py - d.py) >= 4){ d.qx = px; d.qy = py; d.moved = true; }
   }
   tip.style.display = "none";
+  if (d.type === "ann") return annDragEnd(d);
   if (d.type === "item"){
     const it = itemById(d.id);
     if (d.moved && it){
@@ -626,6 +634,8 @@ svg.addEventListener("pointerleave", () => { if (!drag) $("bar-xy").textContent 
 svg.addEventListener("contextmenu", e => {
   e.preventDefault();
   const t = e.target, k = t.dataset.kind;
+  if (ann.tool) return annEnd();                              // Annotate: right-click = cancel
+  if (k === "dann"){ setSel({ type: "dann", item: t.dataset.id, id: t.dataset.sid }); return; }
   if (cmd.name) return cmdEnter();                            // Move / Copy: คลิกขวา = Enter (แบบ AutoCAD)
   if (state.editing && draw.tool) return finishChain();     // ตอนวาด: คลิกขวา = จบเส้น
   if (k === "h") return deleteSurfacePoint(+t.dataset.i);

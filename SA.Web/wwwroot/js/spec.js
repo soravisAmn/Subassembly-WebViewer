@@ -132,6 +132,8 @@ const Spec = (() => {
       if (!Object.keys(ov).length) delete d.overrides;
     } else if ("overrides" in d) delete d.overrides;
     for (const k of ["notes", "dims", "slopes"]) if (k in d && (!Array.isArray(d[k]) || !d[k].length)) delete d[k];
+    // seq (annotation id high-water mark) is kept once written, so a removed id is never handed out again; a bad one is dropped
+    if ("seq" in d && (!d.seq || typeof d.seq !== "object" || Array.isArray(d.seq) || !Object.keys(d.seq).length)) delete d.seq;
     if (!Object.keys(d).length) delete spec.display;
     return spec;
   }
@@ -1154,9 +1156,17 @@ const Spec = (() => {
       for (const g of spec.rotations) g.points = g.points.filter(p => !gone.points.has(p));
       spec.rotations = spec.rotations.filter(g => g.points.length && !gone.points.has(g.pivot));
     }
-    // display overrides of what is gone go too (notes / dimensions of removed points: round 10 M2)
-    if (spec.display && spec.display.overrides){
-      for (const id of [...gone.points, ...gone.links, ...gone.shapes]) delete spec.display.overrides[id];
+    // display overrides of what is gone go too, and the annotations bound to removed points / links (round 10 M2)
+    const d = spec.display;
+    if (d && typeof d === "object"){
+      if (d.overrides) for (const id of [...gone.points, ...gone.links, ...gone.shapes]) delete d.overrides[id];
+      const P = id => gone.points.has(id);
+      if (Array.isArray(d.dims)) d.dims = d.dims.filter(x => !P(x.a) && !P(x.b));
+      if (Array.isArray(d.slopes)) d.slopes = d.slopes.filter(x => !gone.links.has(x.link));
+      if (Array.isArray(d.notes)){
+        d.notes = d.notes.filter(x => !(x.at && P(x.at.point)));
+        for (const x of d.notes) if (x.leader && P(x.leader)) x.leader = null;
+      }
       cleanDisplay(spec);
     }
     return [...gone.points, ...gone.links, ...gone.shapes];

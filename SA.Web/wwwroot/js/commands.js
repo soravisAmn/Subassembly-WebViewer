@@ -25,7 +25,12 @@ const Commands = (() => {
     follow: "<path d=\"M2 12L8 15L14 10L20 16L26 13\" class=\"ground\"/><path d=\"M8 15L14 10L20 16\" class=\"goodline\"/>",
     extend: "<path d=\"M2 18L10 15L18 17L26 14\" class=\"ground\"/><path d=\"M6 3L13 10\"/><path d=\"M13 10L18 16\" stroke-dasharray=\"2 2\" class=\"goodline\"/><circle cx=\"13\" cy=\"10\" r=\"1.8\" class=\"hollow\"/><circle cx=\"18\" cy=\"16.5\" r=\"2\" class=\"good\"/>",
     clip: "<path d=\"M2 8L9 17L16 9L26 14\" class=\"ground\"/><path d=\"M2 12H26\" stroke-dasharray=\"2 2\"/><path d=\"M4 10.5L5.3 12H12.5L16 9L20 11L22.6 12\" class=\"goodline\"/>",
-    cutfill: "<path d=\"M14 2L24 11L14 20L4 11Z\"/><text x=\"14\" y=\"14\" text-anchor=\"middle\">?</text>"
+    cutfill: "<path d=\"M14 2L24 11L14 20L4 11Z\"/><text x=\"14\" y=\"14\" text-anchor=\"middle\">?</text>",
+    // Annotate tab (round 10 M2)
+    dimH: "<path d=\"M5 4V18M23 4V18M5 13H23\"/><path d=\"M5 13L9 11V15ZM23 13L19 11V15Z\" class=\"fill\"/>",
+    dimV: "<path d=\"M6 3H20M6 19H20M14 3V19\"/><path d=\"M14 3L12 7H16ZM14 19L12 15H16Z\" class=\"fill\"/>",
+    dimA: "<path d=\"M3 14L7 19M19 3L23 8M7 19L23 8\"/><path d=\"M7 19L9.3 15.6L11 18.1ZM23 8L20.7 11.4L19 8.9Z\" class=\"fill\"/>",
+    slope: "<path d=\"M3 18L25 6\"/><path d=\"M15 18.5H25V12\" stroke-dasharray=\"2 2\"/><circle cx=\"10\" cy=\"9\" r=\"2\" class=\"fill\"/>"
   };
   const IN_EDIT = "ออกจาก Edit ก่อน";
 
@@ -108,12 +113,28 @@ const Commands = (() => {
     { id: "view.style", label: "Style", icon: "palette", tip: "ใช้ style by code (.style.json + ค่าเฉพาะชิ้น) · ปิด = สีอัตโนมัติ (ดูแบบ Civil 3D = สีกลางเสมอ)",
       active: c => c.bar.style !== false,
       run: () => barClick("style") },
+    { id: "view.annot", label: "Annotations", svg: TOOL_SVG.dimH, tip: "แสดง / ซ่อน note, dimension, slope label (ซ่อนเฉยๆ ไม่ลบ · ดูแบบ Civil 3D = ซ่อนเสมอ)",
+      active: c => c.bar.annot !== false,
+      run: () => barClick("annot") },
     { id: "view.grid", label: "Grid", icon: "grid-dots", tip: "แสดงเส้น grid",
       active: c => !!c.bar.grid,
       run: () => barClick("grid") },
     ...[1, 2, 5].map(n => ({ id: "view.ve" + n, label: "VE " + n, tip: `ขยายแนวดิ่ง ${n} เท่า (Vertical Exaggeration)`,
       active: c => c.ve === n,
       run: () => setVe(n) })),
+
+    // ---------- Annotate (round 10 M2): always visible, works outside Edit; no single-letter keys ----------
+    ...[["h", "dimH", "Horizontal", "บอกระยะแนวราบ: คลิกจุด 1 → จุด 2 → วางเส้น (Tab = พิมพ์ระยะห่าง)"],
+        ["v", "dimV", "Vertical", "บอกระยะแนวดิ่ง: คลิกจุด 1 → จุด 2 → วางเส้น (Tab = พิมพ์ระยะห่าง)"],
+        ["aligned", "dimA", "Aligned", "บอกระยะตามแนวสองจุด: คลิกจุด 1 → จุด 2 → วางเส้น (Tab = พิมพ์ระยะห่าง)"],
+        ["slope", "slope", "Slope label", "ป้ายความลาดบน link เส้นตรง: คลิก link (1:x หรือ %)"]]
+      .map(([t, k, label, tip]) => ({ id: "annot." + k, label, svg: TOOL_SVG[k], tip,
+        active: c => c.annTool === t,
+        run: () => { if (ann.tool === t) annEnd(); else annStart(t); } })),
+    { id: "style.fromColours", label: "สร้าง style จากสีที่เห็นตอนนี้", icon: "palette", tip: "เขียนสีที่แต่ละ code แสดงอยู่ลงไฟล์ style (code ที่ตั้งสีไว้แล้วคงเดิม)",
+      run: () => { Dock.show("style"); styleFromColours(); } },
+    { id: "style.open", label: "Open style file…", icon: "folder-open", tip: "ให้โปรเจกต์ใช้ไฟล์ .style.json อื่น (เช่น template กลาง)",
+      run: () => openStyleFile() },
 
     // ---------- Output ----------
     { id: "build", label: "Build", icon: "hammer", tip: "Build DLL สำหรับ Civil 3D จากไฟล์ .cs ของโปรเจกต์",
@@ -216,11 +237,15 @@ const Commands = (() => {
     { id: "view", label: "View", panels: [
       { title: "Navigate", items: ["view.fit", ["view.zoomSel", "s"]] },
       { title: "Mode", items: ["view.design", "view.c3d"] },
-      { title: "Show", items: [["view.style", "s"], ["view.aux", "s"], ["view.codes", "s"], ["view.grid", "s"]] },
+      { title: "Show", items: [["view.style", "s"], ["view.annot", "s"], ["view.aux", "s"], ["view.codes", "s"], ["view.grid", "s"]] },
       { title: "VE", items: [["view.ve1", "s"], ["view.ve2", "s"], ["view.ve5", "s"]] },
       { title: "Scenario", items: [{ widget: "scenario" }] },
       { title: "Palettes", items: [["pal.tree", "s"], ["pal.scenarios", "s"], ["pal.props", "s"], ["pal.style", "s"], ["pal.code", "s"], ["pal.msg", "s"], ["pal.log", "s"],
                                    ["pal.pts", "s"], ["pal.logic", "s"], ["pal.ai", "s"], ["pal.reset", "s"]] }] },
+    { id: "annotate", label: "Annotate", panels: [
+      { title: "Dimension", items: ["annot.dimH", ["annot.dimV", "s"], ["annot.dimA", "s"]] },
+      { title: "Slope", items: ["annot.slope"] },
+      { title: "Style", items: [["pal.style", "s", "Style palette"], ["style.fromColours", "s"], ["style.open", "s"]] }] },
     { id: "output", label: "Output", panels: [
       { title: "Build", items: ["build"] },
       { title: "Code", items: ["code.edit", ["code.generated", "s"]] },
@@ -300,7 +325,7 @@ const Commands = (() => {
                { id: "bar.snap", text: "Grid snap (ดับเบิลคลิกปุ่ม = ตั้งระยะ ถึง 0.001 m)" },
                { id: "bar.track", text: "Object snap tracking (ชี้ค้างบน snap = จับจุด · ชี้ค้างซ้ำ = ปล่อย · Esc = ล้าง)" },
                ["ปุ่ม Aux", "แสดง / ซ่อน Auxiliary (ซ่อน = snap / คลุมเลือกไม่ได้)"], ["ปุ่ม ดูแบบ Civil 3D", "เห็นเฉพาะที่จะส่งออกไปจริง"]]],
-    ["พิมพ์ค่า", [["ตัวเลข", "dx / dy (มีจุดที่จับไว้ = คิดจากจุดนั้น)"], ["ระยะ<มุม ในช่อง dx", "เช่น 5<30 = ห่าง 5 ทำมุม 30° (ทวนเข็มจาก +x)"]]],
+    ["พิมพ์ค่า", [["ตัวเลข", "dx / dy (มีจุดที่จับไว้ = คิดจากจุดนั้น)"], ["Tab / ตัวเลข (ตอนวาง Dimension)", "พิมพ์ระยะห่างของเส้นบอกระยะจากกึ่งกลางสองจุด (m)"], ["ระยะ<มุม ในช่อง dx", "เช่น 5<30 = ห่าง 5 ทำมุม 30° (ทวนเข็มจาก +x)"]]],
     ["มุมมอง", [["ปุ่มกลางเมาส์ลาก / Space + ลาก", "Pan"], ["ล้อเมาส์", "Zoom"], ["Shift + ล้อเมาส์", "Zoom ทีละน้อย"],
                { id: "view.zoomSel", text: "Zoom ไปที่ของที่เลือก (ไม่มีที่เลือก = Fit)" }]],
     ["Ribbon / palette", [["ดับเบิลคลิกแท็บ ribbon", "ย่อ / ขยาย ribbon (ย่ออยู่: คลิกแท็บ = เปิดชั่วคราว)"],

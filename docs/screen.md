@@ -8,7 +8,7 @@ Round 9 shell (AutoCAD / Civil 3D style): title row + ribbon on top, dockable pa
 
 ```
 ┌ title row  [ไฟล์] [Save][Undo][Redo] │ project name *  folder ┐
-├ tab row    Home  View  Output  AI  │ Draw  Modify  Logic   (contextual, Edit only, teal) ┤
+├ tab row    Home  View  Annotate  Output  AI  │ Draw  Modify  Logic   (contextual, Edit only, teal) ┤
 ├ ribbon     panels of the active tab … [Finish: Save (.cs) | ออกจาก Edit] ┤
 ├ edit bar   "✎ กำลังแก้ X …" (only in Edit) ┤
 ├ palettes   Workspace / Scenarios │ workspace (centre) │ Properties / Code ; Messages · Log · Points · Logic · AI under the workspace ┤
@@ -20,7 +20,8 @@ Round 9 shell (AutoCAD / Civil 3D style): title row + ribbon on top, dockable pa
 | **ไฟล์** (application button) | Import .cs, new .cs from template, Open / Save / Save as / New / Pack project, recent projects, Build, Export / Import scenarios, ตั้งค่า… |
 | **Quick Access** | Save project, Undo, Redo |
 | **Home** | Project (New, Open, Save, Save as, Pack) · Import (Import .cs, New .cs) · Assembly (Edit, New assembly, Add subassembly, Mirror) · Surface (Add point `A`, Reset surface) · Clipboard (Cut, Copy, Paste, Delete, Select all) |
-| **View** | Navigate (Fit `F`, Zoom selection `Z`) · Mode (Design / Civil 3D preview) · Show (Style, Aux, Codes, Grid; Style = style by code on / off, see [display.md](display.md)) · VE 1 / 2 / 5 · Scenario dropdown (same as clicking in Scenarios) · Palettes (one toggle per palette + Reset layout) |
+| **View** | Navigate (Fit `F`, Zoom selection `Z`) · Mode (Design / Civil 3D preview) · Show (Style, Annotations, Aux, Codes, Grid; Style = style by code on / off, Annotations = dimensions / slope labels on / off, see [display.md](display.md)) · VE 1 / 2 / 5 · Scenario dropdown (same as clicking in Scenarios) · Palettes (one toggle per palette + Reset layout) |
+| **Annotate** (always visible, round 10) | Dimension (Horizontal, Vertical, Aligned) · Slope (Slope label) · Style (Style palette, สร้าง style จากสีที่เห็นตอนนี้, Open style file…). Works outside Edit; no single-letter keys. Notes come in M3. See [display.md](display.md) |
 | **Output** | Build · Code (Edit code `Ctrl+E`, View generated code) · Scenarios (Export, Import) |
 | **AI** | Proposals (opens the AI palette, count badge) · Claude (เชื่อม Claude = the steps of [connect-claude.md](connect-claude.md), connection status) |
 | **Draw** (Edit) | Draw (Point `P`, Link `L`, Shape `S`, Polygon, Regular Polygon, Arc) · Surface (Slope to Surface, Follow Surface, Extend to Surface, Clipped Surface Link, Daylight Cut/Fill) · Construct (Intersect `I`, Offset `O`, Fillet, Array, Auxiliary `X`) |
@@ -83,14 +84,14 @@ No shortcut works while typing in a field / the code panel / a dialog. The web's
 | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy / cut / paste |
 | `Delete` | Delete the selection |
 | `Ctrl+A` | Select all |
-| `Esc` | Cancel command / tool / selection |
+| `Esc` | Cancel command / tool / selection (also Dimension / Slope label) |
 | `Enter` / right-click | Finish selecting (Move / Copy) · finish Copy · finish line |
 | `P` / `L` / `S` | Point / Link / Shape tools (Edit mode) |
 | `C` (while drawing a Polygon) | Close a free Polygon (≥ 3 points); otherwise `C` = Copy |
 | `T` / `E` (while drawing an Arc) | Arc by 3 points / start-end-radius |
 | `I` / `O` | Intersect / Offset tools (Edit mode) |
 | `T` / `N` (Intersect waiting for a choice) | Trim / extend lines to the intersection · no trim (intersection point only) |
-| `Tab` | Next snap (when several) / type a value |
+| `Tab` | Next snap (when several) / type a value · placing a dimension line: type its distance |
 | digits / `-` / `.` | Type a value (while drawing) / a distance (while placing Move / Copy) · with an acquired point = measured from it · the dx field accepts `distance<angle` |
 | `F3` / `F8` / `F9` | OSNAP / Ortho / Grid snap |
 | `▾` / right-click the OSNAP button | Snap type menu |
@@ -119,7 +120,7 @@ No shortcut works while typing in a field / the code panel / a dialog. The web's
 - The notice bar on top shows what was undone, e.g. `Undo: ย้ายแกน Assembly 1`, `Undo: แก้ dx · pavement-assembly.cs · P6`, `Undo: ลบ 3 objects`.
 - **Not undone**: saving a .cs file / project (a file written to disk is not changed back; undo and Save again if needed), view (zoom / pan), selection, bottom-bar buttons, entering / leaving Edit · Undo history is lost on page refresh.
 - While typing in a field / the code panel, `Ctrl+Z` = that field's own undo (as before).
-- **`Delete`** (or the Delete button in Properties): Edit mode = delete the selected points / links / shapes · outside Edit = remove the selected subassembly (items attached to it float where they are) · a selected surface point = delete that point. If something depends on what is being deleted (links / shapes / referencing points), the list of what will also disappear is shown for confirmation first.
+- **`Delete`** (or the Delete button in Properties): Edit mode = delete the selected points / links / shapes · outside Edit = remove the selected subassembly (items attached to it float where they are) · a selected surface point = delete that point · a selected dimension / slope label = delete it (in or out of Edit). If something depends on what is being deleted (links / shapes / referencing points), the list of what will also disappear is shown for confirmation first.
 
 ## Differences from AutoCAD
 

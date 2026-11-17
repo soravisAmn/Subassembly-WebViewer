@@ -111,6 +111,16 @@ No Figma pass. Answers: all as proposed (Code palette tabbed with Properties, fl
 - M3: dockview palettes (`js/dock.js`, `lib/dockview`), layout per machine + Reset layout, View › Palettes, `panes.js` removed; MCP e2e passes (its helper fixed for the two-block `sa_status` of round 8).
 - M4: `?` table generated from the registry, narrow window (ribbon scrolls, palette minimum sizes), old layout state dropped, `docs/screen.md` rewritten, `SA.Tests/e2e/ui-smoke.js` (headless Chrome / Edge, Playwright not installed).
 
+## Round 10: web display (`prompt-10.md`, `prompt-10-design.md`)
+
+Answers: all as proposed (fixed screen line weights, 11 px screen-constant text, 2 decimals, Style palette behind Properties, annotation outside Edit = unsaved ●, slope `auto` at 5 %); Ctrl+S outside Edit saves the selected ● item; Civil 3D preview = neutral grey; stable hash-based automatic colours. Changed during M2-M3: a parameter rename renames an explicit dimension label; only dimensions can span two items; Civil 3D preview also hides point ids while editing.
+
+- M0: no server path dropped sa-spec `display` (`SpecLine` keeps every key); design doc with data shapes, resolution order, ops.
+- M1: style by code (`js/style.js`, `{name}.style.json`, `styleFile` in the project file, "ไฟล์หาย", Pack `ext\`), Style palette, Properties › Display overrides, View › Show › Style, neutral Civil 3D preview, `DrawingSpec.Display`.
+- M2: Annotate tab, dimensions h / v / aligned with the automatic parameter label, slope labels (`js/display.js`, `js/annot.js`), Logic ops, cascades, View › Show › Annotations.
+- M3: notes (leader, `{expression}`), cross-item dimensions in the project file (`projEdit`), point names, Side Left / branch ghosts, MCP proposals with annotations.
+- M4: `docs/display.md` completed, `tests-civil3d/round10-checklist.md` (display data must not change what Civil 3D draws).
+
 ## Long-term plan notes
 
 - A SAC-style flowchart is postponed to the public web phase and must edit **the same data** as style ก (`docs/prompts/prompt-flowchart-later.md`).

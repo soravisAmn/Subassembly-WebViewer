@@ -17,6 +17,12 @@ Test sets live in `tests-civil3d/`. Thai labels in quotes are the text shown in 
 - Needs a target surface where the corridor passes through both cut and fill; then follow `tests-civil3d/round4-checklist.md` (10 items + coordinates on flat ground).
 - The same spec is in `drawing-cases.json` (JS vs C# in 5 cases: cut, normal fill, high fill + no curb, Left, Layout).
 
+## Round 10: web display data (style, dimensions, notes)
+
+A drawn `.cs` with web display data (style overrides, dimensions, slope labels, notes) must build and draw in Civil 3D exactly as the same file without it: only the `// sa-spec:` line differs. Follow `tests-civil3d/round10-checklist.md` (a copy of `SA.Tests/fixtures/body_rock-pitching-web.cs` in a scratch folder, built before and after adding display data).
+
+**Results:** not run yet.
+
 ## Round 8: project folders, .atc palette
 
 Open SR03 from `D:\test_cad\SA-Projects\SR03\`, set Copy-to in "ไฟล์ → ตั้งค่า…", Build, then in Civil 3D drag the **whole palette** `SR03` once from the catalog; after a new build, right-click the palette → **Refresh Palette** (does it update without duplicates?). Also checks Thai text, read-only second tab, scenarios and Pack. Follow `tests-civil3d/round8-checklist.md` (results table at the end).

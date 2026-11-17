@@ -11,7 +11,7 @@ Round 9 shell (AutoCAD / Civil 3D style): title row + ribbon on top, dockable pa
 ├ tab row    Home  View  Annotate  Output  AI  │ Draw  Modify  Logic   (contextual, Edit only, teal) ┤
 ├ ribbon     panels of the active tab … [Finish: Save (.cs) | ออกจาก Edit] ┤
 ├ edit bar   "✎ กำลังแก้ X …" (only in Edit) ┤
-├ palettes   Workspace / Scenarios │ workspace (centre) │ Properties / Code ; Messages · Log · Points · Logic · AI under the workspace ┤
+├ palettes   Workspace / Scenarios │ workspace (centre) │ Properties / Style / Code ; Messages · Log · Points · Logic · AI under the workspace ┤
 └ status bar ┘
 ```
 
@@ -84,7 +84,7 @@ No shortcut works while typing in a field / the code panel / a dialog. The web's
 | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy / cut / paste |
 | `Delete` | Delete the selection |
 | `Ctrl+A` | Select all |
-| `Esc` | Cancel command / tool / selection (also Dimension / Slope label) |
+| `Esc` | Cancel command / tool / selection (also Note / Dimension / Slope label) |
 | `Enter` / right-click | Finish selecting (Move / Copy) · finish Copy · finish line |
 | `P` / `L` / `S` | Point / Link / Shape tools (Edit mode) |
 | `C` (while drawing a Polygon) | Close a free Polygon (≥ 3 points); otherwise `C` = Copy |
@@ -120,7 +120,7 @@ No shortcut works while typing in a field / the code panel / a dialog. The web's
 - The notice bar on top shows what was undone, e.g. `Undo: ย้ายแกน Assembly 1`, `Undo: แก้ dx · pavement-assembly.cs · P6`, `Undo: ลบ 3 objects`.
 - **Not undone**: saving a .cs file / project (a file written to disk is not changed back; undo and Save again if needed), view (zoom / pan), selection, bottom-bar buttons, entering / leaving Edit · Undo history is lost on page refresh.
 - While typing in a field / the code panel, `Ctrl+Z` = that field's own undo (as before).
-- **`Delete`** (or the Delete button in Properties): Edit mode = delete the selected points / links / shapes · outside Edit = remove the selected subassembly (items attached to it float where they are) · a selected surface point = delete that point · a selected dimension / slope label = delete it (in or out of Edit). If something depends on what is being deleted (links / shapes / referencing points), the list of what will also disappear is shown for confirmation first.
+- **`Delete`** (or the Delete button in Properties): Edit mode = delete the selected points / links / shapes · outside Edit = remove the selected subassembly (items attached to it float where they are) · a selected surface point = delete that point · a selected note / dimension / slope label (also a cross-item dimension) = delete it (in or out of Edit). If something depends on what is being deleted (links / shapes / referencing points), the list of what will also disappear is shown for confirmation first.
 
 ## Differences from AutoCAD
 

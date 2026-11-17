@@ -1,8 +1,17 @@
-# Web display: style by code (round 10)
+# Web display: style, dimensions, slope labels, notes (round 10)
 
 Everything here is **web only**. It never changes what Civil 3D draws: the generated C# body is byte-identical with or without display data, and a display-only change is not a parameter change for Build. In Civil 3D the user styles codes with a Code Set Style.
 
-Status: M1 (style by code, per-object override, View › Show › Style, Civil 3D preview colours), M2 (dimensions, slope labels, Annotate tab, View › Show › Annotations), M3 (notes, cross-item dimensions in the project file, point names, Side / branch display, MCP).
+Round 10 is complete (M0-M4): style by code and per-object overrides (M1), dimensions and slope labels with the Annotate tab (M2), notes, cross-item dimensions, point names, Side / branch display and MCP (M3). Design: `docs/prompts/prompt-10-design.md`. Civil 3D check: `tests-civil3d/round10-checklist.md`.
+
+Where each thing is stored:
+
+| What | Stored in |
+|---|---|
+| Style by code (colour, linetype, weight, fill, hatch, marker, text size) | `{name}.style.json`, pointed at by the project file (`styleFile`) |
+| Per-object override, dimensions, slope labels, notes of one subassembly | its `.cs` (sa-spec `display`) |
+| Dimensions between two subassemblies | the project file (`.assembly.json`, `display`) |
+| View › Show toggles | the project file / tab state with the other bottom-bar values (`bar`) |
 
 ## Style file `{name}.style.json`
 
@@ -23,7 +32,7 @@ Status: M1 (style by code, per-object override, View › Show › Style, Civil 3
 | shape | `fill`, `alpha` | `#rrggbb`, 0-1 | the workspace shape fill |
 | shape | `hatch` | `{ pattern, scale, angle, color }` or a pattern name | none |
 | point | `marker`, `color`, `size` | `square`, `circle`, `cross`, `triangle`, `none`; `#rrggbb`; px | square, 8 px |
-| — | `text.size` | px, screen-constant size of dimension / slope text | 11 |
+| — | `text.size` | px, screen-constant size of all annotation text (dimensions, slope labels, notes) | 11 |
 
 - Unknown keys are kept (later rounds add fields). A bad field is ignored with a warning in the status line; a broken file = automatic colours.
 - The project file points at the style file with `styleFile` (relative path, may be outside the folder, e.g. a shared `DPT-standard.style.json`). No key = `{project}.style.json` beside the project file if it exists, else automatic colours. The key is written after **Save style** or **Open style file…** (then Save project). **Save project as…** keeps the same style file: the key is rebased to the new folder, and a default `{project}.style.json` that exists gets a key pointing at it (unsaved style edits follow too).
@@ -58,7 +67,7 @@ For a selected drawn point / link / shape: **Style** = ByCode (default) or ก�
 
 Dockable palette `Style` (default: a tab behind Properties on the right; View › Palettes › Style). Header: style file name + `*`. Buttons: **Save style**, **สร้าง style จากสีที่เห็นตอนนี้** (writes the colour each code shows now; codes that already have a link colour keep it), **Open style file…**. One block per code in the project (codes only in the style file are greyed): Link colour / linetype / weight, Shape fill / alpha / hatch (+ hatch colour), Point colour / marker / size. Bold label = set in the style file; `↺` = back to automatic for that kind; `×` = remove the code from the style file. Unsaved edits survive a reload of the tab.
 
-## View › Show › Style and Civil 3D preview
+## View › Show and Civil 3D preview
 
 - **View › Show › Style** (`view.style`, stored with the bottom-bar values): off = automatic colours only (style file and overrides ignored, nothing deleted).
 - **Civil 3D preview** (`view.c3d`): one neutral light grey for every link, the default shape fill, plain square points, no hatch (as Civil 3D with no Code Set Style). It keeps the Style toggle's value for when Design mode returns.
@@ -80,13 +89,13 @@ Stored in the `.cs` (sa-spec `display.dims` / `display.slopes`), bound to **poin
 - **Dimension** (like DIMLINEAR / DIMALIGNED): click point 1 → point 2 → click to place the dimension line (a preview follows the mouse). Picks snap to **real points of drawn items only** (point ids); elsewhere the banner says "ต้องเลือกจุด". `Tab` or a digit while placing = type the distance (m, sign = side). `Esc` or right-click cancels. Two points in different items = a cross-item dimension in the project file (M3, below). In Edit only the edited item can be picked.
 - **Slope label**: click a straight link. Text is placed at the middle of the link, along it, upright.
 - Works **outside Edit**; the item becomes unsaved (●) until Save (.cs) (Ctrl+S outside Edit saves the selected item). Every change is one Undo step through the Logic API (`addDim`, `addSlopeLabel`, `updateAnnotation`, `removeAnnotation`, [logic-api.md](logic-api.md)).
-- **Value**: h = |dx|, v = |dy|, aligned = distance, from the evaluated points (current parameters / scenario / Side), `decimals` (default 2). **Label** `auto` adds `(Wcrest)` when one `delta` / `slopeLength` / `polar` definition joins the two points and the measured field is exactly that parameter name (`Wcrest/2` → no label); or a picked parameter; or none.
+- **Value**: h = |dx|, v = |dy|, aligned = distance, from the evaluated points (current parameters / scenario / Side), `decimals` (default 2). **Label** `auto` adds `(Wcrest)` when one `delta` / `slopeLength` / `polar` definition joins the two points and the measured field is exactly that parameter name (`Wcrest/2` → no label; no auto label when either point is in a rotate group); or a picked parameter; or none.
 - **Slope text**: `ratio` `1:2.00` (run / rise), `percent` `5.0%`, `auto` = ratio when steeper than 5 %, else percent. No sign (the direction is in the drawing).
 - **offset** = distance of the dimension line from the middle of the two points (h: up +, v: outward +, aligned: left of a → b), stored in the Side = Right frame; Side Left mirrors the position. Text is never mirrored: it is centred on the dimension line, rotated with aligned dimensions and kept upright (−90° … 90°; vertical text reads from the right, as in AutoCAD).
 - **Drawing**: extension lines (small gap at the point, a little past the line), arrows as one SVG `<marker>` (`orient="auto-start-reverse"`, checked in Chrome and Edge), screen-constant 1 px lines and `text.size` px text in the app colour `--ann` (app-owned, not from the style file). Drawn on top of the item's points.
 - **Hidden** when a point / link does not exist in the current branch / scenario (no value), when View › Show › Annotations is off, and in Civil 3D preview.
 - **Select**: click the text or the dimension line; double-click also opens Properties. **Properties › Display**: kind (h / v / aligned), ป้าย parameter (อัตโนมัติ / a parameter / ไม่แสดง), ทศนิยม 0–6, ระยะห่าง; slope: รูปแบบ (auto / 1:x / %); ลบ. **Drag** a dimension line = change `offset` only. **Delete** removes the selected annotation (in or out of Edit).
-- **Cascades**: deleting a point / link deletes the annotations bound to it; Undo restores both. Delete in Edit names them in its confirmation ("… และ annotation D1, G1 ไปด้วย"); `removeObjects`, `removeDecision`, `removeCase` and `removeCondition` with `how: remove` list them in `warnings` ("Annotations removed with them: …", shown in the banner). Removing a parameter sets a label that named it back to `auto`; renaming a parameter renames the label. Copy does not copy annotations.
+- **Cascades**: deleting a point / link deletes the annotations bound to it; Undo restores both. Delete in Edit names them in its confirmation ("… และ annotation D1, G1 ไปด้วย"); `removeObjects`, `removeDecision`, `removeCase` and `removeCondition` with `how: remove` list them in `warnings` ("Annotations removed with them: …", shown in the banner). Removing a parameter sets a label that named it back to `auto`; renaming a parameter renames the label (an explicit label is the user's choice, so it follows the name). Array / Loop with fewer sets removes annotations and overrides bound to members that no longer exist, with the same warning. Copy does not copy annotations.
 - **Ids** `D1…`, `G1…`: never reused within an item. `display.seq` (`{ "D": 2, "G": 1 }`) keeps the highest number handed out; it stays after the annotations are removed (a spec never annotated has no `display`). Undo restores it with the spec.
 - A hand-written `.cs` without an SA-DRAWING block cannot be saved, so it takes no annotations and no per-object override (the banner / Properties says why).
 
@@ -100,6 +109,7 @@ Stored in the `.cs` (sa-spec `display.dims` / `display.slopes`), bound to **poin
 - **`{expression}`** in the text is replaced by its current value, using the same `Expr` as number fields: `{Hcrest}`, `{Wcrest*2}`, `{P3.y}`, variables. Up to 3 decimals, trailing zeros dropped. An unknown name, a bad expression or a non-number shows `{?}`. Renaming a parameter (Properties table or Logic API, both through `Logic.editParam`) / variable / condition renames it inside `{…}`; removing a parameter leaves the text (it shows `{?}`).
 - **Position**: `dx` / `dy` from the anchor point, drawing units, Side = Right frame. Side Left mirrors the position; the text is never mirrored or rotated (it grows away from the point: left-aligned on the right side, right-aligned on the left side). The box takes one line; a line break from the Logic API / MCP gives several lines.
 - **Select / edit**: click the text (double-click also opens Properties). **Properties › Display**: ข้อความ, ผูกกับจุด (a leader that pointed at the old anchor moves with it), เส้นชี้ (none / the anchor / another point), dx, dy, ลบ, and the text as shown now. **Drag** the text = `dx` / `dy` only. Delete removes it.
+- Stored `leader` = a point id or `null`; the Logic API also takes `true` (= the anchor point) and `false` (= none).
 - Removing the anchor point removes the note (named in the warning / confirmation); removing the leader point only removes the leader.
 
 ## Cross-item dimensions (M3)
@@ -126,10 +136,33 @@ A dimension whose two points are in **different subassemblies** (e.g. total widt
 - Drawing order: … points → annotations (all items, then the project's) → labels (codes, point names) → selection (design §6), so an item drawn later never covers another item's annotations.
 - While an **AI proposal** is pending on an item, its annotations are hidden and annotation picks on it are refused (accepting replaces its spec).
 
+## Logic API
+
+Every change to display data goes through `js/logicops.js` (one Undo step each; the UI never edits the spec directly). Full reference: [logic-api.md](logic-api.md) (sections "Display").
+
+| Op | Does |
+|---|---|
+| `setOverride(id, { link \| shape \| point })` / `clearOverride(id, kind?)` | per-object style, field by field / back to ByCode |
+| `addDim({ kind, a, b, offset?, label?, decimals? })` | dimension h / v / aligned between two point ids |
+| `addSlopeLabel({ link, format? })` | slope label on a straight link |
+| `addNote({ text, at: { point, dx?, dy? }, leader? })` | note, optional leader, `{expression}` text |
+| `updateAnnotation(id, patch)` / `removeAnnotation(ids)` | change / delete any annotation |
+
+Cross-item dimensions use `addDim` / `updateAnnotation` / `removeAnnotation` on a project doc (`Display.projDoc`, `projEdit` in `js/annot.js`); `addNote` and `addSlopeLabel` refuse it. The style file is not a spec: it is edited by the Style palette only (`js/stylepal.js`), not through the Logic API.
+
 ## MCP
 
 The spec read by `sa_get_spec` carries `display`; `sa_describe` lists `annotations` (ids and what they are bound to). Proposals may add or change annotations with `addNote`, `addDim`, `addSlopeLabel`, `updateAnnotation`, `removeAnnotation` (still a proposal the user accepts); see `SA.Web/Mcp/sa_guide.md`. Cross-item dimensions (project file) and the style file are not editable through MCP.
 
 ## Code
 
-`js/style.js` (pure: resolve, parse / serialize, fromColours, setField, hatches, weights) · `js/display.js` (pure: dimension values, auto label, slope text, note text / geometry, show flags, project helpers `projDoc` / `projPoints` / `projPrune`, visibility) · `js/annot.js` (page: Annotate commands, drawing, drag, Properties of an annotation, `projEdit` / `projCascade`) · `js/stylepal.js` (page: style file state, rendering helpers, Style palette, Properties › Display) · `js/logicops.js` (`setOverride`, `clearOverride`, `addDim`, `addSlopeLabel`, `updateAnnotation`, `removeAnnotation`) · `SA.Web/Projects/ProjectApi.cs` (endpoints), `ProjectFile.cs` (`styleFile`, missing), `ProjectPack.cs` · tests `SA.Tests/js/style.test.js`, `SA.Tests/js/display.test.js`, `SA.Tests/js/notes.test.js`, `SA.Tests/DisplayTests.cs`, fixture `SA.Tests/fixtures/round10/demo.style.json`.
+`js/style.js` (pure: resolve, parse / serialize, fromColours, setField, hatches, weights) · `js/display.js` (pure: dimension values, auto label, slope text, note text / geometry, show flags, project helpers `projDoc` / `projPoints` / `projPrune`, visibility) · `js/annot.js` (page: Annotate commands, drawing, drag, Properties of an annotation, `projEdit` / `projCascade`) · `js/stylepal.js` (page: style file state, rendering helpers, Style palette, Properties › Display) · `js/logicops.js` (`setOverride`, `clearOverride`, `addDim`, `addSlopeLabel`, `addNote`, `updateAnnotation`, `removeAnnotation`) · `SA.Web/Projects/ProjectApi.cs` (endpoints), `ProjectFile.cs` (`styleFile`, missing), `ProjectPack.cs` · tests `SA.Tests/js/style.test.js`, `SA.Tests/js/display.test.js`, `SA.Tests/js/notes.test.js`, `SA.Tests/DisplayTests.cs`, fixture `SA.Tests/fixtures/round10/demo.style.json`.
+
+## Limits (not in this round)
+
+- No `.pat` import (only the built-in hatches above, drawn as approximations); no radius / angle dimensions.
+- No export of the code → style table to a Civil 3D Code Set Style, and no sync with it: in Civil 3D the user styles codes there.
+- No print / PDF / image export; no light theme.
+- The style file cannot be edited through MCP; cross-item dimensions are not editable through MCP.
+- Hand-written `.cs` (no sa-spec): style by code only, no overrides, notes or dimensions.
+- Icon generator: round 11; Browser palette: round 12.

@@ -32,6 +32,13 @@ public static class ProjectPack
 {
     static readonly StringComparer Cmp = StringComparer.OrdinalIgnoreCase;
 
+    // ext/ name for the i-th file with the same name: x-2.cs, x-2.style.json (the suffix goes before a double extension)
+    public static string ExtName(string baseName, int i)
+    {
+        var ext = baseName.EndsWith(ProjectFile.StyleExt, StringComparison.OrdinalIgnoreCase) ? ProjectFile.StyleExt : Path.GetExtension(baseName);
+        return $"ext/{baseName[..^ext.Length]}-{i}{ext}";
+    }
+
     public static string DefaultZipName(string projectName, DateTime now) => $"{projectName}_{now:yyyy-MM-dd}.zip";
 
     public static PackResult Pack(ProjectContext ctx, PackReq req, DateTime? now = null)
@@ -74,7 +81,7 @@ public static class ProjectPack
             if (ProjectPaths.IsInside(dir, full)) { AddWithPng(ProjectPaths.ToRelative(dir, full)!, full); continue; }
             var baseName = Path.GetFileName(full);
             var rel = "ext/" + baseName;
-            for (int i = 2; used.Contains(rel); i++) rel = $"ext/{Path.GetFileNameWithoutExtension(baseName)}-{i}{Path.GetExtension(baseName)}";
+            for (int i = 2; used.Contains(rel); i++) rel = ExtName(baseName, i);
             AddWithPng(rel, full);
             var packed = sep == '/' ? rel : rel.Replace('/', '\\');
             rewrite[f] = packed;
@@ -85,6 +92,25 @@ public static class ProjectPack
             if (ProjectFile.Str(it["file"]) is { } f && rewrite.TryGetValue(f, out var p)) it["file"] = p;
             if (it["draft"] is JsonObject) r.Drafts++;
         }
+        // the style file (round 10): inside the folder it keeps its path; outside it is copied to ext/ and the path is rewritten in the zip only
+        if (ProjectFile.Str(content["styleFile"]) is { } sf)
+        {
+            var sfull = ProjectPaths.Entry(dir, sf);
+            if (sfull == null || !File.Exists(sfull)) r.Missing.Add(sf);
+            else if (ProjectPaths.IsInside(dir, sfull)) Add(ProjectPaths.ToRelative(dir, sfull)!, sfull);
+            else
+            {
+                var baseName = Path.GetFileName(sfull);
+                var rel = "ext/" + baseName;
+                for (int i = 2; used.Contains(rel); i++) rel = ExtName(baseName, i);
+                Add(rel, sfull);
+                var packed = sep == '/' ? rel : rel.Replace('/', '\\');
+                content["styleFile"] = packed;
+                r.Outside.Add(new(sf, packed));
+            }
+        }
+        // no key: the default {project}.style.json beside the project file goes in too (same folder, path unchanged)
+        else if (File.Exists(Path.Combine(dir, name + ProjectFile.StyleExt))) Add(name + ProjectFile.StyleExt, Path.Combine(dir, name + ProjectFile.StyleExt));
         void AddDir(string sub)
         {
             var d = Path.Combine(dir, sub);

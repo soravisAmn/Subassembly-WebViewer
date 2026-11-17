@@ -11,7 +11,8 @@ using SA.Drawing;
 namespace SA.Projects;
 
 public record MigrationQuestion(string ItemId, string? ItemName, string File, string Reason);
-public record MissingFile(string ItemId, string? ItemName, string File);
+// Kind "cs" = a subassembly file of an item; "style" = the project's style file (ItemId = "", round 10)
+public record MissingFile(string ItemId, string? ItemName, string File, string Kind = "cs");
 
 public class ProjectOpenResult
 {
@@ -26,6 +27,7 @@ public static class ProjectFile
 {
     public const int Version = 3;
     public const string Ext = ".assembly.json";
+    public const string StyleExt = ".style.json";               // style by code (docs/display.md); the project file key "styleFile" points at it
 
     static readonly string[] KeepItem = { "id", "file", "name", "className", "params", "attach", "draft" };
     static readonly JsonSerializerOptions Indented = new() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
@@ -141,9 +143,15 @@ public static class ProjectFile
                 if (!KeepItem.Contains(key)) { it.Remove(key); r.Changed = true; }
             if (draft != null && !ReferenceEquals(draft, it["draft"])) { it["draft"] = draft; r.Changed = true; }
         }
+        // the style file is not an item: a missing one is listed (kind "style") but never blocks opening — automatic colours then
+        if (Str(v3["styleFile"]) is { } sf && (ProjectPaths.Entry(dir, sf) is not { } sp || !File.Exists(sp)))
+            r.Missing.Add(new("", null, sf, "style"));
         r.Content = v3;
         return r;
     }
+
+    // Absolute path of the style file the project points at (null = no key / not a relative path)
+    public static string? StylePath(JsonObject c, string dir) => Str(c["styleFile"]) is { } sf ? ProjectPaths.Entry(dir, sf) : null;
 
     static bool SameJson(string text, JsonNode node)
     {
@@ -155,6 +163,11 @@ public static class ProjectFile
     {
         if (!(c["version"] is JsonValue v && v.TryGetValue<int>(out var n) && n == Version)) return "ต้องเป็นไฟล์ project รุ่น 3";
         if (c["assemblies"] is not JsonArray) return "ไม่มี assemblies";
+        if (c.ContainsKey("styleFile") && c["styleFile"] != null)
+        {
+            if (Str(c["styleFile"]) is not { } sf || Path.IsPathRooted(sf) || sf.Contains(':') || !sf.EndsWith(StyleExt, StringComparison.OrdinalIgnoreCase))
+                return "styleFile ต้องเป็น path แบบ relative ของไฟล์ *.style.json";
+        }
         foreach (var it in Items(c))
         {
             if (Str(it["file"]) is { } f && (Path.IsPathRooted(f) || f.Contains(':'))) return $"path ของไฟล์ต้องเป็นแบบ relative: {f}";
@@ -175,7 +188,17 @@ public static class ProjectFile
             {
                 if (ProjectPaths.ToRelative(newDir, full, sep) is { } rel) map.Add((it, rel)); else bad.Add(f);
             }
-        if (bad.Count == 0) foreach (var (it, rel) in map) it["file"] = rel;
+        string? styleRel = null;
+        if (Str(c["styleFile"]) is { } sf && ProjectPaths.Entry(oldDir, sf) is { } sfull)
+        {
+            styleRel = ProjectPaths.ToRelative(newDir, sfull, sep);
+            if (styleRel == null) bad.Add(sf);
+        }
+        if (bad.Count == 0)
+        {
+            foreach (var (it, rel) in map) it["file"] = rel;
+            if (styleRel != null) c["styleFile"] = styleRel;
+        }
         return bad;
     }
 
@@ -184,6 +207,7 @@ public static class ProjectFile
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var f in Files(c)) if (ProjectPaths.Entry(dir, f) is { } full) set.Add(full);
+        if (StylePath(c, dir) is { } style) set.Add(style);
         return set;
     }
 }

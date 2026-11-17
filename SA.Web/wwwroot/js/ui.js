@@ -20,7 +20,7 @@ function setSel(sel){
 function renderAll(){
   aiCheckEdits();
   mapSelected();
-  render(); renderTree(); renderProps(); renderDock(); renderAi(); renderProblem(); applyMarkers(); renderEditBar(); renderDrawer(); renderProjName(); renderScenarios();
+  render(); renderTree(); renderProps(); renderStylePal(); renderDock(); renderAi(); renderProblem(); applyMarkers(); renderEditBar(); renderDrawer(); renderProjName(); renderScenarios();
   refreshGenerated();
   if (typeof updateRibbon === "function") updateRibbon();   // ribbon.js (loads later)
 }
@@ -745,6 +745,7 @@ function propsDrawn(box, it, s){
   const ag = Spec.arrayOf(sp, DRAWN_KIND[s.type], s.id);
   if (ag) propsArray(box, it, ag, s);
   for (const rg of rotationsFor(sp, s)) propsRotation(box, it, rg);
+  propsDisplay(box, it, s);                // round 10: ByCode / per-object override (js/stylepal.js)
   propsCode(box, it, s);
 }
 // กลุ่มหมุนที่เกี่ยวกับ object ที่เลือก: จุด = กลุ่มของมันเอง / กลุ่มที่ใช้มันเป็นจุดหมุน · link / shape = กลุ่มของจุดปลาย
@@ -1959,7 +1960,12 @@ $("bar").addEventListener("click", e => {
 // a status-bar toggle button; the View tab's Aux / Codes / Grid / Civil 3D preview call this too (one state, two buttons)
 function barClick(k){
   if (k === "codes"){ state.showCodes = !state.showCodes; render(); }
-  else { state.bar[k] = !state.bar[k]; if (k === "grid") render(); }
+  else {
+    // style: missing in an older stored bar = on
+    state.bar[k] = k === "style" ? state.bar.style === false : !state.bar[k];
+    if (k === "grid") render();
+    if (k === "style" || k === "c3d"){ render(); renderStylePal(); renderProps(true); }
+  }
   persist(); renderBar(); refreshSnap();
 }
 const OSNAP_HELP = { end: "จุดที่วาด / จุดของโค้ดเดิม / origin", mid: "กึ่งกลาง link", cen: "ศูนย์กลางของโค้ง / polygon ด้านเท่า",

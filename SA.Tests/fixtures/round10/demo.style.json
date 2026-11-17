@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "codes": {
+    "Top": { "link": { "color": "#d9a441", "linetype": "solid", "weight": 0.50 }, "note": "kept" },
+    "Rock": { "shape": { "fill": "#7a6a55", "alpha": 0.35, "hatch": { "pattern": "GRAVEL", "scale": 1.0, "angle": 0, "color": "#c8b89a" } } },
+    "Crest": { "point": { "marker": "triangle", "color": "#ff6b6b", "size": 7 } },
+    "Datum": { "link": { "color": "#888888" } }
+  },
+  "text": { "size": 11 },
+  "icon": { "keep": true }
+}

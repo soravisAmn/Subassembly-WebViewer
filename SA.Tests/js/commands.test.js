@@ -132,6 +132,8 @@ test("View toggles read the same state as the status bar", () => {
   eq(true, Commands.active("view.aux", ctx({ bar: { aux: true } })), "aux");
   eq(false, Commands.active("view.codes", ctx({ showCodes: false })), "codes off");
   eq(true, Commands.active("view.ve2", ctx({ ve: 2 })), "VE 2");
+  eq(true, Commands.active("view.style", ctx({ bar: {} })), "style on by default (older stored bar)");
+  eq(false, Commands.active("view.style", ctx({ bar: { style: false } })), "style off");
 });
 test("keyboard: contextual keys ignored outside Edit; X / B ignored during Move / Copy / Rotate", () => {
   eq(false, Commands.keyAllowed(Commands.forKey("p"), { editing: false }), "P outside Edit");

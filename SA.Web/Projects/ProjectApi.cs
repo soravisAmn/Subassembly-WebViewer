@@ -1,14 +1,16 @@
 // Round 8: endpoints for project folders (design section 2.2). Localhost only, like the rest of the server.
-//   GET  /api/fs/list?path=        drives + recent folders, or one folder: sub-folders + *.assembly.json / *.cs / *.png / *.zip
+//   GET  /api/fs/list?path=        drives + recent folders, or one folder: sub-folders + *.assembly.json / *.style.json / *.cs / *.png / *.zip
 //   POST /api/project/open         {path, tab}         -> handle (header X-SA-Project from then on), v3 content, migration report
 //   POST /api/project/new          {parent, name, tab} -> parent\name\name.assembly.json, opened
 //   POST /api/project/save         {content, path?}    -> writes v3 (path = Save as; item paths rebased to the new folder)
 //   POST /api/project/scratch      {tab}               -> handle for no project (scratch folder in the machine folder)
 //   POST /api/project/close                            -> releases the handle
-//   POST /api/project/relink       {path, sep?}        -> relative path of a file chosen for a missing one
+//   POST /api/project/relink       {path, sep?}        -> relative path of a .cs / .style.json chosen for a missing one (or Open style file…)
 //   POST /api/project/pack         {content, out, includeBuild, dryRun} -> zip of the project (ProjectPack.cs)
+//   GET  /api/style?file=          the project's style file text (round 10; *.style.json, same path rules as the .cs files)
+//   POST /api/style/save           {file, text}        -> writes *.style.json (valid JSON object; not in a read-only tab / without a project file)
 //   GET/POST /api/settings                             -> machine settings (%LOCALAPPDATA%\SA-Studio\settings.json)
-// Read only for the file system except: project files (*.assembly.json) and the new project folder. No delete.
+// Read only for the file system except: project files (*.assembly.json), style files (*.style.json) and the new project folder. No delete.
 
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -21,6 +23,7 @@ public record NewProjectReq(string? Parent, string? Name, string? Tab);
 public record SaveProjectReq(JsonObject? Content, string? Path);
 public record RelinkReq(string? Path, string? Sep);
 public record ScratchReq(string? Tab);
+public record StyleSaveReq(string? File, string? Text);
 
 public static class ProjectHttp
 {
@@ -32,7 +35,7 @@ public static class ProjectHttp
     public static IResult ReadOnly() => Results.Json(new { ok = false, readOnly = true, message = "โปรเจกต์นี้เปิดอยู่ในแท็บอื่น — แท็บนี้อ่านอย่างเดียว" }, statusCode: 409);
     static IResult Fail(string message) => Results.Ok(new { ok = false, message });
 
-    static readonly string[] ListExts = { ".assembly.json", ".cs", ".png", ".zip" };
+    static readonly string[] ListExts = { ".assembly.json", ".style.json", ".cs", ".png", ".zip" };
 
     static bool IsProjectPath(string? p) => !string.IsNullOrWhiteSpace(p) && Path.IsPathFullyQualified(p)
         && p.EndsWith(ProjectFile.Ext, StringComparison.OrdinalIgnoreCase) && Path.GetFileName(p).Length > ProjectFile.Ext.Length;
@@ -60,7 +63,7 @@ public static class ProjectHttp
                 .Select(d => new { name = d.Name, path = d.FullName, kind = "folder", size = (long?)null, mtime = (string?)null });
             var files = dir.EnumerateFiles().Where(f => (f.Attributes & hidden) == 0 && !f.Name.StartsWith('.') && ListExts.Any(e => f.Name.EndsWith(e, StringComparison.OrdinalIgnoreCase)))
                 .OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-                .Select(f => new { name = f.Name, path = f.FullName, kind = f.Name.EndsWith(ProjectFile.Ext, StringComparison.OrdinalIgnoreCase) ? "project" : f.Extension.TrimStart('.').ToLowerInvariant(),
+                .Select(f => new { name = f.Name, path = f.FullName, kind = f.Name.EndsWith(ProjectFile.Ext, StringComparison.OrdinalIgnoreCase) ? "project" : f.Name.EndsWith(ProjectFile.StyleExt, StringComparison.OrdinalIgnoreCase) ? "style" : f.Extension.TrimStart('.').ToLowerInvariant(),
                                    size = (long?)f.Length, mtime = (string?)f.LastWriteTimeUtc.Ticks.ToString() });
             return new { ok = true, path = dir.FullName, parent = dir.Parent?.FullName, start = startFolder, entries = folders.Concat(files).ToList() };
         }
@@ -146,14 +149,49 @@ public static class ProjectHttp
 
     public static object Relink(ProjectContext ctx, RelinkReq req)
     {
-        if (string.IsNullOrWhiteSpace(req.Path) || !Path.IsPathFullyQualified(req.Path) || !req.Path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-            return new { ok = false, message = "ต้องเป็น path เต็มของไฟล์ .cs" };
+        if (string.IsNullOrWhiteSpace(req.Path) || !Path.IsPathFullyQualified(req.Path)
+            || !(req.Path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || req.Path.EndsWith(ProjectFile.StyleExt, StringComparison.OrdinalIgnoreCase)))
+            return new { ok = false, message = "ต้องเป็น path เต็มของไฟล์ .cs หรือ .style.json" };
         var full = Path.GetFullPath(req.Path);
         if (!File.Exists(full)) return new { ok = false, message = $"ไม่พบไฟล์ {full}" };
         var rel = ProjectPaths.ToRelative(ctx.ProjectDir, full, req.Sep == "/" ? '/' : '\\');
         if (rel == null) return new { ok = false, message = "ไฟล์อยู่คนละไดรฟ์กับโปรเจกต์ — copy ไฟล์มาไว้ในโฟลเดอร์โปรเจกต์ก่อน" };
         ctx.Referenced.Add(full);
         return new { ok = true, file = rel, outside = !ProjectPaths.IsInside(ctx.ProjectDir, full) };
+    }
+
+    // GET /api/style?file=   the style file of the project (relative path; outside the folder only when the project references it)
+    public static object StyleRead(ProjectContext ctx, string? file)
+    {
+        var path = ctx.Resolve(file, ProjectFile.StyleExt);
+        if (path == null) return new { ok = false, message = $"ชื่อไฟล์ style ไม่ถูกต้อง (ต้องเป็น *.style.json): {file}" };
+        if (!File.Exists(path)) return new { ok = false, notFound = true, message = $"ไม่พบไฟล์ {file}" };
+        try { return new { ok = true, file, text = FileUtil.ReadShared(path) }; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return new { ok = false, message = $"อ่าน {Path.GetFileName(path)} ไม่ได้: {e.Message}" }; }
+    }
+
+    // POST /api/style/save   {file, text}: only *.style.json, only valid JSON objects, same path rules as reading
+    public static object StyleSave(ProjectContext ctx, StyleSaveReq req)
+    {
+        if (ctx.ReadOnly) return new { ok = false, readOnly = true, message = "โปรเจกต์นี้เปิดอยู่ในแท็บอื่น — แท็บนี้บันทึก style ไม่ได้" };
+        if (ctx.ProjectFile == null) return new { ok = false, message = "Save project ก่อน — ไฟล์ style อยู่คู่กับไฟล์โปรเจกต์" };
+        var path = ctx.Resolve(req.File, ProjectFile.StyleExt);
+        if (path == null) return new { ok = false, message = $"ตั้งชื่อไฟล์ style แบบนี้ไม่ได้ (ต้องเป็น *.style.json): {req.File}" };
+        if (string.IsNullOrWhiteSpace(req.Text)) return new { ok = false, message = "ไม่มีเนื้อหาให้บันทึก" };
+        if (req.Text.Length > 1_000_000) return new { ok = false, message = "ไฟล์ style ใหญ่เกินไป" };
+        try
+        {
+            using var doc = JsonDocument.Parse(req.Text);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object) return new { ok = false, message = "ไฟล์ style ต้องเป็น JSON object" };
+        }
+        catch (JsonException e) { return new { ok = false, message = $"ไฟล์ style ไม่ใช่ JSON: {e.Message}" }; }
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            FileUtil.WriteText(path, req.Text.ReplaceLineEndings("\r\n"));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return new { ok = false, message = $"บันทึก {Path.GetFileName(path)} ไม่ได้: {e.Message}" }; }
+        return new { ok = true, file = req.File };
     }
 
     static object SettingsView(MachineSettings s, string startFolder) => new
@@ -198,6 +236,19 @@ public static class ProjectHttp
             if (ctx == null) return Lost();
             if (ctx.ReadOnly) return ReadOnly();
             return Results.Ok(Relink(ctx, req));
+        });
+
+        app.MapGet("/api/style", (HttpContext h, string? file, ProjectRegistry reg) =>
+        {
+            var ctx = reg.Get(HandleOf(h));
+            return ctx == null ? Lost() : Results.Ok(StyleRead(ctx, file));
+        });
+        app.MapPost("/api/style/save", (HttpContext h, StyleSaveReq req, ProjectRegistry reg) =>
+        {
+            var ctx = reg.Get(HandleOf(h));
+            if (ctx == null) return Lost();
+            if (ctx.ReadOnly) return ReadOnly();
+            return Results.Ok(StyleSave(ctx, req));
         });
 
         app.MapGet("/api/settings", (BuildEngine eng) => SettingsView(MachineSettings.Load(eng.MachineDir), startFolder));

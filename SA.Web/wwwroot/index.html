@@ -40,6 +40,10 @@
   <div class="pal-bar"><span class="spacer"></span><button id="b-save" title="เก็บผิวดิน / ค่า parameter / โหมด ตอนนี้เป็นกรณีใหม่ในโปรเจกต์ (ส่วนที่วาดไม่ถูกเก็บ)">+ บันทึกกรณีนี้</button></div>
   <div class="pal-body"><div id="sc-list" class="sc-list"></div></div>
 </div>
+<div class="pal" data-pal="style">
+  <div class="pal-bar"><span class="sub" id="style-of"></span></div>
+  <div class="pal-body"><div id="style-pal" class="props st-pal"></div></div>
+</div>
 <div class="pal" data-pal="props">
   <div class="pal-bar"><span class="sub" id="props-of"></span></div>
   <div class="pal-body"><div id="props" class="props"></div></div>
@@ -91,6 +95,7 @@
 <span class="pal-tab" data-tab="tree">Workspace</span>
 <span class="pal-tab" data-tab="scenarios">Scenarios</span>
 <span class="pal-tab" data-tab="props">Properties</span>
+<span class="pal-tab" data-tab="style" title="Style by code: สี / เส้น / hatch / marker ของแต่ละ code (ไฟล์ .style.json)">Style</span>
 <span class="pal-tab" data-tab="code">Code</span>
 <span class="pal-tab" data-tab="msg">Messages <span class="badge" id="n-msg"></span><span class="badge i" id="n-info"></span></span>
 <span class="pal-tab" data-tab="log">Log <span class="badge" id="n-log"></span></span>
@@ -129,6 +134,7 @@
 
 <script src="lib/dockview/dockview-core.min.js"></script>
 <script src="js/view.js"></script>
+<script src="js/style.js"></script>
 <script src="js/core.js"></script>
 <script src="js/expr.js"></script>
 <script src="js/spec.js"></script>
@@ -140,6 +146,7 @@
 <script src="js/select.js"></script>
 <script src="js/ops.js"></script>
 <script src="js/workspace.js"></script>
+<script src="js/stylepal.js"></script>
 <script src="js/draw.js"></script>
 <script src="js/history.js"></script>
 <script src="js/cmd.js"></script>

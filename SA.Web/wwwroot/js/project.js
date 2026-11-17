@@ -24,10 +24,12 @@ const ProjectV3 = (() => {
   }
   // whole project file (ws = WS(), st = state for ground / bar values)
   function content(ws, st, dirty){
-    return { version: VERSION, originElevation: st.originElevation, surface: st.surface, surfaceOn: st.surfaceOn, layout: st.layout,
-             extendEnds: st.extendEnds, bar: st.bar,
-             assemblies: ws.assemblies.map(a => ({ id: a.id, name: a.name, baseline: a.baseline, items: a.items.map(it => itemOut(it, dirty)) })),
-             scenarios: ws.scenarios || [] };
+    const c = { version: VERSION, originElevation: st.originElevation, surface: st.surface, surfaceOn: st.surfaceOn, layout: st.layout,
+                extendEnds: st.extendEnds, bar: st.bar,
+                assemblies: ws.assemblies.map(a => ({ id: a.id, name: a.name, baseline: a.baseline, items: a.items.map(it => itemOut(it, dirty)) })),
+                scenarios: ws.scenarios || [] };
+    if (ws.styleFile) c.styleFile = ws.styleFile;           // round 10: written only after the user saved / opened a style file
+    return c;
   }
   // v3 item -> workspace item. draftSpec is applied after the .cs spec is read (applyFileSpec)
   function itemIn(o){
@@ -96,6 +98,7 @@ function renderProjName(){
 // reload of this tab = keep its workspace, re-attach its project · fresh tab = the last project (setting "เปิดโปรเจกต์ล่าสุด"),
 // keeping the backed-up workspace when it is that project (unsaved work after closing the browser) · else no project (scratch)
 Proj.start = function(){
+  const styleCalls = StyleNow.calls;
   this.opening = (async () => {
     this.settings = await getJson("/api/settings");
     const ws = WS();
@@ -132,7 +135,7 @@ Proj.start = function(){
       setStatus("warn", r.message);
     }
     await toScratch(!!ws.path);
-  })().finally(() => { this.opening = null; renderAll(); });
+  })().finally(() => { this.opening = null; renderAll(); if (StyleNow.calls === styleCalls) loadStyle(); });   // once: loadOpened may have loaded it
   return this.opening;
 };
 // no project: a scratch folder. clear = the stored workspace belonged to a project that is not open
@@ -142,6 +145,7 @@ async function toScratch(clear){
   if (clear){
     WS().assemblies = [newAssembly("Assembly 1")];
     WS().name = null; WS().path = null; WS().dir = null; WS().scenarios = []; WS().savedHash = null; resetScenarioState();
+    WS().styleFile = null; WS().styleDraft = null;
     asmRes = {}; state.editing = null; persist();
   }
 }
@@ -172,9 +176,11 @@ async function loadOpened(r, quiet){
   WS().scenarios = c.scenarios || [];
   resetScenarioState();
   loadProjContent({ ...c, assemblies: asmList }, ProjectV3.baseName(r.path));
+  WS().styleFile = c.styleFile || null; WS().styleDraft = null;
   setProjectPath(r);
   WS().savedHash = r.changed ? null : projHashNow();
   persist(); renderAll();
+  loadStyle();
   if (!quiet) setStatus("ok", "เปิด " + projBaseName() + (r.fromVersion < ProjectV3.VERSION ? ` (แปลงจากรุ่น ${r.fromVersion} — Save project เพื่อเขียนเป็นรุ่น 3)` : ""));
   if (r.questions && r.questions.length) await askMigration(r.questions);
   if (r.missing && r.missing.length) showMissing(r.missing);
@@ -193,16 +199,27 @@ async function openProject(){
 async function saveProject(asPath){
   if (Proj.readOnly){ alert("โปรเจกต์นี้เปิดอยู่ในแท็บอื่น — แท็บนี้บันทึกไม่ได้ (ใช้ Save project as… เพื่อบันทึกเป็นไฟล์ใหม่)"); if (!asPath) return; }
   if (!WS().path && !asPath) return saveProjectAs();
+  // Save as: a default {project}.style.json that exists on disk (no key) keeps being used -> write the key so the server rebases it
+  const keyBefore = WS().styleFile;
+  if (asPath && !WS().styleFile && StyleNow.file && StyleNow.saved != null) WS().styleFile = StyleNow.file;
   const r = await fetch("/api/project/save", { method: "POST", headers: { "Content-Type": "application/json" },
                          body: JSON.stringify({ content: projContentV3(), path: asPath || null }) }).then(x => x.json()).catch(() => ({ ok: false, message: NO_SERVER }));
-  if (!r.ok){ if (r.needPath) return saveProjectAs(); alert(r.message || "บันทึกไม่สำเร็จ"); return; }
+  if (!r.ok){ WS().styleFile = keyBefore; if (r.needPath) return saveProjectAs(); alert(r.message || "บันทึกไม่สำเร็จ"); return; }
   if (asPath){
     // paths of the items were rewritten relative to the new folder (same files on disk)
     for (const a of r.content.assemblies) for (const o of a.items){ const it = itemById(o.id); if (it && o.file) it.file = o.file; }
+    if (WS().styleFile) WS().styleFile = r.content.styleFile || null;
     Proj.readOnly = false; WS().readOnly = false;
   }
   setProjectPath(r);
   WS().savedHash = projHashNow();
+  if (asPath){
+    // the style file path is relative to the project file: follow the rebased key (or the new default name), draft included
+    const sf = WS().styleFile || styleFileName();
+    StyleNow.file = sf;
+    if (WS().styleDraft) WS().styleDraft.file = sf;
+    else loadStyle();
+  }
   persist(); await poll(); renderAll(); refreshSettings();
   setStatus("ok", "บันทึก " + projBaseName() + " แล้ว");
 }
@@ -286,7 +303,7 @@ function fileDialog(o){
       const top = div("fd-top", null, b);
       const up = btn("↑", () => { if (cur) go(parentOf(cur)); }, false, "โฟลเดอร์แม่");
       const pathIn = document.createElement("input"); pathIn.type = "text"; pathIn.className = "mono fd-pathin"; pathIn.placeholder = "พิมพ์ / วาง path แล้วกด Enter";
-      pathIn.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); const v = pathIn.value.trim(); if (/\.(assembly\.json|cs)$/i.test(v) && o.mode === "open") finish(v); else go(v || null); } };
+      pathIn.onkeydown = e => { if (e.key === "Enter"){ e.preventDefault(); const v = pathIn.value.trim(); if (/\.(assembly\.json|style\.json|cs)$/i.test(v) && o.mode === "open") finish(v); else go(v || null); } };
       top.append(up, pathIn);
       const wrap = div("fd", null, b);
       const side = div("fd-side", null, wrap), list = div("flist fd-list", null, wrap);
@@ -398,6 +415,7 @@ function showMissing(list){
   openDialog("ไฟล์หาย", b => {
     div("hint", "ไฟล์ที่โปรเจกต์อ้างถึงหาไม่เจอ — หาไฟล์ใหม่ (path จะเก็บแบบ relative จากไฟล์โปรเจกต์) หรือเปิดต่อไปก่อนก็ได้", b);
     for (const m of list){
+      if (m.kind === "style"){ missingStyleRow(b, m, list); continue; }
       const it = itemById(m.itemId);
       const r = div("mig-row", "", b);
       const what = it && it.spec ? "มีส่วนที่วาดในไฟล์โปรเจกต์ (draft) — วาดต่อได้ แล้ว Save (.cs) เพื่อสร้างไฟล์ใหม่" : "แสดงเป็นกรอบว่างจนกว่าจะหาไฟล์เจอ";
@@ -428,6 +446,20 @@ function showMissing(list){
     }
     div("btns", null, b).append(btn("เปิดต่อ", () => { closeDialog(); maybeImportOldScenarios(); }));
   });
+}
+
+// the project's style file is missing (round 10): automatic colours until it is found; never blocks opening
+function missingStyleRow(b, m, list){
+  const r = div("mig-row", "", b);
+  const info = div("", `<b>Style</b> <span class="mono">${esc(m.file)}</span><br><small>ใช้สีอัตโนมัติจนกว่าจะหาไฟล์เจอ</small>`, r);
+  info.style.flex = "1";
+  r.appendChild(btn("หาไฟล์ใหม่…", async () => {
+    const p = await fileDialog({ title: "หาไฟล์ใหม่: " + m.file, mode: "open", exts: [".style.json"], start: WS().dir });
+    if (!p || !/\.style\.json$/i.test(p)){ showMissing(list); return; }
+    const done = await useStyleFile(p);
+    const rest = done ? list.filter(k => k !== m) : list;
+    if (rest.length) showMissing(rest); else closeDialog();
+  }));
 }
 
 // ---------- Pack project (M4) ----------

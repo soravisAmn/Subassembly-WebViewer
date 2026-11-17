@@ -75,6 +75,7 @@ function render(){
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.innerHTML = "";
   svg.classList.toggle("add", addMode);
+  hatchReset();                         // hatch <pattern>s of this frame (js/stylepal.js)
 
   // grid: แนวราบวัดจากแกนของ assembly ที่เลือก, แนวดิ่งเป็นระดับจริง
   const g = el("g", {}, svg);
@@ -124,15 +125,23 @@ function render(){
     // โค้ดที่สร้างจาก spec: รูปที่เห็นมาจาก JS (เร็วกว่า) ผล C# ใช้ตรวจ/เกาะจุดเท่านั้น จึงไม่วาดซ้ำ
     if (!res || rr.generated) continue;
     res.shapes.forEach((sh, i) => {
-      if (sh.polygon) el("polygon", {points: sh.polygon.map(k => sx(P[k].x)+","+sy(P[k].y)).join(" "), class:"shape item-hit", "data-kind":"shape", "data-id":it.id, "data-i":i}, grp);
+      if (!sh.polygon) return;
+      // hand-written / generated: style by code only (no per-object override, round 10 decision 6)
+      const pts = sh.polygon.map(k => sx(P[k].x)+","+sy(P[k].y)).join(" "), st = resolveStyle("shape", sh.codes, null);
+      el("polygon", {points: pts, class:"shape item-hit", ...shapeLook(st), "data-kind":"shape", "data-id":it.id, "data-i":i}, grp);
+      const hf = st.hatch ? hatchFill(st.hatch) : null;
+      if (hf) el("polygon", {points: pts, class:"shape", style: `fill:${hf}`}, grp);
     });
     res.links.forEach((l, i) => {
       const d = ptsPath(P, l.pts);
-      el("path", {d, class:"link", stroke: colorFor(primaryCode(l.codes))}, grp);
+      el("path", {d, class:"link", ...linkLook(resolveStyle("link", l.codes, null))}, grp);
       el("path", {d, class:"link-hit", "data-kind":"link", "data-id":it.id, "data-i":i}, grp);
     });
     P.forEach((p, i) => {
-      el("circle", {cx:sx(p.x), cy:sy(p.y), r:3.6, class:"pt" + (isSel && i === hoverPt ? " hl" : ""), "data-kind":"pt", "data-id":it.id, "data-i":i}, grp);
+      const pst = resolveStyle("point", p.codes, null), pcls = "pt" + (isSel && i === hoverPt ? " hl" : "");
+      // a point code with a marker in the style file: that marker; otherwise the small circle as before
+      if (pst.source.startsWith("code:")) pointMarker(pst, sx(p.x), sy(p.y), pcls, {"data-kind":"pt", "data-id":it.id, "data-i":i}, grp);
+      else el("circle", {cx:sx(p.x), cy:sy(p.y), r:3.6, class:pcls, "data-kind":"pt", "data-id":it.id, "data-i":i}, grp);
       if (state.showCodes && isSel && p.codes.length)
         el("text", {x:sx(p.x)+7, y:sy(p.y)-7, class:"pt-lbl"}, grp).textContent = p.codes.join(", ");
     });
@@ -208,8 +217,12 @@ function renderSpec(it, r, grp, isSel){
   const offBr = (kind, id) => { const q = r[kind][id]; return q && q.err && q.off ? q.off : null; };
   for (const sh of spec.shapes){
     const q = geo("shapes", sh.id), ob = offBr("shapes", sh.id);
-    if (q && q.poly) el("polygon", {points: q.poly.map(p => X(p) + "," + Y(p)).join(" "), class:"shape item-hit dshape" + (ob ? " ghost" : ""),
-                                    ...(ob ? { style: `--br:${branchColor(spec, ob)}` } : {}), "data-kind":"dshape", "data-id":it.id, "data-sid":sh.id}, grp);
+    if (!q || !q.poly) continue;
+    const pts = q.poly.map(p => X(p) + "," + Y(p)).join(" "), st = ob ? null : resolveStyle("shape", sh.codes, ovrOf(spec, sh.id));
+    el("polygon", {points: pts, class:"shape item-hit dshape" + (ob ? " ghost" : ""),
+                   ...(ob ? { style: `--br:${branchColor(spec, ob)}` } : shapeLook(st)), "data-kind":"dshape", "data-id":it.id, "data-sid":sh.id}, grp);
+    const hf = st && st.hatch ? hatchFill(st.hatch) : null;
+    if (hf) el("polygon", {points: pts, class:"shape", style: `fill:${hf}`}, grp);          // hatch on top of the fill; the click goes to the polygon below
   }
   for (const l of spec.links){
     let q = r.links[l.id];
@@ -226,8 +239,9 @@ function renderSpec(it, r, grp, isSel){
     }
     const aux = Spec.isAux(l);
     const d = q.path.map((p, j) => (j ? "L" : "M") + X(p) + " " + Y(p)).join(" ");
+    const lst = resolveStyle("link", l.codes, ovrOf(spec, l.id));
     el("path", {d, class:"link dlink" + (l.type === "followSurface" || l.type === "followClipped" ? " follow" : "") + (aux ? " aux" : "") + (q.bad ? " bad" : "") + (q.ghost ? " ghost" : ""),
-                stroke: q.ghost ? branchColor(spec, q.ghost) : colorFor(primaryCode(l.codes))}, grp);
+                ...(q.ghost ? { stroke: branchColor(spec, q.ghost) } : aux || q.bad ? { stroke: lst.color } : linkLook(lst))}, grp);
     el("path", {d, class:"link-hit", "data-kind":"dlink", "data-id":it.id, "data-sid":l.id}, grp);
     // ป้าย: กึ่งกลางเส้นตรง / จุดกลางของโค้ง · ไม่เกิดตอนนี้ = ต่อท้ายด้วยชื่อกิ่ง
     if (editingThis){
@@ -245,7 +259,7 @@ function renderSpec(it, r, grp, isSel){
     if (Spec.isAux(p)){
       el("path", {d:`M${X(q)-4} ${Y(q)-4}L${X(q)+4} ${Y(q)+4}M${X(q)+4} ${Y(q)-4}L${X(q)-4} ${Y(q)+4}`, class:"dcons" + (ob ? " ghost" : ""), ...gs}, grp);
       el("rect", {x:X(q)-5, y:Y(q)-5, width:10, height:10, class:"dcons-hit", "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
-    } else el("rect", {x:X(q)-4, y:Y(q)-4, width:8, height:8, class:"dpt" + (ob ? " ghost" : ""), ...gs, "data-kind":"dpt", "data-id":it.id, "data-sid":p.id}, grp);
+    } else pointMarker(ob ? null : resolveStyle("point", p.codes, ovrOf(spec, p.id)), X(q), Y(q), "dpt" + (ob ? " ghost" : ""), { ...gs, "data-kind":"dpt", "data-id":it.id, "data-sid":p.id }, grp);
     const lbl = [editingThis ? p.id : "", state.showCodes && (isSel || editingThis) ? p.codes.join(", ") : ""].filter(Boolean).join(" ");
     if (lbl) el("text", {x:X(q)+7, y:Y(q)+14, class:"pt-lbl d-lbl" + (Spec.isAux(p) ? " cons" : "") + (ob ? " ghost-lbl" : "")}, grp).textContent = lbl;
   }
@@ -321,7 +335,7 @@ function renderLegend(){
   }
   for (const c of codes){
     const s = document.createElement("span");
-    s.innerHTML = `<i style="background:${colorFor(c)}"></i>${esc(c || "(no code)")}`;
+    s.innerHTML = `<i style="background:${resolveStyle("link", c ? [c] : [], null).color}"></i>${esc(c || "(no code)")}`;
     lg.appendChild(s);
   }
 }

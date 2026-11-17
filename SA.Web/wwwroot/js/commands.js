@@ -105,6 +105,9 @@ const Commands = (() => {
     { id: "view.codes", label: "Codes", icon: "tag", tip: "แสดง point code บนรูป",
       active: c => !!c.showCodes,
       run: () => barClick("codes") },
+    { id: "view.style", label: "Style", icon: "palette", tip: "ใช้ style by code (.style.json + ค่าเฉพาะชิ้น) · ปิด = สีอัตโนมัติ (ดูแบบ Civil 3D = สีกลางเสมอ)",
+      active: c => c.bar.style !== false,
+      run: () => barClick("style") },
     { id: "view.grid", label: "Grid", icon: "grid-dots", tip: "แสดงเส้น grid",
       active: c => !!c.bar.grid,
       run: () => barClick("grid") },
@@ -130,7 +133,7 @@ const Commands = (() => {
     { id: "ai.open", label: "Proposals", icon: "sparkles", tip: "เปิดแท็บ AI: ข้อเสนอจาก Claude (รับ / ปฏิเสธ)",
       run: () => { aiFocus(); renderDock(); renderAi(); } },
     // View › Palettes: one toggle per palette (js/dock.js) + Reset layout
-    ...[["tree", "Workspace"], ["scenarios", "Scenarios"], ["props", "Properties"], ["code", "Code"], ["msg", "Messages"], ["log", "Log"],
+    ...[["tree", "Workspace"], ["scenarios", "Scenarios"], ["props", "Properties"], ["style", "Style"], ["code", "Code"], ["msg", "Messages"], ["log", "Log"],
         ["pts", "Points"], ["logic", "Logic"], ["ai", "AI"]].map(([p, label]) => ({ id: "pal." + p, label, tip: `เปิด / ปิด palette ${label}`,
       active: c => (c.pals || []).includes(p),
       run: () => Dock.toggle(p) })),
@@ -213,10 +216,10 @@ const Commands = (() => {
     { id: "view", label: "View", panels: [
       { title: "Navigate", items: ["view.fit", ["view.zoomSel", "s"]] },
       { title: "Mode", items: ["view.design", "view.c3d"] },
-      { title: "Show", items: [["view.aux", "s"], ["view.codes", "s"], ["view.grid", "s"]] },
+      { title: "Show", items: [["view.style", "s"], ["view.aux", "s"], ["view.codes", "s"], ["view.grid", "s"]] },
       { title: "VE", items: [["view.ve1", "s"], ["view.ve2", "s"], ["view.ve5", "s"]] },
       { title: "Scenario", items: [{ widget: "scenario" }] },
-      { title: "Palettes", items: [["pal.tree", "s"], ["pal.scenarios", "s"], ["pal.props", "s"], ["pal.code", "s"], ["pal.msg", "s"], ["pal.log", "s"],
+      { title: "Palettes", items: [["pal.tree", "s"], ["pal.scenarios", "s"], ["pal.props", "s"], ["pal.style", "s"], ["pal.code", "s"], ["pal.msg", "s"], ["pal.log", "s"],
                                    ["pal.pts", "s"], ["pal.logic", "s"], ["pal.ai", "s"], ["pal.reset", "s"]] }] },
     { id: "output", label: "Output", panels: [
       { title: "Build", items: ["build"] },
@@ -274,7 +277,7 @@ const Commands = (() => {
   // ---------- ? / F1 shortcut table: command rows take their key from the command, Thai text as before round 9 ----------
   // row: "id" | { ids: [...], text } (keys joined with " / ") | { id, text } | [key, text] (mouse / typing, not a command)
   const HELP = [
-    ["ทั่วไป", [{ id: "undo", text: "Undo" }, { id: "redo", text: "Redo" }, { id: "finish.save", text: "Save (.cs) ตอน Edit / บันทึกแถบโค้ด" },
+    ["ทั่วไป", [{ id: "undo", text: "Undo" }, { id: "redo", text: "Redo" }, { id: "finish.save", text: "Save (.cs) ตอน Edit · นอก Edit = ตัวที่เลือก (ถ้ามี ●) · บันทึกแถบโค้ด" },
                 { id: "code.edit", text: "แถบแก้โค้ด" }, { id: "view.fit", text: "Fit (ดูทั้งหมด)" }, { id: "surf.add", text: "Add point บนเส้น surface" },
                 { id: "help.keys", text: "ตารางนี้" }, ["Esc", "ยกเลิกคำสั่ง / เครื่องมือ / การเลือก"]]],
     ["เลือก", [["คลิก", "เพิ่มเข้าชุดที่เลือก"], ["ลากซ้าย → ขวา", "Window (อยู่ในกรอบทั้งตัว)"], ["ลากขวา → ซ้าย", "Crossing (แตะกรอบ)"],

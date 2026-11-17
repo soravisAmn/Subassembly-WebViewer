@@ -93,6 +93,13 @@ Logic.applyBatch(spec, [
 | `moveObjects(ids, { dx, dy, convert? })` | Move by dx, dy (right +, up +, Side = Right frame), keeping point meanings. | Blocked points without convert |
 | `copyObjects(ids, { dx, dy, convert? })` | Copy, then move the copy. Returns the new points, links, shapes, map. | Blocked points without convert |
 
+### Display
+
+| Function | Does | Possible errors |
+|---|---|---|
+| `setOverride(id, { link \| shape \| point: { field: value } })` | Web-only style of one point / link / shape, merged field by field over the style of its code (like an object not using ByLayer). link: color, linetype solid \| dashed \| center \| hidden, weight mm. shape: fill, alpha, hatch (SOLID, ANSI31, ANSI37, AR-CONC, EARTH, GRAVEL, NONE or { pattern, scale, angle, color }). point: marker square \| circle \| cross \| triangle \| none, color, size. null removes one field. Never reaches the generated C#. | Missing id, field of another kind, bad value |
+| `clearOverride(id, kind?)` | Back to ByCode: removes the override of the object (or only its kind). | Missing id, wrong kind |
+
 ### Tools
 
 | Function | Does | Possible errors |
@@ -145,6 +152,14 @@ Logic.addCondition(spec, { name: "HighFill", expr: "P2.y - ground(P2) > 3", pare
 const w = Logic.addDecision(spec, { kind: "switch", test: "ProtectionType", cases: [{ value: 1, label: "หินเรียง" }, { value: 2, label: "คอนกรีต" }] });
 Logic.addCase(spec, w.decision, { value: 1 });   // { ok: false, error: "ค่า case 1 ซ้ำ" }; the spec does not change
 ```
+
+## Display overrides (round 10)
+
+`setOverride(spec, id, { link | shape | point: { field: value } })` stores a per-object style in `spec.display.overrides[id]` (like an object that does not use ByLayer). Fields merge one at a time over the style of the object's code (`js/style.js`, `docs/display.md`); `null` removes one field; a hatch object merges into the existing hatch. `clearOverride(spec, id, kind?)` goes back to ByCode. Values are checked by `Style.checkField` (colours `#rrggbb`, linetype `solid | dashed | center | hidden`, weight in mm, alpha 0-1, hatch `SOLID | ANSI31 | ANSI37 | AR-CONC | EARTH | GRAVEL | NONE`, marker `square | circle | cross | triangle | none`). Errors are in English.
+
+- `display` is web only: the generator ignores it, and it is written only when it holds something (`Spec.cleanDisplay`), so a spec with no overrides stays byte-identical to before.
+- Cascades: `removeObjects` (and everything that removes objects through `Spec.removeCascade`) removes the overrides of removed ids and lists them in `warnings`; `copyObjects` copies the overrides of copied points / links / shapes to the copies.
+- In the web: Properties › Display (`propsDisplay` in `js/stylepal.js`) calls them through `specEdit` (one Undo step).
 
 ## Lower-level functions from round 4c
 

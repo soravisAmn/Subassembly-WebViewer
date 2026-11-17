@@ -240,7 +240,7 @@ const Ops = (() => {
     }
     const pos = {};
     if (opts.pos) for (const [old, id] of pts) if (opts.pos[old]) pos[id] = opts.pos[old];
-    return { map, points: pts.map(x => x[1]), links, shapes, pos };
+    return { map, lmap, smap, points: pts.map(x => x[1]), links, shapes, pos };   // lmap / smap: old link / shape id -> copy (display overrides, round 10)
   }
   function mustDetach(def, P, names){
     if (def.type === "origin" || def.type === "external") return true;

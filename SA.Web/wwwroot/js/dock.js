@@ -13,6 +13,7 @@ const DockLayout = (() => {
     { id: "tree",      title: "Workspace",  home: "left",   on: true },
     { id: "scenarios", title: "Scenarios",  home: "left2",  on: true },
     { id: "props",     title: "Properties", home: "right",  on: true },
+    { id: "style",     title: "Style",      home: "right",  on: true },     // round 10: tabbed with Properties (Properties stays in front)
     { id: "code",      title: "Code",       home: "right",  on: false },    // opened by Ctrl+E
     { id: "msg",       title: "Messages",   home: "bottom", on: true },
     { id: "log",       title: "Log",        home: "bottom", on: true },
@@ -65,6 +66,7 @@ const Dock = typeof window === "undefined" || !window["dockview-core"] ? null : 
     else if (id === "logic") renderLogic();
     else if (id === "ai") renderAi();
     else if (id === "props") renderProps(true);
+    else if (id === "style") renderStylePal(true);
     else if (id === "tree") renderTree();
     else if (id === "scenarios") renderScenarios();
     else if (id === "main") render();
@@ -125,7 +127,7 @@ const Dock = typeof window === "undefined" || !window["dockview-core"] ? null : 
     try{
       api.addPanel({ id: "main", component: "main", title: "Workspace" });
       fixMain();
-      for (const p of DockLayout.PALETTES) if (p.on) add(p.id, p.home === "bottom" && p.id !== "msg");
+      for (const p of DockLayout.PALETTES) if (p.on) add(p.id, (p.home === "bottom" && p.id !== "msg") || p.id === "style");
       if (typeof ed !== "undefined" && ed.open) add("code");
     } finally { quiet--; }
     api.getPanel("main").api.setActive();

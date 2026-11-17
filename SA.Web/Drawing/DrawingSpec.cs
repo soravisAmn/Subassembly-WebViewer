@@ -21,6 +21,8 @@ public class DrawingSpec
     public SpecLogic? Logic { get; set; }                 // เงื่อนไข / decision / กิ่ง (รอบ 4 — ดู docs/prompts/prompt-4-design.md)
     public SpecSide? Side { get; set; }
     public bool Imported { get; set; }
+    // Web-only display data (round 10): style overrides, notes, dimensions. Never read by the generator; the raw spec JSON carries it into the .cs
+    public JsonElement? Display { get; set; }
 
     public static readonly JsonSerializerOptions Json = new()
     {

@@ -39,9 +39,9 @@ test("a tab in the grid / a floating group without its panel → default", () =>
 });
 
 console.log("palettes");
-test("palettes of prompt-9 §3, each with a View › Palettes toggle; Code is not in the default layout", () => {
+test("palettes of prompt-9 §3 + Style (round 10), each with a View › Palettes toggle; Code is not in the default layout", () => {
   const ids = DockLayout.PALETTES.map(p => p.id).join(",");
-  ok(ids === "tree,scenarios,props,code,msg,log,pts,logic,ai", ids);
+  ok(ids === "tree,scenarios,props,style,code,msg,log,pts,logic,ai", ids);
   for (const p of DockLayout.PALETTES) ok(Commands.get("pal." + p.id), "no toggle for " + p.id);
   ok(Commands.get("pal.reset"), "Reset layout");
   ok(!DockLayout.PALETTES.find(p => p.id === "code").on, "Code opens by Ctrl+E");

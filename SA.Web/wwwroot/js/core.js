@@ -25,8 +25,9 @@ function newId(prefix){ return (prefix || "s") + Math.random().toString(36).slic
 function defaultBar(){
   // snap = Grid snap (F9) ทีละ gridStep m · osOn = OSNAP ทั้งหมด (F3) · osnap = ชนิดที่เปิดอยู่
   // track = Object snap tracking (F11), trackMs = เวลาชี้ค้างเพื่อจับจุด · cen = Center (ศูนย์กลางโค้ง / polygon ด้านเท่า)
-  // aux = แสดง Auxiliary (ซ่อน = snap ไม่ได้ด้วย) · c3d = ดูแบบ Civil 3D (ซ่อน aux + ของที่ไม่ถูกส่งออก)
-  return { grid: true, snap: false, gridStep: 0.05, ortho: false, slopes: ["1:1.5", "1:2", "1:3"], slope: -1, osOn: true, track: false, trackMs: 500, aux: true, c3d: false,
+  // aux = แสดง Auxiliary (ซ่อน = snap ไม่ได้ด้วย) · c3d = ดูแบบ Civil 3D (ซ่อน aux + ของที่ไม่ถูกส่งออก, สีกลาง ไม่ใช้ style)
+  // style = ใช้ style by code (.style.json + override) · ปิด = สีอัตโนมัติ (round 10)
+  return { grid: true, snap: false, gridStep: 0.05, ortho: false, slopes: ["1:1.5", "1:2", "1:3"], slope: -1, osOn: true, track: false, trackMs: 500, aux: true, c3d: false, style: true,
            osnap: { end: true, mid: false, cen: true, int: true, surf: true, perp: false, near: false } };
 }
 // แสดง / snap / คลุมเลือก object auxiliary ได้ไหม (ปุ่ม Aux เปิด และไม่ได้อยู่ในโหมดดูแบบ Civil 3D)
@@ -153,7 +154,6 @@ let files = [], projFiles = [], opened = null;   // opened = {name, text, handle
 let asmRes = {};                                  // item id -> ผลจาก /api/assembly
 let resp = null, result = null;                   // ผลของ subassembly ที่เลือก ในรูปแบบเดิม (ใช้กับกรอบแดง / แถบโค้ด)
 let addMode = false, hoverPt = -1, drag = null, lastSegDown = null;
-const codeColor = {};
 
 // ---------------- workspace ----------------
 const WS = () => state.ws;
@@ -231,10 +231,10 @@ function el(tag, attrs, parent){
 // สีอ่านจาก workspace (ชุดสีมืดของ #center) ไม่ใช่จากธีมของหน้า
 let cssCache = null;
 const css = v => (cssCache ||= getComputedStyle(main)).getPropertyValue(v).trim();
+// automatic colour of a code: palette index from a stable hash of the name (js/style.js), same on every machine / session
 function colorFor(code){
   if (!code) return css("--l8");
-  if (!(code in codeColor)) codeColor[code] = PALETTE[Object.keys(codeColor).length % (PALETTE.length - 1)];
-  return css(codeColor[code]);
+  return css(PALETTE[Style.autoIndex(code)]);
 }
 const primaryCode = codes => codes.find(c => c !== "Datum") || codes[0] || "";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));

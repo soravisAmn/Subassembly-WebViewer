@@ -20,14 +20,14 @@ Round 9 shell (AutoCAD / Civil 3D style): title row + ribbon on top, dockable pa
 | **ไฟล์** (application button) | Import .cs, new .cs from template, Open / Save / Save as / New / Pack project, recent projects, Build, Export / Import scenarios, ตั้งค่า… |
 | **Quick Access** | Save project, Undo, Redo |
 | **Home** | Project (New, Open, Save, Save as, Pack) · Import (Import .cs, New .cs) · Assembly (Edit, New assembly, Add subassembly, Mirror) · Surface (Add point `A`, Reset surface) · Clipboard (Cut, Copy, Paste, Delete, Select all) |
-| **View** | Navigate (Fit `F`, Zoom selection `Z`) · Mode (Design / Civil 3D preview) · Show (Aux, Codes, Grid) · VE 1 / 2 / 5 · Scenario dropdown (same as clicking in Scenarios) · Palettes (one toggle per palette + Reset layout) |
+| **View** | Navigate (Fit `F`, Zoom selection `Z`) · Mode (Design / Civil 3D preview) · Show (Style, Aux, Codes, Grid; Style = style by code on / off, see [display.md](display.md)) · VE 1 / 2 / 5 · Scenario dropdown (same as clicking in Scenarios) · Palettes (one toggle per palette + Reset layout) |
 | **Output** | Build · Code (Edit code `Ctrl+E`, View generated code) · Scenarios (Export, Import) |
 | **AI** | Proposals (opens the AI palette, count badge) · Claude (เชื่อม Claude = the steps of [connect-claude.md](connect-claude.md), connection status) |
 | **Draw** (Edit) | Draw (Point `P`, Link `L`, Shape `S`, Polygon, Regular Polygon, Arc) · Surface (Slope to Surface, Follow Surface, Extend to Surface, Clipped Surface Link, Daylight Cut/Fill) · Construct (Intersect `I`, Offset `O`, Fillet, Array, Auxiliary `X`) |
 | **Modify** (Edit) | Move `M`, Copy `C`, Rotate `R`, Delete |
 | **Logic** (Edit) | Parameters (table in Properties), Variables (node in the Workspace tree), Conditions (Logic palette), Draw into branch `B`, ถ้าตัด / ถม (= Daylight Cut/Fill) |
 | **Finish** (right end of Draw / Modify / Logic) | Save (.cs) `Ctrl+S`, ออกจาก Edit |
-| Palettes | **Workspace** (tree) and **Scenarios** on the left · **Properties** on the right, **Code** opens as a tab next to it with `Ctrl+E` · **Messages / Log / Points / Logic / AI** as one tab group under the workspace (dark like the drawing; each says which subassembly it shows; counts on the tabs) |
+| Palettes | **Workspace** (tree) and **Scenarios** on the left · **Properties** on the right with **Style** as a tab behind it (round 10, [display.md](display.md)), **Code** opens as a tab next to it with `Ctrl+E` · **Messages / Log / Points / Logic / AI** as one tab group under the workspace (dark like the drawing; each says which subassembly it shows; counts on the tabs) |
 | Workspace (centre) | Cross-section (dark CAD-style background); no tab, cannot be closed or floated; palettes dock beside it, never on it |
 | Status bar | Mouse coordinates, Grid, Grid snap (F9), Ortho (F8), preset slopes, OSNAP (F3) + `▾` type menu, Aux, ดูแบบ Civil 3D, codes, VE, Fit, Claude status, server status |
 
@@ -74,7 +74,7 @@ No shortcut works while typing in a field / the code panel / a dialog. The web's
 | Key | Action |
 |---|---|
 | `Ctrl+Z` / `Ctrl+Y`, `Ctrl+Shift+Z` | Undo / Redo |
-| `Ctrl+S` | Save (.cs) during Edit / save the code panel |
+| `Ctrl+S` | Save (.cs) during Edit · outside Edit: the selected drawn item's `.cs` when it is unsaved (●) and the code panel has no focus · otherwise save the code panel |
 | `Ctrl+E` | Code panel |
 | `M` / `C` | Move / Copy |
 | `R` | Rotate (Edit mode) · while giving the angle: `C` = rotate a copy · `R` = Reference |

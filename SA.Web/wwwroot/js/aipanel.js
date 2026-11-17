@@ -75,7 +75,7 @@ function renderProposal(it, p, baseR, grp){
   for (const l of sp.links){
     const q = r.links[l.id]; if (!q || q.err || !q.path) continue;
     const c = color(l.id), aux = Spec.isAux(l);
-    line(q.path, c || (aux ? "#8b9098" : colorFor(primaryCode(l.codes))), aux ? "5 4" : "", c ? 3 : 2);
+    line(q.path, c || (aux ? "#8b9098" : resolveStyle("link", l.codes, ovrOf(sp, l.id)).color), aux ? "5 4" : "", c ? 3 : 2);
     if (c){ const m = q.path[q.path.length >> 1], n = q.path[(q.path.length >> 1) - 1] || m; label((X(m) + X(n)) / 2 + 4, (Y(m) + Y(n)) / 2 - 4, l.id, c); }
   }
   for (const pt of sp.points){

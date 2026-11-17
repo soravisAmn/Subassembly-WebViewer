@@ -44,7 +44,10 @@ document.addEventListener("keydown", e => {
   if (mod && !e.shiftKey && !e.altKey && (e.key === "s" || e.key === "S")){
     e.preventDefault();
     // Edit mode (ไม่ได้พิมพ์อยู่ในแถบโค้ดของไฟล์) = Save ส่วนที่วาดลง .cs
-    if (state.editing && !(ed.open && e.target.closest && e.target.closest("#ed") && ed.kind !== "generated")) saveDrawing(editItem());
+    const inEd = ed.open && e.target.closest && e.target.closest("#ed");
+    if (state.editing && !(inEd && ed.kind !== "generated")) saveDrawing(editItem());
+    // outside Edit (round 10, user answer 7): the selected drawn item's .cs when it is unsaved (●) and no code editor has focus
+    else if (!state.editing && !inEd && selItem() && drawingDirty(selItem()) && canSaveDrawing(selItem())) saveDrawing(selItem());
     else if (ed.open) saveNow();
     return;
   }

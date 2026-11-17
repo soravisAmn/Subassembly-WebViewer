@@ -58,7 +58,7 @@ Docs index: `README.md`. Topic docs are in `docs/`.
 
 - Last finished: round 9 (new UI shell: command registry `js/commands.js`, ribbon `js/ribbon.js`, dockable palettes `js/dock.js`), M0-M4. Docs: `docs/screen.md`. History: `docs/history.md`.
 - The user's projects are in `D:\test_cad\SA-Projects\` (SR03, rock-pitching-compare); none left at the repo root.
-- Round 8 Civil 3D checklist passed (whole-palette drag + Refresh Palette without duplicates, Thai text OK). Next: round 10 (web display: style by code, notes, dimensions, Civil 3D preview mode).
+- Round 8 Civil 3D checklist passed. In progress: round 10 (`prompt-10.md`, design `docs/prompts/prompt-10-design.md`): M0-M1 done (style by code, `js/style.js`, Style palette, overrides; `docs/display.md`); next M2 (dimensions, slope labels).
 - Project skills: `sa-spec-change`, `sa-civil3d-parity`, `sa-add-command` (in `.claude/skills/`). Generic agents `reviewer`, `test-runner` are user-level.
 - Civil 3D results of each round (round 6 shape link order, round 7 `.atc` DLL path): `docs/civil3d-testing.md`.
 - Not yet tested in real Civil 3D: the demo files listed in `docs/history.md`.

@@ -842,7 +842,7 @@ const Logic = (() => {
   }
   function removeObjects(spec, ids){
     return tx(spec, s => {
-      const gone = new Set(), want = asList(ids);
+      const gone = new Set(), want = asList(ids), ov0 = Object.keys((s.display && s.display.overrides) || {});
       for (const id of want){
         if (gone.has(id)) continue;
         const [k, x] = needObj(s, id);
@@ -850,7 +850,10 @@ const Logic = (() => {
         for (const g of Spec.removeCascade(s, k, id)) gone.add(g);
       }
       const extra = [...gone].filter(g => !want.includes(g));
-      return { result: [...gone], warnings: extra.length ? [`Also removed because they depended on it: ${extra.join(", ")}`] : [] };
+      const warnings = extra.length ? [`Also removed because they depended on it: ${extra.join(", ")}`] : [];
+      const lost = [...gone].filter(g => ov0.includes(g));
+      if (lost.length) warnings.push(`Display overrides removed with them: ${lost.join(", ")}`);
+      return { result: [...gone], warnings };
     });
   }
   // o.type: straight (default) | followSurface | arc3 (o.via) | arcR (o.radius, o.sweep, o.large)
@@ -966,7 +969,56 @@ const Logic = (() => {
       o = o || {};
       const c = Ops.clone(s, selection(s, ids), s, { pos: layoutPos(s).pts });
       moveFrag(s, c.points, o.dx, o.dy, o.convert);
+      // display overrides follow the copies (notes / dimensions do not: they belong to the original points)
+      const ov = s.display && s.display.overrides;
+      if (ov) for (const m of [c.map, c.lmap, c.smap]) for (const [from, to] of Object.entries(m || {})) if (ov[from] && typeof to === "string") ov[to] = JSON.parse(JSON.stringify(ov[from]));
       return { result: c.points, links: c.links, shapes: c.shapes, map: c.map };
+    });
+  }
+
+  // ---------- Display (round 10): per-object style overrides in spec.display.overrides ----------
+  // Web only: the generated C# ignores spec.display. An override is { link | shape | point: { field: value } }, merged field by field
+  // over the style of the object's code (js/style.js). Errors are in English (the AI uses these through MCP).
+  function setOverride(spec, id, patch){
+    return tx(spec, s => {
+      const [kind] = needObj(s, id);
+      if (!patch || typeof patch !== "object" || Array.isArray(patch)) fail(`patch must be { ${kind}: { field: value } }.`);
+      const keys = Object.keys(patch);
+      if (!keys.length) fail(`patch is empty. Use { ${kind}: { field: value } } (null removes a field) or clearOverride.`);
+      const SF = typeof Style !== "undefined" ? Style : null;
+      const d = s.display = s.display && typeof s.display === "object" ? s.display : {};
+      d.overrides = d.overrides || {};
+      const cur = d.overrides[id] = d.overrides[id] || {};
+      const k = cur[kind] = cur[kind] || {};
+      for (const key of keys){
+        if (key !== kind) fail(`${id} is a ${kind}: use { ${kind}: { ... } }, not ${key}.`);
+        const body = patch[key];
+        if (!body || typeof body !== "object" || Array.isArray(body)) fail(`${key} must be an object of fields.`);
+        for (const f of Object.keys(body)){
+          const v = body[f];
+          if (v === null){ delete k[f]; continue; }
+          const err = SF ? SF.checkField(kind, f, v) : null;
+          if (err) fail(`${id}: ${err}`);
+          // hatch merges field by field ({ pattern } keeps the code's colour / scale)
+          const cv = SF ? SF.cleanField(f, v) : v;          // store the cleaned value, never the raw input
+          if (f === "hatch" && k.hatch) k.hatch = { ...(typeof k.hatch === "object" ? k.hatch : { pattern: String(k.hatch).toUpperCase() }), ...cv };
+          else k[f] = JSON.parse(JSON.stringify(cv));
+        }
+      }
+      Spec.cleanDisplay(s);
+      return { result: id };
+    });
+  }
+  // kind: optional "link" | "shape" | "point" — omitted = every override of the object ("กลับไปใช้ ByCode")
+  function clearOverride(spec, id, kind){
+    return tx(spec, s => {
+      const [k] = needObj(s, id);
+      if (kind != null && kind !== k) fail(`${id} is a ${k}, not a ${kind}.`);
+      const ov = s.display && s.display.overrides;
+      const had = !!(ov && ov[id]);
+      if (had) delete ov[id];
+      Spec.cleanDisplay(s);
+      return { result: had };
     });
   }
 
@@ -1067,6 +1119,8 @@ const Logic = (() => {
     M("Objects", "addRotateGroup", "ids, pivot, angle", 3, "Rotation group (angle may be an expression). Points that cannot rotate are listed in warnings.", "Nothing can rotate"),
     M("Objects", "moveObjects", "ids, { dx, dy, convert? }", 2, "Move by dx, dy (right +, up +, Side = Right frame), keeping point meanings.", "Blocked points without convert"),
     M("Objects", "copyObjects", "ids, { dx, dy, convert? }", 2, "Copy, then move the copy. Returns the new points, links, shapes, map.", "Blocked points without convert"),
+    M("Display", "setOverride", "id, { link | shape | point: { field: value } }", 2, "Web-only style of one point / link / shape, merged field by field over the style of its code (like an object not using ByLayer). link: color, linetype solid | dashed | center | hidden, weight mm. shape: fill, alpha, hatch (SOLID, ANSI31, ANSI37, AR-CONC, EARTH, GRAVEL, NONE or { pattern, scale, angle, color }). point: marker square | circle | cross | triangle | none, color, size. null removes one field. Never reaches the generated C#.", "Missing id, field of another kind, bad value"),
+    M("Display", "clearOverride", "id, kind?", 2, "Back to ByCode: removes the override of the object (or only its kind).", "Missing id, wrong kind"),
     M("Tools", "addCutFill", "{ hinge, cut, fill, params, dir, … }", 1, "Daylight Cut/Fill. cut / fill = number x of 1:x, or text like a slope field: 1:1.5, 0.667, 2%, parameter name, expression.", "As the tool"),
     M("Tools", "addIntersect", "link1, link2, { trim, keep1, keep2, aux }", 3, "Intersect two straight links.", "Parallel, not straight"),
     M("Tools", "addOffset", "linkId, dist, side, { aux }", 4, "Parallel line: 2 points + link.", "Not straight, bad expression"),
@@ -1101,9 +1155,9 @@ const Logic = (() => {
   const API = { setClassName, setParamInfo, addCondition, editCondition, renameCondition, removeCondition, addDecision, editDecision, removeDecision, moveDecision,
                 addCase, editCase, removeCase, moveCase, renameBranch, setBranch, addVariable, editVariable, renameVariable, removeVariable, moveVariable,
                 addCutFill, addIntersect, addOffset, addExtendToGround, addFollowClipped, addArray, updateArray, rebuildArray, setArrayLoop, removeArray, addLastOf, setParamBounds, setParamUnit,
-                addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects };
+                addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride };
 
-  return { META, catalog, applyBatch, newSubassembly, setClassName, setParamInfo, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects,
+  return { META, catalog, applyBatch, newSubassembly, setClassName, setParamInfo, addParam, editParam, removeParam, addPoint: addPointOp, editPoint, setCodes, setAuxiliary, removeObjects, addLink: addLinkOp, editLink, addFillet, addShape: addShapeOp, addPolygon, addRegularPolygon, addRotateGroup, moveObjects, copyObjects, setOverride, clearOverride,
            RESERVED, nameError, freeCondName, toText, diffText,
            addCondition, editCondition, renameCondition, removeCondition,
            addDecision, editDecision, removeDecision, moveDecision,

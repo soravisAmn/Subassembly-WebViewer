@@ -10,11 +10,12 @@ D:\test_cad\SA-Projects\SR03\     ← any folder, any drive; move / copy / zip i
 ├─ pavement-assembly.cs           ← each .cs holds its own drawing (sa-spec)
 ├─ body_rock-pitching-web.cs
 ├─ base_rock-pitching-web.cs
+├─ SR03.style.json                ← style by code (round 10, optional; docs/display.md)
 ├─ lib\                           ← reserved for round 12 (objects copied from the library)
 └─ build\                         ← Build output (round 7), can be rebuilt
 ```
 
-- **The `.cs` is the only place a saved drawing lives.** The project file keeps file names, parameters, attachments, ground line, scenarios and bottom-bar values.
+- **The `.cs` is the only place a saved drawing lives.** The project file keeps file names, parameters, attachments, ground line, scenarios, bottom-bar values and `styleFile` (the style file it uses, relative path; written only after Save style / Open style file…; no key = `{name}.style.json` if it exists, else automatic colours).
 - **Drafts:** work that is not in a `.cs` yet is kept in the project file as `draft`, so nothing is lost: a drawing not saved to its `.cs` (●), a drawn item with no file yet, inline code from "เปิดจากเครื่อง…". Opening restores the ● state; Save (.cs) clears it.
 - **Paths are relative to the project file** (`pavement.cs`, `lib\x.cs`, `..\shared\x.cs`); no `D:\…` is written. A file outside the folder is allowed (Pack copies it in).
 - **Machine values are not in the project**: Copy-to, Civil 3D install folder, recent projects, start folder (app settings, below), window / panel layout (browser).
@@ -56,12 +57,15 @@ Version 1 / 2 files (with drawings embedded) open and are converted; the title s
 
 On open, every referenced file that is missing is listed: what happens without it (empty frame, or "วาดต่อได้" when there is a draft), **"หาไฟล์ใหม่…"** (web file dialog; the new path is stored relative to the project file, outside the folder allowed) and **"เปิดต่อ"** (always opens). An item with a draft can keep working; Save (.cs) recreates the file.
 
+The project's **style file** (`styleFile`, round 10) is listed too when it is missing ("Style … ใช้สีอัตโนมัติจนกว่าจะหาไฟล์เจอ"): the project opens with automatic colours, and "หาไฟล์ใหม่…" points the project at another `*.style.json`.
+
 ## Pack project
 
 One zip to take the project elsewhere (like eTransmit):
 
 - the project file (scenarios and drafts included), every referenced `.cs` (+ a `.png` with the same name beside it), `lib\`, and `build\` only when ticked (off by default);
 - files referenced from **outside** the project folder are copied into `ext\` and their paths are rewritten **in the zip only** (yellow in the dialog); the open project is not changed; missing files are listed in red and skipped;
+- the style file: inside the folder it keeps its path; outside (e.g. a shared template) it is copied to `ext\` and `styleFile` is rewritten in the zip only; with no `styleFile` key, a `{name}.style.json` beside the project file goes in too;
 - unsaved drawings (●): "Save (.cs) ทั้งหมดก่อน", or pack them as drafts;
 - default name `name_yyyy-mm-dd.zip`, saved where you choose (web file dialog). Inside the zip everything is under `name\`.
 - The web does not open a zip: unzip, then Open project.
@@ -82,6 +86,6 @@ Test cases of the project (left panel), saved in the project file.
 
 - `SA.Web/Projects/`: `ProjectPaths` (resolution), `ProjectFile` (v1 / v2 → v3, drafts, validation, Save-as rebase), `ProjectRegistry` (per-tab handles), `ProjectApi` (endpoints), `ProjectPack` (zip).
 - Every `/api/` request carries the tab's handle in the header `X-SA-Project` (`js/core.js` wraps `fetch`). A request without it uses the old fixed folder `SubassemblyFolder` (only old pages send that). After a server restart the page re-opens its project by path (`409 projectLost`).
-- Endpoints: `GET /api/fs/list` · `POST /api/project/open | new | save | scratch | close | relink | pack` · `GET/POST /api/settings`. Files in a request resolve against the tab's project folder; subfolders are allowed, `..` only for files the project file references; no delete endpoint.
+- Endpoints: `GET /api/fs/list` · `POST /api/project/open | new | save | scratch | close | relink | pack` · `GET/POST /api/settings` · `GET /api/style?file=` / `POST /api/style/save {file, text}` (round 10: only `*.style.json`, same path rules as the `.cs` files, valid JSON object only, refused in a read-only tab or without a project file; `relink` also accepts a `.style.json`). Files in a request resolve against the tab's project folder; subfolders are allowed, `..` only for files the project file references; no delete endpoint.
 - Page: `js/project.js` (`ProjectV3`, start-up, dialogs, Pack) and `js/scenarios.js` (`Scen`).
 - `SA_STUDIO_MACHINE_DIR` (environment) = another machine folder, for a test server that must not touch the real settings.

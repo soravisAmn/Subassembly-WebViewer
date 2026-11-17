@@ -117,8 +117,27 @@ const Spec = (() => {
   }
   // construction (รุ่นก่อน) -> auxiliary — แก้ในที่ คืน spec เดิม (เรียกซ้ำได้)
   //   Max / Min (รอบ 4b ถูกเอาออกในรอบ 4c) -> ตัดทิ้ง จุดใช้ตำแหน่งตามนิยามเดิม · dropped = รายการจุดที่ถูกตัด (ไว้แจ้งผู้ใช้)
+  // spec.display (round 10, web only): written only when it holds something, so a spec without annotations / overrides stays as before
+  function cleanDisplay(spec){
+    const d = spec.display;
+    if (!d || typeof d !== "object" || Array.isArray(d)){ if ("display" in spec) delete spec.display; return spec; }
+    const ov = d.overrides;
+    if (ov && typeof ov === "object" && !Array.isArray(ov)){
+      for (const id of Object.keys(ov)){
+        const e = ov[id];
+        if (!e || typeof e !== "object"){ delete ov[id]; continue; }
+        for (const k of Object.keys(e)) if (!e[k] || typeof e[k] !== "object" || !Object.keys(e[k]).length) delete e[k];
+        if (!Object.keys(e).length) delete ov[id];
+      }
+      if (!Object.keys(ov).length) delete d.overrides;
+    } else if ("overrides" in d) delete d.overrides;
+    for (const k of ["notes", "dims", "slopes"]) if (k in d && (!Array.isArray(d[k]) || !d[k].length)) delete d[k];
+    if (!Object.keys(d).length) delete spec.display;
+    return spec;
+  }
   function normalize(spec, dropped){
     if (!spec) return spec;
+    cleanDisplay(spec);
     for (const o of (spec.points || []).concat(spec.links || []))
       if ("construction" in o){ if (o.construction) o.auxiliary = true; delete o.construction; }
     for (const p of spec.points || []) if ("limit" in p){ delete p.limit; if (dropped) dropped.push(p.id); }
@@ -1135,6 +1154,11 @@ const Spec = (() => {
       for (const g of spec.rotations) g.points = g.points.filter(p => !gone.points.has(p));
       spec.rotations = spec.rotations.filter(g => g.points.length && !gone.points.has(g.pivot));
     }
+    // display overrides of what is gone go too (notes / dimensions of removed points: round 10 M2)
+    if (spec.display && spec.display.overrides){
+      for (const id of [...gone.points, ...gone.links, ...gone.shapes]) delete spec.display.overrides[id];
+      cleanDisplay(spec);
+    }
     return [...gone.points, ...gone.links, ...gone.shapes];
   }
   // ชื่อที่จะลบไปด้วยถ้าลบ id นี้ (ใช้ถามก่อนลบ)
@@ -1569,7 +1593,7 @@ const Spec = (() => {
 
   return { setParamBounds, paramBoundsIssue, exprOpts, caseMatch, branchLabel, offLabel, branchChain, branchRisks, freeName, addIf, addCutFill, branchObjects, condUses, renameCond, decisionTree, removeDecision, POINT_TYPES, MEASURES, EXPR_FIELDS, LINK_TYPES, LINK_EXPR_FIELDS, ARC_TYPES, SEG_DEFAULT, SEG_MIN, SEG_MAX, isArc,
            newSpec, specForImported, evaluate, makeGround, projectSeg, lineX, refs, linkEnds, linkRefs, byId,
-           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, SIDE_OPTIONS, paramOptions, optionsText, parseOptions, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, addLastOf, arraySetPoint, withI, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cascadePreview, dependsOn,
+           UNITS, unitOf, fmtUnit, fmtParam, parseUnitValue, setParamUnit, SIDE_OPTIONS, paramOptions, optionsText, parseOptions, slopeRead, slopeWrite, slopeMagnitude, LOOP_MAX, LOOP_DEFAULT, LOOP_ROUND, addLastOf, arraySetPoint, withI, isAux, isAuxPoint, isAlias, auxEnd, GROUND_OFF, addExtendToGround, addFollowClipped, clipPath, addArray, updateArray, rebuildArray, arrayOf, normalize, auxPlan, applyAux, nextId, names, addPoint, addLink, findLink, addShape, removeCascade, cleanDisplay, cascadePreview, dependsOn,
            chainOrder, walkShape, polygonVertexDefs, addPolygon, updatePolygon, rebuildPolygon, polygonOf,
            tangentPoint, arcGeom, segCount, arcPoints, addFillet, addIntersect, addOffset, exprSlots, rotatePt, rotationOf, addRotation };
 })();
